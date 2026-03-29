@@ -55,25 +55,22 @@ function createReelTexture(symbolOrder: SlotSymbol[]): THREE.CanvasTexture {
     ctx.beginPath(); ctx.moveTo(32, y + 2); ctx.lineTo(W - 32, y + 2); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(32, y + cellH - 2); ctx.lineTo(W - 32, y + cellH - 2); ctx.stroke();
 
-    // Radial glow
-    const glow = ctx.createRadialGradient(CX, y + cellH / 2, 32, CX, y + cellH / 2, 400);
-    glow.addColorStop(0, sym.color + "88");
-    glow.addColorStop(0.4, sym.color + "33");
+    // Subtle radial glow
+    const glow = ctx.createRadialGradient(CX, y + cellH / 2, 32, CX, y + cellH / 2, 350);
+    glow.addColorStop(0, sym.color + "22");
+    glow.addColorStop(0.5, sym.color + "08");
     glow.addColorStop(1, "transparent");
     ctx.fillStyle = glow;
     ctx.fillRect(0, y, W, cellH);
 
-    // Draw symbol
+    // Draw symbol — no shadow blur, crisp rendering
     ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     if (sym.name === "Covrd") {
       ctx.font = "900 320px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.shadowColor = sym.glowColor;
-      ctx.shadowBlur = 80;
       ctx.fillStyle = "#FFD700";
       ctx.fillText("C", CX, y + cellH / 2);
-      ctx.shadowBlur = 40;
       ctx.beginPath();
       ctx.arc(CX, y + cellH / 2, 200, 0, Math.PI * 2);
       ctx.lineWidth = 8;
@@ -86,35 +83,21 @@ function createReelTexture(symbolOrder: SlotSymbol[]): THREE.CanvasTexture {
       ctx.stroke();
     } else if (sym.name === "Seven") {
       ctx.font = "900 360px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.shadowColor = sym.glowColor;
-      ctx.shadowBlur = 60;
       ctx.fillStyle = sym.color;
       ctx.fillText("7", CX, y + cellH / 2);
-      ctx.shadowBlur = 30;
-      ctx.strokeStyle = sym.color + "99";
-      ctx.lineWidth = 5;
+      ctx.strokeStyle = "#FFFFFF44";
+      ctx.lineWidth = 4;
       ctx.strokeText("7", CX, y + cellH / 2);
-      ctx.font = "700 100px sans-serif";
-      ctx.fillStyle = sym.color + "88";
-      ctx.fillText("$", CX, y + cellH / 2 + 180);
     } else {
       ctx.font = "320px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.shadowColor = sym.glowColor;
-      ctx.shadowBlur = 60;
       ctx.fillText(sym.emoji, CX, y + cellH / 2);
     }
     ctx.restore();
 
-    // Neon box border
+    // Thin border
     ctx.save();
-    ctx.shadowColor = sym.color;
-    ctx.shadowBlur = 20;
-    ctx.strokeStyle = sym.color + "50";
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = sym.color + "20";
+    ctx.lineWidth = 2;
     ctx.strokeRect(50, y + 40, W - 100, cellH - 80);
     ctx.restore();
   });
