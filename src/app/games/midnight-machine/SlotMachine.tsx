@@ -148,6 +148,19 @@ class Reel {
 
     const geo = new THREE.CylinderGeometry(1.05, 1.05, 1.15, 48, 1, true);
     const tex = createReelTexture(this.order);
+    tex.repeat.set(1, 1);
+    tex.offset.set(0, 0);
+
+    // Fix UV mapping: the cylinder wraps the texture around circumference
+    // We need the texture to wrap vertically (around the reel)
+    const uvAttr = geo.getAttribute("uv");
+    for (let i = 0; i < uvAttr.count; i++) {
+      const u = uvAttr.getX(i);
+      const v = uvAttr.getY(i);
+      // Swap: use the circumference angle (u) as the vertical scroll axis
+      uvAttr.setXY(i, v, u);
+    }
+    uvAttr.needsUpdate = true;
 
     const mat = new THREE.MeshStandardMaterial({
       map: tex,
