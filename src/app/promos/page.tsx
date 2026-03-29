@@ -112,14 +112,14 @@ export default function PromosPage() {
     setIsSpinning(true);
     if (spinRef.current) clearTimeout(spinRef.current);
 
-    const totalSpins = 15 + Math.floor(Math.random() * 10);
+    const totalSpins = 20 + Math.floor(Math.random() * 10);
     let count = 0;
     const w = containerWidth.current || 380;
 
     const doTick = () => {
       count++;
       const progress = count / totalSpins;
-      const duration = 80 + Math.pow(progress, 2.5) * 500;
+      const duration = 30 + Math.pow(progress, 3) * 600;
       setSnapDuration(duration);
 
       setIsSnapping(false);
@@ -141,12 +141,12 @@ export default function PromosPage() {
             return;
           }
 
-          spinRef.current = setTimeout(doTick, 30);
+          spinRef.current = setTimeout(doTick, 10);
         }, duration);
       });
     };
 
-    spinRef.current = setTimeout(doTick, 50);
+    spinRef.current = setTimeout(doTick, 10);
   };
 
   useEffect(() => {
