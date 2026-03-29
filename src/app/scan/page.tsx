@@ -9,6 +9,7 @@ export default function ScanPage() {
   const [cameraError, setCameraError] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [screenSize, setScreenSize] = useState({ w: 430, h: 932 });
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -19,10 +20,10 @@ export default function ScanPage() {
 
   // Center the box on mount
   useEffect(() => {
-    setPos({
-      x: (window.innerWidth - boxSize) / 2,
-      y: (window.innerHeight - boxSize) / 2,
-    });
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    setScreenSize({ w, h });
+    setPos({ x: (w - boxSize) / 2, y: (h - boxSize) / 2 });
   }, []);
 
   useEffect(() => {
@@ -140,9 +141,6 @@ export default function ScanPage() {
     window.addEventListener("mouseup", onUp);
   };
 
-  const cx = pos.x + boxSize / 2;
-  const cy = pos.y + boxSize / 2;
-
   return (
     <>
       <style>{`html, body { background: #000000 !important; }`}</style>
@@ -172,8 +170,8 @@ export default function ScanPage() {
             background: "rgba(50, 50, 50, 0.08)",
             backdropFilter: "blur(12px) saturate(200%)",
             WebkitBackdropFilter: "blur(12px) saturate(200%)",
-            WebkitMaskImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${window?.innerWidth || 430}' height='${window?.innerHeight || 932}'%3E%3Cdefs%3E%3Cmask id='m'%3E%3Crect width='100%25' height='100%25' fill='white'/%3E%3Crect x='${pos.x}' y='${pos.y}' width='${boxSize}' height='${boxSize}' rx='20' fill='black'/%3E%3C/mask%3E%3C/defs%3E%3Crect width='100%25' height='100%25' mask='url(%23m)'/%3E%3C/svg%3E")`,
-            maskImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${window?.innerWidth || 430}' height='${window?.innerHeight || 932}'%3E%3Cdefs%3E%3Cmask id='m'%3E%3Crect width='100%25' height='100%25' fill='white'/%3E%3Crect x='${pos.x}' y='${pos.y}' width='${boxSize}' height='${boxSize}' rx='20' fill='black'/%3E%3C/mask%3E%3C/defs%3E%3Crect width='100%25' height='100%25' mask='url(%23m)'/%3E%3C/svg%3E")`,
+            WebkitMaskImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${screenSize.w}' height='${screenSize.h}'%3E%3Cdefs%3E%3Cmask id='m'%3E%3Crect width='100%25' height='100%25' fill='white'/%3E%3Crect x='${pos.x}' y='${pos.y}' width='${boxSize}' height='${boxSize}' rx='20' fill='black'/%3E%3C/mask%3E%3C/defs%3E%3Crect width='100%25' height='100%25' mask='url(%23m)'/%3E%3C/svg%3E")`,
+            maskImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${screenSize.w}' height='${screenSize.h}'%3E%3Cdefs%3E%3Cmask id='m'%3E%3Crect width='100%25' height='100%25' fill='white'/%3E%3Crect x='${pos.x}' y='${pos.y}' width='${boxSize}' height='${boxSize}' rx='20' fill='black'/%3E%3C/mask%3E%3C/defs%3E%3Crect width='100%25' height='100%25' mask='url(%23m)'/%3E%3C/svg%3E")`,
             maskSize: "100% 100%",
             WebkitMaskSize: "100% 100%",
             zIndex: 1,
