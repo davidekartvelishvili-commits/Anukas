@@ -14,12 +14,15 @@ export default function MidnightMachinePage() {
   const [result, setResult] = useState<SpinResult | null>(null);
   const [showWin, setShowWin] = useState(false);
   const [payoutOpen, setPayoutOpen] = useState(false);
+  const [showBetPicker, setShowBetPicker] = useState(true);
+  const [betAmount, setBetAmount] = useState(0);
+  const BET_OPTIONS = [0.25, 0.5, 1, 2.5, 5, 10];
 
   const handleSpin = useCallback(async () => {
-    if (isSpinning || balance < BET_COST) return;
+    if (isSpinning || betAmount <= 0 || balance < betAmount) return;
 
     setIsSpinning(true);
-    setBalance((b) => b - BET_COST);
+    setBalance((b) => b - betAmount);
     setResult(null);
     setShowWin(false);
 
@@ -45,9 +48,9 @@ export default function MidnightMachinePage() {
       }, 3300);
     } catch {
       setIsSpinning(false);
-      setBalance((b) => b + BET_COST);
+      setBalance((b) => b + betAmount);
     }
-  }, [isSpinning, balance]);
+  }, [isSpinning, balance, betAmount]);
 
   function spawnParticles(count: number) {
     const colors = ["#FFD700", "#FF6D00", "#FF3D00", "#FFAB00", "#fff"];
@@ -107,22 +110,7 @@ export default function MidnightMachinePage() {
           </svg>
         </button>
 
-        <div className="bg-white/[0.08] backdrop-blur-2xl border border-white/10 rounded-[22px] px-5 py-2 flex flex-col items-center gap-0.5">
-          <div className="flex items-center gap-1.5 font-bold text-[17px] text-white" style={{ fontFamily: "var(--font-outfit)" }}>
-            <span className="text-[16px]">₾</span>
-            {BET_COST}
-          </div>
-          <span className="text-[10px] text-white/40 font-medium uppercase tracking-wider" style={{ fontFamily: "var(--font-dm-sans)" }}>
-            Per Spin
-          </span>
-        </div>
-
-        <button
-          onClick={() => setPayoutOpen(!payoutOpen)}
-          className="w-9 h-9 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-white/60 text-[15px] font-semibold backdrop-blur-lg active:scale-[0.95] transition-transform"
-        >
-          i
-        </button>
+        <div className="w-9" />
       </div>
 
       {/* Payout table */}
@@ -164,7 +152,7 @@ export default function MidnightMachinePage() {
       </div>
 
       {/* Bottom UI */}
-      <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center z-10 gap-2.5 pointer-events-none" style={{ paddingBottom: "max(20px, calc(env(safe-area-inset-bottom, 0px) + 12px))" }}>
+      <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center z-10 gap-3 pointer-events-none" style={{ paddingBottom: "max(20px, calc(env(safe-area-inset-bottom, 0px) + 12px))" }}>
         {/* Result text */}
         <div
           className={`text-[15px] font-bold text-yellow-400 min-h-[24px] text-center transition-all duration-300 ${
@@ -183,33 +171,95 @@ export default function MidnightMachinePage() {
             : ""}
         </div>
 
-        {/* Spin button */}
-        <button
-          onClick={handleSpin}
-          disabled={isSpinning || balance < BET_COST}
-          className="pointer-events-auto px-[72px] py-[15px] rounded-full text-[19px] font-black tracking-wide transition-all duration-150 disabled:bg-[#3a3a4a] disabled:text-[#777] disabled:cursor-not-allowed active:scale-[0.97]"
-          style={{
-            background: isSpinning ? "#3a3a4a" : "#FFE135",
-            color: isSpinning ? "#777" : "#1a1a2e",
-            boxShadow: isSpinning ? "none" : "0 4px 24px rgba(255,225,53,0.25), inset 0 1px 0 rgba(255,255,255,0.3)",
-            fontFamily: "var(--font-outfit)",
-          }}
-        >
-          {isSpinning ? "Spinning..." : "Spin"}
-        </button>
+        {/* Pick amount label */}
+        {showBetPicker && (
+          <p className="text-white/50 text-[14px] font-medium pointer-events-none" style={{ fontFamily: "var(--font-dm-sans)" }}>
+            Pick amount to play
+          </p>
+        )}
 
-        {/* Balance bar */}
-        <div className="pointer-events-auto flex items-center gap-3 w-full max-w-[380px] justify-center px-5">
-          <div className="flex items-center gap-2 bg-white/[0.06] border border-white/10 rounded-[30px] px-4 py-2 backdrop-blur-lg">
-            <div className="flex flex-col items-center">
-              <span className="text-[11px] text-white/40" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                Balance{" "}
-                <span className="text-white font-bold">
-                  {balance.toLocaleString("en-US", { maximumFractionDigits: 2 })} ₾
-                </span>
-              </span>
-            </div>
+        {/* Bet picker pills */}
+        {showBetPicker && (
+          <div className="pointer-events-auto flex gap-2.5 overflow-x-auto px-4 pb-1 scrollbar-hide w-full max-w-[420px]">
+            {BET_OPTIONS.map((amt) => (
+              <button
+                key={amt}
+                onClick={() => { setBetAmount(amt); setShowBetPicker(false); }}
+                className="shrink-0 px-8 py-5 rounded-full text-[20px] font-bold active:scale-[0.95] transition-transform"
+                style={{
+                  background: "#FFE135",
+                  color: "#1a1a2e",
+                  fontFamily: "var(--font-outfit)",
+                }}
+              >
+                {amt}
+              </button>
+            ))}
           </div>
+        )}
+
+        {/* Spin button (after bet selected) */}
+        {!showBetPicker && betAmount > 0 && (
+          <button
+            onClick={handleSpin}
+            disabled={isSpinning || balance < betAmount}
+            className="pointer-events-auto px-12 py-6 rounded-full text-[19px] font-black tracking-wide transition-all duration-150 disabled:bg-[#3a3a4a] disabled:text-[#777] disabled:cursor-not-allowed active:scale-[0.97]"
+            style={{
+              background: isSpinning ? "#3a3a4a" : "#FFE135",
+              color: isSpinning ? "#777" : "#1a1a2e",
+              boxShadow: isSpinning ? "none" : "0 4px 24px rgba(255,225,53,0.25), inset 0 1px 0 rgba(255,255,255,0.3)",
+              fontFamily: "var(--font-outfit)",
+            }}
+          >
+            {isSpinning ? "Spinning..." : "Spin"}
+          </button>
+        )}
+
+        {/* Bottom bar: wallet + balance + info */}
+        <div className="pointer-events-auto flex items-center gap-3 w-full max-w-[420px] justify-between px-4">
+          {/* Wallet icon */}
+          <div className="w-[48px] h-[48px] rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <rect x="2" y="5" width="18" height="14" rx="3" fill="#1a1a2e" stroke="#FFE135" strokeWidth="1.5" />
+              <circle cx="15" cy="12" r="2" fill="#FFE135" />
+            </svg>
+          </div>
+
+          {/* Balance center */}
+          <button
+            onClick={() => setShowBetPicker(true)}
+            className="flex flex-col items-center gap-0.5 bg-white/[0.06] border border-white/10 rounded-[30px] px-5 py-2 backdrop-blur-lg active:scale-[0.97] transition-transform"
+          >
+            {betAmount > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
+                  ₾ {betAmount}
+                </span>
+                <span className="text-white/30 text-[13px]">&rsaquo;</span>
+              </div>
+            )}
+            <span className="text-[11px] text-white/40" style={{ fontFamily: "var(--font-dm-sans)" }}>
+              {betAmount > 0 ? "Balance " : "Pick amount to play"}
+              {betAmount > 0 && (
+                <span className="text-white font-bold">
+                  {balance.toLocaleString("en-US", { maximumFractionDigits: 1 })}
+                </span>
+              )}
+            </span>
+          </button>
+
+          {/* Info icon */}
+          <button
+            onClick={() => setPayoutOpen(!payoutOpen)}
+            className="w-[48px] h-[48px] rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+            style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)" }}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="9" r="7.5" opacity="0.5" />
+              <path d="M9 12.5V8.5" />
+              <circle cx="9" cy="6" r="0.5" fill="white" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
