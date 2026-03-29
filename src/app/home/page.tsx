@@ -113,6 +113,7 @@ export default function HomePage() {
   const countdown = useCountdown(15.58);
 
   useEffect(() => {
+    setActiveTab(0);
     const saved = localStorage.getItem("user-gender");
     if (saved) setGender(saved);
     const t = setTimeout(() => setMounted(true), 50);
