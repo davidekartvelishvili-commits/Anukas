@@ -154,48 +154,38 @@ export default function PromosPage() {
   }, []);
 
   const renderCardContent = (deal: typeof allDeals[0], blur = false) => (
-    <div style={{ filter: blur ? "blur(12px)" : "none", transition: "filter 0.5s ease-out" }}>
-      <div className="mb-3 h-[22px]">
-        {deal.exclusive && (
-          <span
-            className="inline-block px-2.5 py-1 rounded-full text-[11px] font-bold"
-            style={{ background: "#C5E84D", color: "#1A1A1A", fontFamily: "var(--font-dm-sans)" }}
-          >
-            Exclusive
-          </span>
-        )}
-      </div>
-      <div className="flex items-end justify-between">
-        <div className="flex-1">
-          <h2 className="text-[22px] font-bold mb-1" style={{ fontFamily: "var(--font-outfit)", color: deal.textColor }}>
-            {deal.merchant}
-          </h2>
-          <p className="text-[14px] mb-4" style={{ color: deal.textColor === "#FFFFFF" ? "rgba(255,255,255,0.7)" : "rgba(26,26,26,0.7)", fontFamily: "var(--font-dm-sans)" }}>
-            {deal.description}
-          </p>
-          <div className="flex items-center gap-1 mb-2">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={deal.textColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 12V4M5 7l3-3 3 3" />
-            </svg>
-            <span className="text-[28px] font-bold" style={{ fontFamily: "var(--font-outfit)", color: deal.textColor }}>
-              {deal.rate}%
-            </span>
-          </div>
-          <CountdownText
-            seconds={deal.endsIn}
-            className="text-[32px] font-bold"
-            style={{ fontFamily: "var(--font-outfit)", letterSpacing: "1px", color: deal.textColor }}
-          />
-        </div>
-        <div className="w-[80px] h-[80px] rounded-[16px] shrink-0 ml-4 overflow-hidden flex items-center justify-center" style={{ background: deal.image ? "#FFFFFF" : deal.color }}>
+    <div className="flex flex-col h-full min-h-[180px]" style={{ filter: blur ? "blur(12px)" : "none", transition: "filter 0.5s ease-out" }}>
+      {/* Top: logo + name */}
+      <div className="flex items-center gap-3 mb-auto">
+        <div className="w-[48px] h-[48px] rounded-[12px] overflow-hidden flex items-center justify-center shrink-0" style={{ background: deal.image ? "#FFFFFF" : deal.color }}>
           {deal.image ? (
             <img src={deal.image} alt={deal.merchant} className="w-[80%] h-[80%] object-contain" />
           ) : (
-            <span className="text-white text-[24px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
+            <span className="text-white text-[20px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
               {deal.merchant.charAt(0)}
             </span>
           )}
         </div>
+        <h2 className="text-[20px] font-bold" style={{ fontFamily: "var(--font-outfit)", color: deal.textColor }}>
+          {deal.merchant}
+        </h2>
+      </div>
+
+      {/* Bottom: % left, countdown right */}
+      <div className="flex items-end justify-between mt-4">
+        <div className="flex items-center gap-1">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke={deal.textColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 12V4M5 7l3-3 3 3" />
+          </svg>
+          <span className="text-[32px] font-bold" style={{ fontFamily: "var(--font-outfit)", color: deal.textColor }}>
+            {deal.rate}%
+          </span>
+        </div>
+        <CountdownText
+          seconds={deal.endsIn}
+          className="text-[24px] font-bold"
+          style={{ fontFamily: "var(--font-outfit)", letterSpacing: "1px", color: deal.textColor }}
+        />
       </div>
     </div>
   );
