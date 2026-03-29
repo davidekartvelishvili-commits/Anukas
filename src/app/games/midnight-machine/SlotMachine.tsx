@@ -130,7 +130,7 @@ class Reel {
   constructor(scene: THREE.Scene, xPos: number, delay: number, idx: number) {
     this.delay = delay;
     this.idx = idx;
-    this.dur = 2200 + delay;
+    this.dur = 5500 + delay;
     this.order = shuffleArray(SYMBOLS);
 
     const geo = new THREE.CylinderGeometry(1.05, 1.05, 1.15, 48, 1, true);
@@ -191,7 +191,7 @@ class Reel {
     this.settled = false;
     this.spinStart = performance.now();
     this.stOff = this.curOff;
-    const extraSpins = 3 + this.idx + Math.random() * 1.5;
+    const extraSpins = 8 + this.idx * 2 + Math.random() * 2;
     this.tgtOff = this.stOff + extraSpins + this.tgtIdx / this.order.length;
   }
 
@@ -267,6 +267,7 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
     isDragging: boolean;
     dragPrev: { x: number; y: number };
     dragVel: { x: number; y: number };
+    targetCamZ: number;
   } | null>(null);
 
   const prevTrigger = useRef(0);
@@ -394,6 +395,7 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
       isDragging: false,
       dragPrev: { x: 0, y: 0 },
       dragVel: { x: 0, y: 0 },
+      targetCamZ: 10.5,
     };
     sceneRef.current = state;
 
@@ -496,6 +498,9 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
       state.machineGroup.rotation.x = state.rotX;
       state.machineGroup.rotation.y = state.rotY;
 
+      // Smooth camera zoom
+      state.camera.position.z += (state.targetCamZ - state.camera.position.z) * 0.03;
+
       // Pulse lights
       state.purpleLight.intensity = 2 + Math.sin(now * 0.0018) * 0.4;
       state.cyanLight.intensity = 2 + Math.cos(now * 0.0018) * 0.4;
@@ -553,16 +558,16 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
       reel.spin(targetSymbols[i]);
     });
 
-    // ~1.5s before stop: zoom camera closer
+    // After 3s: smoothly zoom in to watch wheels stop
     setTimeout(() => {
-      state.camera.position.z = 8;
-    }, 1800);
+      state.targetCamZ = 7;
+    }, 3000);
 
-    // After animation completes
+    // After animation completes (~7s)
     setTimeout(() => {
       state.isSpinning = false;
-      // Zoom back out
-      state.camera.position.z = 10.5;
+      // Smoothly zoom back out
+      state.targetCamZ = 10.5;
 
       // Flash neon
       let flashCount = 0;
@@ -587,7 +592,7 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
         winType: "none", // Parent determines this from API response
         winAmount: 0,
       });
-    }, 3300);
+    }, 6500);
   }, [spinTrigger, targetSymbols, onSpinStart, onSpinEnd]);
 
   return (

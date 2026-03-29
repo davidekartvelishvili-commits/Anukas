@@ -49,7 +49,7 @@ export default function MidnightMachinePage() {
           setShowNoLuck(true);
           setTimeout(() => setShowNoLuck(false), 4000);
         }
-      }, 3300);
+      }, 6500);
     } catch {
       setIsSpinning(false);
       setBalance((b) => b + betAmount);
