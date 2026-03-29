@@ -15,7 +15,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Covrd — Smart Cashback",
+  title: "BackApp — Smart Cashback",
   description: "Get cashback on every purchase",
   viewport: {
     width: "device-width",
