@@ -78,6 +78,7 @@ function BottomFace() {
 export default function MysteryBoxPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(false);
 
   const rotX = useRef(-15);
   const rotY = useRef(0);
@@ -273,6 +274,7 @@ export default function MysteryBoxPage() {
             style={{ paddingBottom: "max(40px, calc(env(safe-area-inset-bottom, 0px) + 24px))" }}
           >
             <button
+              onClick={() => setShowComingSoon(true)}
               className="flex-1 py-5 rounded-full active:scale-[0.97] transition-transform"
               style={{ background: "#000000" }}
             >
@@ -306,7 +308,58 @@ export default function MysteryBoxPage() {
         </div>
       </main>
 
+      {/* Coming Soon Popup */}
+      {showComingSoon && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          onClick={() => setShowComingSoon(false)}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative rounded-[20px] px-8 py-10 flex flex-col items-center max-w-[320px] w-full"
+            style={{
+              background: "rgba(50, 50, 50, 0.08)",
+              backdropFilter: "blur(12px) saturate(200%)",
+              WebkitBackdropFilter: "blur(12px) saturate(200%)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              animation: "fadeIn 0.2s ease-out",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="text-[40px] mb-4">🚀</span>
+            <h3
+              className="text-white text-[20px] font-bold text-center mb-2"
+              style={{ fontFamily: "var(--font-outfit)" }}
+            >
+              Coming Soon
+            </h3>
+            <p
+              className="text-[#999] text-[14px] text-center mb-6"
+              style={{ fontFamily: "var(--font-dm-sans)" }}
+            >
+              This feature is coming soon
+            </p>
+            <button
+              onClick={() => setShowComingSoon(false)}
+              className="px-10 py-3 rounded-full active:scale-[0.95] transition-transform"
+              style={{ background: "#000000" }}
+            >
+              <span
+                className="text-white text-[15px] font-bold"
+                style={{ fontFamily: "var(--font-outfit)" }}
+              >
+                OK
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
       <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
+        }
         @keyframes sparkle {
           0%, 100% { opacity: 0; transform: scale(0); }
           50% { opacity: 1; transform: scale(1); }
