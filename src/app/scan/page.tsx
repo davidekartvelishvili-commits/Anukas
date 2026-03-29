@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import jsQR from "jsqr";
 
 export default function ScanPage() {
   const router = useRouter();
@@ -14,12 +15,10 @@ export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const scanRef = useRef<number>(0);
-  const detectorRef = useRef<any>(null);
+  const scanTimerRef = useRef<NodeJS.Timeout | null>(null);
   const dragging = useRef(false);
   const dragOffset = useRef({ x: 0, y: 0 });
 
-  // Init screen size + center box
   useEffect(() => {
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -27,98 +26,97 @@ export default function ScanPage() {
     setBox({ x: (w - 260) / 2, y: (h - 260) / 2, size: 260 });
   }, []);
 
-  // Start camera
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
 
     navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } })
+      .getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } })
       .then((stream) => {
         streamRef.current = stream;
         if (videoRef.current) videoRef.current.srcObject = stream;
       })
       .catch(() => setCameraError(true));
 
-    if ("BarcodeDetector" in window) {
-      detectorRef.current = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
-    }
-
     return () => {
       clearTimeout(t);
       if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
-      cancelAnimationFrame(scanRef.current);
+      if (scanTimerRef.current) clearInterval(scanTimerRef.current);
     };
   }, []);
 
-  // Full-frame QR scanning loop
+  // Scanning loop using jsQR on full frame
   useEffect(() => {
-    if (cameraError || scanResult || !detectorRef.current) return;
+    if (cameraError || scanResult) return;
+    if (scanTimerRef.current) clearInterval(scanTimerRef.current);
 
-    let active = true;
-    const scan = async () => {
-      if (!active || !videoRef.current || videoRef.current.readyState < 2) {
-        scanRef.current = requestAnimationFrame(scan);
-        return;
-      }
+    scanTimerRef.current = setInterval(() => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || video.readyState < 2) return;
 
-      try {
-        const barcodes = await detectorRef.current.detect(videoRef.current);
-        if (barcodes.length > 0 && active) {
-          const qr = barcodes[0];
-          const bb = qr.boundingBox;
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      canvas.width = vw;
+      canvas.height = vh;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return;
 
-          // Map video coordinates to screen coordinates
-          const video = videoRef.current;
-          const vw = video.videoWidth;
-          const vh = video.videoHeight;
-          const sw = screenSize.w;
-          const sh = screenSize.h;
+      ctx.drawImage(video, 0, 0, vw, vh);
+      const imageData = ctx.getImageData(0, 0, vw, vh);
+      const code = jsQR(imageData.data, vw, vh);
 
-          // object-cover scaling
-          const videoRatio = vw / vh;
-          const screenRatio = sw / sh;
-          let scale: number, offsetX: number, offsetY: number;
+      if (code) {
+        // Map video coords to screen coords (object-cover)
+        const sw = screenSize.w;
+        const sh = screenSize.h;
+        const videoRatio = vw / vh;
+        const screenRatio = sw / sh;
+        let scale: number, offX: number, offY: number;
 
-          if (videoRatio > screenRatio) {
-            scale = sh / vh;
-            offsetX = (sw - vw * scale) / 2;
-            offsetY = 0;
-          } else {
-            scale = sw / vw;
-            offsetX = 0;
-            offsetY = (sh - vh * scale) / 2;
-          }
-
-          const qrX = bb.x * scale + offsetX;
-          const qrY = bb.y * scale + offsetY;
-          const qrW = bb.width * scale;
-          const qrH = bb.height * scale;
-          const qrSize = Math.max(qrW, qrH) + 40; // padding
-
-          // Snap scanner to QR position
-          setIsSnapping(true);
-          setBox({
-            x: Math.max(0, Math.min(sw - qrSize, qrX + qrW / 2 - qrSize / 2)),
-            y: Math.max(0, Math.min(sh - qrSize, qrY + qrH / 2 - qrSize / 2)),
-            size: Math.max(120, Math.min(350, qrSize)),
-          });
-
-          setTimeout(() => {
-            setScanResult(qr.rawValue);
-            setIsSnapping(false);
-          }, 400);
-          return;
+        if (videoRatio > screenRatio) {
+          scale = sh / vh;
+          offX = (sw - vw * scale) / 2;
+          offY = 0;
+        } else {
+          scale = sw / vw;
+          offX = 0;
+          offY = (sh - vh * scale) / 2;
         }
-      } catch {}
 
-      // Throttle to ~5fps
-      setTimeout(() => {
-        if (active) scanRef.current = requestAnimationFrame(scan);
-      }, 200);
+        const loc = code.location;
+        const minX = Math.min(loc.topLeftCorner.x, loc.bottomLeftCorner.x);
+        const maxX = Math.max(loc.topRightCorner.x, loc.bottomRightCorner.x);
+        const minY = Math.min(loc.topLeftCorner.y, loc.topRightCorner.y);
+        const maxY = Math.max(loc.bottomLeftCorner.y, loc.bottomRightCorner.y);
+
+        const qrX = minX * scale + offX;
+        const qrY = minY * scale + offY;
+        const qrW = (maxX - minX) * scale;
+        const qrH = (maxY - minY) * scale;
+        const padding = 30;
+        const qrSize = Math.max(qrW, qrH) + padding * 2;
+
+        setIsSnapping(true);
+        setBox({
+          x: Math.max(0, Math.min(sw - qrSize, qrX + qrW / 2 - qrSize / 2)),
+          y: Math.max(0, Math.min(sh - qrSize, qrY + qrH / 2 - qrSize / 2)),
+          size: Math.max(100, Math.min(400, qrSize)),
+        });
+
+        if (scanTimerRef.current) clearInterval(scanTimerRef.current);
+        scanTimerRef.current = null;
+
+        setTimeout(() => {
+          setScanResult(code.data);
+          setIsSnapping(false);
+        }, 400);
+      }
+    }, 250);
+
+    return () => {
+      if (scanTimerRef.current) clearInterval(scanTimerRef.current);
+      scanTimerRef.current = null;
     };
-
-    scanRef.current = requestAnimationFrame(scan);
-    return () => { active = false; cancelAnimationFrame(scanRef.current); };
   }, [cameraError, scanResult, screenSize]);
 
   // Drag handlers
@@ -171,7 +169,6 @@ export default function ScanPage() {
       <meta name="theme-color" content="#000000" />
 
       <main className="fixed inset-0 flex flex-col">
-        {/* Full-screen camera */}
         {!cameraError ? (
           <video
             ref={videoRef}
@@ -198,7 +195,6 @@ export default function ScanPage() {
             maskSize: "100% 100%",
             WebkitMaskSize: "100% 100%",
             zIndex: 1,
-            transition: isSnapping ? "none" : undefined,
           }}
         />
 
@@ -212,7 +208,7 @@ export default function ScanPage() {
             top: box.y,
             border: scanResult ? "2.5px solid #00E88F" : "1.5px solid rgba(255,255,255,0.2)",
             boxShadow: scanResult ? "0 0 30px rgba(0,232,143,0.5), inset 0 0 20px rgba(0,232,143,0.1)" : "none",
-            transition: isSnapping || scanResult ? "all 0.35s ease-out" : "none",
+            transition: isSnapping ? "all 0.35s ease-out" : "none",
             zIndex: 3,
           }}
           onTouchStart={onTouchStart}
@@ -234,7 +230,6 @@ export default function ScanPage() {
           className="relative z-10 max-w-[430px] mx-auto w-full flex flex-col flex-1 px-4 pointer-events-none"
           style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
         >
-          {/* Header */}
           <div
             className="flex items-center justify-between mb-8 shrink-0 pointer-events-auto"
             style={{ opacity: mounted ? 1 : 0, transition: "opacity 0.4s ease-out" }}
@@ -256,7 +251,6 @@ export default function ScanPage() {
 
           <div className="flex-1" />
 
-          {/* Result or instruction */}
           <div
             className="text-center shrink-0 pointer-events-auto"
             style={{
