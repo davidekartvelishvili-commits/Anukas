@@ -233,6 +233,7 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
     camera: THREE.PerspectiveCamera;
     renderer: THREE.WebGLRenderer;
     reels: Reel[];
+    machineGroup: THREE.Group;
     leverGroup: THREE.Group;
     leverAngle: number;
     leverTarget: number;
@@ -243,6 +244,13 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
     cyanLight: THREE.PointLight;
     isSpinning: boolean;
     animId: number;
+    rotY: number;
+    rotX: number;
+    velY: number;
+    velX: number;
+    isDragging: boolean;
+    dragPrev: { x: number; y: number };
+    dragVel: { x: number; y: number };
   } | null>(null);
 
   const prevTrigger = useRef(0);
@@ -299,11 +307,16 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
     scene.add(spot);
     scene.add(spot.target);
 
-    // Reels
+    // Machine group — everything rotatable
+    const machineGroup = new THREE.Group();
+    scene.add(machineGroup);
+
+    // Reels (add to machineGroup instead of scene)
+    const reelScene = { add: (obj: THREE.Object3D) => machineGroup.add(obj) } as THREE.Scene;
     const reels = [
-      new Reel(scene, -1.3, 0, 0),
-      new Reel(scene, 0, 250, 1),
-      new Reel(scene, 1.3, 500, 2),
+      new Reel(reelScene, -1.3, 0, 0),
+      new Reel(reelScene, 0, 250, 1),
+      new Reel(reelScene, 1.3, 500, 2),
     ];
 
     // Neon materials (kept for flash effect)
@@ -316,7 +329,7 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
     });
     const payline = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.025, 0.2), paylineMat);
     payline.position.set(0, 0, 0.18);
-    scene.add(payline);
+    machineGroup.add(payline);
 
     // Lever
     const leverGroup = new THREE.Group();
@@ -339,7 +352,10 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
     );
     leverBase.position.y = -0.5;
     leverGroup.add(leverBase);
-    scene.add(leverGroup);
+    machineGroup.add(leverGroup);
+
+    // Set initial rotation
+    machineGroup.rotation.x = -0.15;
 
     // Reflective floor
     const floor = new THREE.Mesh(
@@ -352,13 +368,77 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
 
     // Store refs
     const state = {
-      scene, camera, renderer, reels, leverGroup,
+      scene, camera, renderer, reels, machineGroup, leverGroup,
       leverAngle: 0, leverTarget: 0,
       neonMat, cyanMat, paylineMat,
       purpleLight, cyanLight,
       isSpinning: false, animId: 0,
+      rotY: 0, rotX: -0.15,
+      velY: 0, velX: 0,
+      isDragging: false,
+      dragPrev: { x: 0, y: 0 },
+      dragVel: { x: 0, y: 0 },
     };
     sceneRef.current = state;
+
+    // Touch handlers
+    const SENSITIVITY = 0.008;
+    const FRICTION = 0.95;
+
+    const onTouchStart = (e: TouchEvent) => {
+      state.isDragging = true;
+      state.dragPrev = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      state.dragVel = { x: 0, y: 0 };
+      state.velX = 0;
+      state.velY = 0;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (!state.isDragging) return;
+      const dx = e.touches[0].clientX - state.dragPrev.x;
+      const dy = e.touches[0].clientY - state.dragPrev.y;
+      state.rotY += dx * SENSITIVITY;
+      state.rotX -= dy * SENSITIVITY;
+      state.rotX = Math.max(-0.6, Math.min(0.3, state.rotX));
+      state.dragVel.x = state.dragVel.x * 0.5 + (-dy * SENSITIVITY) * 0.5;
+      state.dragVel.y = state.dragVel.y * 0.5 + (dx * SENSITIVITY) * 0.5;
+      state.dragPrev = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    };
+    const onTouchEnd = () => {
+      state.isDragging = false;
+      state.velX = state.dragVel.x * 1.5;
+      state.velY = state.dragVel.y * 1.5;
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      state.isDragging = true;
+      state.dragPrev = { x: e.clientX, y: e.clientY };
+      state.dragVel = { x: 0, y: 0 };
+      state.velX = 0;
+      state.velY = 0;
+    };
+    const onMouseMove = (e: MouseEvent) => {
+      if (!state.isDragging) return;
+      const dx = e.clientX - state.dragPrev.x;
+      const dy = e.clientY - state.dragPrev.y;
+      state.rotY += dx * SENSITIVITY;
+      state.rotX -= dy * SENSITIVITY;
+      state.rotX = Math.max(-0.6, Math.min(0.3, state.rotX));
+      state.dragVel.x = state.dragVel.x * 0.5 + (-dy * SENSITIVITY) * 0.5;
+      state.dragVel.y = state.dragVel.y * 0.5 + (dx * SENSITIVITY) * 0.5;
+      state.dragPrev = { x: e.clientX, y: e.clientY };
+    };
+    const onMouseUp = () => {
+      state.isDragging = false;
+      state.velX = state.dragVel.x * 1.5;
+      state.velY = state.dragVel.y * 1.5;
+    };
+
+    renderer.domElement.addEventListener("touchstart", onTouchStart);
+    renderer.domElement.addEventListener("touchmove", onTouchMove);
+    renderer.domElement.addEventListener("touchend", onTouchEnd);
+    renderer.domElement.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
 
     // Animation loop
     function animate() {
@@ -371,10 +451,26 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
       state.leverAngle += (state.leverTarget - state.leverAngle) * 0.12;
       state.leverGroup.rotation.z = state.leverAngle;
 
-      // Idle sway
-      const sway = state.isSpinning ? 0.02 : 0.1;
-      state.camera.position.x = Math.sin(now * 0.00025) * sway;
-      state.camera.position.y = 0.15 + Math.sin(now * 0.0004) * 0.04;
+      // 3D rotation with physics
+      if (!state.isDragging) {
+        state.rotY += state.velY;
+        state.rotX += state.velX;
+        state.velY *= FRICTION;
+        state.velX *= FRICTION;
+
+        // Gravity: pull X back to rest
+        const restX = -0.15;
+        const diffX = restX - state.rotX;
+        state.rotX += diffX * 0.04;
+        state.velX += diffX * 0.008;
+
+        if (Math.abs(state.velY) < 0.0005) state.velY = 0;
+        if (Math.abs(state.velX) < 0.0005) state.velX = 0;
+      }
+
+      state.rotX = Math.max(-0.6, Math.min(0.3, state.rotX));
+      state.machineGroup.rotation.x = state.rotX;
+      state.machineGroup.rotation.y = state.rotY;
 
       // Pulse lights
       state.purpleLight.intensity = 2 + Math.sin(now * 0.0018) * 0.4;
@@ -399,6 +495,8 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
 
     return () => {
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
       cancelAnimationFrame(state.animId);
       renderer.dispose();
       containerRef.current?.removeChild(renderer.domElement);
