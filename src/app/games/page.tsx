@@ -166,6 +166,7 @@ export default function GamesPage() {
   const handlePlay = (id: string) => {
     markGamePlayed(id);
     setPlayedGames(getPlayedGames());
+    if (id === "midnight-machine") router.push("/games/midnight-machine");
   };
 
   const handleTabChange = (idx: number) => {
