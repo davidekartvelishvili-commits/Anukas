@@ -1,0 +1,466 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+
+/* ───────── ICONS ───────── */
+
+function CashIcon() {
+  return (
+    <img src="/images/lari-icon.png" alt="₾" width={38} height={38} style={{ objectFit: "contain" }} />
+  );
+}
+
+function HomeIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={active ? "#FFFFFF" : "#666"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12l9-8 9 8" />
+      <path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9" />
+    </svg>
+  );
+}
+
+function GamesIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={active ? "#FFFFFF" : "#666"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="7" cy="7" r="2.5" />
+      <circle cx="17" cy="7" r="2.5" />
+      <circle cx="7" cy="17" r="2.5" />
+      <circle cx="17" cy="17" r="2.5" />
+    </svg>
+  );
+}
+
+function CardIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={active ? "#FFFFFF" : "#666"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+      <path d="M3 10h18" />
+    </svg>
+  );
+}
+
+function TrophyIcon() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+      <defs>
+        <linearGradient id="trophyGold" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFE44D" />
+          <stop offset="40%" stopColor="#FFD700" />
+          <stop offset="100%" stopColor="#B8860B" />
+        </linearGradient>
+        <linearGradient id="trophyStem" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#DAA520" />
+          <stop offset="100%" stopColor="#8B6914" />
+        </linearGradient>
+      </defs>
+      {/* Cup body */}
+      <path d="M8 4h14v9a7 7 0 01-14 0V4z" fill="url(#trophyGold)" />
+      {/* Shine */}
+      <path d="M10 5h4v7a3 3 0 01-4 0V5z" fill="rgba(255,255,255,0.25)" />
+      {/* Left handle */}
+      <path d="M8 7H5.5a2 2 0 00-2 2v1.5a5 5 0 005 5" stroke="url(#trophyGold)" strokeWidth="2" fill="none" />
+      {/* Right handle */}
+      <path d="M22 7h2.5a2 2 0 012 2v1.5a5 5 0 01-5 5" stroke="url(#trophyGold)" strokeWidth="2" fill="none" />
+      {/* Stem */}
+      <rect x="13" y="17" width="4" height="4" rx="1" fill="url(#trophyStem)" />
+      {/* Base */}
+      <rect x="10" y="21" width="10" height="3" rx="1.5" fill="url(#trophyStem)" />
+      {/* Star on cup */}
+      <path d="M15 8l1.2 2.4 2.6.4-1.9 1.8.4 2.6L15 14l-2.3 1.2.4-2.6-1.9-1.8 2.6-.4L15 8z" fill="#FFF8DC" opacity="0.6" />
+    </svg>
+  );
+}
+
+/* ───────── GAMES DATA ───────── */
+
+const GAMES = [
+  { id: 1, name: "Midnight Machine", color: "#4338CA", gradient: "linear-gradient(135deg, #4338CA, #6366F1)" },
+  { id: 2, name: "Coverd 21", color: "#92400E", gradient: "linear-gradient(135deg, #B45309, #D97706)" },
+  { id: 3, name: "Chicken Rush", color: "#DC2626", gradient: "linear-gradient(135deg, #DC2626, #F59E0B)" },
+];
+
+/* ───────── COUNTDOWN HOOK ───────── */
+
+function useCountdown(hours: number) {
+  const target = useRef(Date.now() + hours * 3600 * 1000);
+  const [time, setTime] = useState("");
+
+  useEffect(() => {
+    const tick = () => {
+      const diff = Math.max(0, target.current - Date.now());
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setTime(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return time;
+}
+
+/* ───────── MAIN ───────── */
+
+export default function HomePage() {
+  const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
+  const [showBalanceModal, setShowBalanceModal] = useState(false);
+  const [gender, setGender] = useState("Male");
+  const countdown = useCountdown(15.58);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("user-gender");
+    if (saved) setGender(saved);
+    const t = setTimeout(() => setMounted(true), 50);
+    return () => clearTimeout(t);
+  }, []);
+
+  const avatarSrc = gender === "Female" ? "/images/profile-avatar-female.png" : gender === "Other" ? "/images/profile-avatar-other.png" : "/images/profile-avatar.png";
+
+  const stagger = (i: number) => ({
+    opacity: mounted ? 1 : 0,
+    transform: mounted ? "translateY(0)" : "translateY(20px)",
+    transition: `all 0.5s ease-out ${i * 0.08}s`,
+  });
+
+  return (
+    <>
+      <style>{`html, body { background: #000000 !important; }`}</style>
+      <meta name="theme-color" content="#000000" />
+
+      <main className="min-h-[100dvh] bg-black pb-[90px]">
+        <div className="max-w-[430px] mx-auto px-4" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)" }}>
+
+          {/* ── Header: balance + avatar ── */}
+          <div className="flex items-center justify-between mb-6" style={stagger(0)}>
+            <button
+              onClick={() => setShowBalanceModal(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-full transition-all duration-200 active:scale-[0.95]"
+              style={{ background: "#1C1C1E" }}
+            >
+              <CashIcon />
+              <span className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>28</span>
+            </button>
+            <div
+              className="w-[48px] h-[48px] rounded-full overflow-hidden cursor-pointer active:scale-[0.95] transition-transform"
+              style={{ background: "linear-gradient(135deg, #C4E0F9, #E8D5F5)" }}
+              onClick={() => router.push("/profile")}
+            >
+              <img
+                src={avatarSrc}
+                alt="Profile"
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
+
+          {/* ── Featured Games ── */}
+          <div style={stagger(1)}>
+            <h2 className="text-[22px] font-bold text-white mb-4" style={{ fontFamily: "var(--font-outfit)" }}>
+              Featured Games
+            </h2>
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+              {GAMES.map((game) => (
+                <div
+                  key={game.id}
+                  className="shrink-0 w-[130px] h-[130px] rounded-[36px] relative overflow-hidden cursor-pointer active:scale-[0.97] transition-transform"
+                  style={{ background: game.gradient }}
+                >
+                  {/* Video cover for Midnight Machine */}
+                  {(game.id === 1 || game.id === 2) ? (
+                    <video
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="absolute inset-0 w-full h-full object-cover"
+                      src={game.id === 1 ? "/images/onboarding/slot-machine.mp4" : "/images/onboarding/coverd21.mp4"}
+                    />
+                  ) : game.id === 3 ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src="/images/onboarding/chicken-rush.webp" alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 opacity-20">
+                      <div className="absolute top-[20%] left-[10%] w-[60px] h-[60px] rounded-full" style={{ background: "rgba(255,255,255,0.3)" }} />
+                      <div className="absolute bottom-[15%] right-[15%] w-[40px] h-[40px] rounded-[10px] rotate-45" style={{ background: "rgba(255,255,255,0.2)" }} />
+                    </div>
+                  )}
+                  {/* Game name */}
+                  <div className="absolute bottom-0 left-0 right-0 p-4" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%)" }}>
+                    <span className="text-[16px] font-bold text-white leading-tight" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>
+                      {game.name}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Today's Promo Inbox ── */}
+          <div
+            className="mt-6 flex items-center justify-between px-5 py-5 rounded-[20px] cursor-pointer active:scale-[0.98] transition-transform"
+            style={{ ...stagger(2), background: "#A8E06C" }}
+            onClick={() => router.push("/promos")}
+          >
+            <div className="flex items-center gap-3">
+              <TrophyIcon />
+              <span className="text-[17px] font-bold text-[#1A1A1A]" style={{ fontFamily: "var(--font-outfit)" }}>
+                Today&apos;s Promo Inbox
+              </span>
+            </div>
+            <div className="w-[28px] h-[28px] rounded-full bg-[#EF4444] flex items-center justify-center">
+              <span className="text-[13px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>5</span>
+            </div>
+          </div>
+
+          {/* ── Mystery Box ── */}
+          <div
+            className="mt-6 rounded-[20px] overflow-hidden relative cursor-pointer active:scale-[0.98] transition-transform"
+            style={{ ...stagger(3), background: "#E8C840", minHeight: 220 }}
+          >
+            <div className="p-5 relative z-10">
+              <p className="text-[15px] font-semibold text-[#1A1A1A] opacity-80" style={{ fontFamily: "var(--font-dm-sans)" }}>
+                Mystery Box
+              </p>
+              <p className="text-[36px] font-black text-[#1A1A1A] mt-1 tracking-tight" style={{ fontFamily: "var(--font-outfit)" }}>
+                {countdown}
+              </p>
+            </div>
+            {/* Cube visual */}
+            <div className="absolute right-2 bottom-2 w-[180px] h-[180px] flex items-center justify-center" style={{ perspective: "400px" }}>
+              <div
+                className="relative w-[120px] h-[120px]"
+                style={{
+                  transformStyle: "preserve-3d",
+                  transform: "rotateX(-15deg) rotateY(25deg)",
+                  animation: "rotateSlow 12s linear infinite",
+                }}
+              >
+                {/* Front — ₾ */}
+                <div className="absolute inset-0 rounded-[14px] flex items-center justify-center" style={{ background: "linear-gradient(135deg, #1A1A1A, #2D2D2D)", border: "2px solid #3A3A3A", transform: "translateZ(60px)", backfaceVisibility: "hidden", boxShadow: "0 0 20px rgba(77,201,246,0.3)" }}>
+                  <div className="absolute inset-1 rounded-[12px] border border-[#4dc9f6] opacity-20" />
+                  <span className="text-[40px] font-black text-[#FFE500]" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 0 20px rgba(255,229,0,0.5)" }}>₾</span>
+                </div>
+                {/* Right — ? */}
+                <div className="absolute inset-0 rounded-[14px] flex items-center justify-center" style={{ background: "linear-gradient(135deg, #1A1A1A, #222)", border: "2px solid #333", transform: "rotateY(90deg) translateZ(60px)", backfaceVisibility: "hidden", boxShadow: "0 0 15px rgba(255,184,0,0.2)" }}>
+                  <div className="absolute inset-1 rounded-[12px] border border-[#FFB800] opacity-15" />
+                  <div className="absolute top-2 left-1 w-1 h-[80%] rounded-full bg-[#4dc9f6] opacity-30" />
+                  <span className="text-[40px] font-black text-[#FFB800]" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 0 20px rgba(255,184,0,0.4)" }}>?</span>
+                </div>
+                {/* Back — ₾ */}
+                <div className="absolute inset-0 rounded-[14px] flex items-center justify-center" style={{ background: "#1A1A1A", border: "2px solid #333", transform: "rotateY(180deg) translateZ(60px)", backfaceVisibility: "hidden", boxShadow: "0 0 15px rgba(0,232,143,0.2)" }}>
+                  <div className="absolute inset-1 rounded-[12px] border border-[#00E88F] opacity-15" />
+                  <span className="text-[40px] font-black text-[#00E88F]" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 0 20px rgba(0,232,143,0.4)" }}>₾</span>
+                </div>
+                {/* Left — ? */}
+                <div className="absolute inset-0 rounded-[14px] flex items-center justify-center" style={{ background: "linear-gradient(135deg, #222, #1A1A1A)", border: "2px solid #333", transform: "rotateY(-90deg) translateZ(60px)", backfaceVisibility: "hidden", boxShadow: "0 0 15px rgba(168,85,247,0.2)" }}>
+                  <div className="absolute inset-1 rounded-[12px] border border-[#A855F7] opacity-15" />
+                  <div className="absolute top-2 right-1 w-1 h-[80%] rounded-full bg-[#4dc9f6] opacity-30" />
+                  <span className="text-[40px] font-black text-[#A855F7]" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 0 20px rgba(168,85,247,0.4)" }}>?</span>
+                </div>
+                {/* Top */}
+                <div className="absolute inset-0 rounded-[14px]" style={{ background: "#222", border: "2px solid #3A3A3A", transform: "rotateX(90deg) translateZ(60px)", backfaceVisibility: "hidden" }} />
+                {/* Bottom */}
+                <div className="absolute inset-0 rounded-[14px]" style={{ background: "#111", border: "2px solid #222", transform: "rotateX(-90deg) translateZ(60px)", backfaceVisibility: "hidden" }} />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Link a Card ── */}
+          <div
+            className="mt-6 rounded-[20px] p-5 cursor-pointer active:scale-[0.98] transition-transform"
+            style={{ ...stagger(4), background: "#1C1C1E" }}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[14px] text-[#9CA3AF] font-medium" style={{ fontFamily: "var(--font-dm-sans)" }}>
+                  Link a Card
+                </p>
+                <h3 className="text-[24px] font-bold text-white mt-1 leading-[1.15]" style={{ fontFamily: "var(--font-outfit)" }}>
+                  Win back<br />your purchases
+                </h3>
+              </div>
+              {/* Card visual */}
+              <div className="w-[140px] h-[90px] rounded-[12px] flex flex-col justify-between p-3 mt-2" style={{ background: "linear-gradient(135deg, #2A2A2E, #3A3A3E)", border: "1px solid #4A4A4E" }}>
+                <div className="flex justify-between items-start">
+                  <div className="w-[24px] h-[18px] rounded-[3px]" style={{ background: "linear-gradient(135deg, #C0C0C0, #E0E0E0)" }} />
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M2 7c0 0 2.5-4 5-4s5 4 5 4-2.5 4-5 4-5-4-5-4z" stroke="#666" strokeWidth="1" />
+                    <circle cx="7" cy="7" r="1.5" stroke="#666" strokeWidth="1" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-[11px] text-[#9CA3AF] font-medium" style={{ fontFamily: "var(--font-dm-sans)" }}>CoverdFan User</p>
+                </div>
+              </div>
+            </div>
+            <p className="text-[13px] text-[#4B5563] mt-3" style={{ fontFamily: "var(--font-dm-sans)" }}>
+              Get Started
+            </p>
+          </div>
+        </div>
+
+        {/* ── Bottom Tab Bar — floating glass island ── */}
+        <nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-center" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom, 12px))" }}>
+          <div
+            className="flex items-center px-2 py-1.5 rounded-full gap-0"
+            style={{
+              background: "rgba(50, 50, 50, 0.08)",
+              backdropFilter: "blur(5px) saturate(200%)",
+              WebkitBackdropFilter: "blur(5px) saturate(200%)",
+              border: "0.5px solid rgba(255,255,255,0.15)",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+            }}
+          >
+            {[
+              { label: "Home", idx: 0, icon: (a: boolean) => (
+                <svg width="22" height="22" viewBox="0 0 22 22" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 11l8-7 8 7" /><path d="M5 9.5v8a1 1 0 001 1h3v-4h4v4h3a1 1 0 001-1v-8" />
+                </svg>
+              )},
+              { label: "Games", idx: 1, icon: (a: boolean) => (
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                  <circle cx="7" cy="7" r="2.2" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.5" />
+                  <circle cx="15" cy="7" r="2.2" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.5" />
+                  <circle cx="7" cy="15" r="2.2" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.5" />
+                  <circle cx="15" cy="15" r="2.2" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.5" />
+                </svg>
+              )},
+              { label: "Scan", idx: 2, icon: (a: boolean) => (
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 7V4a2 2 0 012-2h3" />
+                  <path d="M15 2h3a2 2 0 012 2v3" />
+                  <path d="M20 15v3a2 2 0 01-2 2h-3" />
+                  <path d="M7 20H4a2 2 0 01-2-2v-3" />
+                  <line x1="2" y1="11" x2="20" y2="11" />
+                </svg>
+              )},
+            ].map(({ label, idx, icon }) => {
+              const isActive = idx === activeTab;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setActiveTab(idx);
+                    if (idx === 1) router.push("/games");
+                  }}
+                  className="flex flex-col items-center px-5 py-1.5 rounded-full transition-all duration-200"
+                  style={{ background: isActive ? "rgba(255,255,255,0.1)" : "transparent" }}
+                >
+                  {icon(isActive)}
+                  <span
+                    className="text-[10px] mt-1 font-medium"
+                    style={{ fontFamily: "var(--font-dm-sans)", color: isActive ? "#FFFFFF" : "rgba(255,255,255,0.4)" }}
+                  >
+                    {label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      </main>
+
+      {/* ── Balance Modal ── */}
+      {showBalanceModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          onClick={() => setShowBalanceModal(false)}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40" />
+
+          {/* Modal */}
+          <div
+            className="relative w-full max-w-[430px] rounded-t-[36px] pb-8 pt-3 px-5"
+            style={{
+              background: "rgba(50, 50, 50, 0.08)",
+              backdropFilter: "blur(12px) saturate(200%)",
+              WebkitBackdropFilter: "blur(12px) saturate(200%)",
+              borderTop: "1px solid rgba(255,255,255,0.2)",
+              animation: "slideUp 0.3s ease-out",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Handle bar */}
+            <div className="w-[36px] h-[5px] rounded-full bg-white/30 mx-auto mb-5" />
+
+            {/* Title */}
+            <h3
+              className="text-white text-[20px] font-bold text-center mb-6"
+              style={{ fontFamily: "var(--font-outfit)" }}
+            >
+              Select an Option
+            </h3>
+
+            {/* Options */}
+            <div className="flex gap-3 mb-6">
+              {/* Add to Balance */}
+              <button
+                className="flex-1 flex flex-col items-center gap-3 py-6 rounded-[28px] transition-all duration-200 active:scale-[0.97]"
+                style={{
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                }}
+                onClick={() => {
+                  setShowBalanceModal(false);
+                  router.push("/top-up");
+                }}
+              >
+                <div className="w-[52px] h-[52px] rounded-full bg-white flex items-center justify-center">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="5" width="18" height="14" rx="2" />
+                    <path d="M12 9v6M9 12h6" />
+                  </svg>
+                </div>
+                <span
+                  className="text-white text-[14px] font-semibold"
+                  style={{ fontFamily: "var(--font-dm-sans)" }}
+                >
+                  Add to Balance
+                </span>
+              </button>
+
+              {/* Redeem Balance */}
+              <button
+                className="flex-1 flex flex-col items-center gap-3 py-6 rounded-[28px] transition-all duration-200 active:scale-[0.97]"
+                style={{
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                }}
+                onClick={() => {
+                  setShowBalanceModal(false);
+                  router.push("/redeem");
+                }}
+              >
+                <div className="w-[52px] h-[52px] rounded-full bg-[#3A3A3C] flex items-center justify-center">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                </div>
+                <span
+                  className="text-[#999] text-[14px] font-semibold"
+                  style={{ fontFamily: "var(--font-dm-sans)" }}
+                >
+                  Redeem Balance
+                </span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+      `}</style>
+    </>
+  );
+}
