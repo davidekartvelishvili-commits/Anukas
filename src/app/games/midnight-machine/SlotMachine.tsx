@@ -28,9 +28,9 @@ function shuffleArray<T>(arr: T[]): T[] {
 
 // ── Reel Texture Generator ──
 function createReelTexture(symbolOrder: SlotSymbol[]): THREE.CanvasTexture {
-  const cellH = 512;
+  const cellH = 1024;
   const canvas = document.createElement("canvas");
-  canvas.width = 512;
+  canvas.width = 1024;
   canvas.height = cellH * symbolOrder.length;
   const ctx = canvas.getContext("2d")!;
 
@@ -51,14 +51,14 @@ function createReelTexture(symbolOrder: SlotSymbol[]): THREE.CanvasTexture {
 
     // Separator lines
     ctx.strokeStyle = "rgba(90,110,240,0.3)";
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(16, y + 1); ctx.lineTo(W - 16, y + 1); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(16, y + cellH - 1); ctx.lineTo(W - 16, y + cellH - 1); ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(32, y + 2); ctx.lineTo(W - 32, y + 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(32, y + cellH - 2); ctx.lineTo(W - 32, y + cellH - 2); ctx.stroke();
 
     // Radial glow
-    const glow = ctx.createRadialGradient(CX, y + cellH / 2, 16, CX, y + cellH / 2, 200);
-    glow.addColorStop(0, sym.color + "66");
-    glow.addColorStop(0.5, sym.color + "22");
+    const glow = ctx.createRadialGradient(CX, y + cellH / 2, 32, CX, y + cellH / 2, 400);
+    glow.addColorStop(0, sym.color + "88");
+    glow.addColorStop(0.4, sym.color + "33");
     glow.addColorStop(1, "transparent");
     ctx.fillStyle = glow;
     ctx.fillRect(0, y, W, cellH);
@@ -66,45 +66,45 @@ function createReelTexture(symbolOrder: SlotSymbol[]): THREE.CanvasTexture {
     // Draw symbol
     ctx.save();
     if (sym.name === "Covrd") {
-      ctx.font = "900 160px sans-serif";
+      ctx.font = "900 320px sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.shadowColor = sym.glowColor;
-      ctx.shadowBlur = 50;
+      ctx.shadowBlur = 80;
       ctx.fillStyle = "#FFD700";
       ctx.fillText("C", CX, y + cellH / 2);
-      ctx.shadowBlur = 25;
+      ctx.shadowBlur = 40;
       ctx.beginPath();
-      ctx.arc(CX, y + cellH / 2, 100, 0, Math.PI * 2);
-      ctx.lineWidth = 5;
+      ctx.arc(CX, y + cellH / 2, 200, 0, Math.PI * 2);
+      ctx.lineWidth = 8;
       ctx.strokeStyle = "#FFD700";
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(CX, y + cellH / 2, 60, 0.5, Math.PI * 1.5);
-      ctx.lineWidth = 4;
+      ctx.arc(CX, y + cellH / 2, 120, 0.5, Math.PI * 1.5);
+      ctx.lineWidth = 6;
       ctx.strokeStyle = "#FFA000";
       ctx.stroke();
     } else if (sym.name === "Seven") {
-      ctx.font = "900 180px sans-serif";
+      ctx.font = "900 360px sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.shadowColor = sym.glowColor;
-      ctx.shadowBlur = 40;
+      ctx.shadowBlur = 60;
       ctx.fillStyle = sym.color;
       ctx.fillText("7", CX, y + cellH / 2);
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = 30;
       ctx.strokeStyle = sym.color + "99";
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 5;
       ctx.strokeText("7", CX, y + cellH / 2);
-      ctx.font = "700 50px sans-serif";
+      ctx.font = "700 100px sans-serif";
       ctx.fillStyle = sym.color + "88";
-      ctx.fillText("$", CX, y + cellH / 2 + 90);
+      ctx.fillText("$", CX, y + cellH / 2 + 180);
     } else {
-      ctx.font = "160px sans-serif";
+      ctx.font = "320px sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.shadowColor = sym.glowColor;
-      ctx.shadowBlur = 40;
+      ctx.shadowBlur = 60;
       ctx.fillText(sym.emoji, CX, y + cellH / 2);
     }
     ctx.restore();
@@ -112,10 +112,10 @@ function createReelTexture(symbolOrder: SlotSymbol[]): THREE.CanvasTexture {
     // Neon box border
     ctx.save();
     ctx.shadowColor = sym.color;
-    ctx.shadowBlur = 12;
-    ctx.strokeStyle = sym.color + "40";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(30, y + 20, W - 60, cellH - 40);
+    ctx.shadowBlur = 20;
+    ctx.strokeStyle = sym.color + "50";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(50, y + 40, W - 100, cellH - 80);
     ctx.restore();
   });
 
@@ -168,12 +168,12 @@ class Reel {
 
     const mat = new THREE.MeshStandardMaterial({
       map: tex,
-      metalness: 0.55,
-      roughness: 0.35,
+      metalness: 0.3,
+      roughness: 0.5,
       side: THREE.DoubleSide,
       emissiveMap: tex,
-      emissive: new THREE.Color(0x2a2a60),
-      emissiveIntensity: 0.6,
+      emissive: new THREE.Color(0x3a3a80),
+      emissiveIntensity: 0.8,
     });
 
     this.mesh = new THREE.Mesh(geo, mat);
@@ -282,7 +282,7 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.3;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
