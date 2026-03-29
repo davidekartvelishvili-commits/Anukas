@@ -316,7 +316,7 @@ export default function MysteryBoxPage() {
         >
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="relative rounded-[20px] px-8 py-10 flex flex-col items-center max-w-[320px] w-full"
+            className="relative rounded-[20px] px-6 py-7 max-w-[320px] w-full"
             style={{
               background: "rgba(50, 50, 50, 0.08)",
               backdropFilter: "blur(12px) saturate(200%)",
@@ -326,29 +326,40 @@ export default function MysteryBoxPage() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <span className="text-[40px] mb-4">🚀</span>
             <h3
-              className="text-white text-[20px] font-bold text-center mb-2"
+              className="text-white text-[20px] font-bold mb-2"
               style={{ fontFamily: "var(--font-outfit)" }}
             >
-              Coming Soon
+              Get a Mystery Box
             </h3>
             <p
-              className="text-[#999] text-[14px] text-center mb-6"
+              className="text-[rgba(255,255,255,0.6)] text-[15px] mb-5 leading-relaxed"
               style={{ fontFamily: "var(--font-dm-sans)" }}
             >
-              This feature is coming soon
+              Use your Cashback Cash to buy a Mystery Box?
             </p>
             <button
               onClick={() => setShowComingSoon(false)}
-              className="px-10 py-3 rounded-full active:scale-[0.95] transition-transform"
-              style={{ background: "#000000" }}
+              className="w-full py-4 rounded-full active:scale-[0.97] transition-transform mb-3"
+              style={{ background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.15)" }}
             >
               <span
-                className="text-white text-[15px] font-bold"
+                className="text-white text-[16px] font-bold"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
-                OK
+                Buy for 5 Cashback Cash
+              </span>
+            </button>
+            <button
+              onClick={() => setShowComingSoon(false)}
+              className="w-full py-4 rounded-full active:scale-[0.97] transition-transform"
+              style={{ background: "rgba(255,255,255,0.12)" }}
+            >
+              <span
+                className="text-white text-[16px] font-bold"
+                style={{ fontFamily: "var(--font-outfit)" }}
+              >
+                Cancel
               </span>
             </button>
           </div>
