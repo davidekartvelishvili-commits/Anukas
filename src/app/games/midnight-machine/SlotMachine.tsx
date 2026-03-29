@@ -306,39 +306,15 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
       new Reel(scene, 1.3, 500, 2),
     ];
 
-    // Frame
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x12122e, metalness: 0.9, roughness: 0.1 });
-    [1.25, -1.25].forEach((y) => {
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.14, 0.35), frameMat);
-      bar.position.set(0, y, 0);
-      scene.add(bar);
-    });
-    [-2.45, 2.45].forEach((x) => {
-      const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.64, 0.35), frameMat);
-      pillar.position.set(x, 0, 0);
-      scene.add(pillar);
-    });
-
-    // Neon strips
+    // Neon materials (kept for flash effect)
     const neonMat = new THREE.MeshStandardMaterial({ color: 0x7c4dff, emissive: 0x7c4dff, emissiveIntensity: 3 });
     const cyanMat = new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x00e5ff, emissiveIntensity: 2.5 });
-
-    [1.38, -1.38].forEach((y) => {
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(5, 0.035, 0.36), neonMat);
-      strip.position.set(0, y, 0);
-      scene.add(strip);
-    });
-    [-2.53, 2.53].forEach((x) => {
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.035, 2.8, 0.36), cyanMat);
-      strip.position.set(x, 0, 0);
-      scene.add(strip);
-    });
 
     // Payline
     const paylineMat = new THREE.MeshStandardMaterial({
       color: 0x00e676, emissive: 0x00e676, emissiveIntensity: 2, transparent: true, opacity: 0.5,
     });
-    const payline = new THREE.Mesh(new THREE.BoxGeometry(5, 0.025, 0.38), paylineMat);
+    const payline = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.025, 0.2), paylineMat);
     payline.position.set(0, 0, 0.18);
     scene.add(payline);
 
