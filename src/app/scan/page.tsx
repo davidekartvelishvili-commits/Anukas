@@ -115,25 +115,6 @@ export default function ScanPage() {
             zIndex: 2,
           }}
         >
-          {/* Scanning line */}
-          <div
-            className="absolute left-[8px] right-[8px] h-[2px]"
-            style={{
-              background: "linear-gradient(90deg, transparent, #00E88F, transparent)",
-              boxShadow: "0 0 15px #00E88F, 0 0 30px rgba(0,232,143,0.3)",
-              animation: "scan-line 3s ease-in-out infinite",
-            }}
-          />
-
-          {/* Corner brackets */}
-          <div className="absolute top-0 left-0 w-[40px] h-[3px] rounded-full bg-white" />
-          <div className="absolute top-0 left-0 w-[3px] h-[40px] rounded-full bg-white" />
-          <div className="absolute top-0 right-0 w-[40px] h-[3px] rounded-full bg-white" />
-          <div className="absolute top-0 right-0 w-[3px] h-[40px] rounded-full bg-white" />
-          <div className="absolute bottom-0 left-0 w-[40px] h-[3px] rounded-full bg-white" />
-          <div className="absolute bottom-0 left-0 w-[3px] h-[40px] rounded-full bg-white" />
-          <div className="absolute bottom-0 right-0 w-[40px] h-[3px] rounded-full bg-white" />
-          <div className="absolute bottom-0 right-0 w-[3px] h-[40px] rounded-full bg-white" />
 
           {/* Camera error text */}
           {cameraError && (
