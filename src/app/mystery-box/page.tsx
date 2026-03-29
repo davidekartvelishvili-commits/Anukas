@@ -297,8 +297,8 @@ export default function MysteryBoxPage() {
               onClick={() => {
                 if (navigator.share) {
                   navigator.share({
-                    title: "Cashback App",
-                    text: "Join me on Cashback App and get a free Mystery Box!",
+                    title: "BackApp - smart cashback",
+                    text: "Join me on BackApp and get a free Mystery Box!",
                     url: window.location.origin,
                   }).catch(() => {});
                 }
