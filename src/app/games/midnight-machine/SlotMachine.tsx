@@ -200,12 +200,28 @@ class Reel {
     const elapsed = now - this.spinStart;
     if (elapsed < this.delay) return;
 
-    const t = Math.min((elapsed - this.delay) / (this.dur - this.delay), 1);
+    const rawT = (elapsed - this.delay) / (this.dur - this.delay);
+    const t = Math.min(rawT, 1);
 
-    // Back-ease-out (slight overshoot then settle)
-    const c1 = 1.15;
-    const c3 = c1 + 1;
-    const eased = t < 1 ? 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2) : 1;
+    // Custom easing: fast spin → overshoot past target → bounce back → settle
+    let eased: number;
+    if (t < 0.7) {
+      // Fast spin phase (0 to 0.7) — ease-in-out
+      const p = t / 0.7;
+      eased = p * p * (3 - 2 * p) * 0.92;
+    } else if (t < 0.85) {
+      // Overshoot phase — go past target
+      const p = (t - 0.7) / 0.15;
+      eased = 0.92 + p * 0.12; // reaches 1.04 (4% overshoot)
+    } else if (t < 0.95) {
+      // Bounce back phase — come back past target slightly
+      const p = (t - 0.85) / 0.1;
+      eased = 1.04 - p * 0.06; // goes to 0.98
+    } else {
+      // Final settle — ease into exact position
+      const p = (t - 0.95) / 0.05;
+      eased = 0.98 + p * 0.02; // reaches exactly 1.0
+    }
 
     this.curOff = this.stOff + (this.tgtOff - this.stOff) * eased;
     const uv = this.curOff % 1;
