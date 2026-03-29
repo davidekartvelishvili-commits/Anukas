@@ -260,20 +260,25 @@ export default function MidnightMachinePage() {
             </span>
           </button>
 
-          {/* Info icon */}
-          <button
-            onClick={() => setPayoutOpen(!payoutOpen)}
-            className="w-[48px] h-[48px] rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-            style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)" }}
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="9" cy="9" r="7.5" opacity="0.5" />
-              <path d="M9 12.5V8.5" />
-              <circle cx="9" cy="6" r="0.5" fill="white" />
-            </svg>
-          </button>
         </div>
       </div>
+
+      {/* Info button — fixed bottom right */}
+      <button
+        onClick={() => setPayoutOpen(!payoutOpen)}
+        className="absolute right-4 z-10 w-[48px] h-[48px] rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+        style={{
+          bottom: "max(20px, calc(env(safe-area-inset-bottom, 0px) + 12px))",
+          background: "rgba(255,255,255,0.08)",
+          border: "1px solid rgba(255,255,255,0.1)",
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="9" cy="9" r="7.5" opacity="0.5" />
+          <path d="M9 12.5V8.5" />
+          <circle cx="9" cy="6" r="0.5" fill="white" />
+        </svg>
+      </button>
     </div>
   );
 }
