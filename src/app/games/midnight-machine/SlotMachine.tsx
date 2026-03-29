@@ -402,6 +402,7 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
     const FRICTION = 0.95;
 
     const onTouchStart = (e: TouchEvent) => {
+      if (state.isSpinning) return;
       state.isDragging = true;
       state.dragPrev = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       state.dragVel = { x: 0, y: 0 };
@@ -426,6 +427,7 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
     };
 
     const onMouseDown = (e: MouseEvent) => {
+      if (state.isSpinning) return;
       state.isDragging = true;
       state.dragPrev = { x: e.clientX, y: e.clientY };
       state.dragVel = { x: 0, y: 0 };
@@ -467,8 +469,14 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
       state.leverAngle += (state.leverTarget - state.leverAngle) * 0.12;
       state.leverGroup.rotation.z = state.leverAngle;
 
-      // 3D rotation with physics
-      if (!state.isDragging) {
+      // 3D rotation with physics (locked during spin)
+      if (state.isSpinning) {
+        // During spin: smoothly hold at rotY=0, rotX=-0.15
+        state.rotY += (0 - state.rotY) * 0.08;
+        state.rotX += (-0.15 - state.rotX) * 0.08;
+        state.velY = 0;
+        state.velX = 0;
+      } else if (!state.isDragging) {
         state.rotY += state.velY;
         state.rotX += state.velX;
         state.velY *= FRICTION;
@@ -527,7 +535,14 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
 
     if (state.isSpinning) return;
     state.isSpinning = true;
+    state.isDragging = false;
     onSpinStart?.();
+
+    // Snap to correct position (stick on right side) and stop user rotation
+    state.velY = 0;
+    state.velX = 0;
+    state.rotY = 0;
+    state.rotX = -0.15;
 
     // Animate lever
     state.leverTarget = -0.6;
@@ -538,9 +553,16 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
       reel.spin(targetSymbols[i]);
     });
 
+    // ~1.5s before stop: zoom camera closer
+    setTimeout(() => {
+      state.camera.position.z = 8;
+    }, 1800);
+
     // After animation completes
     setTimeout(() => {
       state.isSpinning = false;
+      // Zoom back out
+      state.camera.position.z = 10.5;
 
       // Flash neon
       let flashCount = 0;
