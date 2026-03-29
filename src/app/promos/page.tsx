@@ -155,13 +155,13 @@ export default function PromosPage() {
 
   const renderCardContent = (deal: typeof allDeals[0], blur = false) => (
     <div className="flex flex-col h-full min-h-[180px]" style={{ filter: blur ? "blur(12px)" : "none", transition: "filter 0.5s ease-out" }}>
-      {/* Top: logo + name */}
-      <div className="flex items-center gap-3 mb-auto">
-        <div className="w-[48px] h-[48px] rounded-[12px] overflow-hidden flex items-center justify-center shrink-0" style={{ background: deal.image ? "#FFFFFF" : deal.color }}>
+      {/* Top: logo + name below */}
+      <div className="mb-auto">
+        <div className="w-[64px] h-[64px] rounded-[16px] overflow-hidden flex items-center justify-center mb-2" style={{ background: deal.image ? "#FFFFFF" : deal.color }}>
           {deal.image ? (
             <img src={deal.image} alt={deal.merchant} className="w-[80%] h-[80%] object-contain" />
           ) : (
-            <span className="text-white text-[20px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
+            <span className="text-white text-[26px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
               {deal.merchant.charAt(0)}
             </span>
           )}
