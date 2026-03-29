@@ -277,7 +277,7 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(0, 0.15, 9);
+    camera.position.set(0, 0.15, 10.5);
     camera.lookAt(0, -0.1, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
