@@ -166,14 +166,9 @@ class Reel {
     }
     uvAttr.needsUpdate = true;
 
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshBasicMaterial({
       map: tex,
-      metalness: 0.3,
-      roughness: 0.5,
       side: THREE.DoubleSide,
-      emissiveMap: tex,
-      emissive: new THREE.Color(0x3a3a80),
-      emissiveIntensity: 0.8,
     });
 
     this.mesh = new THREE.Mesh(geo, mat);
@@ -232,9 +227,8 @@ class Reel {
     this.curOff = this.stOff + (this.tgtOff - this.stOff) * eased;
     const uv = this.curOff % 1;
 
-    const mat = this.mesh.material as THREE.MeshStandardMaterial;
+    const mat = this.mesh.material as THREE.MeshBasicMaterial;
     if (mat.map) mat.map.offset.y = uv;
-    if (mat.emissiveMap) mat.emissiveMap.offset.y = uv;
 
     if (t >= 1 && !this.settled) {
       this.settled = true;
@@ -242,7 +236,6 @@ class Reel {
       const finalUV = (this.tgtIdx / this.order.length) % 1;
       this.curOff = this.tgtOff;
       if (mat.map) mat.map.offset.y = finalUV;
-      if (mat.emissiveMap) mat.emissiveMap.offset.y = finalUV;
     }
   }
 }
