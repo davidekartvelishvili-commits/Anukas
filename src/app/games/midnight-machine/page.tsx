@@ -110,8 +110,28 @@ export default function MidnightMachinePage() {
           </svg>
         </button>
 
+        {/* My Play card */}
+        <div className="bg-white/[0.08] backdrop-blur-2xl border border-white/10 rounded-[22px] px-5 py-2 flex flex-col items-center gap-0.5">
+          <div className="flex items-center gap-1.5 font-bold text-[17px] text-white" style={{ fontFamily: "var(--font-outfit)" }}>
+            <span className="text-[14px]">₾</span>
+            {betAmount > 0 ? betAmount : "—"}
+          </div>
+          <span className="text-[10px] text-white/40 font-medium uppercase tracking-wider" style={{ fontFamily: "var(--font-dm-sans)" }}>
+            My Play
+          </span>
+        </div>
+
         <div className="w-9" />
       </div>
+
+      {/* No luck message */}
+      {result && result.winAmount === 0 && !isSpinning && (
+        <div className="absolute top-0 left-0 right-0 z-20 flex justify-center" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 80px)" }}>
+          <p className="text-white/70 text-[16px] font-semibold text-center" style={{ fontFamily: "var(--font-outfit)" }}>
+            No luck this time! Try again!
+          </p>
+        </div>
+      )}
 
       {/* Payout table */}
       <div
@@ -205,7 +225,7 @@ export default function MidnightMachinePage() {
             disabled={isSpinning || balance < betAmount}
             className="pointer-events-auto px-12 py-6 rounded-full text-[19px] font-black tracking-wide transition-all duration-150 disabled:bg-[#3a3a4a] disabled:text-[#777] disabled:cursor-not-allowed active:scale-[0.97]"
             style={{
-              background: isSpinning ? "#3a3a4a" : "#FFE135",
+              background: isSpinning ? "#3a3a4a" : "#FFD700",
               color: isSpinning ? "#777" : "#1a1a2e",
               boxShadow: isSpinning ? "none" : "0 4px 24px rgba(255,225,53,0.25), inset 0 1px 0 rgba(255,255,255,0.3)",
               fontFamily: "var(--font-outfit)",
@@ -216,15 +236,7 @@ export default function MidnightMachinePage() {
         )}
 
         {/* Bottom bar: wallet + balance + info */}
-        <div className="pointer-events-auto flex items-center gap-3 w-full max-w-[420px] justify-between px-4">
-          {/* Wallet icon */}
-          <div className="w-[48px] h-[48px] rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)" }}>
-            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-              <rect x="2" y="5" width="18" height="14" rx="3" fill="#1a1a2e" stroke="#FFE135" strokeWidth="1.5" />
-              <circle cx="15" cy="12" r="2" fill="#FFE135" />
-            </svg>
-          </div>
-
+        <div className="pointer-events-auto flex items-center gap-3 w-full max-w-[420px] justify-center px-4">
           {/* Balance center */}
           <button
             onClick={() => setShowBetPicker(true)}
