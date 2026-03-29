@@ -294,6 +294,15 @@ export default function MysteryBoxPage() {
             </span>
 
             <button
+              onClick={() => {
+                if (navigator.share) {
+                  navigator.share({
+                    title: "Cashback App",
+                    text: "Join me on Cashback App and get a free Mystery Box!",
+                    url: window.location.origin,
+                  }).catch(() => {});
+                }
+              }}
               className="flex-1 py-5 rounded-full active:scale-[0.97] transition-transform"
               style={{ background: "#000000" }}
             >
