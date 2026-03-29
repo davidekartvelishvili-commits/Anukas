@@ -333,7 +333,7 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
 
     // Lever
     const leverGroup = new THREE.Group();
-    leverGroup.position.set(2.9, 0.3, 0);
+    leverGroup.position.set(2.2, 0.3, 0);
     const pole = new THREE.Mesh(
       new THREE.CylinderGeometry(0.05, 0.05, 1.6, 16),
       new THREE.MeshStandardMaterial({ color: 0x888899, metalness: 0.9, roughness: 0.2 })

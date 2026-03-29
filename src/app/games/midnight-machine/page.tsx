@@ -13,6 +13,7 @@ export default function MidnightMachinePage() {
   const [targetSymbols, setTargetSymbols] = useState<[string, string, string] | null>(null);
   const [result, setResult] = useState<SpinResult | null>(null);
   const [showWin, setShowWin] = useState(false);
+  const [showNoLuck, setShowNoLuck] = useState(false);
   const [payoutOpen, setPayoutOpen] = useState(false);
   const [showBetPicker, setShowBetPicker] = useState(true);
   const [betAmount, setBetAmount] = useState(0);
@@ -44,6 +45,9 @@ export default function MidnightMachinePage() {
             data.winType === "triple" && data.winSymbol === "Covrd" ? 60 : 25
           );
           setTimeout(() => setShowWin(false), 2500);
+        } else {
+          setShowNoLuck(true);
+          setTimeout(() => setShowNoLuck(false), 4000);
         }
       }, 3300);
     } catch {
@@ -125,13 +129,17 @@ export default function MidnightMachinePage() {
       </div>
 
       {/* No luck message */}
-      {result && result.winAmount === 0 && !isSpinning && (
-        <div className="absolute top-0 left-0 right-0 z-20 flex justify-center" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 80px)" }}>
-          <p className="text-white/70 text-[16px] font-semibold text-center" style={{ fontFamily: "var(--font-outfit)" }}>
-            No luck this time! Try again!
-          </p>
-        </div>
-      )}
+      <div
+        className={`absolute top-0 left-0 right-0 z-20 flex flex-col items-center transition-opacity duration-500 ${showNoLuck ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 100px)" }}
+      >
+        <p className="text-white text-[28px] font-black text-center" style={{ fontFamily: "var(--font-outfit)" }}>
+          No luck this time!
+        </p>
+        <p className="text-white/60 text-[18px] font-bold text-center mt-1" style={{ fontFamily: "var(--font-outfit)" }}>
+          Try again!
+        </p>
+      </div>
 
       {/* Payout table */}
       <div
