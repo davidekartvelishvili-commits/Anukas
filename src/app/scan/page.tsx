@@ -1,15 +1,35 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 export default function ScanPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [cameraError, setCameraError] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
-    return () => clearTimeout(t);
+
+    // Start camera
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: "environment" } })
+      .then((stream) => {
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      })
+      .catch(() => setCameraError(true));
+
+    return () => {
+      clearTimeout(t);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
   }, []);
 
   return (
@@ -83,6 +103,23 @@ export default function ScanPage() {
                   border: "2px solid rgba(255,255,255,0.15)",
                 }}
               >
+                {/* Camera feed */}
+                {!cameraError ? (
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <p className="text-[13px] text-[#666] text-center px-4" style={{ fontFamily: "var(--font-dm-sans)" }}>
+                      Camera access denied.<br />Please enable camera permissions.
+                    </p>
+                  </div>
+                )}
+
                 {/* Scanning line */}
                 <div
                   className="absolute left-[8px] right-[8px] h-[2px]"
