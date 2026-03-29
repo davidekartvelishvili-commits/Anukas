@@ -268,6 +268,9 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
     dragPrev: { x: number; y: number };
     dragVel: { x: number; y: number };
     targetCamZ: number;
+    targetRotY: number;
+    targetRotX: number;
+    snapToTarget: boolean;
   } | null>(null);
 
   const prevTrigger = useRef(0);
@@ -396,6 +399,9 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
       dragPrev: { x: 0, y: 0 },
       dragVel: { x: 0, y: 0 },
       targetCamZ: 10.5,
+      targetRotY: 0,
+      targetRotX: -0.15,
+      snapToTarget: false,
     };
     sceneRef.current = state;
 
@@ -471,11 +477,15 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
       state.leverAngle += (state.leverTarget - state.leverAngle) * 0.12;
       state.leverGroup.rotation.z = state.leverAngle;
 
-      // 3D rotation with physics (locked during spin)
-      if (state.isSpinning) {
-        // During spin: smoothly hold at rotY=0, rotX=-0.15
-        state.rotY += (0 - state.rotY) * 0.08;
-        state.rotX += (-0.15 - state.rotX) * 0.08;
+      // 3D rotation with physics
+      if (state.isSpinning && state.snapToTarget) {
+        // Smoothly rotate to correct position when zoom starts
+        state.rotY += (state.targetRotY - state.rotY) * 0.03;
+        state.rotX += (state.targetRotX - state.rotX) * 0.03;
+        state.velY = 0;
+        state.velX = 0;
+      } else if (state.isSpinning && !state.snapToTarget) {
+        // Spinning but before zoom — keep current position, no user input
         state.velY = 0;
         state.velX = 0;
       } else if (!state.isDragging) {
@@ -543,11 +553,9 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
     state.isDragging = false;
     onSpinStart?.();
 
-    // Snap to correct position (stick on right side) and stop user rotation
+    // Stop user velocity but keep current rotation — don't snap yet
     state.velY = 0;
     state.velX = 0;
-    state.rotY = 0;
-    state.rotX = -0.15;
 
     // Animate lever
     state.leverTarget = -0.6;
@@ -558,14 +566,18 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
       reel.spin(targetSymbols[i]);
     });
 
-    // After 3s: smoothly zoom in to watch wheels stop
+    // After 3s: smoothly zoom in AND smoothly rotate to correct position (stick right)
     setTimeout(() => {
       state.targetCamZ = 7;
+      state.targetRotY = 0;
+      state.targetRotX = -0.15;
+      state.snapToTarget = true;
     }, 3000);
 
     // After animation completes (~7s)
     setTimeout(() => {
       state.isSpinning = false;
+      state.snapToTarget = false;
       // Smoothly zoom back out
       state.targetCamZ = 10.5;
 
