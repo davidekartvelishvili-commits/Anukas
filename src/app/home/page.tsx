@@ -78,6 +78,7 @@ const GAMES = [
   { id: 1, name: "Midnight Machine", color: "#4338CA", gradient: "linear-gradient(135deg, #4338CA, #6366F1)" },
   { id: 2, name: "Coverd 21", color: "#92400E", gradient: "linear-gradient(135deg, #B45309, #D97706)" },
   { id: 3, name: "Chicken Rush", color: "#DC2626", gradient: "linear-gradient(135deg, #DC2626, #F59E0B)" },
+  { id: 4, name: "Lucky Drop", color: "#059669", gradient: "linear-gradient(135deg, #059669, #34D399)" },
 ];
 
 /* ───────── COUNTDOWN HOOK ───────── */
