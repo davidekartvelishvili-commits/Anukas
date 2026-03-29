@@ -184,8 +184,8 @@ export default function MysteryBoxPage() {
 
   return (
     <>
-      <style>{`html, body { background: #E8C840 !important; }`}</style>
-      <meta name="theme-color" content="#E8C840" />
+      <style>{`html, body { background: #1A1510 !important; }`}</style>
+      <meta name="theme-color" content="#1A1510" />
 
       <main
         className="relative flex flex-col overflow-hidden"
