@@ -348,6 +348,7 @@ export default function HomePage() {
                   onClick={() => {
                     setActiveTab(idx);
                     if (idx === 1) router.push("/games");
+                    if (idx === 2) router.push("/scan");
                   }}
                   className="flex flex-col items-center px-5 py-1.5 rounded-full transition-all duration-200"
                   style={{ background: isActive ? "rgba(255,255,255,0.1)" : "transparent" }}
