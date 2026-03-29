@@ -157,7 +157,7 @@ export default function PromosPage() {
     <div className="flex flex-col h-full min-h-[180px]" style={{ filter: blur ? "blur(12px)" : "none", transition: "filter 0.5s ease-out" }}>
       {/* Top: logo + name below */}
       <div className="mb-auto">
-        <div className="w-[64px] h-[64px] rounded-[16px] overflow-hidden flex items-center justify-center mb-2" style={{ background: deal.image ? "#FFFFFF" : deal.color }}>
+        <div className="w-[76px] h-[76px] rounded-[18px] overflow-hidden flex items-center justify-center mb-2" style={{ background: deal.image ? "#FFFFFF" : deal.color }}>
           {deal.image ? (
             <img src={deal.image} alt={deal.merchant} className="w-[80%] h-[80%] object-contain" />
           ) : (
