@@ -312,7 +312,7 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
     scene.add(machineGroup);
 
     // Reels (add to machineGroup instead of scene)
-    const reelScene = { add: (obj: THREE.Object3D) => machineGroup.add(obj) } as THREE.Scene;
+    const reelScene = { add: (obj: THREE.Object3D) => machineGroup.add(obj) } as unknown as THREE.Scene;
     const reels = [
       new Reel(reelScene, -1.3, 0, 0),
       new Reel(reelScene, 0, 250, 1),
