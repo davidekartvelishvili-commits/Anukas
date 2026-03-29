@@ -221,6 +221,7 @@ export default function HomePage() {
           <div
             className="mt-6 rounded-[20px] overflow-hidden relative cursor-pointer active:scale-[0.98] transition-transform"
             style={{ ...stagger(3), background: "#E8C840", minHeight: 220 }}
+            onClick={() => router.push("/mystery-box")}
           >
             <div className="p-5 relative z-10">
               <p className="text-[15px] font-semibold text-[#1A1A1A] opacity-80" style={{ fontFamily: "var(--font-dm-sans)" }}>
