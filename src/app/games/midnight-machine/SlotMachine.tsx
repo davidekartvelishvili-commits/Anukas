@@ -269,10 +269,10 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
     bgCanvas.width = bgCanvas.height = 512;
     const bgCtx = bgCanvas.getContext("2d")!;
     const bgGrad = bgCtx.createRadialGradient(256, 170, 30, 256, 300, 420);
-    bgGrad.addColorStop(0, "#1a237e");
-    bgGrad.addColorStop(0.35, "#0d1254");
-    bgGrad.addColorStop(0.7, "#070b2e");
-    bgGrad.addColorStop(1, "#030612");
+    bgGrad.addColorStop(0, "#1565C0");
+    bgGrad.addColorStop(0.35, "#0D47A1");
+    bgGrad.addColorStop(0.7, "#062B6E");
+    bgGrad.addColorStop(1, "#031540");
     bgCtx.fillStyle = bgGrad;
     bgCtx.fillRect(0, 0, 512, 512);
     scene.background = new THREE.CanvasTexture(bgCanvas);
@@ -283,7 +283,7 @@ export default function SlotMachine({ spinTrigger, targetSymbols, onSpinStart, o
     keyLight.position.set(1, 3, 4);
     scene.add(keyLight);
 
-    const purpleLight = new THREE.PointLight(0x7c4dff, 2, 12);
+    const purpleLight = new THREE.PointLight(0x1976D2, 2, 12);
     purpleLight.position.set(-3.5, 0.5, 2.5);
     scene.add(purpleLight);
 
