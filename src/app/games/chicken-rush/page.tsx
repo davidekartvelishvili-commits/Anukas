@@ -137,6 +137,8 @@ export default function ChickenRushPage() {
       }
       setGame((g) => g ? { ...g, tiles: newTiles, chickenPos: { row, col }, gameOver: true, won: false, trapMap: data.trapMap } : g);
       setResultText("You hit a trap!");
+      // Auto-restart after 2 seconds
+      setTimeout(() => { setGame(null); setResultText(""); setTimeout(() => startRound(), 100); }, 2000);
     }
     setTimeout(() => setAnimating(false), 300);
   }, [game, animating, betAmount]);
@@ -287,12 +289,6 @@ export default function ChickenRushPage() {
           </button>
         )}
 
-        {/* Play Again */}
-        {game?.gameOver && (
-          <button onClick={playAgain} className="pointer-events-auto px-10 py-5 rounded-full text-[17px] font-black active:scale-[0.97] transition-transform"
-            style={{ background: "#FFD700", color: "#1a1a2e", boxShadow: "0 4px 24px rgba(255,215,0,.25)", fontFamily: "var(--font-outfit)" }}
-          >Play Again</button>
-        )}
 
         {/* Balance */}
         <button onClick={() => setShowBetPicker(true)}
