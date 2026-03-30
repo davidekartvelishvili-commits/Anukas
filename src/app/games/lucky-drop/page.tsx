@@ -35,6 +35,9 @@ export default function LuckyDropPage() {
   const [result, setResult] = useState<{ text: string; isJP: boolean } | null>(null);
   const [showWin, setShowWin] = useState(false);
   const [winAmount, setWinAmount] = useState(0);
+  const [betAmount, setBetAmount] = useState(0);
+  const [showBetPicker, setShowBetPicker] = useState(true);
+  const BET_OPTIONS = [0.25, 0.5, 1, 2.5, 5, 10];
 
   const riskRef = useRef(risk);
   useEffect(() => { riskRef.current = risk; }, [risk]);
@@ -44,10 +47,10 @@ export default function LuckyDropPage() {
     const H = window.innerHeight;
     const pegR = Math.max(4, W * 0.007);
     const cols = ROWS + 2;
-    const gapX = (W - 60) / cols;
-    const gapY = (H * 0.52) / ROWS;
-    const startY = H * 0.16;
-    const slotH = H * 0.08;
+    const gapX = (W - 100) / cols;
+    const gapY = (H * 0.42) / ROWS;
+    const startY = H * 0.22;
+    const slotH = H * 0.065;
 
     const pegs: Peg[] = [];
     const rowEdges: { left: number; right: number; y: number }[] = [];
@@ -72,7 +75,7 @@ export default function LuckyDropPage() {
 
     const mults = MULTIPLIERS[riskRef.current];
     const count = mults.length;
-    const totalW2 = (ROWS + 1) * gapX;
+    const totalW2 = (ROWS + 2) * gapX;
     const sx2 = (W - totalW2) / 2;
     const slotW = totalW2 / count;
     const sy = startY + ROWS * gapY + gapY * 0.6;
@@ -304,8 +307,8 @@ export default function LuckyDropPage() {
   }
 
   const handleDrop = useCallback(async () => {
-    if (balance < BET_COST) return;
-    setBalance((b) => b - BET_COST);
+    if (betAmount <= 0 || balance < betAmount) return;
+    setBalance((b) => b - betAmount);
 
     try {
       const res = await fetch("/api/lucky-drop", {
@@ -357,9 +360,9 @@ export default function LuckyDropPage() {
 
       s.balls.push(ball);
     } catch {
-      setBalance((b) => b + BET_COST);
+      setBalance((b) => b + betAmount);
     }
-  }, [balance, risk]);
+  }, [balance, risk, betAmount]);
 
   return (
     <div className="relative w-full h-[100dvh] bg-[#050a1a] overflow-hidden">
@@ -385,7 +388,7 @@ export default function LuckyDropPage() {
         <div className="bg-white/[0.08] backdrop-blur-2xl border border-white/10 rounded-[22px] px-5 py-2 flex flex-col items-center gap-px">
           <div className="flex items-center gap-1.5 font-bold text-[17px] text-white" style={{ fontFamily: "var(--font-outfit)" }}>
             <span className="text-[14px]">₾</span>
-            {BET_COST}
+            {betAmount > 0 ? betAmount : "—"}
           </div>
           <span className="text-[10px] text-white/[0.45] font-medium uppercase tracking-wider" style={{ fontFamily: "var(--font-dm-sans)" }}>Lucky Drop</span>
         </div>
@@ -393,12 +396,12 @@ export default function LuckyDropPage() {
       </div>
 
       {/* Risk Selector */}
-      <div className="absolute top-[68px] left-0 right-0 z-10 flex justify-center gap-1.5" style={{ marginTop: "env(safe-area-inset-top, 0px)" }}>
+      <div className="absolute left-0 right-0 z-10 flex justify-center gap-2" style={{ top: "calc(env(safe-area-inset-top, 0px) + 80px)" }}>
         {(["low", "mid", "high"] as RiskLevel[]).map((r) => (
           <button
             key={r}
             onClick={() => setRisk(r)}
-            className={`px-4 py-1 rounded-full text-[11px] font-bold border backdrop-blur-lg transition-all active:scale-[0.95] ${
+            className={`px-5 py-1.5 rounded-full text-[12px] font-bold border backdrop-blur-lg transition-all active:scale-[0.95] ${
               risk === r
                 ? r === "low"
                   ? "bg-green-500/20 text-green-400 border-green-400"
@@ -425,7 +428,8 @@ export default function LuckyDropPage() {
       </div>
 
       {/* Bottom UI */}
-      <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center z-10 pointer-events-none gap-2.5" style={{ paddingBottom: "max(18px, calc(env(safe-area-inset-bottom, 0px) + 12px))" }}>
+      <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center z-10 pointer-events-none gap-3" style={{ paddingBottom: "max(18px, calc(env(safe-area-inset-bottom, 0px) + 12px))" }}>
+        {/* Result text */}
         <div
           className={`text-[15px] font-bold min-h-[22px] text-center transition-all duration-300 ${
             result ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1.5"
@@ -435,30 +439,71 @@ export default function LuckyDropPage() {
           {result?.text || ""}
         </div>
 
-        <button
-          onClick={handleDrop}
-          disabled={balance < BET_COST}
-          className="pointer-events-auto px-12 py-6 rounded-full text-[19px] font-black tracking-wide transition-all duration-150 active:scale-[0.97] disabled:bg-[#3a3a4a] disabled:text-[#777] disabled:cursor-not-allowed"
-          style={{
-            background: balance < BET_COST ? "#3a3a4a" : "#FFD700",
-            color: balance < BET_COST ? "#777" : "#1a1a2e",
-            boxShadow: balance < BET_COST ? "none" : "0 4px 24px rgba(255,215,0,.25), inset 0 1px 0 rgba(255,255,255,.3)",
-            fontFamily: "var(--font-outfit)",
-          }}
-        >
-          Drop
-        </button>
+        {/* Pick amount label */}
+        {showBetPicker && (
+          <p className="text-white/50 text-[14px] font-medium" style={{ fontFamily: "var(--font-dm-sans)" }}>
+            Pick amount to play
+          </p>
+        )}
 
-        <div className="pointer-events-auto flex items-center justify-center">
-          <div className="flex items-center gap-2 bg-white/[0.06] border border-white/10 rounded-[30px] px-4 py-2 backdrop-blur-lg">
+        {/* Bet picker pills */}
+        {showBetPicker && (
+          <div className="pointer-events-auto flex gap-2.5 overflow-x-auto px-4 pb-1 scrollbar-hide w-full max-w-[420px]">
+            {BET_OPTIONS.map((amt) => (
+              <button
+                key={amt}
+                onClick={() => { setBetAmount(amt); setShowBetPicker(false); }}
+                className="shrink-0 px-8 py-5 rounded-full text-[20px] font-bold active:scale-[0.95] transition-transform"
+                style={{ background: "#FFD700", color: "#1a1a2e", fontFamily: "var(--font-outfit)" }}
+              >
+                {amt}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Drop button (after bet selected) */}
+        {!showBetPicker && betAmount > 0 && (
+          <button
+            onClick={handleDrop}
+            disabled={balance < betAmount}
+            className="pointer-events-auto px-12 py-6 rounded-full text-[19px] font-black tracking-wide transition-all duration-150 active:scale-[0.97] disabled:bg-[#3a3a4a] disabled:text-[#777] disabled:cursor-not-allowed"
+            style={{
+              background: balance < betAmount ? "#3a3a4a" : "#FFD700",
+              color: balance < betAmount ? "#777" : "#1a1a2e",
+              boxShadow: balance < betAmount ? "none" : "0 4px 24px rgba(255,215,0,.25), inset 0 1px 0 rgba(255,255,255,.3)",
+              fontFamily: "var(--font-outfit)",
+            }}
+          >
+            Drop
+          </button>
+        )}
+
+        {/* Balance bar — same pill shape as Drop button */}
+        <button
+          onClick={() => setShowBetPicker(true)}
+          className="pointer-events-auto px-8 py-4 rounded-full active:scale-[0.97] transition-transform"
+          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+        >
+          <div className="flex flex-col items-center gap-0.5">
+            {betAmount > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
+                  ₾ {betAmount}
+                </span>
+                <span className="text-white/30 text-[13px]">&rsaquo;</span>
+              </div>
+            )}
             <span className="text-[11px] text-white/40" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              Balance{" "}
-              <span className="text-white font-bold">
-                {balance.toLocaleString("en-US", { maximumFractionDigits: 2 })} ₾
-              </span>
+              {betAmount > 0 ? "Balance " : "Pick amount to play"}
+              {betAmount > 0 && (
+                <span className="text-white font-bold">
+                  {balance.toLocaleString("en-US", { maximumFractionDigits: 1 })}
+                </span>
+              )}
             </span>
           </div>
-        </div>
+        </button>
       </div>
     </div>
   );
