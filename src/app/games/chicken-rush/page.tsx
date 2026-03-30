@@ -83,13 +83,19 @@ export default function ChickenRushPage() {
     if (!autoStarted) { setAutoStarted(true); startRound(); }
   }, [autoStarted, startRound]);
 
-  // Auto-restart when game is null (after difficulty change or reset)
+  // Restart when difficulty changes (only if game hasn't progressed)
+  const prevDiff = useRef(difficulty);
   useEffect(() => {
-    if (autoStarted && !game) {
-      const t = setTimeout(() => startRound(), 150);
-      return () => clearTimeout(t);
+    if (prevDiff.current !== difficulty && autoStarted) {
+      prevDiff.current = difficulty;
+      // Refund current bet if game was just started
+      if (game && game.currentRow === 0) {
+        setBalance((b) => b + betAmount);
+      }
+      startRound();
     }
-  }, [game, autoStarted, startRound]);
+  }, [difficulty, autoStarted, startRound, game, betAmount]);
+
 
   const handleTileClick = useCallback(async (row: number, col: number, e: React.MouseEvent | React.TouchEvent) => {
     if (!game || game.gameOver || animating || row !== game.currentRow) return;
@@ -146,7 +152,7 @@ export default function ChickenRushPage() {
       setGame((g) => g ? { ...g, tiles: newTiles, chickenPos: { row, col }, gameOver: true, won: false, trapMap: data.trapMap } : g);
       setResultText("You hit a trap!");
       // Auto-restart after 2 seconds
-      setTimeout(() => { setGame(null); setResultText(""); setTimeout(() => startRound(), 100); }, 2000);
+      setTimeout(() => { setResultText(""); startRound(); }, 2000);
     }
     setTimeout(() => setAnimating(false), 300);
   }, [game, animating, betAmount]);
@@ -165,10 +171,8 @@ export default function ChickenRushPage() {
     setGame((g) => g ? { ...g, gameOver: true, won: true } : g);
     setTimeout(() => setShowWin(false), 2500);
     // Auto-restart after cashout
-    setTimeout(() => { setGame(null); setResultText(""); setTimeout(() => startRound(), 100); }, 2500);
+    setTimeout(() => { setResultText(""); startRound(); }, 2500);
   }, [game, betAmount, startRound]);
-
-  const playAgain = () => { setGame(null); setResultText(""); setTimeout(() => startRound(), 100); };
 
   return (
     <div className="relative w-full h-[100dvh] bg-[#050a1a] overflow-hidden flex flex-col">
@@ -197,18 +201,15 @@ export default function ChickenRushPage() {
 
       {/* Multiplier + Difficulty */}
       <div className="relative z-10 text-center shrink-0 py-1">
-        {game && (
-          <span className="text-[28px] font-black text-white" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 0 20px rgba(255,215,0,0.5)" }}>
-            x{game.multiplier.toFixed(2)}
-          </span>
-        )}
+        <span className="text-[28px] font-black text-white" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 0 20px rgba(255,215,0,0.5)" }}>
+          x{game ? game.multiplier.toFixed(2) : "1.00"}
+        </span>
         {/* Difficulty pills inline */}
         <div className="flex justify-center gap-1.5 mt-1">
           {(Object.keys(DIFFICULTIES) as Difficulty[]).map((d) => (
             <button key={d} onClick={() => {
               if (!game || game.currentRow === 0) {
                 setDifficulty(d);
-                setGame(null);
               }
             }}
               className={`px-3 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-[0.95] ${
