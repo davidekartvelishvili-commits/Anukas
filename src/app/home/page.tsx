@@ -171,7 +171,7 @@ export default function HomePage() {
                   key={game.id}
                   className="shrink-0 w-[130px] h-[130px] rounded-[36px] relative overflow-hidden cursor-pointer active:scale-[0.97] transition-transform"
                   style={{ background: game.gradient }}
-                  onClick={() => { if (game.id === 1) router.push("/games/midnight-machine"); }}
+                  onClick={() => { if (game.id === 1) router.push("/games/midnight-machine"); if (game.id === 4) router.push("/games/lucky-drop"); }}
                 >
                   {/* Video cover for Midnight Machine */}
                   {(game.id === 1 || game.id === 2) ? (
