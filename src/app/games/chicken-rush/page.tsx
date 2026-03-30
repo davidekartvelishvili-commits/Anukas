@@ -83,6 +83,14 @@ export default function ChickenRushPage() {
     if (!autoStarted) { setAutoStarted(true); startRound(); }
   }, [autoStarted, startRound]);
 
+  // Auto-restart when game is null (after difficulty change or reset)
+  useEffect(() => {
+    if (autoStarted && !game) {
+      const t = setTimeout(() => startRound(), 150);
+      return () => clearTimeout(t);
+    }
+  }, [game, autoStarted, startRound]);
+
   const handleTileClick = useCallback(async (row: number, col: number, e: React.MouseEvent | React.TouchEvent) => {
     if (!game || game.gameOver || animating || row !== game.currentRow) return;
     setAnimating(true);
@@ -197,7 +205,12 @@ export default function ChickenRushPage() {
         {/* Difficulty pills inline */}
         <div className="flex justify-center gap-1.5 mt-1">
           {(Object.keys(DIFFICULTIES) as Difficulty[]).map((d) => (
-            <button key={d} onClick={() => { if (!game || game.currentRow === 0) setDifficulty(d); }}
+            <button key={d} onClick={() => {
+              if (!game || game.currentRow === 0) {
+                setDifficulty(d);
+                setGame(null);
+              }
+            }}
               className={`px-3 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-[0.95] ${
                 difficulty === d ? "bg-opacity-20 border-current" : "bg-white/5 text-white/40 border-white/10"
               }`}
