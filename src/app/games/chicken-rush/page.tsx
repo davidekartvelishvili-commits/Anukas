@@ -156,7 +156,9 @@ export default function ChickenRushPage() {
     setResultText(`Cashed out! +${data.winAmount}`);
     setGame((g) => g ? { ...g, gameOver: true, won: true } : g);
     setTimeout(() => setShowWin(false), 2500);
-  }, [game, betAmount]);
+    // Auto-restart after cashout
+    setTimeout(() => { setGame(null); setResultText(""); setTimeout(() => startRound(), 100); }, 2500);
+  }, [game, betAmount, startRound]);
 
   const playAgain = () => { setGame(null); setResultText(""); setTimeout(() => startRound(), 100); };
 
@@ -195,7 +197,7 @@ export default function ChickenRushPage() {
         {/* Difficulty pills inline */}
         <div className="flex justify-center gap-1.5 mt-1">
           {(Object.keys(DIFFICULTIES) as Difficulty[]).map((d) => (
-            <button key={d} onClick={() => { if (!game || game.gameOver) setDifficulty(d); }}
+            <button key={d} onClick={() => { if (!game || game.currentRow === 0) setDifficulty(d); }}
               className={`px-3 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-[0.95] ${
                 difficulty === d ? "bg-opacity-20 border-current" : "bg-white/5 text-white/40 border-white/10"
               }`}
