@@ -169,6 +169,7 @@ export default function GamesPage() {
     setPlayedGames(getPlayedGames());
     if (id === "midnight-machine") router.push("/games/midnight-machine");
     if (id === "lucky-drop") router.push("/games/lucky-drop");
+    if (id === "chicken-rush") router.push("/games/chicken-rush");
   };
 
   const handleTabChange = (idx: number) => {
