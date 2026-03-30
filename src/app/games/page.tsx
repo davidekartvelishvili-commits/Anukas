@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 const ALL_GAMES = [
   { id: "midnight-machine", name: "Midnight Machine", gradient: "linear-gradient(135deg, #4338CA, #6366F1)", media: "/images/onboarding/slot-machine.mp4", type: "video" as const },
   { id: "coverd-21", name: "Coverd 21", gradient: "linear-gradient(135deg, #B45309, #D97706)", media: "/images/onboarding/coverd21.mp4", type: "video" as const },
-  { id: "chicken-rush", name: "Chicken Rush", gradient: "linear-gradient(135deg, #DC2626, #F59E0B)", media: "/images/onboarding/chicken-rush.webp", type: "image" as const },
+  { id: "chicken-rush", name: "Lucky Step", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)", media: "/images/lucky-step-cover.png", type: "image" as const },
   { id: "lucky-drop", name: "Lucky Drop", gradient: "linear-gradient(135deg, #059669, #34D399)", media: "", type: "gradient" as const },
   { id: "wonder-wheel", name: "Wonder Wheel", gradient: "linear-gradient(135deg, #7C3AED, #A855F7)", media: "", type: "gradient" as const },
   { id: "suns-n-moons", name: "Suns N Moons", gradient: "linear-gradient(135deg, #6B7280, #9CA3AF)", media: "", type: "gradient" as const },

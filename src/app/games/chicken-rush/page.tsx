@@ -178,7 +178,7 @@ export default function ChickenRushPage() {
           <div className="flex items-center gap-1.5 font-bold text-[17px] text-white" style={{ fontFamily: "var(--font-outfit)" }}>
             <span className="text-[14px]">₾</span>{betAmount}
           </div>
-          <span className="text-[10px] text-white/[0.45] font-medium uppercase tracking-wider" style={{ fontFamily: "var(--font-dm-sans)" }}>Chicken Rush</span>
+          <span className="text-[10px] text-white/[0.45] font-medium uppercase tracking-wider" style={{ fontFamily: "var(--font-dm-sans)" }}>Lucky Step</span>
         </div>
         <div className="w-9" />
       </div>
