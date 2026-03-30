@@ -238,9 +238,23 @@ export default function LuckyDropPage() {
           if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx) * 0.5; }
           if (b.x > W - b.r) { b.x = W - b.r; b.vx = -Math.abs(b.vx) * 0.5; }
 
-          // Slot landing
+          // Steer ball toward target slot in bottom third
+          const targetSlot = s.slots[b.targetSlot];
+          if (targetSlot && b.y > s.startY + s.gapY * (ROWS * 0.6)) {
+            const targetX = targetSlot.x + targetSlot.w / 2;
+            const dx = targetX - b.x;
+            const progress = Math.min(1, (b.y - s.startY - s.gapY * (ROWS * 0.6)) / (s.gapY * ROWS * 0.4));
+            const steerForce = dx * 0.02 * progress;
+            b.vx += steerForce;
+          }
+
+          // Slot landing — snap to target slot
           if (b.y >= (s.slots[0]?.y || H)) {
             b.settled = true; b.vy = 0; b.vx = 0;
+            // Force ball into correct target slot
+            if (targetSlot) {
+              b.x = targetSlot.x + targetSlot.w / 2;
+            }
             for (const sl of s.slots) {
               if (b.x >= sl.x && b.x <= sl.x + sl.w) { sl.glow = 1; break; }
             }
