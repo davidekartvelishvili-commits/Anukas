@@ -78,7 +78,7 @@ const GAMES = [
   { id: 1, name: "Midnight Machine", color: "#4338CA", gradient: "linear-gradient(135deg, #4338CA, #6366F1)" },
   { id: 2, name: "Coverd 21", color: "#92400E", gradient: "linear-gradient(135deg, #B45309, #D97706)" },
   { id: 3, name: "Lucky Step", color: "#1a237e", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)" },
-  { id: 4, name: "Lucky Drop", color: "#059669", gradient: "linear-gradient(135deg, #059669, #34D399)" },
+  { id: 4, name: "Lucky Drop", color: "#1a237e", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)" },
 ];
 
 /* ───────── COUNTDOWN HOOK ───────── */
@@ -186,6 +186,9 @@ export default function HomePage() {
                   ) : game.id === 3 ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img src="/images/lucky-step-cover.png" alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  ) : game.id === 4 ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src="/images/lucky-drop-cover.png" alt="" className="absolute inset-0 w-full h-full object-cover" />
                   ) : (
                     <div className="absolute inset-0 opacity-20">
                       <div className="absolute top-[20%] left-[10%] w-[60px] h-[60px] rounded-full" style={{ background: "rgba(255,255,255,0.3)" }} />
