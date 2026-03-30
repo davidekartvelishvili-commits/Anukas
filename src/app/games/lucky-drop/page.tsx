@@ -15,6 +15,7 @@ interface Ball {
   x: number; y: number; vx: number; vy: number;
   r: number; alive: boolean; settled: boolean;
   trail: TrailPoint[]; targetSlot: number;
+  data: DropResult;
 }
 
 export default function LuckyDropPage() {
@@ -25,11 +26,12 @@ export default function LuckyDropPage() {
     slots: [] as Slot[],
     W: 0, H: 0,
     gapX: 0, gapY: 0, startY: 0, slotH: 0, pegR: 0,
+    leftWall: [] as { x1: number; y1: number; x2: number; y2: number }[],
+    rightWall: [] as { x1: number; y1: number; x2: number; y2: number }[],
   });
 
   const [balance, setBalance] = useState(5000);
   const [risk, setRisk] = useState<RiskLevel>("low");
-  const [dropping, setDropping] = useState(false);
   const [result, setResult] = useState<{ text: string; isJP: boolean } | null>(null);
   const [showWin, setShowWin] = useState(false);
   const [winAmount, setWinAmount] = useState(0);
@@ -48,6 +50,8 @@ export default function LuckyDropPage() {
     const slotH = H * 0.08;
 
     const pegs: Peg[] = [];
+    const rowEdges: { left: number; right: number; y: number }[] = [];
+
     for (let row = 0; row < ROWS; row++) {
       const c = row + 3;
       const totalW = (c - 1) * gapX;
@@ -55,24 +59,34 @@ export default function LuckyDropPage() {
       for (let col = 0; col < c; col++) {
         pegs.push({ x: sx + col * gapX, y: startY + row * gapY, r: pegR, glow: 0 });
       }
+      rowEdges.push({ left: sx, right: sx + totalW, y: startY + row * gapY });
+    }
+
+    // Build angled walls from peg edges
+    const leftWall: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    const rightWall: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    for (let i = 0; i < rowEdges.length - 1; i++) {
+      leftWall.push({ x1: rowEdges[i].left, y1: rowEdges[i].y, x2: rowEdges[i + 1].left, y2: rowEdges[i + 1].y });
+      rightWall.push({ x1: rowEdges[i].right, y1: rowEdges[i].y, x2: rowEdges[i + 1].right, y2: rowEdges[i + 1].y });
     }
 
     const mults = MULTIPLIERS[riskRef.current];
     const count = mults.length;
-    const totalW = (ROWS + 1) * gapX;
-    const sx = (W - totalW) / 2;
-    const slotW = totalW / count;
+    const totalW2 = (ROWS + 1) * gapX;
+    const sx2 = (W - totalW2) / 2;
+    const slotW = totalW2 / count;
     const sy = startY + ROWS * gapY + gapY * 0.6;
     const colors = SLOT_COLORS[riskRef.current];
 
     const slots: Slot[] = mults.map((m, i) => ({
-      x: sx + i * slotW, y: sy, w: slotW, h: slotH,
+      x: sx2 + i * slotW, y: sy, w: slotW, h: slotH,
       mult: m, color: colors[i], glow: 0,
     }));
 
     const s = stateRef.current;
     s.W = W; s.H = H; s.pegs = pegs; s.slots = slots;
     s.gapX = gapX; s.gapY = gapY; s.startY = startY; s.slotH = slotH; s.pegR = pegR;
+    s.leftWall = leftWall; s.rightWall = rightWall;
   }, []);
 
   useEffect(() => {
@@ -113,6 +127,7 @@ export default function LuckyDropPage() {
         ctx.fill(); ctx.shadowBlur = 0; ctx.restore();
       }
 
+      // Pegs
       for (const peg of s.pegs) {
         peg.glow *= 0.92;
         if (peg.glow > 0.05) {
@@ -133,93 +148,126 @@ export default function LuckyDropPage() {
         ctx.lineWidth = 1; ctx.stroke();
       }
 
+      // Slots
       for (let i = 0; i < s.slots.length; i++) {
         const sl = s.slots[i];
         sl.glow *= 0.95;
         const pulse = 0.5 + Math.sin(now * 0.003 + i * 0.5) * 0.15;
-
         ctx.fillStyle = sl.color + "18";
         ctx.fillRect(sl.x + 1, sl.y, sl.w - 2, sl.h);
-
         if (sl.glow > 0.05) {
           const ga = Math.min(255, Math.floor(sl.glow * 80));
           ctx.fillStyle = sl.color + ga.toString(16).padStart(2, "0");
           ctx.fillRect(sl.x, sl.y, sl.w, sl.h);
         }
-
         const la = Math.min(255, Math.floor((pulse + sl.glow) * 180));
         ctx.fillStyle = sl.color + la.toString(16).padStart(2, "0").slice(0, 2);
         ctx.fillRect(sl.x + 2, sl.y, sl.w - 4, 2.5);
-
         ctx.font = `${sl.mult >= 10 ? "900" : "700"} ${Math.min(sl.w * 0.38, 18)}px sans-serif`;
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.shadowColor = sl.color; ctx.shadowBlur = 8 + sl.glow * 20;
         ctx.fillStyle = sl.mult === 0 ? "rgba(255,255,255,0.2)" : sl.color;
         ctx.fillText(sl.mult === 0 ? "0x" : sl.mult + "x", sl.x + sl.w / 2, sl.y + sl.h / 2);
         ctx.shadowBlur = 0;
-
         ctx.fillStyle = "rgba(255,255,255,0.04)";
         ctx.fillRect(sl.x + sl.w - 0.5, sl.y, 1, sl.h);
       }
 
+      // Balls
       for (let i = s.balls.length - 1; i >= 0; i--) {
         const b = s.balls[i];
         if (!b.alive) { s.balls.splice(i, 1); continue; }
 
-        b.vy += GRAVITY;
-        b.vx *= FRICTION;
-        b.x += b.vx; b.y += b.vy;
+        if (!b.settled) {
+          b.vy += GRAVITY;
+          b.vx *= FRICTION;
+          b.x += b.vx; b.y += b.vy;
 
-        b.trail.push({ x: b.x, y: b.y, a: 1 });
-        if (b.trail.length > 12) b.trail.shift();
-        b.trail.forEach((t) => (t.a *= 0.85));
+          // Trail
+          b.trail.push({ x: b.x, y: b.y, a: 1 });
+          if (b.trail.length > 12) b.trail.shift();
+          b.trail.forEach((t) => (t.a *= 0.85));
 
-        for (const peg of s.pegs) {
-          const dx = b.x - peg.x, dy = b.y - peg.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const minD = b.r + peg.r;
-          if (dist < minD) {
-            const nx = dx / dist, ny = dy / dist;
-            const rv = b.vx * nx + b.vy * ny;
-            if (rv < 0) {
-              b.vx -= (1 + BOUNCE) * rv * nx;
-              b.vy -= (1 + BOUNCE) * rv * ny;
-              b.vx += (Math.random() - 0.5) * 1.2;
+          // Peg collisions
+          for (const peg of s.pegs) {
+            const dx = b.x - peg.x, dy = b.y - peg.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const minD = b.r + peg.r;
+            if (dist < minD) {
+              const nx = dx / dist, ny = dy / dist;
+              const rv = b.vx * nx + b.vy * ny;
+              if (rv < 0) {
+                b.vx -= (1 + BOUNCE) * rv * nx;
+                b.vy -= (1 + BOUNCE) * rv * ny;
+                b.vx += (Math.random() - 0.5) * 1.2;
+              }
+              const ov = minD - dist;
+              b.x += nx * ov; b.y += ny * ov;
+              peg.glow = 1;
             }
-            const ov = minD - dist;
-            b.x += nx * ov; b.y += ny * ov;
-            peg.glow = 1;
+          }
+
+          // Angled wall collisions — keep ball inside the peg triangle
+          for (const wall of s.leftWall) {
+            const wallY = b.y;
+            if (wallY >= wall.y1 && wallY <= wall.y2) {
+              const t = (wallY - wall.y1) / (wall.y2 - wall.y1);
+              const wallX = wall.x1 + t * (wall.x2 - wall.x1) - s.gapX * 0.5;
+              if (b.x < wallX + b.r) {
+                b.x = wallX + b.r;
+                b.vx = Math.abs(b.vx) * 0.5;
+              }
+            }
+          }
+          for (const wall of s.rightWall) {
+            const wallY = b.y;
+            if (wallY >= wall.y1 && wallY <= wall.y2) {
+              const t = (wallY - wall.y1) / (wall.y2 - wall.y1);
+              const wallX = wall.x1 + t * (wall.x2 - wall.x1) + s.gapX * 0.5;
+              if (b.x > wallX - b.r) {
+                b.x = wallX - b.r;
+                b.vx = -Math.abs(b.vx) * 0.5;
+              }
+            }
+          }
+
+          // Hard screen walls as last resort
+          if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx) * 0.5; }
+          if (b.x > W - b.r) { b.x = W - b.r; b.vx = -Math.abs(b.vx) * 0.5; }
+
+          // Slot landing
+          if (b.y >= (s.slots[0]?.y || H)) {
+            b.settled = true; b.vy = 0; b.vx = 0;
+            for (const sl of s.slots) {
+              if (b.x >= sl.x && b.x <= sl.x + sl.w) { sl.glow = 1; break; }
+            }
+            // Trigger win display from settled ball
+            if (typeof (b as any)._onSettle === "function") (b as any)._onSettle();
+            setTimeout(() => { b.alive = false; }, 800);
           }
         }
 
-        if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx) * 0.5; }
-        if (b.x > W - b.r) { b.x = W - b.r; b.vx = -Math.abs(b.vx) * 0.5; }
-
-        if (b.y >= (s.slots[0]?.y || H) && !b.settled) {
-          b.settled = true; b.vy = 0; b.vx = 0;
-          for (const sl of s.slots) {
-            if (b.x >= sl.x && b.x <= sl.x + sl.w) { sl.glow = 1; break; }
-          }
-          setTimeout(() => { b.alive = false; }, 800);
-        }
-
+        // Draw trail
         b.trail.forEach((t, ti) => {
           ctx.beginPath();
           ctx.arc(t.x, t.y, b.r * 0.6 * (ti / b.trail.length), 0, Math.PI * 2);
           ctx.fillStyle = `rgba(255,215,0,${t.a * 0.3})`; ctx.fill();
         });
 
+        // Draw glow
         const gg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r * 3);
         gg.addColorStop(0, "rgba(255,215,0,0.3)"); gg.addColorStop(1, "transparent");
         ctx.fillStyle = gg;
         ctx.fillRect(b.x - b.r * 3, b.y - b.r * 3, b.r * 6, b.r * 6);
 
+        // Draw ball
         const bg2 = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.1, b.x, b.y, b.r);
         bg2.addColorStop(0, "#fff8e1"); bg2.addColorStop(0.3, "#FFD700");
         bg2.addColorStop(0.8, "#FFA000"); bg2.addColorStop(1, "#E65100");
         ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
         ctx.fillStyle = bg2; ctx.fill();
 
+        // Shine
         ctx.beginPath();
         ctx.arc(b.x - b.r * 0.25, b.y - b.r * 0.25, b.r * 0.35, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.fill();
@@ -256,11 +304,8 @@ export default function LuckyDropPage() {
   }
 
   const handleDrop = useCallback(async () => {
-    if (dropping || balance < BET_COST) return;
-    setDropping(true);
+    if (balance < BET_COST) return;
     setBalance((b) => b - BET_COST);
-    setResult(null);
-    setShowWin(false);
 
     try {
       const res = await fetch("/api/lucky-drop", {
@@ -273,16 +318,17 @@ export default function LuckyDropPage() {
       const s = stateRef.current;
       const ballR = Math.max(8, s.W * 0.015);
       const ball: Ball = {
-        x: s.W / 2 + (Math.random() - 0.5) * s.gapX * 0.8,
+        x: s.W / 2 + (Math.random() - 0.5) * s.gapX * 0.5,
         y: s.startY - 40,
-        vx: (Math.random() - 0.5) * 1.5,
+        vx: (Math.random() - 0.5) * 1,
         vy: 0, r: ballR,
         alive: true, settled: false,
         trail: [], targetSlot: data.slotIndex,
+        data,
       };
-      s.balls.push(ball);
 
-      setTimeout(() => {
+      // Called when ball physically settles into a slot
+      (ball as any)._onSettle = () => {
         if (data.winAmount > 0) {
           setBalance((b) => b + data.winAmount);
           const isJP = data.multiplier >= 40;
@@ -301,20 +347,19 @@ export default function LuckyDropPage() {
             spawnParticles(isJP ? 50 : 20, isJP);
             setTimeout(() => setShowWin(false), 2200);
           }
-        } else {
-          setResult({ text: "No win — try again!", isJP: false });
-        }
 
-        setTimeout(() => {
-          setDropping(false);
-          setResult(null);
-        }, 2500);
-      }, 3000);
+          setTimeout(() => setResult(null), 2500);
+        } else {
+          setResult({ text: "0x — No win", isJP: false });
+          setTimeout(() => setResult(null), 2000);
+        }
+      };
+
+      s.balls.push(ball);
     } catch {
       setBalance((b) => b + BET_COST);
-      setDropping(false);
     }
-  }, [dropping, balance, risk]);
+  }, [balance, risk]);
 
   return (
     <div className="relative w-full h-[100dvh] bg-[#050a1a] overflow-hidden">
@@ -392,16 +437,16 @@ export default function LuckyDropPage() {
 
         <button
           onClick={handleDrop}
-          disabled={dropping || balance < BET_COST}
+          disabled={balance < BET_COST}
           className="pointer-events-auto px-12 py-6 rounded-full text-[19px] font-black tracking-wide transition-all duration-150 active:scale-[0.97] disabled:bg-[#3a3a4a] disabled:text-[#777] disabled:cursor-not-allowed"
           style={{
-            background: dropping ? "#3a3a4a" : "#FFD700",
-            color: dropping ? "#777" : "#1a1a2e",
-            boxShadow: dropping ? "none" : "0 4px 24px rgba(255,215,0,.25), inset 0 1px 0 rgba(255,255,255,.3)",
+            background: balance < BET_COST ? "#3a3a4a" : "#FFD700",
+            color: balance < BET_COST ? "#777" : "#1a1a2e",
+            boxShadow: balance < BET_COST ? "none" : "0 4px 24px rgba(255,215,0,.25), inset 0 1px 0 rgba(255,255,255,.3)",
             fontFamily: "var(--font-outfit)",
           }}
         >
-          {dropping ? "Dropping..." : "Drop"}
+          Drop
         </button>
 
         <div className="pointer-events-auto flex items-center justify-center">
