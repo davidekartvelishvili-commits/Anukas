@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { MULTIPLIERS, SLOT_COLORS, BET_COST, type RiskLevel, type DropResult } from "./drop-config";
 
 const ROWS = 12;
-const GRAVITY = 0.25;
+const GRAVITY = 0.4;
 const BOUNCE = 0.55;
 const FRICTION = 0.98;
 
@@ -37,6 +37,8 @@ export default function LuckyDropPage() {
   const [winAmount, setWinAmount] = useState(0);
   const [betAmount, setBetAmount] = useState(0);
   const [showBetPicker, setShowBetPicker] = useState(true);
+  const [bigWinText, setBigWinText] = useState("");
+  const dropQueue = useRef<Promise<void>>(Promise.resolve());
   const BET_OPTIONS = [0.25, 0.5, 1, 2.5, 5, 10];
 
   const riskRef = useRef(risk);
@@ -324,58 +326,46 @@ export default function LuckyDropPage() {
     if (betAmount <= 0 || balance < betAmount) return;
     setBalance((b) => b - betAmount);
 
-    try {
-      const res = await fetch("/api/lucky-drop", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ risk }),
-      });
-      const data: DropResult = await res.json();
+    // Queue drops so balls go one at a time
+    dropQueue.current = dropQueue.current.then(() => new Promise<void>(async (resolve) => {
+      try {
+        const res = await fetch("/api/lucky-drop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ risk }),
+        });
+        const data: DropResult = await res.json();
 
-      const s = stateRef.current;
-      const ballR = Math.max(8, s.W * 0.015);
-      const ball: Ball = {
-        x: s.W / 2 + (Math.random() - 0.5) * s.gapX * 0.5,
-        y: s.startY - 40,
-        vx: (Math.random() - 0.5) * 1,
-        vy: 0, r: ballR,
-        alive: true, settled: false,
-        trail: [], targetSlot: data.slotIndex,
-        data,
-      };
+        const s = stateRef.current;
+        const ballR = Math.max(8, s.W * 0.015);
+        const ball: Ball = {
+          x: s.W / 2 + (Math.random() - 0.5) * s.gapX * 0.5,
+          y: s.startY - 40,
+          vx: (Math.random() - 0.5) * 1,
+          vy: 0, r: ballR,
+          alive: true, settled: false,
+          trail: [], targetSlot: data.slotIndex,
+          data,
+        };
 
-      // Called when ball physically settles into a slot
-      (ball as any)._onSettle = () => {
-        if (data.winAmount > 0) {
-          setBalance((b) => b + data.winAmount);
-          const isJP = data.multiplier >= 40;
-          setResult({
-            text: isJP
-              ? `${data.multiplier}x — +${data.winAmount} coins!`
-              : data.multiplier >= 5
-              ? `${data.multiplier}x — +${data.winAmount} coins!`
-              : `${data.multiplier}x — +${data.winAmount.toFixed(1)}`,
-            isJP,
-          });
-
-          if (data.multiplier >= 5) {
+        (ball as any)._onSettle = () => {
+          if (data.winAmount > 0) {
+            setBalance((b) => b + data.winAmount);
             setWinAmount(data.winAmount);
-            setShowWin(true);
-            spawnParticles(isJP ? 50 : 20, isJP);
-            setTimeout(() => setShowWin(false), 2200);
+            setBigWinText(`+${data.winAmount}`);
+            spawnParticles(data.multiplier >= 40 ? 50 : 20, data.multiplier >= 40);
+            setTimeout(() => setBigWinText(""), 2000);
           }
+          // Resolve queue so next ball can drop
+          setTimeout(() => resolve(), 400);
+        };
 
-          setTimeout(() => setResult(null), 2500);
-        } else {
-          setResult({ text: "0x — No win", isJP: false });
-          setTimeout(() => setResult(null), 2000);
-        }
-      };
-
-      s.balls.push(ball);
-    } catch {
-      setBalance((b) => b + betAmount);
-    }
+        s.balls.push(ball);
+      } catch {
+        setBalance((b) => b + betAmount);
+        resolve();
+      }
+    }));
   }, [balance, risk, betAmount]);
 
   return (
@@ -431,27 +421,16 @@ export default function LuckyDropPage() {
         ))}
       </div>
 
-      {/* Win Overlay */}
-      <div className={`absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none transition-opacity duration-300 ${showWin ? "opacity-100" : "opacity-0"}`}>
-        <span className="text-[52px] font-black bg-gradient-to-br from-yellow-400 to-amber-600 bg-clip-text text-transparent animate-pulse" style={{ filter: "drop-shadow(0 0 30px rgba(255,215,0,.5))", fontFamily: "var(--font-outfit)" }}>
-          +{winAmount}
-        </span>
-        <span className="text-[15px] text-white/60 mt-1" style={{ fontFamily: "var(--font-dm-sans)" }}>
-          {result?.isJP ? "JACKPOT!" : "Coins Won!"}
+      {/* Big center win text */}
+      <div className={`absolute inset-0 z-20 flex items-center justify-center pointer-events-none transition-all duration-300 ${bigWinText ? "opacity-100 scale-100" : "opacity-0 scale-75"}`}>
+        <span className="text-[64px] font-black bg-gradient-to-br from-yellow-400 to-amber-600 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 40px rgba(255,215,0,.6))", fontFamily: "var(--font-outfit)" }}>
+          {bigWinText}
         </span>
       </div>
 
       {/* Bottom UI */}
       <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center z-10 pointer-events-none gap-3" style={{ paddingBottom: "max(18px, calc(env(safe-area-inset-bottom, 0px) + 12px))" }}>
-        {/* Result text */}
-        <div
-          className={`text-[15px] font-bold min-h-[22px] text-center transition-all duration-300 ${
-            result ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1.5"
-          } ${result?.isJP ? "text-[20px] text-red-500" : "text-yellow-400"}`}
-          style={{ textShadow: result?.isJP ? "0 0 30px rgba(255,61,0,.7)" : "0 0 20px rgba(255,215,0,.5)", fontFamily: "var(--font-outfit)" }}
-        >
-          {result?.text || ""}
-        </div>
+        <div className="min-h-[4px]" />
 
         {/* Pick amount label */}
         {showBetPicker && (
