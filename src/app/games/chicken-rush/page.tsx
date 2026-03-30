@@ -291,14 +291,14 @@ export default function ChickenRushPage() {
 
 
         {/* Balance */}
-        <button onClick={() => setShowBetPicker(true)}
+        <button onClick={() => { if (!game || game.currentRow === 0) setShowBetPicker(true); }}
           className="pointer-events-auto px-8 py-4 rounded-full active:scale-[0.97] transition-transform"
           style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
         >
           <div className="flex flex-col items-center gap-0.5">
             <div className="flex items-center gap-1.5">
               <span className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>₾ {betAmount}</span>
-              <span className="text-white/30 text-[13px]">&rsaquo;</span>
+              {(!game || game.currentRow === 0) && <span className="text-white/30 text-[13px]">&rsaquo;</span>}
             </div>
             <span className="text-[11px] text-white/40" style={{ fontFamily: "var(--font-dm-sans)" }}>
               Balance <span className="text-white font-bold">{balance.toLocaleString("en-US", { maximumFractionDigits: 1 })}</span>
