@@ -221,6 +221,26 @@ export default function ChickenRushPage() {
         </div>
       </div>
 
+      {/* Loading Grid placeholder */}
+      {!game && (
+        <div className="relative z-10 flex-1 flex items-center justify-center">
+          <div className="flex flex-col-reverse gap-1.5">
+            {Array.from({ length: 8 }).map((_, row) => (
+              <div key={row} className="flex justify-center gap-1.5">
+                {Array.from({ length: config.cols }).map((_, col) => (
+                  <div key={col} className="rounded-[10px]" style={{
+                    width: `${Math.min(56, (typeof window !== "undefined" ? window.innerWidth : 400) / config.cols - 10)}px`,
+                    height: "42px", background: "#12122e", border: "1px solid rgba(124,77,255,0.1)",
+                    opacity: 0.3 + (row / 8) * 0.4,
+                    animation: `pulse-glow ${1.5 + col * 0.2}s ease-in-out infinite`,
+                  }} />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Game Grid */}
       {game && (
         <div ref={gridRef} className="relative z-10 flex-1 overflow-y-auto px-2 py-1 scrollbar-hide">
