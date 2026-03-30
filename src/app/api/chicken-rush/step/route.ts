@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { rounds } from "../start/route";
+import { rounds } from "../store";
 
 const MULTS: Record<string, number> = { easy: 1.2, medium: 1.3, hard: 1.45, extreme: 1.9 };
 

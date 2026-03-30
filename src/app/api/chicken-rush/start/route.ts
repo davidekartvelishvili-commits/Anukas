@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rounds } from "../store";
 
 const DIFFICULTIES: Record<string, { cols: number; rows: number; mult: number }> = {
   easy:    { cols: 5, rows: 25, mult: 1.2 },
@@ -6,14 +7,6 @@ const DIFFICULTIES: Record<string, { cols: number; rows: number; mult: number }>
   hard:    { cols: 3, rows: 15, mult: 1.45 },
   extreme: { cols: 2, rows: 10, mult: 1.9 },
 };
-
-// In-memory store (replace with Redis in production)
-const rounds = new Map<string, { trapMap: number[]; difficulty: string; betAmount: number; currentRow: number; cashedOut: boolean; multiplier: number }>();
-
-// Clean old rounds every 5 min
-setInterval(() => { if (rounds.size > 1000) rounds.clear(); }, 300000);
-
-export { rounds };
 
 export async function POST(request: Request) {
   try {
@@ -29,8 +22,6 @@ export async function POST(request: Request) {
     }
 
     rounds.set(roundId, { trapMap, difficulty, betAmount, currentRow: 0, cashedOut: false, multiplier: 1 });
-
-    // TTL cleanup
     setTimeout(() => rounds.delete(roundId), 300000);
 
     return NextResponse.json({ roundId, rows: config.rows, cols: config.cols });
