@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { MULTIPLIERS, SLOT_COLORS, BET_COST, type RiskLevel, type DropResult } from "./drop-config";
 
 const ROWS = 12;
-const GRAVITY = 0.4;
+const BASE_GRAVITY = 0.4;
 const BOUNCE = 0.55;
 const FRICTION = 0.98;
 
@@ -15,7 +15,7 @@ interface Ball {
   x: number; y: number; vx: number; vy: number;
   r: number; alive: boolean; settled: boolean;
   trail: TrailPoint[]; targetSlot: number;
-  data: DropResult;
+  data: DropResult; gravity: number;
 }
 
 export default function LuckyDropPage() {
@@ -38,7 +38,7 @@ export default function LuckyDropPage() {
   const [betAmount, setBetAmount] = useState(0);
   const [showBetPicker, setShowBetPicker] = useState(true);
   const [bigWinText, setBigWinText] = useState("");
-  const dropQueue = useRef<Promise<void>>(Promise.resolve());
+  const dropCount = useRef(0);
   const BET_OPTIONS = [0.25, 0.5, 1, 2.5, 5, 10];
 
   const riskRef = useRef(risk);
@@ -184,7 +184,7 @@ export default function LuckyDropPage() {
         if (!b.alive) { s.balls.splice(i, 1); continue; }
 
         if (!b.settled) {
-          b.vy += GRAVITY;
+          b.vy += b.gravity;
           b.vx *= FRICTION;
           b.x += b.vx; b.y += b.vy;
 
@@ -262,7 +262,7 @@ export default function LuckyDropPage() {
             }
             // Trigger win display from settled ball
             if (typeof (b as any)._onSettle === "function") (b as any)._onSettle();
-            setTimeout(() => { b.alive = false; }, 800);
+            setTimeout(() => { b.alive = false; }, 400);
           }
         }
 
@@ -325,47 +325,47 @@ export default function LuckyDropPage() {
   const handleDrop = useCallback(async () => {
     if (betAmount <= 0 || balance < betAmount) return;
     setBalance((b) => b - betAmount);
+    dropCount.current++;
 
-    // Queue drops so balls go one at a time
-    dropQueue.current = dropQueue.current.then(() => new Promise<void>(async (resolve) => {
-      try {
-        const res = await fetch("/api/lucky-drop", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ risk }),
-        });
-        const data: DropResult = await res.json();
+    // Vary gravity: alternates fast/slow/faster pattern
+    const n = dropCount.current;
+    const gravities = [0.35, 0.5, 0.3, 0.55, 0.42, 0.48];
+    const gravity = gravities[n % gravities.length];
 
-        const s = stateRef.current;
-        const ballR = Math.max(8, s.W * 0.015);
-        const ball: Ball = {
-          x: s.W / 2 + (Math.random() - 0.5) * s.gapX * 0.5,
-          y: s.startY - 40,
-          vx: (Math.random() - 0.5) * 1,
-          vy: 0, r: ballR,
-          alive: true, settled: false,
-          trail: [], targetSlot: data.slotIndex,
-          data,
-        };
+    try {
+      const res = await fetch("/api/lucky-drop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ risk }),
+      });
+      const data: DropResult = await res.json();
 
-        (ball as any)._onSettle = () => {
-          if (data.winAmount > 0) {
-            setBalance((b) => b + data.winAmount);
-            setWinAmount(data.winAmount);
-            setBigWinText(`+${data.winAmount}`);
-            spawnParticles(data.multiplier >= 40 ? 50 : 20, data.multiplier >= 40);
-            setTimeout(() => setBigWinText(""), 2000);
-          }
-          // Resolve queue so next ball can drop
-          setTimeout(() => resolve(), 400);
-        };
+      const s = stateRef.current;
+      const ballR = Math.max(8, s.W * 0.015);
+      const ball: Ball = {
+        x: s.W / 2 + (Math.random() - 0.5) * s.gapX * 0.6,
+        y: s.startY - 40,
+        vx: (Math.random() - 0.5) * 1.5,
+        vy: 0, r: ballR,
+        alive: true, settled: false,
+        trail: [], targetSlot: data.slotIndex,
+        data, gravity,
+      };
 
-        s.balls.push(ball);
-      } catch {
-        setBalance((b) => b + betAmount);
-        resolve();
-      }
-    }));
+      (ball as any)._onSettle = () => {
+        if (data.winAmount > 0) {
+          setBalance((b) => b + data.winAmount);
+          setWinAmount(data.winAmount);
+          setBigWinText(`+${data.winAmount}`);
+          spawnParticles(data.multiplier >= 40 ? 50 : 20, data.multiplier >= 40);
+          setTimeout(() => setBigWinText(""), 2000);
+        }
+      };
+
+      s.balls.push(ball);
+    } catch {
+      setBalance((b) => b + betAmount);
+    }
   }, [balance, risk, betAmount]);
 
   return (
