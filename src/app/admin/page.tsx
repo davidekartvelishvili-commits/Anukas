@@ -161,7 +161,7 @@ export default function AdminPage() {
             </div>
             <nav className="flex-1 py-3">
               {NAV_ITEMS.map((item) => (
-                <button key={item.id} onClick={() => { setActiveNav(item.id); setSidebarOpen(false); }}
+                <button key={item.id} onClick={() => { setActiveNav(item.id); setSidebarOpen(false); if (item.id === "algorithm") router.push("/admin/algorithm"); }}
                   className="w-full flex items-center gap-3 px-5 py-2.5 text-left transition-all"
                   style={{ background: activeNav === item.id ? "#1A1A1A" : "transparent", borderLeft: activeNav === item.id ? "3px solid #F9E741" : "3px solid transparent" }}
                 >
