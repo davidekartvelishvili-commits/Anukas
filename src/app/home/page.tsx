@@ -337,7 +337,15 @@ export default function HomePage() {
                   <circle cx="15" cy="15" r="2.2" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.5" />
                 </svg>
               )},
-              { label: "Scan", idx: 2, icon: (a: boolean) => (
+              { label: "Village", idx: 2, icon: (a: boolean) => (
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 20V10l8-7 8 7v10" />
+                  <path d="M8 20v-5h6v5" />
+                  <path d="M1 20h20" />
+                  <circle cx="17" cy="6" r="2" fill={a ? "#FFF" : "none"} />
+                </svg>
+              )},
+              { label: "Scan", idx: 3, icon: (a: boolean) => (
                 <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M2 7V4a2 2 0 012-2h3" />
                   <path d="M15 2h3a2 2 0 012 2v3" />
@@ -354,9 +362,10 @@ export default function HomePage() {
                   onClick={() => {
                     setActiveTab(idx);
                     if (idx === 1) router.push("/games");
-                    if (idx === 2) router.push("/scan");
+                    if (idx === 2) router.push("/village");
+                    if (idx === 3) router.push("/scan");
                   }}
-                  className="flex flex-col items-center px-5 py-1.5 rounded-full transition-all duration-200"
+                  className="flex flex-col items-center px-3.5 py-1.5 rounded-full transition-all duration-200"
                   style={{ background: isActive ? "rgba(255,255,255,0.1)" : "transparent" }}
                 >
                   {icon(isActive)}
