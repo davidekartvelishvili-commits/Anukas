@@ -56,16 +56,16 @@ function NavIcon({ id, active }: { id: string; active: boolean }) {
 }
 
 const NAV_ITEMS = [
-  { label: "Dashboard", id: "dashboard" },
-  { label: "Algorithm", id: "algorithm" },
-  { label: "Users", id: "users" },
-  { label: "Merchants", id: "merchants" },
-  { label: "Transactions", id: "transactions" },
-  { label: "Games", id: "games" },
-  { label: "Village", id: "village" },
-  { label: "Notifications", id: "notifications" },
-  { label: "Analytics", id: "analytics" },
-  { label: "System", id: "system" },
+  { label: "Dashboard", id: "dashboard", href: "/admin" },
+  { label: "Algorithm", id: "algorithm", href: "/admin/algorithm" },
+  { label: "Users", id: "users", href: "/admin/users" },
+  { label: "Merchants", id: "merchants", href: "/admin/merchants" },
+  { label: "Transactions", id: "transactions", href: "/admin/transactions" },
+  { label: "Games", id: "games", href: "/admin/games" },
+  { label: "Village", id: "village", href: "/admin/village" },
+  { label: "Notifications", id: "notifications", href: "/admin/notifications" },
+  { label: "Analytics", id: "analytics", href: "/admin/analytics" },
+  { label: "System", id: "system", href: "/admin/system" },
 ];
 
 /* ── SIMPLE SVG CHART ── */
@@ -134,7 +134,7 @@ export default function AdminPage() {
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
-              onClick={() => { setActiveNav(item.id); if (item.id === "algorithm") router.push("/admin/algorithm"); }}
+              onClick={() => { setActiveNav(item.id); router.push(item.href); }}
               className="w-full flex items-center gap-3 px-5 py-2.5 text-left transition-all"
               style={{
                 background: activeNav === item.id ? "#1A1A1A" : "transparent",
@@ -161,7 +161,7 @@ export default function AdminPage() {
             </div>
             <nav className="flex-1 py-3">
               {NAV_ITEMS.map((item) => (
-                <button key={item.id} onClick={() => { setActiveNav(item.id); setSidebarOpen(false); if (item.id === "algorithm") router.push("/admin/algorithm"); }}
+                <button key={item.id} onClick={() => { setActiveNav(item.id); setSidebarOpen(false); router.push(item.href); }}
                   className="w-full flex items-center gap-3 px-5 py-2.5 text-left transition-all"
                   style={{ background: activeNav === item.id ? "#1A1A1A" : "transparent", borderLeft: activeNav === item.id ? "3px solid #F9E741" : "3px solid transparent" }}
                 >
