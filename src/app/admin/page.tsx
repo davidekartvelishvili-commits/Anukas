@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 /* ── MOCK DATA ── */
 const MOCK_STATS = {
@@ -99,6 +100,7 @@ function MiniChart({ data }: { data: { day: string; value: number }[] }) {
 }
 
 export default function AdminPage() {
+  const router = useRouter();
   const [now, setNow] = useState(new Date());
   const [activeNav, setActiveNav] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -132,7 +134,7 @@ export default function AdminPage() {
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveNav(item.id)}
+              onClick={() => { setActiveNav(item.id); if (item.id === "algorithm") router.push("/admin/algorithm"); }}
               className="w-full flex items-center gap-3 px-5 py-2.5 text-left transition-all"
               style={{
                 background: activeNav === item.id ? "#1A1A1A" : "transparent",
