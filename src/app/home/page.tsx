@@ -560,7 +560,7 @@ export default function HomePage() {
                 }
               }}
               disabled={!exchangeAmount || parseFloat(exchangeAmount) <= 0 || parseFloat(exchangeAmount) > cashBalance}
-              className="mx-auto block px-16 py-6 rounded-full text-[16px] font-bold transition-all active:scale-[0.97] disabled:opacity-40"
+              className="mx-auto block px-10 py-8 rounded-full text-[16px] font-bold transition-all active:scale-[0.97] disabled:opacity-40"
               style={{ background: "#F9E741", color: "#000", fontFamily: "var(--font-outfit)" }}
             >
               Exchange

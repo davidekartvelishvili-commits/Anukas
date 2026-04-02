@@ -618,7 +618,7 @@ export default function ProfilePage() {
                 if (amt > 0 && amt <= cashBalance) { setCashBalance((b) => b - amt); setCoinBalance((c) => c + amt * 100); setShowExchange(false); setExchangeAmount(""); }
               }}
               disabled={!exchangeAmount || parseFloat(exchangeAmount) <= 0 || parseFloat(exchangeAmount) > cashBalance}
-              className="mx-auto block px-16 py-6 rounded-full text-[16px] font-bold transition-all active:scale-[0.97] disabled:opacity-40"
+              className="mx-auto block px-10 py-8 rounded-full text-[16px] font-bold transition-all active:scale-[0.97] disabled:opacity-40"
               style={{ background: "#F9E741", color: "#000", fontFamily: "var(--font-outfit)" }}
             >Exchange</button>
           </div>
