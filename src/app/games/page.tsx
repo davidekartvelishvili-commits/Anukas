@@ -156,7 +156,8 @@ export default function GamesPage() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState(1);
   const [playedGames, setPlayedGames] = useState<string[]>([]);
-  const [mode, setMode] = useState<"cash" | "practice">("cash");
+  const [mode, setMode] = useState<"cash" | "coins">("coins");
+  const [showCashNotif, setShowCashNotif] = useState(false);
 
   useEffect(() => {
     setPlayedGames(getPlayedGames());
@@ -198,7 +199,7 @@ export default function GamesPage() {
             <div className="flex-1" />
             <div className="flex items-center gap-1 rounded-full overflow-hidden p-1" style={{ background: "#1C1C1E" }}>
               <button
-                onClick={() => setMode("cash")}
+                onClick={() => setShowCashNotif(true)}
                 className="flex items-center justify-center gap-1 px-3 py-1.5 transition-all duration-200 rounded-full min-w-[80px]"
                 style={{ background: mode === "cash" ? "#FFFFFF" : "transparent" }}
               >
@@ -206,12 +207,12 @@ export default function GamesPage() {
                 <span className={`text-[11px] font-bold ${mode === "cash" ? "text-black" : "text-white"}`} style={{ fontFamily: "var(--font-outfit)" }}>28</span>
               </button>
               <button
-                onClick={() => setMode("practice")}
+                onClick={() => setMode("coins")}
                 className="flex items-center justify-center gap-1 px-3 py-1.5 transition-all duration-200 rounded-full min-w-[80px]"
-                style={{ background: mode === "practice" ? "#FFFFFF" : "transparent" }}
+                style={{ background: mode === "coins" ? "#FFFFFF" : "transparent" }}
               >
-                <span className="text-[12px]">🪙</span>
-                <span className={`text-[11px] font-bold ${mode === "practice" ? "text-black" : "text-white"}`} style={{ fontFamily: "var(--font-dm-sans)" }}>Practice</span>
+                <img src="/images/coin-icon.png" alt="Coin" width={16} height={16} style={{ objectFit: "contain" }} />
+                <span className={`text-[11px] font-bold ${mode === "coins" ? "text-black" : "text-white"}`} style={{ fontFamily: "var(--font-outfit)" }}>5,000</span>
               </button>
             </div>
             <div className="flex-1 flex justify-end">
@@ -227,7 +228,7 @@ export default function GamesPage() {
 
           {/* ── Play for Cash label ── */}
           <p className="text-white text-center text-[19px] font-bold mb-6" style={{ ...stagger(0), fontFamily: "var(--font-outfit)" }}>
-            {mode === "cash" ? "Play for Cash" : "Practice Mode"}
+            Play with Coins
           </p>
 
           {/* ── Your Favorites ── */}
@@ -337,6 +338,48 @@ export default function GamesPage() {
           </div>
         </nav>
       </main>
+
+      {/* Cash notification popup */}
+      {showCashNotif && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          onClick={() => setShowCashNotif(false)}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative rounded-[20px] px-8 py-10 flex flex-col items-center max-w-[320px] w-full"
+            style={{
+              background: "rgba(50, 50, 50, 0.08)",
+              backdropFilter: "blur(12px) saturate(200%)",
+              WebkitBackdropFilter: "blur(12px) saturate(200%)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              animation: "fadeIn 0.2s ease-out",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img src="/images/coin-icon.png" alt="Coin" width={48} height={48} style={{ objectFit: "contain" }} className="mb-4" />
+            <h3
+              className="text-white text-[20px] font-bold text-center mb-2"
+              style={{ fontFamily: "var(--font-outfit)" }}
+            >
+              Coins Only
+            </h3>
+            <p
+              className="text-[#999] text-[14px] text-center"
+              style={{ fontFamily: "var(--font-dm-sans)" }}
+            >
+              Games are available only with Coins
+            </p>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </>
   );
 }
