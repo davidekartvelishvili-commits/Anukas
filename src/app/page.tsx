@@ -16,8 +16,11 @@ export default function SplashScreen() {
     const t3 = setTimeout(() => setPhase(3), 1800);
     // Phase 4: Fade out + redirect (3500ms)
     const t4 = setTimeout(() => setPhase(4), 3500);
-    // Navigate after fade completes
-    const t5 = setTimeout(() => router.push("/welcome"), 4200);
+    // Navigate after fade completes — check auth
+    const t5 = setTimeout(() => {
+      const token = localStorage.getItem("shansi_token");
+      router.push(token ? "/home" : "/welcome");
+    }, 4200);
 
     return () => {
       clearTimeout(t1);

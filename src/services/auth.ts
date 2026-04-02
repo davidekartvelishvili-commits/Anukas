@@ -1,0 +1,95 @@
+import { apiFetch } from "./api";
+
+export interface User {
+  id: string;
+  phone: string;
+  name: string | null;
+  balance: number;
+  hasPin: boolean;
+}
+
+interface VerifyOtpResponse {
+  success: boolean;
+  token: string;
+  user: User;
+  isNewUser: boolean;
+}
+
+export async function sendOtp(phone: string) {
+  // Ensure E.164 format
+  const formatted = phone.startsWith("+995") ? phone : `+995${phone}`;
+  return apiFetch("/auth/send-otp", {
+    method: "POST",
+    body: JSON.stringify({ phone: formatted }),
+  });
+}
+
+export async function verifyOtp(phone: string, code: string): Promise<VerifyOtpResponse> {
+  const formatted = phone.startsWith("+995") ? phone : `+995${phone}`;
+  const data = await apiFetch<VerifyOtpResponse>("/auth/verify-otp", {
+    method: "POST",
+    body: JSON.stringify({ phone: formatted, code }),
+  });
+
+  // Store token and user
+  if (data.success && data.token) {
+    localStorage.setItem("shansi_token", data.token);
+    localStorage.setItem("shansi_user", JSON.stringify(data.user));
+  }
+
+  return data;
+}
+
+export async function setupPin(pin: string) {
+  return apiFetch("/auth/pin/setup", {
+    method: "POST",
+    body: JSON.stringify({ pin }),
+  });
+}
+
+export async function verifyPin(pin: string) {
+  return apiFetch("/auth/pin/verify", {
+    method: "POST",
+    body: JSON.stringify({ pin }),
+  });
+}
+
+export async function verifyBiometric() {
+  return apiFetch("/auth/biometric/verify", {
+    method: "POST",
+  });
+}
+
+export async function getMe() {
+  const data = await apiFetch<{ user: User }>("/auth/me");
+  if (data.success && data.user) {
+    localStorage.setItem("shansi_user", JSON.stringify(data.user));
+  }
+  return data;
+}
+
+export async function logout() {
+  try {
+    await apiFetch("/auth/logout", { method: "POST" });
+  } catch {
+    // Ignore errors — we're logging out anyway
+  }
+  localStorage.removeItem("shansi_token");
+  localStorage.removeItem("shansi_user");
+}
+
+export function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("shansi_token");
+}
+
+export function getStoredUser(): User | null {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem("shansi_user");
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+export function isAuthenticated(): boolean {
+  return !!getStoredToken();
+}

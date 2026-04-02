@@ -3,11 +3,13 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { verifyOtp, sendOtp } from "@/services/auth";
 
 function VerifyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const phoneRaw = searchParams.get("phone") || "";
+  const [verifyError, setVerifyError] = useState("");
 
   // Format phone for display: +995 5XX XX XX XX
   const formatDisplay = (d: string) => {
@@ -38,10 +40,7 @@ function VerifyContent() {
 
     // Auto-submit when all 6 filled
     if (value && index === 5 && next.every((d) => d !== "")) {
-      setVerifying(true);
-      setTimeout(() => {
-        router.push("/auth/email");
-      }, 1200);
+      submitOtp(next.join(""));
     }
   };
 
@@ -64,14 +63,35 @@ function VerifyContent() {
     inputRefs.current[focusIdx]?.focus();
 
     if (pasted.length === 6) {
-      setVerifying(true);
-      setTimeout(() => router.push("/auth/email"), 1200);
+      submitOtp(pasted);
     }
   };
 
-  const handleResend = () => {
+  const submitOtp = async (code: string) => {
+    setVerifying(true);
+    setVerifyError("");
+    try {
+      const data = await verifyOtp(phoneRaw, code);
+      if (data.isNewUser) {
+        router.push("/auth/setup");
+      } else {
+        router.push("/home");
+      }
+    } catch (err: any) {
+      setVerifyError(err.message || "Invalid code");
+      setVerifying(false);
+      setOtp(["", "", "", "", "", ""]);
+      inputRefs.current[0]?.focus();
+    }
+  };
+
+  const handleResend = async () => {
     setOtp(["", "", "", "", "", ""]);
+    setVerifyError("");
     inputRefs.current[0]?.focus();
+    try {
+      await sendOtp(phoneRaw);
+    } catch {}
   };
 
   return (
@@ -153,6 +173,11 @@ function VerifyContent() {
 
         {/* ── Spacer ── */}
         <div className="flex-1" />
+
+        {/* Error */}
+        {verifyError && (
+          <p className="text-[#EF4444] text-[14px] text-center font-medium mb-2" style={{ fontFamily: "var(--font-dm-sans)" }}>{verifyError}</p>
+        )}
 
         {/* ── Resend Code ── */}
         <div className="flex justify-center pb-4 shrink-0">

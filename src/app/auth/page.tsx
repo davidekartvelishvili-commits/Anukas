@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { sendOtp, verifyPin as verifyPinApi, verifyBiometric } from "@/services/auth";
 
 function AuthContent() {
   const router = useRouter();
@@ -10,6 +11,8 @@ function AuthContent() {
   const isLogin = searchParams.get("mode") === "login";
   const [phone, setPhone] = useState("");
   const [focused, setFocused] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Face ID state
@@ -35,9 +38,18 @@ function AuthContent() {
   const digits = phone.replace(/\D/g, "");
   const isValid = digits.length === 9;
 
-  const handleContinue = () => {
-    if (!isValid) return;
-    router.push(`/auth/verify?phone=${digits}`);
+  const handleContinue = async () => {
+    if (!isValid || sending) return;
+    setSending(true);
+    setSendError("");
+    try {
+      await sendOtp(digits);
+      router.push(`/auth/verify?phone=${digits}`);
+    } catch (err: any) {
+      setSendError(err.message || "Failed to send OTP");
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleFaceScan = () => {
@@ -55,13 +67,18 @@ function AuthContent() {
     }, 2000);
   };
 
-  const handlePinSubmit = (val: string) => {
+  const handlePinSubmit = async (val: string) => {
     const clean = val.replace(/\D/g, "").slice(0, 6);
     setPinInput(clean);
     setPinError("");
     if (clean.length === 6) {
-      // Mock: accept any 6-digit PIN
-      router.push("/home");
+      try {
+        await verifyPinApi(clean);
+        router.push("/home");
+      } catch (err: any) {
+        setPinError(err.message || "Invalid PIN");
+        setPinInput("");
+      }
     }
   };
 
@@ -160,18 +177,22 @@ function AuthContent() {
           <span className="underline text-[#9CA3AF]">Privacy Policy</span>.
         </p>
 
+        {sendError && (
+          <p className="text-[#EF4444] text-[13px] text-center mb-2" style={{ fontFamily: "var(--font-dm-sans)" }}>{sendError}</p>
+        )}
+
         <button
           onClick={handleContinue}
-          disabled={!isValid}
+          disabled={!isValid || sending}
           className="w-full h-[64px] rounded-[32px] text-[18px] font-bold transition-all duration-200 active:scale-[0.97]"
           style={{
             fontFamily: "var(--font-outfit), system-ui, sans-serif",
-            background: isValid ? "#FFE500" : "#1C1C1E",
-            color: isValid ? "#000000" : "#4B5563",
-            cursor: isValid ? "pointer" : "not-allowed",
+            background: isValid && !sending ? "#FFE500" : "#1C1C1E",
+            color: isValid && !sending ? "#000000" : "#4B5563",
+            cursor: isValid && !sending ? "pointer" : "not-allowed",
           }}
         >
-          Continue
+          {sending ? "Sending..." : "Continue"}
         </button>
 
         {/* Face ID login button — only on login mode */}

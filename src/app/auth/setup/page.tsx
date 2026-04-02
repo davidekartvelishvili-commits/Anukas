@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/services/api";
 
 /* ───────── SVG ICONS ───────── */
 
@@ -182,9 +183,17 @@ export default function SetupPage() {
     return parts.map((p) => p[0]).join("").slice(0, 2).toUpperCase();
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     setFinishing(true);
-    setTimeout(() => router.push("/home"), 1200);
+    try {
+      if (name.trim()) {
+        await apiFetch("/user/profile", {
+          method: "PATCH",
+          body: JSON.stringify({ name: name.trim().replace(/\s+/g, "_").slice(0, 20) }),
+        });
+      }
+    } catch {}
+    router.push("/home");
   };
 
   const canFinish = name.trim().length > 0;
