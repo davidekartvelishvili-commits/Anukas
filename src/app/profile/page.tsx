@@ -504,12 +504,14 @@ export default function ProfilePage() {
               >
                 <div className="w-[52px] h-[52px] rounded-full bg-white flex items-center justify-center">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="5" width="18" height="14" rx="2" />
-                    <path d="M12 9v6M9 12h6" />
+                    <path d="M7 16l-4-4 4-4" />
+                    <path d="M3 12h14" />
+                    <path d="M17 8l4 4-4 4" />
+                    <path d="M21 12H7" />
                   </svg>
                 </div>
                 <span className="text-white text-[14px] font-semibold" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                  Add to Balance
+                  Exchange
                 </span>
               </button>
               <button
