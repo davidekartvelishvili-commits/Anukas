@@ -134,8 +134,8 @@ export default function ProfilePage() {
               <img
                 src="/images/lari-icon.png"
                 alt="₾"
-                width={90}
-                height={90}
+                width={100}
+                height={100}
                 style={{ objectFit: "contain" }}
                 className="mb-1"
               />
