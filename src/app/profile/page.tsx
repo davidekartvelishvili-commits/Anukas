@@ -100,6 +100,16 @@ export default function ProfilePage() {
             >
               Cashback User
             </h1>
+
+            {/* Level badge */}
+            <div className="flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full" style={{ background: "rgba(249,231,65,0.12)", border: "1px solid rgba(249,231,65,0.2)" }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="#F9E741" stroke="none">
+                <path d="M7 0.5l1.76 3.57 3.94.57-2.85 2.78.67 3.93L7 9.46l-3.52 1.89.67-3.93L1.3 4.64l3.94-.57L7 0.5z" />
+              </svg>
+              <span className="text-[12px] font-bold" style={{ color: "#F9E741", fontFamily: "var(--font-outfit)" }}>
+                Level 1
+              </span>
+            </div>
           </div>
 
           {/* ── Balance row: Coins + Lari + Card ── */}
