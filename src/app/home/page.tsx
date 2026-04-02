@@ -487,62 +487,64 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ── Exchange Popup ── */}
+      {/* ── Exchange Popup (bottom sheet) ── */}
       {showExchange && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
+          className="fixed inset-0 z-50 flex items-end justify-center"
           onClick={() => setShowExchange(false)}
         >
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="relative rounded-[20px] px-6 py-7 max-w-[340px] w-full"
+            className="relative w-full max-w-[430px] rounded-t-[36px] pb-8 pt-3 px-5"
             style={{
               background: "rgba(50, 50, 50, 0.08)",
               backdropFilter: "blur(12px) saturate(200%)",
               WebkitBackdropFilter: "blur(12px) saturate(200%)",
-              border: "1px solid rgba(255,255,255,0.2)",
-              animation: "fadeIn 0.2s ease-out",
+              borderTop: "1px solid rgba(255,255,255,0.2)",
+              animation: "slideUp 0.3s ease-out",
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-white text-[18px] font-bold text-center mb-5" style={{ fontFamily: "var(--font-outfit)" }}>
+            <div className="w-[36px] h-[5px] rounded-full bg-white/30 mx-auto mb-5" />
+
+            <h3 className="text-white text-[20px] font-bold text-center mb-6" style={{ fontFamily: "var(--font-outfit)" }}>
               Exchange
             </h3>
 
-            {/* Cash input row */}
-            <div className="flex items-center gap-3 px-4 py-3 rounded-[14px] mb-3" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            {/* Cash input line */}
+            <div className="flex items-center gap-3 py-3 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
               <img src="/images/lari-icon.png" alt="₾" width={32} height={32} style={{ objectFit: "contain" }} />
               <input
                 type="number"
                 placeholder="0"
                 value={exchangeAmount}
                 onChange={(e) => setExchangeAmount(e.target.value)}
-                className="flex-1 bg-transparent text-white text-[20px] font-bold outline-none"
+                className="flex-1 bg-transparent text-white text-[22px] font-bold outline-none"
                 style={{ fontFamily: "var(--font-outfit)" }}
                 min={0}
                 max={cashBalance}
               />
-              <span className="text-[12px] text-[#888]" style={{ fontFamily: "var(--font-dm-sans)" }}>₾ Balance: {cashBalance}</span>
+              <span className="text-[12px] text-[#666] shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>Balance: {cashBalance} ₾</span>
             </div>
 
             {/* Arrow */}
-            <div className="flex justify-center my-2">
+            <div className="flex justify-center py-2">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#F9E741" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M10 4v12M6 12l4 4 4-4" />
               </svg>
             </div>
 
-            {/* Coin output row */}
-            <div className="flex items-center gap-3 px-4 py-3 rounded-[14px] mb-5" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            {/* Coin output line */}
+            <div className="flex items-center gap-3 py-3 border-b mb-4" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
               <img src="/images/coin-icon.png" alt="Coin" width={32} height={32} style={{ objectFit: "contain" }} />
-              <span className="flex-1 text-white text-[20px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
+              <span className="flex-1 text-white text-[22px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
                 {exchangeAmount ? (parseFloat(exchangeAmount) * 100).toLocaleString() : "0"}
               </span>
-              <span className="text-[12px] text-[#888]" style={{ fontFamily: "var(--font-dm-sans)" }}>Coins</span>
+              <span className="text-[12px] text-[#666] shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>Coins</span>
             </div>
 
-            {/* Rate info */}
-            <p className="text-[11px] text-[#666] text-center mb-4" style={{ fontFamily: "var(--font-dm-sans)" }}>
+            {/* Rate */}
+            <p className="text-[11px] text-[#666] text-center mb-5" style={{ fontFamily: "var(--font-dm-sans)" }}>
               1 ₾ = 100 Coins
             </p>
 
