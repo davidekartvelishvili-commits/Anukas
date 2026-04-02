@@ -192,15 +192,15 @@ export default function SecurityPage() {
 
         {/* ── PIN Setup Modal ── */}
         {showPinSetup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => { setShowPinSetup(false); setPinError(""); }}>
-            <div className="absolute inset-0 bg-black/40" />
+          <div className="fixed inset-0 z-50 flex items-start justify-center pt-[25vh]" onClick={() => { setShowPinSetup(false); setPinError(""); }}>
+            <div className="absolute inset-0 bg-black/30" />
             <div
               className="relative rounded-[20px] px-8 py-8 flex flex-col items-center max-w-[320px] w-full"
               style={{
-                background: "rgba(30, 30, 30, 0.55)",
-                backdropFilter: "blur(40px) saturate(200%)",
-                WebkitBackdropFilter: "blur(40px) saturate(200%)",
-                border: "1px solid rgba(255,255,255,0.2)",
+                background: "rgba(60, 60, 60, 0.12)",
+                backdropFilter: "blur(8px) saturate(180%)",
+                WebkitBackdropFilter: "blur(8px) saturate(180%)",
+                border: "1px solid rgba(255,255,255,0.15)",
               }}
               onClick={(e) => e.stopPropagation()}
             >
