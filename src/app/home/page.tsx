@@ -497,10 +497,10 @@ export default function HomePage() {
           <div
             className="relative w-full max-w-[430px] rounded-t-[36px] pb-8 pt-3 px-5"
             style={{
-              background: "rgba(50, 50, 50, 0.08)",
-              backdropFilter: "blur(12px) saturate(200%)",
-              WebkitBackdropFilter: "blur(12px) saturate(200%)",
-              borderTop: "1px solid rgba(255,255,255,0.2)",
+              background: "rgba(30, 30, 30, 0.55)",
+              backdropFilter: "blur(40px) saturate(200%)",
+              WebkitBackdropFilter: "blur(40px) saturate(200%)",
+              borderTop: "1px solid rgba(255,255,255,0.15)",
               animation: "slideUp 0.3s ease-out",
             }}
             onClick={(e) => e.stopPropagation()}
@@ -560,7 +560,7 @@ export default function HomePage() {
                 }
               }}
               disabled={!exchangeAmount || parseFloat(exchangeAmount) <= 0 || parseFloat(exchangeAmount) > cashBalance}
-              className="w-full py-4 rounded-full text-[16px] font-bold transition-all active:scale-[0.97] disabled:opacity-40"
+              className="mx-auto block px-16 py-6 rounded-full text-[16px] font-bold transition-all active:scale-[0.97] disabled:opacity-40"
               style={{ background: "#F9E741", color: "#000", fontFamily: "var(--font-outfit)" }}
             >
               Exchange
