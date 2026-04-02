@@ -10,8 +10,10 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.12",
     "@libsql/client": "^0.14.0",
     "bcryptjs": "^2.4.3",
+    "dotenv": "^17.4.0",
     "drizzle-orm": "^0.36.0",
     "hono": "^4.6.0",
     "jsonwebtoken": "^9.0.2",

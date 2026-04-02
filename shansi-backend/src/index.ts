@@ -1,3 +1,5 @@
+import "dotenv/config";
+import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
@@ -51,9 +53,6 @@ app.notFound((c) => {
 const env = getEnv();
 const port = parseInt(env.PORT);
 
-console.log(`Shansi backend starting on port ${port}...`);
-
-export default {
-  port,
-  fetch: app.fetch,
-};
+serve({ fetch: app.fetch, port }, () => {
+  console.log(`Shansi backend running on http://localhost:${port}`);
+});
