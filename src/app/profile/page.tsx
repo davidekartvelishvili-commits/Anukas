@@ -98,44 +98,73 @@ export default function ProfilePage() {
             </h1>
           </div>
 
-          {/* ── Balance + Card row ── */}
+          {/* ── Balance row: Coins + Lari + Card ── */}
           <div className="flex items-end justify-center gap-0 mb-10" style={stagger(2)}>
-            {/* Manage Funds */}
-            <div className="flex-1 flex flex-col items-center cursor-pointer active:scale-[0.97] transition-transform" onClick={() => setShowBalanceModal(true)}>
+            {/* Coins (for playing) */}
+            <div className="flex-1 flex flex-col items-center">
               <img
-                src="/images/lari-icon.png"
-                alt="₾"
-                width={110}
-                height={110}
+                src="/images/coin-icon.png"
+                alt="Coin"
+                width={80}
+                height={80}
                 style={{ objectFit: "contain" }}
                 className="mb-1"
               />
               <div className="flex items-center gap-1 mb-1">
                 <span
-                  className="text-white text-[24px] font-bold"
+                  className="text-white text-[22px] font-bold"
                   style={{ fontFamily: "var(--font-outfit)" }}
                 >
-                  28
+                  5,000
                 </span>
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 5l3 3 3-3" />
-                </svg>
               </div>
               <span
-                className="text-[13px] text-[#888]"
+                className="text-[12px] text-[#888]"
                 style={{ fontFamily: "var(--font-dm-sans)" }}
               >
-                Manage Funds
+                Coins
               </span>
             </div>
 
             {/* Divider */}
-            <div className="w-[1px] h-[60px] bg-[#333]" />
+            <div className="w-[1px] h-[50px] bg-[#333]" />
+
+            {/* Lari (winnings) */}
+            <div className="flex-1 flex flex-col items-center cursor-pointer active:scale-[0.97] transition-transform" onClick={() => setShowBalanceModal(true)}>
+              <img
+                src="/images/lari-icon.png"
+                alt="₾"
+                width={80}
+                height={80}
+                style={{ objectFit: "contain" }}
+                className="mb-1"
+              />
+              <div className="flex items-center gap-1 mb-1">
+                <span
+                  className="text-white text-[22px] font-bold"
+                  style={{ fontFamily: "var(--font-outfit)" }}
+                >
+                  28
+                </span>
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 5l3 3 3-3" />
+                </svg>
+              </div>
+              <span
+                className="text-[12px] text-[#888]"
+                style={{ fontFamily: "var(--font-dm-sans)" }}
+              >
+                Winnings ₾
+              </span>
+            </div>
+
+            {/* Divider */}
+            <div className="w-[1px] h-[50px] bg-[#333]" />
 
             {/* Add a card */}
             <div className="flex-1 flex flex-col items-center cursor-pointer active:scale-[0.97] transition-transform" onClick={() => setShowCardNotif(true)}>
               <div className="mb-1">
-                <svg width="48" height="36" viewBox="0 0 48 36" fill="none">
+                <svg width="48" height="48" viewBox="0 0 48 36" fill="none">
                   <rect x="2" y="2" width="44" height="32" rx="6" fill="#1C1C1E" stroke="#333" strokeWidth="1" />
                   <rect x="6" y="10" width="20" height="3" rx="1.5" fill="#333" />
                   <rect x="6" y="16" width="12" height="2" rx="1" fill="#2A2A2A" />
@@ -145,17 +174,17 @@ export default function ProfilePage() {
               </div>
               <div className="flex items-center gap-1 mb-1">
                 <span
-                  className="text-white text-[24px] font-bold"
+                  className="text-white text-[22px] font-bold"
                   style={{ fontFamily: "var(--font-outfit)" }}
                 >
                   ₾0.00
                 </span>
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 5l3 3 3-3" />
                 </svg>
               </div>
               <span
-                className="text-[13px] text-[#888]"
+                className="text-[12px] text-[#888]"
                 style={{ fontFamily: "var(--font-dm-sans)" }}
               >
                 Add a card

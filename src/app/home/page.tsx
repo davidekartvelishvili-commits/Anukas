@@ -137,16 +137,24 @@ export default function HomePage() {
       <main className="min-h-[100dvh] bg-black pb-[90px]">
         <div className="max-w-[430px] mx-auto px-4" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)" }}>
 
-          {/* ── Header: balance + avatar ── */}
+          {/* ── Header: balances + avatar ── */}
           <div className="flex items-center justify-between mb-6" style={stagger(0)}>
-            <button
-              onClick={() => setShowBalanceModal(true)}
-              className="flex items-center gap-2 px-3 py-2 rounded-full transition-all duration-200 active:scale-[0.95]"
-              style={{ background: "#1C1C1E" }}
-            >
-              <CashIcon />
-              <span className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>28</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Coin balance (for playing games) */}
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-full" style={{ background: "#1C1C1E" }}>
+                <img src="/images/coin-icon.png" alt="Coin" width={22} height={22} style={{ objectFit: "contain" }} />
+                <span className="text-[14px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>5,000</span>
+              </div>
+              {/* Lari balance (winnings) */}
+              <button
+                onClick={() => setShowBalanceModal(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full transition-all duration-200 active:scale-[0.95]"
+                style={{ background: "#1C1C1E" }}
+              >
+                <CashIcon />
+                <span className="text-[14px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>28</span>
+              </button>
+            </div>
             <div
               className="w-[48px] h-[48px] rounded-full overflow-hidden cursor-pointer active:scale-[0.95] transition-transform"
               style={{ background: "linear-gradient(135deg, #C4E0F9, #E8D5F5)" }}
