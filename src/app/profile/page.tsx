@@ -119,7 +119,7 @@ export default function ProfilePage() {
                   className="text-white text-[22px] font-bold"
                   style={{ fontFamily: "var(--font-outfit)" }}
                 >
-                  5,000
+                  {coinBalance.toLocaleString()}
                 </span>
               </div>
               <span
@@ -148,7 +148,7 @@ export default function ProfilePage() {
                   className="text-white text-[22px] font-bold"
                   style={{ fontFamily: "var(--font-outfit)" }}
                 >
-                  28
+                  {cashBalance}
                 </span>
                 <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 5l3 3 3-3" />
