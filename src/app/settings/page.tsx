@@ -176,8 +176,37 @@ export default function SettingsPage() {
           {/* ── Divider ── */}
           <div className="h-[0.5px] my-2" style={{ background: "rgba(255,255,255,0.08)" }} />
 
-          {/* ── Referral Code ── */}
+          {/* ── Security & Easy Access ── */}
           <div style={stagger(4)}>
+            <button
+              onClick={() => router.push("/security")}
+              className="w-full flex items-center justify-between py-4 active:opacity-70 transition-opacity"
+            >
+              <div>
+                <h3
+                  className="text-white text-[18px] font-bold text-left"
+                  style={{ fontFamily: "var(--font-outfit)" }}
+                >
+                  Security & Easy Access
+                </h3>
+                <p
+                  className="text-[#888] text-[14px] text-left mt-0.5"
+                  style={{ fontFamily: "var(--font-dm-sans)" }}
+                >
+                  Face recognition and PIN settings
+                </p>
+              </div>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 4l6 6-6 6" />
+              </svg>
+            </button>
+          </div>
+
+          {/* ── Divider ── */}
+          <div className="h-[0.5px] my-2" style={{ background: "rgba(255,255,255,0.08)" }} />
+
+          {/* ── Referral Code ── */}
+          <div style={stagger(5)}>
             <button
               onClick={() => router.push("/referral-code")}
               className="w-full flex items-center justify-between py-4 active:opacity-70 transition-opacity"
