@@ -1,0 +1,11 @@
+node_modules/
+.next/
+package-lock.json
+dist/
+build/
+.vercel/
+.turso/
+*.log
+public/uploads/
+.env
+.env.local

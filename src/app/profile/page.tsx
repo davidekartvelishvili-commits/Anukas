@@ -105,8 +105,8 @@ export default function ProfilePage() {
               <img
                 src="/images/coin-icon.png"
                 alt="Coin"
-                width={80}
-                height={80}
+                width={60}
+                height={60}
                 style={{ objectFit: "contain" }}
                 className="mb-1"
               />
@@ -134,8 +134,8 @@ export default function ProfilePage() {
               <img
                 src="/images/lari-icon.png"
                 alt="₾"
-                width={80}
-                height={80}
+                width={90}
+                height={90}
                 style={{ objectFit: "contain" }}
                 className="mb-1"
               />
@@ -164,7 +164,7 @@ export default function ProfilePage() {
             {/* Add a card */}
             <div className="flex-1 flex flex-col items-center cursor-pointer active:scale-[0.97] transition-transform" onClick={() => setShowCardNotif(true)}>
               <div className="mb-1">
-                <svg width="48" height="48" viewBox="0 0 48 36" fill="none">
+                <svg width="60" height="60" viewBox="0 0 48 36" fill="none">
                   <rect x="2" y="2" width="44" height="32" rx="6" fill="#1C1C1E" stroke="#333" strokeWidth="1" />
                   <rect x="6" y="10" width="20" height="3" rx="1.5" fill="#333" />
                   <rect x="6" y="16" width="12" height="2" rx="1" fill="#2A2A2A" />
