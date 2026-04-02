@@ -176,6 +176,7 @@ export default function GamesPage() {
   const handleTabChange = (idx: number) => {
     setActiveTab(idx);
     if (idx === 0) router.push("/home");
+    if (idx === 2) router.push("/scan");
   };
 
   const stagger = (i: number) => ({
@@ -310,10 +311,13 @@ export default function GamesPage() {
                   <circle cx="15" cy="15" r="2.2" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.5" />
                 </svg>
               )},
-              { label: "My Card", idx: 2, icon: (a: boolean) => (
-                <svg width="24" height="22" viewBox="0 0 24 22" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="4" width="20" height="14" rx="3" />
-                  {!a && <path d="M2 9h20" />}
+              { label: "Scan", idx: 2, icon: (a: boolean) => (
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 7V4a2 2 0 012-2h3" />
+                  <path d="M15 2h3a2 2 0 012 2v3" />
+                  <path d="M20 15v3a2 2 0 01-2 2h-3" />
+                  <path d="M7 20H4a2 2 0 01-2-2v-3" />
+                  <line x1="2" y1="11" x2="20" y2="11" />
                 </svg>
               )},
             ].map(({ label, idx, icon }) => {
