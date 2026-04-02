@@ -14,6 +14,10 @@ export default function ProfilePage() {
   const [showEditCode, setShowEditCode] = useState(false);
   const [referralCode, setReferralCode] = useState("CASHBACK001");
   const [editCodeInput, setEditCodeInput] = useState("");
+  const [showExchange, setShowExchange] = useState(false);
+  const [exchangeAmount, setExchangeAmount] = useState("");
+  const [cashBalance, setCashBalance] = useState(28);
+  const [coinBalance, setCoinBalance] = useState(5000);
 
   useEffect(() => {
     const saved = localStorage.getItem("user-gender");
@@ -499,7 +503,8 @@ export default function ProfilePage() {
                 }}
                 onClick={() => {
                   setShowBalanceModal(false);
-                  router.push("/top-up");
+                  setExchangeAmount("");
+                  setShowExchange(true);
                 }}
               >
                 <div className="w-[52px] h-[52px] rounded-full bg-white flex items-center justify-center">
@@ -570,6 +575,52 @@ export default function ProfilePage() {
             >
               This feature is coming soon
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Exchange Popup (bottom sheet) ── */}
+      {showExchange && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setShowExchange(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative w-full max-w-[430px] rounded-t-[36px] pb-8 pt-3 px-5"
+            style={{ background: "rgba(30,30,30,0.55)", backdropFilter: "blur(40px) saturate(200%)", WebkitBackdropFilter: "blur(40px) saturate(200%)", borderTop: "1px solid rgba(255,255,255,0.15)", animation: "slideUp 0.3s ease-out" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-[36px] h-[5px] rounded-full bg-white/30 mx-auto mb-5" />
+            <h3 className="text-white text-[20px] font-bold text-center mb-6" style={{ fontFamily: "var(--font-outfit)" }}>Exchange</h3>
+
+            <div className="flex items-center gap-3 py-3 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+              <img src="/images/lari-icon.png" alt="₾" width={32} height={32} style={{ objectFit: "contain" }} />
+              <input type="number" placeholder="0" value={exchangeAmount} onChange={(e) => setExchangeAmount(e.target.value)}
+                className="flex-1 bg-transparent text-white text-[22px] font-bold outline-none" style={{ fontFamily: "var(--font-outfit)" }} min={0} max={cashBalance} />
+              <span className="text-[12px] text-[#666] shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>Balance: {cashBalance} ₾</span>
+            </div>
+
+            <div className="flex justify-center py-2">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#F9E741" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 4v12M6 12l4 4 4-4" /></svg>
+            </div>
+
+            <div className="flex items-center gap-3 py-3 border-b mb-4" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+              <img src="/images/coin-icon.png" alt="Coin" width={32} height={32} style={{ objectFit: "contain" }} />
+              <span className="flex-1 text-white text-[22px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
+                {exchangeAmount ? (parseFloat(exchangeAmount) * 100).toLocaleString() : "0"}
+              </span>
+              <span className="text-[12px] text-[#666] shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>Coins</span>
+            </div>
+
+            <p className="text-[11px] text-[#666] text-center mb-5" style={{ fontFamily: "var(--font-dm-sans)" }}>1 ₾ = 100 Coins</p>
+
+            <button
+              onClick={() => {
+                const amt = parseFloat(exchangeAmount);
+                if (amt > 0 && amt <= cashBalance) { setCashBalance((b) => b - amt); setCoinBalance((c) => c + amt * 100); setShowExchange(false); setExchangeAmount(""); }
+              }}
+              disabled={!exchangeAmount || parseFloat(exchangeAmount) <= 0 || parseFloat(exchangeAmount) > cashBalance}
+              className="mx-auto block px-16 py-6 rounded-full text-[16px] font-bold transition-all active:scale-[0.97] disabled:opacity-40"
+              style={{ background: "#F9E741", color: "#000", fontFamily: "var(--font-outfit)" }}
+            >Exchange</button>
           </div>
         </div>
       )}
