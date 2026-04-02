@@ -192,7 +192,7 @@ export default function SecurityPage() {
 
         {/* ── PIN Setup Modal ── */}
         {showPinSetup && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center pt-[25vh]" onClick={() => { setShowPinSetup(false); setPinError(""); }}>
+          <div className="fixed inset-0 z-50 flex items-start justify-center pt-[18vh]" onClick={() => { setShowPinSetup(false); setPinError(""); }}>
             <div className="absolute inset-0 bg-black/30" />
             <div
               className="relative rounded-[20px] px-8 py-8 flex flex-col items-center max-w-[320px] w-full"
