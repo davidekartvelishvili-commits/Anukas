@@ -11,7 +11,25 @@ import { getEnv } from "./utils/env.js";
 const app = new Hono();
 
 // ── Middleware ──
-app.use("*", cors());
+app.use("*", cors({
+  origin: (origin) => {
+    const allowed = [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      process.env.FRONTEND_URL,
+    ].filter(Boolean) as string[];
+
+    // Allow all Vercel preview deployments
+    if (origin && origin.endsWith(".vercel.app")) return origin;
+    if (origin && allowed.includes(origin)) return origin;
+    // Allow requests with no origin (mobile apps, curl)
+    if (!origin) return "*";
+    return allowed[0] || "*";
+  },
+  allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+  allowHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+}));
 app.use("*", logger());
 
 // ── Request timing ──

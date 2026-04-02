@@ -9,6 +9,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16),
   PORT: z.string().default("3000"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  FRONTEND_URL: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
