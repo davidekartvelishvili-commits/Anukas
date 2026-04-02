@@ -110,6 +110,10 @@ export default function HomePage() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [showBalanceModal, setShowBalanceModal] = useState(false);
+  const [showExchange, setShowExchange] = useState(false);
+  const [exchangeAmount, setExchangeAmount] = useState("");
+  const [cashBalance, setCashBalance] = useState(28);
+  const [coinBalance, setCoinBalance] = useState(5000);
   const [gender, setGender] = useState("Male");
   const countdown = useCountdown(15.58);
 
@@ -143,7 +147,7 @@ export default function HomePage() {
               {/* Coin balance (for playing games) */}
               <div className="flex items-center gap-1.5 px-3 py-2 rounded-full" style={{ background: "#1C1C1E" }}>
                 <img src="/images/coin-icon.png" alt="Coin" width={22} height={22} style={{ objectFit: "contain" }} />
-                <span className="text-[14px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>5,000</span>
+                <span className="text-[14px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>{coinBalance.toLocaleString()}</span>
               </div>
               {/* Lari balance (winnings) */}
               <button
@@ -152,7 +156,7 @@ export default function HomePage() {
                 style={{ background: "#1C1C1E" }}
               >
                 <CashIcon />
-                <span className="text-[14px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>28</span>
+                <span className="text-[14px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>{cashBalance}</span>
               </button>
             </div>
             <div
@@ -433,7 +437,8 @@ export default function HomePage() {
                 }}
                 onClick={() => {
                   setShowBalanceModal(false);
-                  router.push("/top-up");
+                  setExchangeAmount("");
+                  setShowExchange(true);
                 }}
               >
                 <div className="w-[52px] h-[52px] rounded-full bg-white flex items-center justify-center">
@@ -482,10 +487,94 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* ── Exchange Popup ── */}
+      {showExchange && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          onClick={() => setShowExchange(false)}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative rounded-[20px] px-6 py-7 max-w-[340px] w-full"
+            style={{
+              background: "rgba(50, 50, 50, 0.08)",
+              backdropFilter: "blur(12px) saturate(200%)",
+              WebkitBackdropFilter: "blur(12px) saturate(200%)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              animation: "fadeIn 0.2s ease-out",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-white text-[18px] font-bold text-center mb-5" style={{ fontFamily: "var(--font-outfit)" }}>
+              Exchange
+            </h3>
+
+            {/* Cash input row */}
+            <div className="flex items-center gap-3 px-4 py-3 rounded-[14px] mb-3" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+              <img src="/images/lari-icon.png" alt="₾" width={32} height={32} style={{ objectFit: "contain" }} />
+              <input
+                type="number"
+                placeholder="0"
+                value={exchangeAmount}
+                onChange={(e) => setExchangeAmount(e.target.value)}
+                className="flex-1 bg-transparent text-white text-[20px] font-bold outline-none"
+                style={{ fontFamily: "var(--font-outfit)" }}
+                min={0}
+                max={cashBalance}
+              />
+              <span className="text-[12px] text-[#888]" style={{ fontFamily: "var(--font-dm-sans)" }}>₾ Balance: {cashBalance}</span>
+            </div>
+
+            {/* Arrow */}
+            <div className="flex justify-center my-2">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#F9E741" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 4v12M6 12l4 4 4-4" />
+              </svg>
+            </div>
+
+            {/* Coin output row */}
+            <div className="flex items-center gap-3 px-4 py-3 rounded-[14px] mb-5" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+              <img src="/images/coin-icon.png" alt="Coin" width={32} height={32} style={{ objectFit: "contain" }} />
+              <span className="flex-1 text-white text-[20px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
+                {exchangeAmount ? (parseFloat(exchangeAmount) * 100).toLocaleString() : "0"}
+              </span>
+              <span className="text-[12px] text-[#888]" style={{ fontFamily: "var(--font-dm-sans)" }}>Coins</span>
+            </div>
+
+            {/* Rate info */}
+            <p className="text-[11px] text-[#666] text-center mb-4" style={{ fontFamily: "var(--font-dm-sans)" }}>
+              1 ₾ = 100 Coins
+            </p>
+
+            {/* Exchange button */}
+            <button
+              onClick={() => {
+                const amt = parseFloat(exchangeAmount);
+                if (amt > 0 && amt <= cashBalance) {
+                  setCashBalance((b) => b - amt);
+                  setCoinBalance((c) => c + amt * 100);
+                  setShowExchange(false);
+                  setExchangeAmount("");
+                }
+              }}
+              disabled={!exchangeAmount || parseFloat(exchangeAmount) <= 0 || parseFloat(exchangeAmount) > cashBalance}
+              className="w-full py-4 rounded-full text-[16px] font-bold transition-all active:scale-[0.97] disabled:opacity-40"
+              style={{ background: "#F9E741", color: "#000", fontFamily: "var(--font-outfit)" }}
+            >
+              Exchange
+            </button>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes slideUp {
           from { transform: translateY(100%); }
           to { transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
         }
       `}</style>
     </>
