@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getCoinBalance, getCashBalance, exchange as doExchange } from "@/services/balance";
+import { getCoinBalance, getCashBalance, exchange as doExchange, seedTestUser } from "@/services/balance";
 
 /* ───────── ICONS ───────── */
 
@@ -119,6 +119,7 @@ export default function HomePage() {
   const countdown = useCountdown(15.58);
 
   useEffect(() => {
+    seedTestUser();
     setActiveTab(0);
     setCashBalanceState(getCashBalance());
     setCoinBalanceState(getCoinBalance());
