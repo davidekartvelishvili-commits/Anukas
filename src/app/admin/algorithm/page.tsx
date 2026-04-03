@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getGameConfig, updateGameConfig, getPool, fundPool } from "@/services/admin";
+import AdminAuthGuard from "@/components/admin/AdminAuthGuard";
 
 /* ── SVG ICONS (same as dashboard) ── */
 function NavIcon({ id, active }: { id: string; active: boolean }) {
@@ -46,14 +48,15 @@ interface Param {
   step: number;
 }
 
-export default function AlgorithmPage() {
+function AlgorithmContent() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [now, setNow] = useState(new Date());
 
   // Pool
-  const [poolBalance, setPoolBalance] = useState(142580.5);
-  const poolMinimum = 20;
+  const [poolBalance, setPoolBalance] = useState(0);
+  const [poolTotalFunded, setPoolTotalFunded] = useState(0);
+  const [poolTotalWon, setPoolTotalWon] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addAmount, setAddAmount] = useState("");
 
@@ -63,14 +66,15 @@ export default function AlgorithmPage() {
 
   // Params
   const [params, setParams] = useState<Param[]>([
-    { key: "avgReturn", label: "საშუალო დაბრუნება %", value: 1, suffix: "%", description: "საშუალოდ რამდენი % უბრუნდება მომხმარებელს ყოველი გადახდიდან", min: 0.1, max: 10, step: 0.1 },
-    { key: "maxWinPerson", label: "მაქს. მოგება 1 ადამიანზე", value: 10, suffix: "₾", description: "ერთ თამაშზე მაქსიმუმ რამდენის მოგება შეუძლია", min: 1, max: 1000, step: 1 },
-    { key: "poolMinThreshold", label: "Pool მინიმუმის ზღვარი", value: 20, suffix: "₾", description: "ამ თანხაზე ქვემოთ ბონუს მოგებები ავტომატურად ჩერდება, მხოლოდ 0.5% მინიმუმი გაიცემა", min: 0, max: 10000, step: 1 },
+    { key: "avgReturnPercent", label: "საშუალო დაბრუნება %", value: 85, suffix: "%", description: "საშუალოდ რამდენი % უბრუნდება მომხმარებელს ყოველი გადახდიდან", min: 0.1, max: 100, step: 0.1 },
+    { key: "maxWinPerUser", label: "მაქს. მოგება 1 ადამიანზე", value: 100, suffix: "₾", description: "ერთ თამაშზე მაქსიმუმ რამდენის მოგება შეუძლია", min: 1, max: 1000, step: 1 },
+    { key: "poolMinimumThreshold", label: "Pool მინიმუმის ზღვარი", value: 1000, suffix: "₾", description: "ამ თანხაზე ქვემოთ ბონუს მოგებები ავტომატურად ჩერდება, მხოლოდ 0.5% მინიმუმი გაიცემა", min: 0, max: 10000, step: 1 },
     { key: "fullReturnThreshold", label: "100% ზღვარი (დაბალი თანხა)", value: 5, suffix: "₾", description: "ამ თანხამდე გადახდებზე 100% დაბრუნების შანსი მაღალია (~20%)", min: 1, max: 50, step: 0.5 },
   ]);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState(0);
   const [savedKey, setSavedKey] = useState<string | null>(null);
+  const [gameTypes, setGameTypes] = useState<string[]>([]);
 
   // How it works
   const [howOpen, setHowOpen] = useState(false);
@@ -80,17 +84,73 @@ export default function AlgorithmPage() {
     return () => clearInterval(iv);
   }, []);
 
+  // Fetch real data on mount
+  useEffect(() => {
+    getPool().then((data: any) => {
+      if (data.success && data.pool) {
+        setPoolBalance(data.pool.balance || 0);
+        setPoolTotalFunded(data.pool.totalFunded || 0);
+        setPoolTotalWon(data.pool.totalWon || 0);
+      }
+    }).catch(() => {});
+
+    getGameConfig().then((data: any) => {
+      if (data.success && data.configs && data.configs.length > 0) {
+        const c = data.configs[0]; // Use first config as reference
+        setGameTypes(data.configs.map((g: any) => g.gameType));
+        setWinningsEnabled(c.isActive);
+        setParams((prev) => prev.map((p) => {
+          const val = c[p.key];
+          return val !== undefined ? { ...p, value: val } : p;
+        }));
+      }
+    }).catch(() => {});
+  }, []);
+
+  const poolMinimum = params.find((p) => p.key === "poolMinimumThreshold")?.value || 1000;
   const poolHealthPercent = Math.min(100, (poolBalance / Math.max(poolMinimum * 5, 1)) * 100);
   const poolColor = poolBalance > poolMinimum * 3 ? "#22C55E" : poolBalance > poolMinimum ? "#F97316" : "#EF4444";
 
-  const handleSaveParam = (key: string) => {
+  const handleSaveParam = async (key: string) => {
     const p = params.find((p) => p.key === key);
     if (!p) return;
     const clamped = Math.min(p.max, Math.max(p.min, editValue));
-    setParams((prev) => prev.map((p) => p.key === key ? { ...p, value: clamped } : p));
-    setEditingKey(null);
-    setSavedKey(key);
-    setTimeout(() => setSavedKey(null), 2000);
+
+    // Update all game types
+    try {
+      for (const gt of gameTypes) {
+        await updateGameConfig(gt, { [key]: clamped });
+      }
+      setParams((prev) => prev.map((p) => p.key === key ? { ...p, value: clamped } : p));
+      setEditingKey(null);
+      setSavedKey(key);
+      setTimeout(() => setSavedKey(null), 2000);
+    } catch {}
+  };
+
+  const handleFundPool = async () => {
+    const amt = parseFloat(addAmount);
+    if (amt > 0) {
+      try {
+        const data = await fundPool(amt) as any;
+        if (data.success) {
+          setPoolBalance(data.newBalance);
+          setPoolTotalFunded((prev) => prev + amt);
+          setAddAmount("");
+          setShowAddModal(false);
+        }
+      } catch {}
+    }
+  };
+
+  const handleToggleWinnings = async (enable: boolean) => {
+    try {
+      for (const gt of gameTypes) {
+        await updateGameConfig(gt, { isActive: enable });
+      }
+      setWinningsEnabled(enable);
+      setShowConfirmOff(false);
+    } catch {}
   };
 
   return (
@@ -195,7 +255,7 @@ export default function AlgorithmPage() {
               </div>
               {/* Toggle */}
               <button
-                onClick={() => { if (winningsEnabled) { setShowConfirmOff(true); } else { setWinningsEnabled(true); } }}
+                onClick={() => { if (winningsEnabled) { setShowConfirmOff(true); } else { handleToggleWinnings(true); } }}
                 className="relative w-[56px] h-[30px] rounded-full transition-all duration-300"
                 style={{ background: winningsEnabled ? "#22C55E" : "#EF4444" }}
               >
@@ -293,10 +353,7 @@ export default function AlgorithmPage() {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => {
-                  const amt = parseFloat(addAmount);
-                  if (amt > 0) { setPoolBalance((b) => b + amt); setAddAmount(""); setShowAddModal(false); }
-                }}
+                onClick={handleFundPool}
                 className="flex-1 py-3 rounded-[8px] text-[14px] font-bold" style={{ background: "#F9E741", color: "#000" }}
               >
                 დადასტურება
@@ -325,7 +382,7 @@ export default function AlgorithmPage() {
             </p>
             <div className="flex gap-2">
               <button
-                onClick={() => { setWinningsEnabled(false); setShowConfirmOff(false); }}
+                onClick={() => handleToggleWinnings(false)}
                 className="flex-1 py-3 rounded-[8px] text-[14px] font-bold" style={{ background: "#EF4444", color: "#FFFFFF" }}
               >
                 გამორთვა
@@ -340,5 +397,13 @@ export default function AlgorithmPage() {
 
       <style>{`@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.85; } }`}</style>
     </div>
+  );
+}
+
+export default function AlgorithmPage() {
+  return (
+    <AdminAuthGuard>
+      <AlgorithmContent />
+    </AdminAuthGuard>
   );
 }
