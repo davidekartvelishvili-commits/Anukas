@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/services/api";
-import { setupPin } from "@/services/auth";
+import { setupPin, getStoredUser, isAuthenticated } from "@/services/auth";
 
 /* ───────── SVG ICONS ───────── */
 
@@ -157,6 +157,14 @@ export default function SetupPage() {
   const [pinSuccess, setPinSuccess] = useState("");
   const pinRef = useRef<HTMLInputElement>(null);
 
+  // If already authenticated with PIN, redirect to home
+  useEffect(() => {
+    const user = getStoredUser();
+    if (user?.hasPin && isAuthenticated()) {
+      router.push("/home");
+    }
+  }, [router]);
+
   // Stagger animations
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -219,7 +227,16 @@ export default function SetupPage() {
       } else if (pinStep === "confirm") {
         if (clean === firstPin) {
           setPinSuccess("PIN set successfully!");
-          try { await setupPin(clean); } catch {}
+          try {
+            await setupPin(clean);
+            // Update stored user to reflect hasPin
+            const stored = localStorage.getItem("shansi_user");
+            if (stored) {
+              const user = JSON.parse(stored);
+              user.hasPin = true;
+              localStorage.setItem("shansi_user", JSON.stringify(user));
+            }
+          } catch {}
           setTimeout(() => router.push("/home"), 1200);
         } else {
           setPinError("PINs don't match. Try again.");
