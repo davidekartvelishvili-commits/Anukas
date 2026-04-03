@@ -5,7 +5,7 @@ import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
 import { gameConfig, gameHistory } from "../db/schema.js";
 import { authMiddleware } from "../middleware/auth.js";
-import { playGame } from "../services/gameEngine.js";
+import { playGame, playChickenRush } from "../services/gameEngine.js";
 import { BadRequestError } from "../utils/errors.js";
 
 const games = new Hono<AppEnv>();
@@ -40,6 +40,52 @@ games.post("/play", async (c) => {
     });
   } catch (err: any) {
     throw new BadRequestError(err.message || "Game play failed");
+  }
+});
+
+// POST /games/chicken-rush
+const chickenRushSchema = z.object({
+  betAmount: z.number().positive().default(10),
+  difficulty: z.enum(["easy", "medium", "hard", "extreme"]).default("easy"),
+});
+
+const DIFFICULTY_MAP = {
+  easy: { cols: 5, rows: 25, multiplierPerStep: 1.2 },
+  medium: { cols: 4, rows: 20, multiplierPerStep: 1.3 },
+  hard: { cols: 3, rows: 15, multiplierPerStep: 1.45 },
+  extreme: { cols: 2, rows: 10, multiplierPerStep: 1.9 },
+};
+
+games.post("/chicken-rush", async (c) => {
+  const body = await c.req.json();
+  const parsed = chickenRushSchema.safeParse(body);
+  if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
+
+  const userId = c.get("userId") as string;
+  const { betAmount, difficulty } = parsed.data;
+  const diffConfig = DIFFICULTY_MAP[difficulty];
+
+  try {
+    const result = await playChickenRush(userId, betAmount, diffConfig);
+
+    return c.json({
+      success: true,
+      result: {
+        maxSafeStep: result.maxSafeStep,
+        trapStep: result.trapStep,
+        cashoutUnlockStep: result.cashoutUnlockStep,
+        totalSteps: result.totalSteps,
+        stepValues: result.stepValues,
+        trapMap: result.trapMap,
+        cols: result.cols,
+        minWin: result.minWin,
+        totalWin: result.totalWin,
+        bonusWin: result.bonusWin,
+        won: result.won,
+      },
+    });
+  } catch (err: any) {
+    throw new BadRequestError(err.message || "Game failed");
   }
 });
 

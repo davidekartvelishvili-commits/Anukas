@@ -161,3 +161,92 @@ export async function playGame(
     poolBalance: poolBalanceAfter,
   };
 }
+
+// ═══════════════════════════════════════
+// CHICKEN RUSH (Lucky Step) — Step-based
+// ═══════════════════════════════════════
+
+export interface ChickenRushResult extends GameResult {
+  maxSafeStep: number;      // How far user can go safely (0-based)
+  trapStep: number;         // Step where trap is placed
+  cashoutUnlockStep: number; // Step where cashout becomes available
+  totalSteps: number;       // Total rows in the grid
+  stepValues: number[];     // ₾ value at each step (cumulative)
+  trapMap: number[];        // Which column has trap per row
+  cols: number;
+}
+
+export async function playChickenRush(
+  userId: string,
+  betAmount: number,
+  difficulty: { cols: number; rows: number; multiplierPerStep: number }
+): Promise<ChickenRushResult> {
+  // 1. Get base game result from engine (decides total win)
+  const baseResult = await playGame(userId, "chicken_rush", betAmount);
+
+  const { rows, cols, multiplierPerStep } = difficulty;
+  const betInLari = betAmount / 100; // coins to lari
+
+  // 2. Build step values (cumulative winnings at each step)
+  const stepValues: number[] = [];
+  for (let i = 0; i < rows; i++) {
+    const mult = Math.pow(multiplierPerStep, i + 1);
+    stepValues.push(round2(betInLari * mult * 0.005)); // Scale to actual win range
+  }
+
+  // 3. Find which step matches the server's totalWin
+  let maxSafeStep = 0;
+  if (baseResult.bonusWin > 0) {
+    // User won bonus — find the step closest to totalWin
+    for (let i = 0; i < stepValues.length; i++) {
+      if (stepValues[i] <= baseResult.totalWin) {
+        maxSafeStep = i;
+      } else {
+        break;
+      }
+    }
+    // Ensure at least a few steps for gameplay
+    maxSafeStep = Math.max(maxSafeStep, 3);
+    maxSafeStep = Math.min(maxSafeStep, rows - 2);
+  } else {
+    // No bonus — user can go 2-5 steps before trap
+    const maxSteps = 2 + Math.floor(secureRandom() * 4); // 2-5
+    maxSafeStep = Math.min(maxSteps, rows - 2);
+  }
+
+  // 4. Place trap at maxSafeStep + 1
+  const trapStep = maxSafeStep + 1;
+
+  // 5. Cashout unlocks after ~60% of maxSafeStep (min step 2)
+  const cashoutUnlockStep = Math.max(2, Math.floor(maxSafeStep * 0.6));
+
+  // 6. Generate trap map (which column is trapped per row)
+  const trapMap: number[] = [];
+  for (let i = 0; i < rows; i++) {
+    trapMap.push(Math.floor(secureRandom() * cols));
+  }
+
+  // 7. Recalculate step values to match actual totalWin at maxSafeStep
+  const adjustedStepValues: number[] = [];
+  for (let i = 0; i < rows; i++) {
+    if (i <= maxSafeStep) {
+      // Linear interpolation: step 0 = minWin, step maxSafeStep = totalWin
+      const progress = maxSafeStep > 0 ? i / maxSafeStep : 1;
+      adjustedStepValues.push(round2(baseResult.minWin + (baseResult.totalWin - baseResult.minWin) * progress));
+    } else {
+      // Steps beyond trap — values don't matter (user can't reach)
+      adjustedStepValues.push(round2(baseResult.totalWin * (1 + (i - maxSafeStep) * 0.2)));
+    }
+  }
+
+  return {
+    ...baseResult,
+    maxSafeStep,
+    trapStep,
+    cashoutUnlockStep,
+    totalSteps: rows,
+    stepValues: adjustedStepValues,
+    trapMap,
+    cols,
+  };
+}

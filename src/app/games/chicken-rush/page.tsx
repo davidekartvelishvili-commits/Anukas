@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { DIFFICULTIES, type Difficulty, type StartResult, type StepResult } from "./game-config";
-import { playGame as playGameApi } from "@/services/games";
+import { startChickenRush, type ChickenRushServerResult } from "@/services/chickenRush";
 import { getCoinBalance, spendCoins, creditCashWinnings, getCashBalance, setCoinBalance as storeCoinBalance } from "@/services/balance";
 
 type TileState = "hidden" | "safe" | "trap" | "revealed-trap";
@@ -61,8 +61,8 @@ export default function ChickenRushPage() {
     if (rowEl) rowEl.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [game?.currentRow]);
 
-  // Auto-start on first load
-  const serverResultRef = useRef<{ won: boolean; totalWin: number; newBalance: number } | null>(null);
+  // Server result for current round
+  const serverResultRef = useRef<ChickenRushServerResult | null>(null);
 
   const startRound = useCallback(async () => {
     if (balance < betAmount) return;
@@ -71,34 +71,20 @@ export default function ChickenRushPage() {
     setResultText("");
     setShowWin(false);
 
-    // Get server outcome FIRST
+    // Server decides EVERYTHING — trap positions, max safe step, win amount
     try {
-      const serverResult = await playGameApi("chicken_rush");
-      serverResultRef.current = serverResult;
-    } catch (err: any) {
-      storeCoinBalance(getCoinBalance() + betAmount); setBalance(getCoinBalance() + betAmount);
-      if (err.message?.includes("disabled")) {
-        alert("თამაში დროებით შეჩერებულია");
-      }
-      return;
-    }
+      const sr = await startChickenRush(betAmount, difficulty);
+      serverResultRef.current = sr;
 
-    // Still use local start API for tile grid (visual only)
-    try {
-      const res = await fetch("/api/chicken-rush/start", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ difficulty, betAmount }),
-      });
-      const data: StartResult = await res.json();
       const tiles: TileState[][] = [];
-      for (let r = 0; r < data.rows; r++) tiles.push(Array(data.cols).fill("hidden"));
+      for (let r = 0; r < sr.totalSteps; r++) tiles.push(Array(sr.cols).fill("hidden"));
 
       setGame({
-        roundId: data.roundId, rows: data.rows, cols: data.cols,
+        roundId: "server", rows: sr.totalSteps, cols: sr.cols,
         currentRow: 0, multiplier: 1, tiles, chickenPos: null,
         gameOver: false, won: false,
       });
-    } catch {
+    } catch (err: any) {
       storeCoinBalance(getCoinBalance() + betAmount); setBalance(getCoinBalance() + betAmount);
     }
   }, [betAmount, balance, difficulty]);
@@ -123,69 +109,70 @@ export default function ChickenRushPage() {
 
   const handleTileClick = useCallback(async (row: number, col: number, e: React.MouseEvent | React.TouchEvent) => {
     if (!game || game.gameOver || animating || row !== game.currentRow) return;
+    const sr = serverResultRef.current;
+    if (!sr) return;
     setAnimating(true);
 
     const rect = (e.target as HTMLElement).getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
 
-    const res = await fetch("/api/chicken-rush/step", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roundId: game.roundId, row, column: col }),
-    });
-    const data: StepResult & { trapMap?: number[] } = await res.json();
+    // Server already decided: is this step safe or trap?
+    const isTrap = row >= sr.trapStep && col === sr.trapMap[row];
+    const isSafe = !isTrap;
 
-    if (data.safe) {
+    if (isSafe) {
       spawnFirework(cx, cy);
       const newTiles = game.tiles.map((r) => [...r]);
       newTiles[row][col] = "safe";
-      const completed = data.nextRow >= game.rows;
+      const nextRow = row + 1;
+      const completed = nextRow >= game.rows;
+      const stepValue = sr.stepValues[row] || 0;
 
-      setGame((g) => g ? { ...g, tiles: newTiles, currentRow: data.nextRow, multiplier: data.multiplier, chickenPos: { row, col }, gameOver: completed, won: completed } : g);
+      setGame((g) => g ? { ...g, tiles: newTiles, currentRow: nextRow, multiplier: round2(stepValue), chickenPos: { row, col }, gameOver: completed, won: completed } : g);
 
       if (completed) {
-        const cRes = await fetch("/api/chicken-rush/cashout", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ roundId: game.roundId, betAmount }),
-        });
-        const cData = await cRes.json();
-        setBalance((b) => b + cData.winAmount);
-        setWinAmount(cData.winAmount);
+        creditCashWinnings(sr.totalWin);
+        setWinAmount(sr.totalWin);
         setShowWin(true);
-        setResultText(`LEGENDARY! x${data.multiplier}`);
+        setResultText(`LEGENDARY! +${sr.totalWin}₾`);
         setTimeout(() => setShowWin(false), 3000);
       }
     } else {
+      // Hit trap — reveal all traps, credit only minimum
       const newTiles = game.tiles.map((r) => [...r]);
       newTiles[row][col] = "trap";
-      if (data.trapMap) {
-        const tm = data.trapMap as number[];
-        for (let r = 0; r < tm.length; r++) {
-          if (r !== row) {
-            setTimeout(() => {
-              setGame((g) => {
-                if (!g) return g;
-                const t = g.tiles.map((row) => [...row]);
-                if (t[r][tm[r]] === "hidden") t[r][tm[r]] = "revealed-trap";
-                return { ...g, tiles: t };
-              });
-            }, r * 50);
-          }
+      const tm = sr.trapMap;
+      for (let r = 0; r < tm.length; r++) {
+        if (r !== row) {
+          setTimeout(() => {
+            setGame((g) => {
+              if (!g) return g;
+              const t = g.tiles.map((row) => [...row]);
+              if (t[r][tm[r]] === "hidden") t[r][tm[r]] = "revealed-trap";
+              return { ...g, tiles: t };
+            });
+          }, r * 50);
         }
       }
-      setGame((g) => g ? { ...g, tiles: newTiles, chickenPos: { row, col }, gameOver: true, won: false, trapMap: data.trapMap } : g);
+      // Credit guaranteed minimum
+      if (sr.minWin > 0) creditCashWinnings(sr.minWin);
+      setGame((g) => g ? { ...g, tiles: newTiles, chickenPos: { row, col }, gameOver: true, won: false } : g);
       setResultText("You hit a trap!");
-      // Auto-restart after 2 seconds
       setTimeout(() => { setResultText(""); startRound(); }, 2000);
     }
     setTimeout(() => setAnimating(false), 300);
-  }, [game, animating, betAmount]);
+  }, [game, animating, betAmount, startRound]);
+
+  function round2(n: number) { return Math.round(n * 100) / 100; }
 
   const handleCashout = useCallback(async () => {
     if (!game || game.gameOver || game.currentRow === 0) return;
-    // Use server result for win amount
     const sr = serverResultRef.current;
-    const winAmt = sr ? sr.totalWin : betAmount * game.multiplier * 0.005;
+    if (!sr) return;
+    // Cashout: credit the step value at current position
+    const currentStepIdx = Math.max(0, game.currentRow - 1);
+    const winAmt = sr.stepValues[currentStepIdx] || sr.minWin;
     if (winAmt > 0) creditCashWinnings(winAmt);
     setBalance(getCoinBalance());
     setWinAmount(winAmt);
