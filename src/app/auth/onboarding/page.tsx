@@ -295,7 +295,7 @@ export default function OnboardingPage() {
           <div className="h-[66px] flex items-center justify-center">
             {faceIdx === 3 && (
               <button
-                onClick={() => router.push("/home")}
+                onClick={() => router.push("/auth/setup")}
                 className="w-[145px] h-[66px] rounded-[33px] bg-[#1A1A1A] text-white text-[17px] font-bold active:scale-[0.96] transition-transform duration-150 animate-fadeInUp"
                 style={{ fontFamily: "var(--font-outfit), system-ui, sans-serif", boxShadow: "0 4px 20px rgba(0,0,0,0.2)", zIndex: 20 }}
               >

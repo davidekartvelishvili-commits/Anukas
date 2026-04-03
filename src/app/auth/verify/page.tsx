@@ -73,7 +73,7 @@ function VerifyContent() {
     try {
       const data = await verifyOtp(phoneRaw, code);
       if (data.isNewUser) {
-        router.push("/auth/setup");
+        router.push("/auth/onboarding");
       } else {
         router.push("/home");
       }
