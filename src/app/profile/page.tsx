@@ -15,6 +15,7 @@ export default function ProfilePage() {
   const [referralCode, setReferralCode] = useState("CASHBACK001");
   const [editCodeInput, setEditCodeInput] = useState("");
   const [showEditName, setShowEditName] = useState(false);
+  const [showNameConfirm, setShowNameConfirm] = useState(false);
   const [editNameInput, setEditNameInput] = useState("");
   const [nameError, setNameError] = useState("");
   const [username, setUsername] = useState("Cashback User");
@@ -602,74 +603,106 @@ export default function ProfilePage() {
       )}
 
       {/* ── Edit Username Modal (bottom sheet) ── */}
-      {showEditName && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setShowEditName(false)}>
+      {showEditName && !showNameConfirm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }} onClick={() => setShowEditName(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div
             className="relative w-full max-w-[430px] rounded-t-[36px] pb-8 pt-3 px-5"
-            style={{ background: "rgba(50,50,50,0.08)", backdropFilter: "blur(12px) saturate(200%)", WebkitBackdropFilter: "blur(12px) saturate(200%)", borderTop: "1px solid rgba(255,255,255,0.2)", animation: "slideUp 0.3s ease-out" }}
+            style={{ background: "rgba(30,30,30,0.55)", backdropFilter: "blur(40px) saturate(200%)", WebkitBackdropFilter: "blur(40px) saturate(200%)", borderTop: "1px solid rgba(255,255,255,0.15)", animation: "slideUp 0.3s ease-out" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-[36px] h-[5px] rounded-full bg-white/30 mx-auto mb-6" />
+            <div className="w-[36px] h-[5px] rounded-full bg-white/30 mx-auto mb-5" />
 
-            <div className="flex justify-center mb-4">
-              <svg width="40" height="40" viewBox="0 0 20 20" fill="none" stroke="#FFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="10" cy="7" r="4" />
-                <path d="M3 18c0-3.87 3.13-7 7-7s7 3.13 7 7" />
-              </svg>
-            </div>
-
-            <h3 className="text-white text-[22px] font-bold text-center mb-3" style={{ fontFamily: "var(--font-outfit)" }}>
+            <h3 className="text-white text-[20px] font-bold text-center mb-5" style={{ fontFamily: "var(--font-outfit)" }}>
               Edit Username
             </h3>
 
-            <p className="text-[#999] text-[15px] text-center mb-6 leading-relaxed" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              Max 20 characters. Letters, numbers, _ and - only.
-            </p>
-
-            <input
-              type="text"
-              placeholder="eg. cool_user"
-              value={editNameInput}
-              onChange={(e) => {
-                const v = e.target.value.replace(/\s/g, "").slice(0, 20);
-                setEditNameInput(v);
-                if (v.length > 0 && v.length < 3) setNameError("Minimum 3 characters");
-                else if (!/^[a-zA-Z0-9_-]*$/.test(v)) setNameError("Only letters, numbers, _ and -");
-                else setNameError("");
-              }}
-              className="w-full px-5 py-4 rounded-full text-[16px] text-white placeholder-[#666] outline-none mb-2"
-              style={{ background: "rgba(255,255,255,0.06)", border: nameError ? "1px solid #EF4444" : "1px solid rgba(255,255,255,0.1)", fontFamily: "var(--font-dm-sans)" }}
-              maxLength={20}
-              autoFocus
-            />
-
-            <div className="flex items-center justify-between px-2 mb-6">
-              {nameError ? (
-                <p className="text-[#EF4444] text-[12px]" style={{ fontFamily: "var(--font-dm-sans)" }}>{nameError}</p>
-              ) : <span />}
-              <span className="text-[#666] text-[12px]" style={{ fontFamily: "var(--font-dm-sans)" }}>{editNameInput.length}/20</span>
+            <div className="flex items-center gap-3 py-3 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="10" cy="7" r="4" /><path d="M3 18c0-3.87 3.13-7 7-7s7 3.13 7 7" />
+              </svg>
+              <input
+                type="text"
+                placeholder="eg. cool_user"
+                value={editNameInput}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\s/g, "").slice(0, 20);
+                  setEditNameInput(v);
+                  if (v.length > 0 && v.length < 3) setNameError("Minimum 3 characters");
+                  else if (!/^[a-zA-Z0-9_-]*$/.test(v)) setNameError("Only letters, numbers, _ and -");
+                  else setNameError("");
+                }}
+                className="flex-1 bg-transparent text-white text-[18px] font-bold outline-none"
+                style={{ fontFamily: "var(--font-outfit)" }}
+                maxLength={20}
+              />
+              <span className="text-[11px] text-[#666] shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>{editNameInput.length}/20</span>
             </div>
 
-            <div className="flex items-center justify-between px-4">
-              <button onClick={() => setShowEditName(false)} className="active:opacity-60 transition-opacity">
-                <span className="text-white text-[17px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>Cancel</span>
-              </button>
+            {nameError && (
+              <p className="text-[#EF4444] text-[12px] mt-2 px-1" style={{ fontFamily: "var(--font-dm-sans)" }}>{nameError}</p>
+            )}
+
+            <p className="text-[11px] text-[#666] text-center my-4" style={{ fontFamily: "var(--font-dm-sans)" }}>
+              Letters, numbers, _ and - only
+            </p>
+
+            <button
+              onClick={() => {
+                if (editNameInput.length >= 3 && !nameError) {
+                  setShowNameConfirm(true);
+                }
+              }}
+              disabled={editNameInput.length < 3 || !!nameError}
+              className="mx-auto block px-10 py-5 rounded-full text-[16px] font-bold transition-all active:scale-[0.97] disabled:opacity-40"
+              style={{ background: "#F9E741", color: "#000", fontFamily: "var(--font-outfit)" }}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirm Username Change ── */}
+      {showNameConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }} onClick={() => setShowNameConfirm(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative rounded-[20px] px-7 py-7 flex flex-col items-center max-w-[320px] w-full"
+            style={{ background: "rgba(30,30,30,0.55)", backdropFilter: "blur(40px) saturate(200%)", WebkitBackdropFilter: "blur(40px) saturate(200%)", border: "1px solid rgba(255,255,255,0.15)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <svg width="28" height="28" viewBox="0 0 20 20" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-3">
+              <path d="M10 2L1 18h18L10 2z" /><line x1="10" y1="8" x2="10" y2="12" /><circle cx="10" cy="15" r="0.5" fill="#F97316" />
+            </svg>
+            <h3 className="text-white text-[17px] font-bold text-center mb-2" style={{ fontFamily: "var(--font-outfit)" }}>Are you sure?</h3>
+            <p className="text-[#999] text-[13px] text-center mb-5 leading-relaxed" style={{ fontFamily: "var(--font-dm-sans)" }}>
+              You will not be able to change your username for the next <span className="text-white font-bold">24 hours</span>
+            </p>
+            <div className="flex gap-2 w-full">
               <button
-                onClick={() => {
-                  if (editNameInput.length >= 3 && !nameError) {
-                    setUsername(editNameInput);
-                    setShowEditName(false);
-                    // Save to backend
-                    import("@/services/api").then(({ apiFetch }) => {
-                      apiFetch("/user/profile", { method: "PATCH", body: JSON.stringify({ name: editNameInput }) }).catch(() => {});
-                    });
-                  }
+                onClick={async () => {
+                  setUsername(editNameInput);
+                  setShowNameConfirm(false);
+                  setShowEditName(false);
+                  // Save to backend
+                  try {
+                    const { apiFetch } = await import("@/services/api");
+                    await apiFetch("/user/profile", { method: "PATCH", body: JSON.stringify({ name: editNameInput }) });
+                    const stored = localStorage.getItem("shansi_user");
+                    if (stored) {
+                      const user = JSON.parse(stored);
+                      user.name = editNameInput;
+                      localStorage.setItem("shansi_user", JSON.stringify(user));
+                    }
+                  } catch {}
                 }}
-                className="active:opacity-60 transition-opacity"
-              >
-                <span className={`text-[17px] font-bold ${editNameInput.length >= 3 && !nameError ? "text-white" : "text-[#555]"}`} style={{ fontFamily: "var(--font-outfit)" }}>Save</span>
-              </button>
+                className="flex-1 py-3 rounded-full text-[13px] font-bold active:scale-[0.97]"
+                style={{ background: "#F9E741", color: "#000", fontFamily: "var(--font-outfit)" }}
+              >Confirm</button>
+              <button onClick={() => setShowNameConfirm(false)} className="flex-1 py-3 rounded-full text-[13px] font-bold"
+                style={{ background: "rgba(255,255,255,0.08)", color: "#999", fontFamily: "var(--font-outfit)" }}
+              >Cancel</button>
             </div>
           </div>
         </div>
