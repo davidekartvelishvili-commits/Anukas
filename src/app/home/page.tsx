@@ -516,7 +516,7 @@ export default function HomePage() {
 
             {/* Cash input line */}
             <div className="flex items-center gap-3 py-3 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-              <img src="/images/lari-icon.png" alt="₾" width={44} height={44} style={{ objectFit: "contain" }} />
+              <img src="/images/lari-icon.png" alt="₾" width={58} height={58} style={{ objectFit: "contain" }} />
               <input
                 type="number"
                 placeholder="0"

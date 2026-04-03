@@ -738,7 +738,7 @@ export default function ProfilePage() {
             <h3 className="text-white text-[20px] font-bold text-center mb-6" style={{ fontFamily: "var(--font-outfit)" }}>Exchange</h3>
 
             <div className="flex items-center gap-3 py-3 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-              <img src="/images/lari-icon.png" alt="₾" width={44} height={44} style={{ objectFit: "contain" }} />
+              <img src="/images/lari-icon.png" alt="₾" width={58} height={58} style={{ objectFit: "contain" }} />
               <input type="number" placeholder="0" value={exchangeAmount} onChange={(e) => setExchangeAmount(e.target.value)}
                 className="flex-1 bg-transparent text-white text-[22px] font-bold outline-none" style={{ fontFamily: "var(--font-outfit)" }} min={0} max={cashBalance} />
               <span className="text-[15px] text-[#999] font-semibold shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>Balance: {cashBalance} ₾</span>
