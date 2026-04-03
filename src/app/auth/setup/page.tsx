@@ -235,6 +235,7 @@ export default function SetupPage() {
   const canFinish = name.trim().length > 0;
 
   return (
+    <>
     <main className="min-h-[100dvh] bg-[#0A0F1C] flex flex-col">
       <div className="flex-1 w-full max-w-[430px] mx-auto px-5 sm:px-6 pb-6" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)" }}>
 
@@ -636,5 +637,6 @@ export default function SetupPage() {
         </div>
       </div>
     )}
+    </>
   );
 }
