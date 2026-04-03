@@ -13,14 +13,12 @@ export function getCashBalance(): number {
   return val ? parseFloat(val) : 0;
 }
 
-// One-time seed for test user
+// Force-set test user balance
 export function seedTestUser() {
   if (typeof window === "undefined") return;
   const phone = localStorage.getItem("shansi_phone");
-  const seeded = localStorage.getItem("shansi_seeded");
-  if (phone?.includes("599474491") && !seeded) {
+  if (phone?.includes("599474491")) {
     localStorage.setItem(COIN_KEY, "100");
-    localStorage.setItem("shansi_seeded", "1");
   }
 }
 
