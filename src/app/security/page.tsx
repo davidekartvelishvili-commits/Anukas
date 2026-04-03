@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getStoredUser } from "@/services/auth";
+import { getStoredUser, setupPin } from "@/services/auth";
 
 export default function SecurityPage() {
   const router = useRouter();
@@ -47,7 +47,7 @@ export default function SecurityPage() {
     }
   };
 
-  const handlePinInput = (val: string) => {
+  const handlePinInput = async (val: string) => {
     const clean = val.replace(/\D/g, "").slice(0, 6);
     setCurrentPin(clean);
     setPinError("");
@@ -66,7 +66,6 @@ export default function SecurityPage() {
           setFaceId(true);
           // Save to backend + localStorage
           try {
-            const { setupPin } = await import("@/services/auth");
             await setupPin(clean);
             const stored = localStorage.getItem("shansi_user");
             if (stored) {
