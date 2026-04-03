@@ -9,10 +9,13 @@ function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isLogin = searchParams.get("mode") === "login";
-  const [phone, setPhone] = useState("");
+  const prefillPhone = searchParams.get("phone") || "";
+  const msgParam = searchParams.get("msg");
+  const [phone, setPhone] = useState(prefillPhone);
   const [focused, setFocused] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
+  const [infoMsg, setInfoMsg] = useState(msgParam === "registered" ? "This number is already registered. Please log in." : "");
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Face ID state
@@ -111,7 +114,7 @@ function AuthContent() {
           className="flex-1 text-center text-[16px] font-semibold text-white pr-8"
           style={{ fontFamily: "var(--font-outfit), system-ui, sans-serif" }}
         >
-          Create account
+          {isLogin ? "Log In" : "Create account"}
         </span>
       </div>
 
@@ -130,8 +133,15 @@ function AuthContent() {
           className="text-[15px] text-[#9CA3AF] mt-3 text-center"
           style={{ fontFamily: "var(--font-dm-sans), system-ui, sans-serif" }}
         >
-          Used to create your account
+          {isLogin ? "Enter your phone to log in" : "Used to create your account"}
         </p>
+
+        {/* Info message (e.g. already registered) */}
+        {infoMsg && (
+          <p className="text-[#F97316] text-[13px] text-center mt-3 font-medium" style={{ fontFamily: "var(--font-dm-sans)" }}>
+            {infoMsg}
+          </p>
+        )}
 
         {/* Phone input — rounded pill shape */}
         <div
