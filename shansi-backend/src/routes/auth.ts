@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import { eq, and } from "drizzle-orm";
+import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
 import { users, sessions, otpRateLimits } from "../db/schema.js";
 import { sendOtp, verifyOtp } from "../services/otp.js";
@@ -10,7 +11,7 @@ import { hashPin, verifyPin } from "../services/pin.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { BadRequestError, RateLimitError, UnauthorizedError } from "../utils/errors.js";
 
-const auth = new Hono();
+const auth = new Hono<AppEnv>();
 
 // ── Schemas ──
 const phoneSchema = z.object({

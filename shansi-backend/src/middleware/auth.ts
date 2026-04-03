@@ -1,10 +1,11 @@
 import { Context, Next } from "hono";
+import type { AppEnv } from "../types.js";
 import { verifyToken } from "../services/token.js";
 import { getDb } from "../db/client.js";
 import { sessions } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 
-export async function authMiddleware(c: Context, next: Next) {
+export async function authMiddleware(c: Context<AppEnv>, next: Next) {
   const header = c.req.header("Authorization");
   if (!header?.startsWith("Bearer ")) {
     return c.json({ success: false, message: "Unauthorized" }, 401);
@@ -16,7 +17,6 @@ export async function authMiddleware(c: Context, next: Next) {
     const decoded = verifyToken(token);
     const db = getDb();
 
-    // Check session is still valid
     const [session] = await db
       .select()
       .from(sessions)
@@ -27,7 +27,6 @@ export async function authMiddleware(c: Context, next: Next) {
       return c.json({ success: false, message: "Session expired" }, 401);
     }
 
-    // Check expiry
     if (new Date(session.expiresAt) < new Date()) {
       return c.json({ success: false, message: "Session expired" }, 401);
     }
