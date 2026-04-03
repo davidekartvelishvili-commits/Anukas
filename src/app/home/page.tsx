@@ -515,14 +515,16 @@ export default function HomePage() {
             </h3>
 
             {/* Cash input line */}
-            <div className="flex items-center gap-3 py-3 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-              <img src="/images/lari-icon.png" alt="₾" width={75} height={75} style={{ objectFit: "contain", marginLeft: -12 }} />
+            <div className="flex items-center py-3 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+              <div className="w-[60px] shrink-0 flex items-center justify-center">
+                <img src="/images/lari-icon.png" alt="₾" width={75} height={75} style={{ objectFit: "contain" }} />
+              </div>
               <input
                 type="number"
                 placeholder="0"
                 value={exchangeAmount}
                 onChange={(e) => setExchangeAmount(e.target.value)}
-                className="flex-1 bg-transparent text-white text-[22px] font-bold outline-none"
+                className="flex-1 bg-transparent text-white text-[22px] font-bold outline-none ml-2"
                 style={{ fontFamily: "var(--font-outfit)" }}
                 min={0}
                 max={cashBalance}
@@ -538,9 +540,11 @@ export default function HomePage() {
             </div>
 
             {/* Coin output line */}
-            <div className="flex items-center gap-3 py-3 border-b mb-4" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-              <img src="/images/coin-icon.png" alt="Coin" width={32} height={32} style={{ objectFit: "contain" }} />
-              <span className="flex-1 text-white text-[22px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
+            <div className="flex items-center py-3 border-b mb-4" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+              <div className="w-[60px] shrink-0 flex items-center justify-center">
+                <img src="/images/coin-icon.png" alt="Coin" width={42} height={42} style={{ objectFit: "contain" }} />
+              </div>
+              <span className="flex-1 text-white text-[22px] font-bold ml-2" style={{ fontFamily: "var(--font-outfit)" }}>
                 {exchangeAmount ? (parseFloat(exchangeAmount) * 100).toLocaleString() : "0"}
               </span>
               <span className="text-[15px] text-[#999] font-semibold shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>Coins</span>
