@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { nanoid } from "nanoid";
-import { eq, desc, sql, count, sum, and, gte } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
@@ -50,8 +50,8 @@ admin.post("/auth/setup", async (c) => {
   if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
 
   const db = getDb();
-  const existing = await db.select({ c: count() }).from(admins);
-  if (existing[0].c > 0) throw new BadRequestError("Admin already exists. Setup disabled.");
+  const existing = await db.select().from(admins).limit(1);
+  if (existing.length > 0) throw new BadRequestError("Admin already exists. Setup disabled.");
 
   const hash = await bcrypt.hash(parsed.data.password, 10);
   const id = nanoid();
@@ -60,14 +60,14 @@ admin.post("/auth/setup", async (c) => {
   });
 
   // Seed pool if empty
-  const poolRows = await db.select({ c: count() }).from(pool);
-  if (poolRows[0].c === 0) {
+  const poolRows = await db.select().from(pool).limit(1);
+  if (poolRows.length === 0) {
     await db.insert(pool).values({ id: nanoid(), balance: 0, totalFunded: 0, totalWon: 0 });
   }
 
   // Seed game configs if empty
-  const configRows = await db.select({ c: count() }).from(gameConfig);
-  if (configRows[0].c === 0) {
+  const configRows = await db.select().from(gameConfig).limit(1);
+  if (configRows.length === 0) {
     for (const gt of ["slot", "plinko", "chicken_rush"]) {
       await db.insert(gameConfig).values({ id: nanoid(), gameType: gt });
     }
@@ -149,22 +149,23 @@ admin.post("/auth/login", async (c) => {
 // GET /admin/dashboard
 admin.get("/dashboard", adminMiddleware, async (c) => {
   const db = getDb();
-  const [userCount] = await db.select({ c: count() }).from(users);
+  const allUsers = await db.select().from(users);
   const [poolData] = await db.select().from(pool).limit(1);
+  const allGames = await db.select().from(gameHistory);
 
   const today = new Date().toISOString().split("T")[0];
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-
-  const [todayGames] = await db.select({ c: count(), total: sum(gameHistory.winAmount) }).from(gameHistory).where(gte(gameHistory.createdAt, today));
-  const [weekGames] = await db.select({ c: count() }).from(gameHistory).where(gte(gameHistory.createdAt, weekAgo));
+  const todayGames = allGames.filter((g) => g.createdAt >= today);
+  const weekGames = allGames.filter((g) => g.createdAt >= weekAgo);
+  const todayWinnings = todayGames.reduce((s, g) => s + g.winAmount, 0);
 
   return c.json({
     success: true,
     dashboard: {
-      totalUsers: userCount.c,
-      gamesToday: todayGames.c,
-      gamesThisWeek: weekGames.c,
-      totalCashbackPaid: todayGames.total || 0,
+      totalUsers: allUsers.length,
+      gamesToday: todayGames.length,
+      gamesThisWeek: weekGames.length,
+      totalCashbackPaid: todayWinnings,
       poolBalance: poolData?.balance || 0,
       poolTotalFunded: poolData?.totalFunded || 0,
       poolTotalWon: poolData?.totalWon || 0,
@@ -242,15 +243,13 @@ admin.get("/users", adminMiddleware, async (c) => {
   const offset = (page - 1) * limit;
   const search = c.req.query("search");
 
-  let query = db.select().from(users).limit(limit).offset(offset).orderBy(desc(users.createdAt));
-
-  const allUsers = await query;
-  const [total] = await db.select({ c: count() }).from(users);
+  const allUsers = await db.select().from(users).limit(limit).offset(offset).orderBy(desc(users.createdAt));
+  const totalUsers = await db.select().from(users);
 
   return c.json({
     success: true,
     users: allUsers.map((u) => ({ id: u.id, phone: u.phone, name: u.name, balance: u.balance, isActive: u.isActive, createdAt: u.createdAt })),
-    pagination: { page, limit, total: total.c },
+    pagination: { page, limit, total: totalUsers.length },
   });
 });
 
@@ -280,12 +279,12 @@ admin.get("/game-history", adminMiddleware, async (c) => {
   const userId = c.req.query("user_id");
 
   const history = await db.select().from(gameHistory).orderBy(desc(gameHistory.createdAt)).limit(limit).offset(offset);
-  const [total] = await db.select({ c: count() }).from(gameHistory);
+  const allHistory = await db.select().from(gameHistory);
 
   return c.json({
     success: true,
     history,
-    pagination: { page, limit, total: total.c },
+    pagination: { page, limit, total: allHistory.length },
   });
 });
 
