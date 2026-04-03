@@ -170,6 +170,8 @@ export default function ChickenRushPage() {
     if (!game || game.gameOver || game.currentRow === 0) return;
     const sr = serverResultRef.current;
     if (!sr) return;
+    const unlockStep = sr.cashoutUnlockStep ?? 10;
+    if (game.currentRow < unlockStep) return;
     // Cashout: credit the step value at current position
     const currentStepIdx = Math.max(0, game.currentRow - 1);
     const winAmt = sr.stepValues[currentStepIdx] || sr.minWin;
@@ -322,18 +324,36 @@ export default function ChickenRushPage() {
           <p className={`text-[15px] font-bold text-center ${game?.won ? "text-yellow-400" : "text-red-400"}`} style={{ fontFamily: "var(--font-outfit)", textShadow: "0 0 15px currentColor" }}>{resultText}</p>
         )}
 
-        {/* Cash out — same shape as balance */}
-        {game && !game.gameOver && game.currentRow > 0 && (
-          <button onClick={handleCashout}
-            className="pointer-events-auto px-8 py-4 rounded-full active:scale-[0.97] transition-transform"
-            style={{ background: "#00E676", color: "#0a1a0a", fontFamily: "var(--font-outfit)", boxShadow: "0 0 20px rgba(0,230,118,0.4)" }}
-          >
-            <div className="flex flex-col items-center gap-0.5">
-              <span className="text-[15px] font-bold">Cash Out</span>
-              <span className="text-[11px] font-medium opacity-70">{(betAmount * (game?.multiplier || 1)).toFixed(2)} ₾</span>
-            </div>
-          </button>
-        )}
+        {/* Cash out — locked until 10 steps */}
+        {game && !game.gameOver && game.currentRow > 0 && (() => {
+          const sr = serverResultRef.current;
+          const unlockStep = sr?.cashoutUnlockStep ?? 10;
+          const canCashout = game.currentRow >= unlockStep;
+          const currentStepIdx = Math.max(0, game.currentRow - 1);
+          const stepVal = sr?.stepValues[currentStepIdx] ?? 0;
+          return (
+            <button
+              onClick={canCashout ? handleCashout : undefined}
+              className={`pointer-events-auto px-8 py-4 rounded-full transition-transform ${canCashout ? "active:scale-[0.97]" : ""}`}
+              style={{
+                background: canCashout ? "#00E676" : "rgba(255,255,255,0.06)",
+                color: canCashout ? "#0a1a0a" : "rgba(255,255,255,0.4)",
+                fontFamily: "var(--font-outfit)",
+                boxShadow: canCashout ? "0 0 20px rgba(0,230,118,0.4)" : "none",
+                border: canCashout ? "none" : "1px solid rgba(255,255,255,0.1)",
+              }}
+            >
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-[15px] font-bold">
+                  {canCashout ? "Cash Out" : `Step ${game.currentRow}/${unlockStep}`}
+                </span>
+                <span className="text-[11px] font-medium opacity-70">
+                  {canCashout ? `${stepVal.toFixed(2)} ₾` : `Unlock at step ${unlockStep}`}
+                </span>
+              </div>
+            </button>
+          );
+        })()}
 
 
         {/* Balance */}
