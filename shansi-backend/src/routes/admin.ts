@@ -13,6 +13,8 @@ import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/err
 
 const admin = new Hono<AdminEnv>();
 
+const ALL_PERMISSIONS = ["dashboard", "algorithm", "users", "merchants", "transactions", "games", "village", "notifications", "analytics", "system"];
+
 // ── Schemas ──
 const loginSchema = z.object({
   email: z.string().email(),
@@ -143,7 +145,7 @@ admin.post("/auth/login", async (c) => {
   return c.json({
     success: true,
     token,
-    admin: { id: a.id, email: a.email, name: a.name, role: a.role },
+    admin: { id: a.id, email: a.email, name: a.name, role: a.role, permissions: a.permissions ? JSON.parse(a.permissions) : ALL_PERMISSIONS },
   });
 });
 
@@ -291,6 +293,137 @@ admin.get("/game-history", adminMiddleware, async (c) => {
     history,
     pagination: { page, limit, total: allHistory.length },
   });
+});
+
+// ══════════════════════════════════════
+// ADMIN MANAGEMENT (super_admin only)
+// ══════════════════════════════════════
+
+const createAdminSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  name: z.string().min(1),
+  role: z.enum(["admin", "super_admin"]),
+  permissions: z.array(z.string()).optional(),
+});
+
+// POST /admin/admins/create (super_admin only)
+admin.post("/admins/create", adminMiddleware, async (c) => {
+  const adminRole = c.get("adminRole") as string;
+  if (adminRole !== "super_admin") {
+    return c.json({ success: false, message: "Only super admins can create new admins" }, 403);
+  }
+
+  const body = await c.req.json();
+  const parsed = createAdminSchema.safeParse(body);
+  if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
+
+  const db = getDb();
+
+  // Check email not taken
+  const [existing] = await db.select().from(admins).where(eq(admins.email, parsed.data.email)).limit(1);
+  if (existing) throw new BadRequestError("Email already in use");
+
+  const hash = await bcrypt.hash(parsed.data.password, 10);
+  const id = nanoid();
+  const perms = parsed.data.role === "super_admin"
+    ? ALL_PERMISSIONS
+    : (parsed.data.permissions || ["dashboard"]);
+
+  await db.insert(admins).values({
+    id,
+    email: parsed.data.email,
+    passwordHash: hash,
+    name: parsed.data.name,
+    role: parsed.data.role,
+    permissions: JSON.stringify(perms),
+  });
+
+  const adminId = c.get("adminId") as string;
+  await logAction(adminId, "create_admin", `Created admin: ${parsed.data.email} (${parsed.data.role})`);
+
+  return c.json({
+    success: true,
+    admin: { id, email: parsed.data.email, name: parsed.data.name, role: parsed.data.role, permissions: perms },
+  });
+});
+
+// GET /admin/admins (super_admin only)
+admin.get("/admins", adminMiddleware, async (c) => {
+  const adminRole = c.get("adminRole") as string;
+  if (adminRole !== "super_admin") {
+    return c.json({ success: false, message: "Only super admins can view admin list" }, 403);
+  }
+
+  const db = getDb();
+  const all = await db.select().from(admins).orderBy(desc(admins.createdAt));
+
+  return c.json({
+    success: true,
+    admins: all.map((a) => ({
+      id: a.id,
+      email: a.email,
+      name: a.name,
+      role: a.role,
+      permissions: a.permissions ? JSON.parse(a.permissions) : ALL_PERMISSIONS,
+      isActive: a.isActive,
+      createdAt: a.createdAt,
+    })),
+  });
+});
+
+// PATCH /admin/admins/:id (super_admin only)
+admin.patch("/admins/:id", adminMiddleware, async (c) => {
+  const adminRole = c.get("adminRole") as string;
+  if (adminRole !== "super_admin") {
+    return c.json({ success: false, message: "Only super admins can edit admins" }, 403);
+  }
+
+  const id = c.req.param("id") as string;
+  const body = await c.req.json();
+  const db = getDb();
+
+  const [target] = await db.select().from(admins).where(eq(admins.id, id)).limit(1);
+  if (!target) return c.json({ success: false, message: "Admin not found" }, 404);
+
+  const updates: Record<string, any> = {};
+  if (body.name) updates.name = body.name;
+  if (body.role && ["admin", "super_admin"].includes(body.role)) updates.role = body.role;
+  if (body.permissions) updates.permissions = JSON.stringify(body.permissions);
+  if (typeof body.isActive === "boolean") updates.isActive = body.isActive;
+  if (body.password && body.password.length >= 8) {
+    updates.passwordHash = await bcrypt.hash(body.password, 10);
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await db.update(admins).set(updates).where(eq(admins.id, id));
+  }
+
+  const adminId = c.get("adminId") as string;
+  await logAction(adminId, "update_admin", `Updated admin: ${target.email}`);
+
+  return c.json({ success: true });
+});
+
+// DELETE /admin/admins/:id (super_admin only, can't delete self)
+admin.delete("/admins/:id", adminMiddleware, async (c) => {
+  const adminRole = c.get("adminRole") as string;
+  if (adminRole !== "super_admin") {
+    return c.json({ success: false, message: "Only super admins can delete admins" }, 403);
+  }
+
+  const id = c.req.param("id") as string;
+  const currentAdminId = c.get("adminId") as string;
+
+  if (id === currentAdminId) {
+    return c.json({ success: false, message: "Cannot delete yourself" }, 400);
+  }
+
+  const db = getDb();
+  await db.delete(admins).where(eq(admins.id, id));
+
+  await logAction(currentAdminId, "delete_admin", `Deleted admin: ${id}`);
+  return c.json({ success: true });
 });
 
 export default admin;

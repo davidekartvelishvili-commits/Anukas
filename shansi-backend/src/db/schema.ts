@@ -35,6 +35,7 @@ export const admins = sqliteTable("admins", {
   passwordHash: text("password_hash").notNull(),
   name: text("name"),
   role: text("role").default("admin").notNull(),
+  permissions: text("permissions"), // JSON array of allowed pages e.g. ["dashboard","users","games"]
   isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
 });

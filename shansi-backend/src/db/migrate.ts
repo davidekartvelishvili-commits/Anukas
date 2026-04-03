@@ -71,6 +71,7 @@ async function migrate() {
       pool_balance_after REAL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `ALTER TABLE admins ADD COLUMN permissions TEXT`,
     `CREATE TABLE IF NOT EXISTS admin_logs (
       id TEXT PRIMARY KEY,
       admin_id TEXT NOT NULL REFERENCES admins(id),
@@ -80,8 +81,11 @@ async function migrate() {
     )`,
   ];
 
-  for (const sql of statements) {
-    await client.execute(sql);
+  for (const s of statements) {
+    try { await client.execute(s); } catch (e: any) {
+      // Ignore "duplicate column" errors from ALTER TABLE
+      if (!e.message?.includes("duplicate column")) throw e;
+    }
   }
 
   console.log("Migrations complete");
