@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { logout } from "@/services/auth";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -362,6 +363,7 @@ export default function SettingsPage() {
           {/* ── Log Out ── */}
           <div style={stagger(5)}>
             <button
+              onClick={async () => { await logout(); router.push("/welcome"); }}
               className="w-full flex items-center justify-between py-4 active:opacity-70 transition-opacity"
             >
               <h3
