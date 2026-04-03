@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { getStoredUser } from "@/services/auth";
 
 export default function SecurityPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const storedUser = typeof window !== "undefined" ? getStoredUser() : null;
   const [faceId, setFaceId] = useState(false);
-  const [pinEnabled, setPinEnabled] = useState(false);
+  const [pinEnabled, setPinEnabled] = useState(storedUser?.hasPin ?? false);
 
   // PIN setup flow
   const [showPinSetup, setShowPinSetup] = useState(false);
@@ -62,6 +64,17 @@ export default function SecurityPage() {
           setPinSuccess("PIN set successfully!");
           setPinEnabled(true);
           setFaceId(true);
+          // Save to backend + localStorage
+          try {
+            const { setupPin } = await import("@/services/auth");
+            await setupPin(clean);
+            const stored = localStorage.getItem("shansi_user");
+            if (stored) {
+              const user = JSON.parse(stored);
+              user.hasPin = true;
+              localStorage.setItem("shansi_user", JSON.stringify(user));
+            }
+          } catch {}
           setTimeout(() => {
             setShowPinSetup(false);
             setPinSuccess("");
