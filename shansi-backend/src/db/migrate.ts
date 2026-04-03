@@ -35,6 +35,49 @@ async function migrate() {
       attempts INTEGER NOT NULL DEFAULT 0,
       window_start TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS admins (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      name TEXT,
+      role TEXT NOT NULL DEFAULT 'admin',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS game_config (
+      id TEXT PRIMARY KEY,
+      game_type TEXT NOT NULL,
+      avg_return_percent REAL NOT NULL DEFAULT 85,
+      max_win_per_user REAL NOT NULL DEFAULT 100,
+      pool_minimum_threshold REAL NOT NULL DEFAULT 1000,
+      full_return_threshold REAL NOT NULL DEFAULT 5,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS pool (
+      id TEXT PRIMARY KEY,
+      balance REAL NOT NULL DEFAULT 0,
+      total_funded REAL NOT NULL DEFAULT 0,
+      total_won REAL NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS game_history (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      game_type TEXT NOT NULL,
+      bet_amount REAL NOT NULL,
+      win_amount REAL NOT NULL,
+      pool_balance_before REAL,
+      pool_balance_after REAL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS admin_logs (
+      id TEXT PRIMARY KEY,
+      admin_id TEXT NOT NULL REFERENCES admins(id),
+      action TEXT NOT NULL,
+      details TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
   ];
 
   for (const sql of statements) {

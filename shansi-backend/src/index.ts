@@ -5,6 +5,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import auth from "./routes/auth.js";
 import user from "./routes/user.js";
+import admin from "./routes/admin.js";
 import { AppError } from "./utils/errors.js";
 import { getEnv } from "./utils/env.js";
 
@@ -43,6 +44,7 @@ app.use("*", async (c, next) => {
 // ── Routes ──
 app.route("/auth", auth);
 app.route("/user", user);
+app.route("/admin", admin);
 
 // ── Health check ──
 app.get("/health", (c) => {

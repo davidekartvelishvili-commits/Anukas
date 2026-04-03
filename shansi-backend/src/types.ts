@@ -4,3 +4,10 @@ export type AppEnv = {
     phone: string;
   };
 };
+
+export type AdminEnv = {
+  Variables: {
+    adminId: string;
+    adminRole: string;
+  };
+};
