@@ -45,6 +45,7 @@ async function logAction(adminId: string, action: string, details?: string) {
 
 // POST /admin/auth/setup — first admin only
 admin.post("/auth/setup", async (c) => {
+  try {
   const body = await c.req.json();
   const parsed = setupSchema.safeParse(body);
   if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
@@ -74,6 +75,10 @@ admin.post("/auth/setup", async (c) => {
   }
 
   return c.json({ success: true, admin: { id, email: parsed.data.email, name: parsed.data.name } });
+  } catch (err: any) {
+    console.error("Setup error:", err);
+    return c.json({ success: false, message: err.message || "Setup failed", detail: String(err) }, 500);
+  }
 });
 
 // POST /admin/auth/login
