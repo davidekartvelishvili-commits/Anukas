@@ -69,38 +69,52 @@ function calculateWin(
   if (!config.isActive) return { minWin: 0, bonusWin: 0 };
   if (poolBalance < config.poolMinimumThreshold) return { minWin: 0, bonusWin: 0 };
 
+  // avgReturnPercent is the target AVERAGE return across ALL users
+  // e.g. 0.5% means on average users get back 0.5% of their bet
   const avgReturnDecimal = config.avgReturnPercent / 100;
-  const bonusReturnBudget = avgReturnDecimal;
 
-  if (bonusReturnBudget <= 0) return { minWin: 0, bonusWin: 0 };
+  if (avgReturnDecimal <= 0) return { minWin: 0, bonusWin: 0 };
 
   const availablePool = poolBalance - config.poolMinimumThreshold;
   if (availablePool <= 0) return { minWin: 0, bonusWin: 0 };
 
-  // Special case: low amounts get higher chance of 100% return
-  if (betAmountInLari <= config.fullReturnThreshold) {
-    const roll = secureRandom();
-    if (roll < 0.20) {
-      let bonusWin = betAmountInLari;
-      bonusWin = Math.min(bonusWin, config.maxWinPerUser, availablePool);
-      return { minWin: 0, bonusWin: round2(Math.max(0, bonusWin)) };
-    }
-  }
+  // Special case: low ORIGINAL payment amounts (not coin bets) get 100% return chance
+  // fullReturnThreshold is in ₾ (e.g. 5₾) — compare against the TRANSACTION payment, not per-game bet
+  // For coin-based games, individual bets are always small (0.10₾), so we SKIP this path
+  // This path only applies to direct ₾ payments (future feature)
+  // For now: disabled for coin-based games
 
-  // Normal bonus: 10% of games get a bonus win
+  // Win probability: to maintain avgReturnPercent across all users
+  // Average win per game = betAmountInLari * avgReturnDecimal
+  // We spread this: some games win 0, some win more
+  // 10% of games get a bonus win
   const winChance = 0.10;
   const roll = secureRandom();
   if (roll >= winChance) {
     return { minWin: 0, bonusWin: 0 }; // No win this game — that's OK
   }
 
-  // Calculate bonus amount
-  const expectedBonus = (bonusReturnBudget / winChance) * betAmountInLari;
+  // This game is a winner! Calculate amount.
+  // Target average per game = betAmountInLari * avgReturnDecimal
+  // Since only winChance% of games win: each winner gets avgReturn / winChance
+  // e.g. 0.5% avg, 10% chance: each winner gets (0.005 / 0.10) = 5% of bet
+  const expectedBonus = (avgReturnDecimal / winChance) * betAmountInLari;
+
+  // Add randomness: 50% to 150% of expected
   const randomMultiplier = 0.5 + secureRandom();
   let bonusWin = expectedBonus * randomMultiplier;
+
+  // Cap at max_win_per_user
   bonusWin = Math.min(bonusWin, config.maxWinPerUser);
+
+  // Cap at available pool
   bonusWin = Math.min(bonusWin, availablePool);
+
+  // Floor at 0, round to 2 decimals
   bonusWin = round2(Math.max(0, bonusWin));
+
+  // LOG for debugging (remove in production)
+  console.log(`[GAME ENGINE] bet=${betAmountInLari}₾ avgReturn=${config.avgReturnPercent}% winChance=${winChance} expectedBonus=${expectedBonus} randomMult=${randomMultiplier.toFixed(3)} bonusWin=${bonusWin}`);
 
   return { minWin: 0, bonusWin };
 }
@@ -199,6 +213,8 @@ export async function playGame(
   }, poolBefore, isBonusRound, plannedBonusWin);
 
   const totalWin = round2(minWin + bonusWin);
+
+  console.log(`[PLAY] userId=${userId} game=${gameType} coins=${coinCost} betLari=${betInLari} minWin=${minWin} bonusWin=${bonusWin} totalWin=${totalWin} pool=${poolBefore} isBonusRound=${isBonusRound}`);
 
   // 5. Deduct from pool if bonus win (not from guarantee)
   if (bonusWin > 0 && !isBonusRound) {
