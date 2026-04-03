@@ -44,7 +44,7 @@ function AuthContent() {
     setSendError("");
     try {
       await sendOtp(digits);
-      router.push(`/auth/verify?phone=${digits}`);
+      router.push(`/auth/verify?phone=${digits}${isLogin ? "&mode=login" : ""}`);
     } catch (err: any) {
       setSendError(err.message || "Failed to send OTP");
     } finally {

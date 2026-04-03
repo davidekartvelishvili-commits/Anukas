@@ -9,6 +9,7 @@ function VerifyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const phoneRaw = searchParams.get("phone") || "";
+  const isLoginMode = searchParams.get("mode") === "login";
   const [verifyError, setVerifyError] = useState("");
 
   // Format phone for display: +995 5XX XX XX XX
@@ -72,6 +73,11 @@ function VerifyContent() {
     setVerifyError("");
     try {
       const data = await verifyOtp(phoneRaw, code);
+      if (!data.isNewUser && !isLoginMode) {
+        // User already exists but came from signup — redirect to login
+        router.push("/auth?mode=login");
+        return;
+      }
       if (data.isNewUser) {
         router.push("/auth/onboarding");
       } else {

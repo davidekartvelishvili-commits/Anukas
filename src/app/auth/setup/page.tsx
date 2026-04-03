@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/services/api";
+import { setupPin } from "@/services/auth";
 
 /* ───────── SVG ICONS ───────── */
 
@@ -148,6 +149,13 @@ export default function SetupPage() {
   const [referralStatus, setReferralStatus] = useState<"idle" | "checking" | "valid" | "invalid">("idle");
 
   const [finishing, setFinishing] = useState(false);
+  const [showEasyLogin, setShowEasyLogin] = useState(false);
+  const [pinStep, setPinStep] = useState<"ask" | "enter" | "confirm">("ask");
+  const [firstPin, setFirstPin] = useState("");
+  const [currentPin, setCurrentPin] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [pinSuccess, setPinSuccess] = useState("");
+  const pinRef = useRef<HTMLInputElement>(null);
 
   // Stagger animations
   const [visible, setVisible] = useState(false);
@@ -193,7 +201,35 @@ export default function SetupPage() {
         });
       }
     } catch {}
-    router.push("/home");
+    setFinishing(false);
+    setShowEasyLogin(true);
+    setPinStep("ask");
+  };
+
+  const handlePinInput = async (val: string) => {
+    const clean = val.replace(/\D/g, "").slice(0, 6);
+    setCurrentPin(clean);
+    setPinError("");
+    if (clean.length === 6) {
+      if (pinStep === "enter") {
+        setFirstPin(clean);
+        setCurrentPin("");
+        setPinStep("confirm");
+        setTimeout(() => pinRef.current?.focus(), 50);
+      } else if (pinStep === "confirm") {
+        if (clean === firstPin) {
+          setPinSuccess("PIN set successfully!");
+          try { await setupPin(clean); } catch {}
+          setTimeout(() => router.push("/home"), 1200);
+        } else {
+          setPinError("PINs don't match. Try again.");
+          setCurrentPin("");
+          setFirstPin("");
+          setPinStep("enter");
+          setTimeout(() => pinRef.current?.focus(), 50);
+        }
+      }
+    }
   };
 
   const canFinish = name.trim().length > 0;
@@ -484,5 +520,121 @@ export default function SetupPage() {
         <div className="w-[134px] h-[5px] rounded-full bg-[rgba(241,245,249,0.12)]" />
       </div>
     </main>
+
+    {/* ── Easy Login Setup Overlay ── */}
+    {showEasyLogin && (
+      <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "#000000" }}>
+        <div className="flex-1 flex flex-col items-center justify-center px-6">
+          {pinStep === "ask" && (
+            <>
+              {/* Lock icon */}
+              <div className="w-[80px] h-[80px] rounded-full flex items-center justify-center mb-6" style={{ background: "#1C1C1E" }}>
+                <svg width="36" height="36" viewBox="0 0 22 22" fill="none" stroke="#FFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="5" y="10" width="12" height="9" rx="2" />
+                  <path d="M8 10V7a3 3 0 016 0v3" />
+                  <circle cx="11" cy="15" r="1" fill="#FFF" />
+                </svg>
+              </div>
+
+              <h2 className="text-white text-[26px] font-bold text-center mb-3" style={{ fontFamily: "var(--font-outfit)" }}>
+                Easy Login
+              </h2>
+              <p className="text-[#9CA3AF] text-[15px] text-center mb-8 leading-relaxed" style={{ fontFamily: "var(--font-dm-sans)" }}>
+                Set up Face ID or PIN for quick access next time
+              </p>
+
+              <button
+                onClick={() => { setPinStep("enter"); setTimeout(() => pinRef.current?.focus(), 100); }}
+                className="w-full max-w-[300px] h-[60px] rounded-[30px] text-[17px] font-bold mb-4 active:scale-[0.97] transition-transform"
+                style={{ background: "#FFE500", color: "#000", fontFamily: "var(--font-outfit)" }}
+              >
+                Set Up PIN
+              </button>
+
+              <button
+                onClick={() => router.push("/home")}
+                className="text-[16px] font-semibold active:opacity-50 transition-opacity"
+                style={{ color: "#9CA3AF", fontFamily: "var(--font-outfit)" }}
+              >
+                Maybe Later
+              </button>
+            </>
+          )}
+
+          {(pinStep === "enter" || pinStep === "confirm") && (
+            <>
+              <div className="w-[80px] h-[80px] rounded-full flex items-center justify-center mb-6" style={{ background: "#1C1C1E" }}>
+                <svg width="36" height="36" viewBox="0 0 22 22" fill="none" stroke="#FFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="5" y="10" width="12" height="9" rx="2" />
+                  <path d="M8 10V7a3 3 0 016 0v3" />
+                  <circle cx="11" cy="15" r="1" fill="#FFF" />
+                </svg>
+              </div>
+
+              <h2 className="text-white text-[24px] font-bold text-center mb-2" style={{ fontFamily: "var(--font-outfit)" }}>
+                {pinStep === "enter" ? "Create PIN" : "Confirm PIN"}
+              </h2>
+              <p className="text-[#9CA3AF] text-[14px] text-center mb-8" style={{ fontFamily: "var(--font-dm-sans)" }}>
+                {pinStep === "enter" ? "Enter a 6-digit PIN" : "Re-enter your PIN to confirm"}
+              </p>
+
+              {/* PIN dots */}
+              <div className="flex gap-4 mb-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-[16px] h-[16px] rounded-full transition-all duration-200"
+                    style={{
+                      background: i < currentPin.length ? "#FFE500" : "transparent",
+                      border: i < currentPin.length ? "2px solid #FFE500" : "2px solid #2A2A2A",
+                    }}
+                  />
+                ))}
+              </div>
+
+              {pinError && (
+                <p className="text-[#EF4444] text-[13px] font-medium mb-4" style={{ fontFamily: "var(--font-dm-sans)" }}>{pinError}</p>
+              )}
+
+              {pinSuccess && (
+                <div className="flex items-center gap-2 mb-4">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3,8 6,11 13,4" />
+                  </svg>
+                  <p className="text-[#22C55E] text-[14px] font-medium" style={{ fontFamily: "var(--font-dm-sans)" }}>{pinSuccess}</p>
+                </div>
+              )}
+
+              {/* Hidden input */}
+              <input
+                ref={pinRef}
+                type="number"
+                value={currentPin}
+                onChange={(e) => handlePinInput(e.target.value)}
+                className="absolute opacity-0 w-0 h-0"
+                inputMode="numeric"
+                autoFocus
+              />
+
+              <button
+                onClick={() => pinRef.current?.focus()}
+                className="text-[13px] text-[#6B7280] mb-6"
+                style={{ fontFamily: "var(--font-dm-sans)" }}
+              >
+                Tap to enter PIN
+              </button>
+
+              <button
+                onClick={() => { setShowEasyLogin(false); router.push("/home"); }}
+                className="text-[14px] font-semibold active:opacity-50"
+                style={{ color: "#9CA3AF", fontFamily: "var(--font-outfit)" }}
+              >
+                Skip
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    )}
   );
 }
