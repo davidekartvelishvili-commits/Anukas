@@ -41,6 +41,7 @@ games.post("/play", async (c) => {
         bonusRound: result.bonusRound,
         bonusMessage: result.bonusMessage,
         freeCoins: result.freeCoins,
+        bonusGamesLeft: result.bonusGamesLeft,
         transactionComplete: result.transactionComplete,
       },
     });

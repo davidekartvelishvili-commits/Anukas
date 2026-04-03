@@ -11,6 +11,7 @@ export interface GameResult {
   bonusRound: boolean;
   bonusMessage?: string;
   freeCoins?: number;
+  bonusGamesLeft: number;
   transactionComplete: boolean;
 }
 

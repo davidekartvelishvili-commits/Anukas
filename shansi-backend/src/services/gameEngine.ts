@@ -18,6 +18,7 @@ export interface GameResult {
   bonusRound: boolean;
   bonusMessage?: string;
   freeCoins?: number;
+  bonusGamesLeft: number;
   transactionComplete: boolean;
 }
 
@@ -54,11 +55,11 @@ function calculateWin(
   config: Config,
   poolBalance: number,
   isBonusRound: boolean,
-  shortfall: number
+  plannedBonusWin: number
 ): { minWin: number; bonusWin: number } {
-  // BONUS ROUND: rigged to win exactly the shortfall
-  if (isBonusRound && shortfall > 0) {
-    return { minWin: 0, bonusWin: round2(shortfall) };
+  // BONUS ROUND: win the pre-planned amount
+  if (isBonusRound && plannedBonusWin > 0) {
+    return { minWin: 0, bonusWin: round2(plannedBonusWin) };
   }
 
   // Normal game: individual games CAN return 0₾
@@ -105,6 +106,42 @@ function calculateWin(
 }
 
 // ═══════════════════════════════════════
+// BONUS PLAN GENERATOR
+// ═══════════════════════════════════════
+
+function generateBonusPlan(shortfall: number): number[] {
+  if (shortfall <= 0) return [];
+
+  // Add noise to make amounts look natural
+  const addNoise = (amt: number): number => {
+    const noise = (secureRandom() - 0.5) * amt * 0.3; // ±15%
+    return round2(Math.max(0.001, amt + noise));
+  };
+
+  if (shortfall <= 0.01) {
+    // Very small: 1 game
+    return [round2(shortfall)];
+  }
+
+  if (shortfall <= 0.03) {
+    // Medium: 2 games
+    const ratio = 0.4 + secureRandom() * 0.2; // 40-60%
+    const game1 = addNoise(shortfall * ratio);
+    const game2 = round2(shortfall - game1);
+    return [Math.max(0.001, game1), Math.max(0.001, game2)];
+  }
+
+  // Larger: 3 games
+  const ratio1 = 0.2 + secureRandom() * 0.2; // 20-40%
+  const game1 = addNoise(shortfall * ratio1);
+  const remaining = shortfall - game1;
+  const ratio2 = 0.3 + secureRandom() * 0.2; // 30-50% of remaining
+  const game2 = addNoise(remaining * ratio2);
+  const game3 = round2(shortfall - game1 - game2);
+  return [Math.max(0.001, round2(game1)), Math.max(0.001, round2(game2)), Math.max(0.001, game3)];
+}
+
+// ═══════════════════════════════════════
 // MAIN PLAY FUNCTION
 // ═══════════════════════════════════════
 
@@ -143,9 +180,14 @@ export async function playGame(
 
   // 4. Calculate win
   const betInLari = coinCost / 100;
-  const shortfall = isBonusRound
-    ? round2(activeTx.guaranteedMinimum - activeTx.totalCashWon)
-    : 0;
+  let plannedBonusWin = 0;
+
+  if (isBonusRound && activeTx.bonusWinsPlan) {
+    // Pop next planned win from the bonus plan
+    const plan: number[] = JSON.parse(activeTx.bonusWinsPlan);
+    const played = activeTx.bonusGamesPlayed || 0;
+    plannedBonusWin = plan[played] || 0;
+  }
 
   const { minWin, bonusWin } = calculateWin(betInLari, {
     avgReturnPercent: config.avgReturnPercent,
@@ -154,7 +196,7 @@ export async function playGame(
     fullReturnThreshold: config.fullReturnThreshold,
     minReturnPercent: config.minReturnPercent,
     isActive: config.isActive,
-  }, poolBefore, isBonusRound, shortfall);
+  }, poolBefore, isBonusRound, plannedBonusWin);
 
   const totalWin = round2(minWin + bonusWin);
 
@@ -177,60 +219,77 @@ export async function playGame(
 
   // 7. Update transaction
   const actualCoinDeduct = isBonusRound ? Math.min(coinCost, activeTx.coinsRemaining) : coinCost;
-  const newCoinsRemaining = activeTx.coinsRemaining - actualCoinDeduct;
+  const newCoinsRemaining = Math.max(0, activeTx.coinsRemaining - actualCoinDeduct);
   const newTotalCashWon = round2(activeTx.totalCashWon + totalWin);
 
-  await db.update(transactions).set({
+  const txUpdates: Record<string, any> = {
     coinsRemaining: newCoinsRemaining,
     totalCashWon: newTotalCashWon,
-  }).where(eq(transactions.id, activeTx.id));
+  };
+
+  // Track bonus games played
+  if (isBonusRound) {
+    txUpdates.bonusGamesPlayed = (activeTx.bonusGamesPlayed || 0) + 1;
+  }
+
+  await db.update(transactions).set(txUpdates).where(eq(transactions.id, activeTx.id));
 
   // 8. Check if transaction should complete or trigger bonus round
   let bonusRoundTriggered = false;
   let bonusMessage: string | undefined;
   let freeCoins: number | undefined;
   let transactionComplete = false;
+  let bonusGamesLeft = 0;
 
-  if (newCoinsRemaining <= 0) {
-    if (newTotalCashWon >= activeTx.guaranteedMinimum || activeTx.guaranteedMinimum === 0) {
-      // Guarantee met or no guarantee (free coins)
+  if (isBonusRound) {
+    const played = (activeTx.bonusGamesPlayed || 0) + 1;
+    const total = activeTx.bonusGamesTotal || 0;
+    bonusGamesLeft = Math.max(0, total - played);
+
+    if (newTotalCashWon >= activeTx.guaranteedMinimum || played >= total) {
+      // All bonus games played or guarantee met
       await db.update(transactions).set({
-        status: "completed",
-        guaranteeMet: true,
-        completedAt: new Date().toISOString(),
+        status: "completed", guaranteeMet: true, completedAt: new Date().toISOString(),
       }).where(eq(transactions.id, activeTx.id));
       transactionComplete = true;
-    } else if (isBonusRound) {
-      // Still in bonus round but coins ran out — check if met now
-      if (newTotalCashWon >= activeTx.guaranteedMinimum) {
-        await db.update(transactions).set({
-          status: "completed",
-          guaranteeMet: true,
-          completedAt: new Date().toISOString(),
-        }).where(eq(transactions.id, activeTx.id));
-        transactionComplete = true;
-      } else {
-        // Give more bonus coins
-        const bonusCoins = 10;
-        await db.update(transactions).set({
-          coinsRemaining: bonusCoins,
-          bonusGamesGiven: activeTx.bonusGamesGiven + 1,
-        }).where(eq(transactions.id, activeTx.id));
-        bonusRoundTriggered = true;
-        bonusMessage = "შანსმა შანსი მოგცა! 🎉 ითამაშე უფასოდ!";
-        freeCoins = bonusCoins;
-      }
+    } else if (newCoinsRemaining <= 0) {
+      // Need more coins for remaining bonus games
+      const coinsPerGame = 10;
+      const remainingGames = total - played;
+      const bonusCoins = coinsPerGame * remainingGames;
+      await db.update(transactions).set({ coinsRemaining: bonusCoins }).where(eq(transactions.id, activeTx.id));
+      bonusRoundTriggered = true;
+      bonusMessage = `კიდევ ${remainingGames} უფასო თამაში დარჩა`;
+      freeCoins = bonusCoins;
+      bonusGamesLeft = remainingGames;
+    }
+  } else if (newCoinsRemaining <= 0) {
+    if (newTotalCashWon >= activeTx.guaranteedMinimum || activeTx.guaranteedMinimum === 0) {
+      // Guarantee met or free coins (no guarantee)
+      await db.update(transactions).set({
+        status: "completed", guaranteeMet: true, completedAt: new Date().toISOString(),
+      }).where(eq(transactions.id, activeTx.id));
+      transactionComplete = true;
     } else {
-      // Normal coins ran out, guarantee NOT met — trigger bonus round
-      const bonusCoins = 10;
+      // Normal coins ran out, guarantee NOT met — generate bonus plan
+      const shortfall = round2(activeTx.guaranteedMinimum - newTotalCashWon);
+      const plan = generateBonusPlan(shortfall);
+      const totalBonusGames = plan.length;
+      const bonusCoins = 10 * totalBonusGames;
+
       await db.update(transactions).set({
         status: "bonus_round",
         coinsRemaining: bonusCoins,
-        bonusGamesGiven: 1,
+        bonusGamesGiven: totalBonusGames,
+        bonusWinsPlan: JSON.stringify(plan),
+        bonusGamesPlayed: 0,
+        bonusGamesTotal: totalBonusGames,
       }).where(eq(transactions.id, activeTx.id));
+
       bonusRoundTriggered = true;
-      bonusMessage = "შანსმა შანსი მოგცა! 🎉 ითამაშე უფასოდ!";
+      bonusMessage = "შენ მიიღე ბონუს შანსი! 🎉 ითამაშე უფასოდ!";
       freeCoins = bonusCoins;
+      bonusGamesLeft = totalBonusGames;
     }
   }
 
@@ -259,6 +318,7 @@ export async function playGame(
     bonusRound: bonusRoundTriggered,
     bonusMessage,
     freeCoins,
+    bonusGamesLeft,
     transactionComplete,
   };
 }
