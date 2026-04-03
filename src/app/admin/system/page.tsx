@@ -238,8 +238,10 @@ function SystemContent() {
     { key: "settings", label: "აპის პარამეტრები", icon: SettingsIcon },
   ];
 
+  const defaultColor = { bg: "#A0A0A020", text: "#A0A0A0" };
   const roleColors: Record<string, { bg: string; text: string }> = {
     super: { bg: "#F9E74120", text: "#F9E741" },
+    super_admin: { bg: "#F9E74120", text: "#F9E741" },
     admin: { bg: "#3B82F620", text: "#3B82F6" },
     viewer: { bg: "#A0A0A020", text: "#A0A0A0" },
   };
@@ -379,7 +381,7 @@ function SystemContent() {
                           <td className="px-4 py-3 text-[13px] font-medium" style={{ color: "#FFFFFF" }}>{admin.name}</td>
                           <td className="px-4 py-3 text-[12px]" style={{ color: "#A0A0A0" }}>{admin.email}</td>
                           <td className="px-4 py-3">
-                            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: roleColors[admin.role].bg, color: roleColors[admin.role].text }}>
+                            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: (roleColors[admin.role] || defaultColor).bg, color: (roleColors[admin.role] || defaultColor).text }}>
                               {admin.role}
                             </span>
                           </td>
