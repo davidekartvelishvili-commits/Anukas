@@ -31,10 +31,11 @@ export async function verifyOtp(phone: string, code: string): Promise<VerifyOtpR
     body: JSON.stringify({ phone: formatted, code }),
   });
 
-  // Store token and user
+  // Store token, user, and phone for PIN login
   if (data.success && data.token) {
     localStorage.setItem("shansi_token", data.token);
     localStorage.setItem("shansi_user", JSON.stringify(data.user));
+    localStorage.setItem("shansi_phone", formatted);
   }
 
   return data;
@@ -45,6 +46,20 @@ export async function setupPin(pin: string) {
     method: "POST",
     body: JSON.stringify({ pin }),
   });
+}
+
+export async function pinLogin(phone: string, pin: string) {
+  const formatted = phone.startsWith("+995") ? phone : `+995${phone}`;
+  const data = await apiFetch<{ token: string; user: User }>("/auth/pin/login", {
+    method: "POST",
+    body: JSON.stringify({ phone: formatted, pin }),
+  });
+  if (data.success && data.token) {
+    localStorage.setItem("shansi_token", data.token);
+    localStorage.setItem("shansi_user", JSON.stringify(data.user));
+    localStorage.setItem("shansi_phone", formatted);
+  }
+  return data;
 }
 
 export async function verifyPin(pin: string) {

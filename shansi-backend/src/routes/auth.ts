@@ -159,6 +159,93 @@ auth.post("/pin/setup", authMiddleware, async (c) => {
   return c.json({ success: true, message: "PIN set" });
 });
 
+// ── POST /auth/pin/login (NO auth required) ──
+const pinLoginSchema = z.object({
+  phone: z.string().regex(/^\+995\d{9}$/),
+  pin: z.string().regex(/^\d{6}$/),
+});
+
+auth.post("/pin/login", async (c) => {
+  const body = await c.req.json();
+  const parsed = pinLoginSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new BadRequestError(parsed.error.errors[0].message);
+  }
+
+  const { phone, pin } = parsed.data;
+  const db = getDb();
+
+  // Rate limit: check pin login attempts
+  const [rateLimit] = await db
+    .select()
+    .from(otpRateLimits)
+    .where(eq(otpRateLimits.phone, `pin:${phone}`))
+    .limit(1);
+
+  const now = new Date();
+  const windowMs = 15 * 60 * 1000; // 15 minutes
+
+  if (rateLimit) {
+    const windowStart = new Date(rateLimit.windowStart);
+    if (now.getTime() - windowStart.getTime() < windowMs && rateLimit.attempts >= 5) {
+      throw new RateLimitError("Too many wrong attempts. Try again in 15 minutes.");
+    }
+  }
+
+  // Find user
+  const [user] = await db.select().from(users).where(eq(users.phone, phone)).limit(1);
+  if (!user) {
+    throw new UnauthorizedError("Invalid credentials");
+  }
+  if (!user.pinHash) {
+    throw new BadRequestError("PIN not set up");
+  }
+
+  // Verify PIN
+  const valid = await verifyPin(pin, user.pinHash);
+  if (!valid) {
+    // Increment rate limit
+    if (rateLimit) {
+      const windowStart = new Date(rateLimit.windowStart);
+      if (now.getTime() - windowStart.getTime() < windowMs) {
+        await db.update(otpRateLimits).set({ attempts: rateLimit.attempts + 1 }).where(eq(otpRateLimits.id, rateLimit.id));
+      } else {
+        await db.update(otpRateLimits).set({ attempts: 1, windowStart: now.toISOString() }).where(eq(otpRateLimits.id, rateLimit.id));
+      }
+    } else {
+      await db.insert(otpRateLimits).values({ id: nanoid(), phone: `pin:${phone}`, attempts: 1, windowStart: now.toISOString() });
+    }
+    throw new UnauthorizedError("Invalid credentials");
+  }
+
+  // Reset rate limit on success
+  if (rateLimit) {
+    await db.update(otpRateLimits).set({ attempts: 0 }).where(eq(otpRateLimits.id, rateLimit.id));
+  }
+
+  // Generate JWT + session
+  const token = signToken({ userId: user.id, phone: user.phone });
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  await db.insert(sessions).values({
+    id: nanoid(),
+    userId: user.id,
+    token,
+    expiresAt: expiresAt.toISOString(),
+  });
+
+  return c.json({
+    success: true,
+    token,
+    user: {
+      id: user.id,
+      phone: user.phone,
+      name: user.name,
+      balance: user.balance,
+      hasPin: true,
+    },
+  });
+});
+
 // ── POST /auth/pin/verify (protected) ──
 auth.post("/pin/verify", authMiddleware, async (c) => {
   const body = await c.req.json();

@@ -3,15 +3,17 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { sendOtp, verifyPin as verifyPinApi, verifyBiometric } from "@/services/auth";
+import { sendOtp, pinLogin, verifyBiometric } from "@/services/auth";
 
 function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isLogin = searchParams.get("mode") === "login";
+  const isPinMode = searchParams.get("pin") === "true";
   const prefillPhone = searchParams.get("phone") || "";
   const msgParam = searchParams.get("msg");
   const [phone, setPhone] = useState(prefillPhone);
+  const [showPinLogin, setShowPinLogin] = useState(isPinMode && !!prefillPhone);
   const [focused, setFocused] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
@@ -76,7 +78,7 @@ function AuthContent() {
     setPinError("");
     if (clean.length === 6) {
       try {
-        await verifyPinApi(clean);
+        await pinLogin(prefillPhone || phone, clean);
         router.push("/home");
       } catch (err: any) {
         setPinError(err.message || "Invalid PIN");
@@ -84,6 +86,76 @@ function AuthContent() {
       }
     }
   };
+
+  // Show PIN login screen directly if pin mode
+  if (showPinLogin) {
+    return (
+      <>
+      <style>{`html, body { background: #000000 !important; }`}</style>
+      <meta name="theme-color" content="#000000" />
+      <div className="fixed inset-0 flex flex-col items-center justify-center" style={{ background: "#000000" }}>
+        <button
+          onClick={() => setShowPinLogin(false)}
+          className="absolute top-0 left-0 p-4 active:opacity-50"
+          style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
+        >
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#FFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 5L8 11l6 6" />
+          </svg>
+        </button>
+
+        <div className="w-[80px] h-[80px] rounded-full flex items-center justify-center mb-6" style={{ background: "#1C1C1E" }}>
+          <svg width="36" height="36" viewBox="0 0 22 22" fill="none" stroke="#FFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="5" y="10" width="12" height="9" rx="2" />
+            <path d="M8 10V7a3 3 0 016 0v3" />
+            <circle cx="11" cy="15" r="1" fill="#FFF" />
+          </svg>
+        </div>
+
+        <h2 className="text-white text-[22px] font-bold mb-2" style={{ fontFamily: "var(--font-outfit)" }}>
+          Enter PIN
+        </h2>
+        <p className="text-[#6B7280] text-[14px] mb-8" style={{ fontFamily: "var(--font-dm-sans)" }}>
+          Enter your 6-digit PIN to log in
+        </p>
+
+        <div className="flex gap-4 mb-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="w-[16px] h-[16px] rounded-full transition-all duration-200"
+              style={{ background: i < pinInput.length ? "#FFE500" : "transparent", border: i < pinInput.length ? "2px solid #FFE500" : "2px solid #2A2A2A" }}
+            />
+          ))}
+        </div>
+
+        {pinError && (
+          <p className="text-[#EF4444] text-[13px] font-medium mb-4" style={{ fontFamily: "var(--font-dm-sans)" }}>{pinError}</p>
+        )}
+
+        <input
+          ref={pinRef}
+          type="number"
+          value={pinInput}
+          onChange={(e) => handlePinSubmit(e.target.value)}
+          className="absolute opacity-0 w-0 h-0"
+          inputMode="numeric"
+          autoFocus
+        />
+
+        <button onClick={() => pinRef.current?.focus()} className="text-[13px] text-[#6B7280] mb-8" style={{ fontFamily: "var(--font-dm-sans)" }}>
+          Tap to enter PIN
+        </button>
+
+        <button
+          onClick={() => setShowPinLogin(false)}
+          className="text-[14px] font-semibold active:opacity-50"
+          style={{ color: "#9CA3AF", fontFamily: "var(--font-outfit)" }}
+        >
+          Use phone number instead
+        </button>
+      </div>
+      </>
+    );
+  }
 
   return (
     <>

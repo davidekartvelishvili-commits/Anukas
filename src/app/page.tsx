@@ -19,7 +19,15 @@ export default function SplashScreen() {
     // Navigate after fade completes — check auth
     const t5 = setTimeout(() => {
       const token = localStorage.getItem("shansi_token");
-      router.push(token ? "/home" : "/welcome");
+      const phone = localStorage.getItem("shansi_phone");
+      if (token) {
+        router.push("/home");
+      } else if (phone) {
+        // Has phone stored (set up PIN before) — show PIN login
+        router.push(`/auth?mode=login&pin=true&phone=${phone}`);
+      } else {
+        router.push("/welcome");
+      }
     }, 4200);
 
     return () => {
