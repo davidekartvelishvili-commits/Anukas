@@ -12,7 +12,10 @@ export default function ProfilePage() {
   const [activeFilter, setActiveFilter] = useState("All Activity");
   const [gender, setGender] = useState("Male");
   const [showEditCode, setShowEditCode] = useState(false);
-  const [referralCode, setReferralCode] = useState("CASHBACK001");
+  const [referralCode, setReferralCode] = useState(() => {
+    if (typeof window === "undefined") return "CASHBACK001";
+    return localStorage.getItem("shansi_referral") || "CASHBACK001";
+  });
   const [editCodeInput, setEditCodeInput] = useState("");
   const [showEditName, setShowEditName] = useState(false);
   const [showNameConfirm, setShowNameConfirm] = useState(false);
@@ -485,6 +488,7 @@ export default function ProfilePage() {
                 onClick={() => {
                   if (editCodeInput.length >= 4) {
                     setReferralCode(editCodeInput);
+                    localStorage.setItem("shansi_referral", editCodeInput);
                     setShowEditCode(false);
                   }
                 }}
