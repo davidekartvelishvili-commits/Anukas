@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { DIFFICULTIES, type Difficulty, type StartResult, type StepResult } from "./game-config";
 import { playGame as playGameApi } from "@/services/games";
+import { getCoinBalance, spendCoins, creditCashWinnings, getCashBalance, setCoinBalance as storeCoinBalance } from "@/services/balance";
 
 type TileState = "hidden" | "safe" | "trap" | "revealed-trap";
 interface GameState {
@@ -40,7 +41,7 @@ function spawnFirework(x: number, y: number) {
 export default function ChickenRushPage() {
   const [balance, setBalance] = useState(5000);
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
-  const [betAmount, setBetAmount] = useState(0.25);
+  const [betAmount, setBetAmount] = useState(10);
   const [showBetPicker, setShowBetPicker] = useState(false);
   const [game, setGame] = useState<GameState | null>(null);
   const [animating, setAnimating] = useState(false);
@@ -49,7 +50,9 @@ export default function ChickenRushPage() {
   const [winAmount, setWinAmount] = useState(0);
   const [autoStarted, setAutoStarted] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
-  const BET_OPTIONS = [0.25, 0.5, 1, 2.5, 5, 10];
+  const BET_OPTIONS = [10, 25, 50, 100, 250, 500];
+
+  useEffect(() => { setBalance(getCoinBalance()); }, []);
   const config = DIFFICULTIES[difficulty];
 
   useEffect(() => {
@@ -63,7 +66,8 @@ export default function ChickenRushPage() {
 
   const startRound = useCallback(async () => {
     if (balance < betAmount) return;
-    setBalance((b) => b - betAmount);
+    spendCoins(betAmount);
+    setBalance(getCoinBalance());
     setResultText("");
     setShowWin(false);
 
@@ -72,7 +76,7 @@ export default function ChickenRushPage() {
       const serverResult = await playGameApi("chicken_rush");
       serverResultRef.current = serverResult;
     } catch (err: any) {
-      setBalance((b) => b + betAmount);
+      storeCoinBalance(getCoinBalance() + betAmount); setBalance(getCoinBalance() + betAmount);
       if (err.message?.includes("disabled")) {
         alert("თამაში დროებით შეჩერებულია");
       }
@@ -95,7 +99,7 @@ export default function ChickenRushPage() {
         gameOver: false, won: false,
       });
     } catch {
-      setBalance((b) => b + betAmount);
+      storeCoinBalance(getCoinBalance() + betAmount); setBalance(getCoinBalance() + betAmount);
     }
   }, [betAmount, balance, difficulty]);
 
@@ -110,7 +114,7 @@ export default function ChickenRushPage() {
       prevDiff.current = difficulty;
       // Refund current bet if game was just started
       if (game && game.currentRow === 0) {
-        setBalance((b) => b + betAmount);
+        storeCoinBalance(getCoinBalance() + betAmount); setBalance(getCoinBalance() + betAmount);
       }
       startRound();
     }
@@ -181,10 +185,9 @@ export default function ChickenRushPage() {
     if (!game || game.gameOver || game.currentRow === 0) return;
     // Use server result for win amount
     const sr = serverResultRef.current;
-    const winAmt = sr ? sr.totalWin : betAmount * game.multiplier;
-    const newBal = sr ? sr.newBalance : balance + winAmt;
-
-    setBalance(newBal);
+    const winAmt = sr ? sr.totalWin : betAmount * game.multiplier * 0.005;
+    if (winAmt > 0) creditCashWinnings(winAmt);
+    setBalance(getCoinBalance());
     setWinAmount(winAmt);
     setShowWin(true);
     setResultText(`Cashed out! +${winAmt}`);

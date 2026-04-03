@@ -21,6 +21,18 @@ export function setCashBalance(amount: number) {
   localStorage.setItem(CASH_KEY, String(amount));
 }
 
+export function spendCoins(amount: number): boolean {
+  const coins = getCoinBalance();
+  if (amount <= 0 || amount > coins) return false;
+  setCoinBalance(coins - amount);
+  return true;
+}
+
+export function creditCashWinnings(amount: number) {
+  if (amount <= 0) return;
+  setCashBalance(getCashBalance() + amount);
+}
+
 export function exchange(cashAmount: number): boolean {
   const cash = getCashBalance();
   if (cashAmount <= 0 || cashAmount > cash) return false;

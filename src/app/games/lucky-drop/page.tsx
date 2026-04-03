@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { MULTIPLIERS, SLOT_COLORS, BET_COST, type RiskLevel, type DropResult } from "./drop-config";
 import { playGame } from "@/services/games";
+import { getCoinBalance, spendCoins, creditCashWinnings, getCashBalance, setCoinBalance as storeCoinBalance } from "@/services/balance";
 
 const ROWS = 12;
 const BASE_GRAVITY = 0.4;
@@ -38,9 +39,11 @@ export default function LuckyDropPage() {
   const [winAmount, setWinAmount] = useState(0);
   const [betAmount, setBetAmount] = useState(0);
   const [showBetPicker, setShowBetPicker] = useState(true);
+
+  useEffect(() => { setBalance(getCoinBalance()); }, []);
   const [bigWinText, setBigWinText] = useState("");
   const dropCount = useRef(0);
-  const BET_OPTIONS = [0.25, 0.5, 1, 2.5, 5, 10];
+  const BET_OPTIONS = [10, 25, 50, 100, 250, 500];
 
   const riskRef = useRef(risk);
   useEffect(() => { riskRef.current = risk; }, [risk]);
@@ -325,7 +328,8 @@ export default function LuckyDropPage() {
 
   const handleDrop = useCallback(async () => {
     if (betAmount <= 0 || balance < betAmount) return;
-    setBalance((b) => b - betAmount);
+    spendCoins(betAmount);
+    setBalance(getCoinBalance());
     dropCount.current++;
 
     // Vary gravity: alternates fast/slow/faster pattern
@@ -367,7 +371,9 @@ export default function LuckyDropPage() {
       };
 
       (ball as any)._onSettle = () => {
-        setBalance(serverResult.newBalance);
+        if (serverResult.totalWin > 0) {
+          creditCashWinnings(serverResult.totalWin);
+        }
         if (serverResult.totalWin > 0 && serverResult.won) {
           setWinAmount(serverResult.totalWin);
           setBigWinText(`+${serverResult.totalWin}`);
@@ -378,7 +384,8 @@ export default function LuckyDropPage() {
 
       s.balls.push(ball);
     } catch (err: any) {
-      setBalance((b) => b + betAmount);
+      storeCoinBalance(getCoinBalance() + betAmount);
+      setBalance(getCoinBalance() + betAmount);
       if (err.message?.includes("disabled")) {
         alert("თამაში დროებით შეჩერებულია");
       }

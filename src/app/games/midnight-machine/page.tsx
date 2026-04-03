@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { SYMBOLS, BET_COST, type SpinResult } from "./slot-config";
 import { playGame } from "@/services/games";
+import { getCoinBalance, spendCoins, creditCashWinnings, getCashBalance } from "@/services/balance";
 
 const SlotMachine = dynamic(() => import("./SlotMachine"), { ssr: false });
 
 export default function MidnightMachinePage() {
-  const [balance, setBalance] = useState(5000);
+  const [coinBalance, setCoinBalance] = useState(5000);
+  const [cashBalance, setCashBalance] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinTrigger, setSpinTrigger] = useState(0);
   const [targetSymbols, setTargetSymbols] = useState<[string, string, string] | null>(null);
@@ -18,13 +20,19 @@ export default function MidnightMachinePage() {
   const [payoutOpen, setPayoutOpen] = useState(false);
   const [showBetPicker, setShowBetPicker] = useState(true);
   const [betAmount, setBetAmount] = useState(0);
-  const BET_OPTIONS = [0.25, 0.5, 1, 2.5, 5, 10];
+  const BET_OPTIONS = [10, 25, 50, 100, 250, 500];
+
+  useEffect(() => {
+    setCoinBalance(getCoinBalance());
+    setCashBalance(getCashBalance());
+  }, []);
 
   const handleSpin = useCallback(async () => {
-    if (isSpinning || betAmount <= 0 || balance < betAmount) return;
+    if (isSpinning || betAmount <= 0 || coinBalance < betAmount) return;
 
     setIsSpinning(true);
-    setBalance((b) => b - betAmount);
+    spendCoins(betAmount);
+    setCoinBalance(getCoinBalance());
     setResult(null);
     setShowWin(false);
 
@@ -50,7 +58,10 @@ export default function MidnightMachinePage() {
       setTimeout(() => {
         setResult(spinData);
         setIsSpinning(false);
-        setBalance(serverResult.newBalance);
+        if (serverResult.totalWin > 0) {
+          creditCashWinnings(serverResult.totalWin);
+          setCashBalance(getCashBalance());
+        }
 
         if (serverResult.totalWin > 0 && serverResult.won) {
           setShowWin(true);
@@ -63,12 +74,14 @@ export default function MidnightMachinePage() {
       }, 6500);
     } catch (err: any) {
       setIsSpinning(false);
-      setBalance((b) => b + betAmount);
+      // Refund coins on error
+      setCoinBalance(getCoinBalance() + betAmount);
+      import("@/services/balance").then(m => m.setCoinBalance(getCoinBalance() + betAmount));
       if (err.message?.includes("disabled")) {
         alert("თამაში დროებით შეჩერებულია");
       }
     }
-  }, [isSpinning, balance, betAmount]);
+  }, [isSpinning, coinBalance, betAmount]);
 
   function spawnParticles(count: number) {
     const colors = ["#FFD700", "#FF6D00", "#FF3D00", "#FFAB00", "#fff"];
@@ -244,7 +257,7 @@ export default function MidnightMachinePage() {
         {!showBetPicker && betAmount > 0 && (
           <button
             onClick={handleSpin}
-            disabled={isSpinning || balance < betAmount}
+            disabled={isSpinning || coinBalance < betAmount}
             className="pointer-events-auto px-12 py-6 rounded-full text-[19px] font-black tracking-wide transition-all duration-150 disabled:bg-[#3a3a4a] disabled:text-[#777] disabled:cursor-not-allowed active:scale-[0.97]"
             style={{
               background: isSpinning ? "#3a3a4a" : "#FFD700",
@@ -276,7 +289,7 @@ export default function MidnightMachinePage() {
               {betAmount > 0 ? "Balance " : "Pick amount to play"}
               {betAmount > 0 && (
                 <span className="text-white font-bold">
-                  {balance.toLocaleString("en-US", { maximumFractionDigits: 1 })}
+                  {coinBalance.toLocaleString("en-US", { maximumFractionDigits: 1 })}
                 </span>
               )}
             </span>
