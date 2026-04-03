@@ -188,7 +188,7 @@ export default function ProfilePage() {
                   className="text-white text-[22px] font-bold"
                   style={{ fontFamily: "var(--font-outfit)" }}
                 >
-                  {cashBalance}
+                  {cashBalance.toFixed(2)}
                 </span>
                 <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 5l3 3 3-3" />
@@ -764,7 +764,7 @@ export default function ProfilePage() {
               </div>
               <input type="number" placeholder="0" value={exchangeAmount} onChange={(e) => setExchangeAmount(e.target.value)}
                 className="flex-1 bg-transparent text-white text-[22px] font-bold outline-none ml-2" style={{ fontFamily: "var(--font-outfit)" }} min={0} max={cashBalance} />
-              <span className="text-[15px] text-[#999] font-semibold shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>Balance: {cashBalance} ₾</span>
+              <span className="text-[15px] text-[#999] font-semibold shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>Balance: {cashBalance.toFixed(2)} ₾</span>
             </div>
 
             <div className="flex justify-center py-2">

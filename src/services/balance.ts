@@ -18,7 +18,11 @@ export function setCoinBalance(amount: number) {
 }
 
 export function setCashBalance(amount: number) {
-  localStorage.setItem(CASH_KEY, String(amount));
+  localStorage.setItem(CASH_KEY, String(Math.round(amount * 100) / 100));
+}
+
+export function formatCash(amount: number): string {
+  return amount.toFixed(2);
 }
 
 export function spendCoins(amount: number): boolean {

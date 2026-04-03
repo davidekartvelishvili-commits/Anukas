@@ -159,7 +159,7 @@ export default function HomePage() {
                 style={{ background: "#1C1C1E" }}
               >
                 <CashIcon />
-                <span className="text-[14px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>{cashBalance}</span>
+                <span className="text-[14px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>{cashBalance.toFixed(2)}</span>
               </button>
             </div>
             <div
@@ -529,7 +529,7 @@ export default function HomePage() {
                 min={0}
                 max={cashBalance}
               />
-              <span className="text-[15px] text-[#999] font-semibold shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>Balance: {cashBalance} ₾</span>
+              <span className="text-[15px] text-[#999] font-semibold shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>Balance: {cashBalance.toFixed(2)} ₾</span>
             </div>
 
             {/* Arrow */}

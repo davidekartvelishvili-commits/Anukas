@@ -210,7 +210,7 @@ export default function GamesPage() {
                 style={{ background: mode === "cash" ? "#FFFFFF" : "transparent" }}
               >
                 <CashIcon />
-                <span className={`text-[11px] font-bold ${mode === "cash" ? "text-black" : "text-white"}`} style={{ fontFamily: "var(--font-outfit)" }}>{cash}</span>
+                <span className={`text-[11px] font-bold ${mode === "cash" ? "text-black" : "text-white"}`} style={{ fontFamily: "var(--font-outfit)" }}>{cash.toFixed(2)}</span>
               </button>
               <button
                 onClick={() => setMode("coins")}
