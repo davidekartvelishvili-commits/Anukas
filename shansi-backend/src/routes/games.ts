@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { gameConfig, gameHistory } from "../db/schema.js";
+import { gameConfig, gameHistory, transactions } from "../db/schema.js";
 import { authMiddleware } from "../middleware/auth.js";
-import { playGame, playChickenRush } from "../services/gameEngine.js";
+import { playGame, playChickenRush, createTransaction } from "../services/gameEngine.js";
 import { BadRequestError } from "../utils/errors.js";
 
 const games = new Hono<AppEnv>();
@@ -36,6 +36,12 @@ games.post("/play", async (c) => {
         bonusWin: result.bonusWin,
         totalWin: result.totalWin,
         newBalance: result.newBalance,
+        coinsRemaining: result.coinsRemaining,
+        totalCashWon: result.totalCashWon,
+        bonusRound: result.bonusRound,
+        bonusMessage: result.bonusMessage,
+        freeCoins: result.freeCoins,
+        transactionComplete: result.transactionComplete,
       },
     });
   } catch (err: any) {
@@ -130,6 +136,62 @@ games.get("/config", async (c) => {
       isActive: g.isActive,
     })),
   });
+});
+
+// GET /games/active-transaction
+games.get("/active-transaction", async (c) => {
+  const userId = c.get("userId") as string;
+  const db = getDb();
+
+  const [tx] = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), eq(transactions.status, "active")))
+    .limit(1);
+  const [bonusTx] = !tx ? await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), eq(transactions.status, "bonus_round")))
+    .limit(1) : [tx];
+  const activeTx = tx || bonusTx;
+
+  if (!activeTx) {
+    return c.json({ success: true, hasActiveTransaction: false, coinsRemaining: 0, totalCashWon: 0, guaranteedMinimum: 0, isBonusRound: false, paymentAmount: 0 });
+  }
+
+  return c.json({
+    success: true,
+    hasActiveTransaction: true,
+    coinsRemaining: activeTx.coinsRemaining,
+    totalCashWon: activeTx.totalCashWon,
+    guaranteedMinimum: activeTx.guaranteedMinimum,
+    isBonusRound: activeTx.status === "bonus_round",
+    paymentAmount: activeTx.paymentAmount,
+  });
+});
+
+// POST /games/create-transaction (for testing — in production this comes from QR scan)
+const createTxSchema = z.object({
+  paymentAmount: z.number().min(0),
+  coinsReceived: z.number().positive().int(),
+});
+
+games.post("/create-transaction", async (c) => {
+  const body = await c.req.json();
+  const parsed = createTxSchema.safeParse(body);
+  if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
+
+  const userId = c.get("userId") as string;
+  const db = getDb();
+
+  // Check no active transaction exists
+  const [existing] = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), eq(transactions.status, "active")))
+    .limit(1);
+  if (existing) throw new BadRequestError("Active transaction already exists");
+
+  // Read min_return_percent from config
+  const [cfg] = await db.select().from(gameConfig).limit(1);
+  const minReturnPercent = cfg?.minReturnPercent || 0.5;
+
+  const txId = await createTransaction(userId, parsed.data.paymentAmount, parsed.data.coinsReceived, minReturnPercent);
+  return c.json({ success: true, transactionId: txId });
 });
 
 export default games;

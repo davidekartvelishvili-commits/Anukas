@@ -73,6 +73,20 @@ async function migrate() {
     )`,
     `ALTER TABLE admins ADD COLUMN permissions TEXT`,
     `ALTER TABLE game_config ADD COLUMN min_return_percent REAL NOT NULL DEFAULT 0.5`,
+    `CREATE TABLE IF NOT EXISTS transactions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      payment_amount REAL NOT NULL,
+      coins_received INTEGER NOT NULL,
+      coins_remaining INTEGER NOT NULL,
+      total_cash_won REAL NOT NULL DEFAULT 0,
+      guaranteed_minimum REAL NOT NULL,
+      guarantee_met INTEGER NOT NULL DEFAULT 0,
+      bonus_games_given INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      completed_at TEXT
+    )`,
     `CREATE TABLE IF NOT EXISTS admin_logs (
       id TEXT PRIMARY KEY,
       admin_id TEXT NOT NULL REFERENCES admins(id),

@@ -1,8 +1,8 @@
 import crypto from "crypto";
 import { nanoid } from "nanoid";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getDb } from "../db/client.js";
-import { gameConfig, pool, users, gameHistory } from "../db/schema.js";
+import { gameConfig, pool, users, gameHistory, transactions } from "../db/schema.js";
 
 export interface GameResult {
   won: boolean;
@@ -12,9 +12,25 @@ export interface GameResult {
   totalWin: number;
   newBalance: number;
   poolBalance: number;
+  // Transaction info
+  coinsRemaining: number;
+  totalCashWon: number;
+  bonusRound: boolean;
+  bonusMessage?: string;
+  freeCoins?: number;
+  transactionComplete: boolean;
 }
 
-// Secure random [0, 1) using crypto
+export interface ChickenRushResult extends GameResult {
+  maxSafeStep: number;
+  trapStep: number;
+  cashoutUnlockStep: number;
+  totalSteps: number;
+  stepValues: number[];
+  trapMap: number[];
+  cols: number;
+}
+
 function secureRandom(): number {
   const buf = crypto.randomBytes(4);
   return buf.readUInt32BE(0) / 0x100000000;
@@ -34,92 +50,116 @@ interface Config {
 }
 
 function calculateWin(
-  betAmount: number,
+  betAmountInLari: number,
   config: Config,
-  poolBalance: number
+  poolBalance: number,
+  isBonusRound: boolean,
+  shortfall: number
 ): { minWin: number; bonusWin: number } {
-  // Step 1: Guaranteed minimum — from admin config (ZERO hardcoded)
-  const minReturnDecimal = config.minReturnPercent / 100;
-  const minWin = round2(betAmount * minReturnDecimal);
+  // BONUS ROUND: rigged to win exactly the shortfall
+  if (isBonusRound && shortfall > 0) {
+    return { minWin: 0, bonusWin: round2(shortfall) };
+  }
 
-  // Step 2: Check if bonus wins are possible
-  if (!config.isActive) return { minWin, bonusWin: 0 };
-  if (poolBalance < config.poolMinimumThreshold) return { minWin, bonusWin: 0 };
+  // Normal game: individual games CAN return 0₾
+  // No per-game minimum — guarantee is per-transaction
 
-  // Step 3: Determine bonus budget
+  // Check if bonus wins are possible
+  if (!config.isActive) return { minWin: 0, bonusWin: 0 };
+  if (poolBalance < config.poolMinimumThreshold) return { minWin: 0, bonusWin: 0 };
+
   const avgReturnDecimal = config.avgReturnPercent / 100;
-  const bonusReturnBudget = avgReturnDecimal - minReturnDecimal;
+  const bonusReturnBudget = avgReturnDecimal;
 
-  if (bonusReturnBudget <= 0) return { minWin, bonusWin: 0 };
+  if (bonusReturnBudget <= 0) return { minWin: 0, bonusWin: 0 };
 
   const availablePool = poolBalance - config.poolMinimumThreshold;
-  if (availablePool <= 0) return { minWin, bonusWin: 0 };
+  if (availablePool <= 0) return { minWin: 0, bonusWin: 0 };
 
-  // Step 4: Special case — low amounts get higher chance of 100% return
-  if (betAmount <= config.fullReturnThreshold) {
+  // Special case: low amounts get higher chance of 100% return
+  if (betAmountInLari <= config.fullReturnThreshold) {
     const roll = secureRandom();
     if (roll < 0.20) {
-      let bonusWin = betAmount - minWin;
+      let bonusWin = betAmountInLari;
       bonusWin = Math.min(bonusWin, config.maxWinPerUser, availablePool);
-      return { minWin, bonusWin: round2(Math.max(0, bonusWin)) };
+      return { minWin: 0, bonusWin: round2(Math.max(0, bonusWin)) };
     }
   }
 
-  // Step 5: Normal bonus — 10% of users get a bonus win
+  // Normal bonus: 10% of games get a bonus win
   const winChance = 0.10;
   const roll = secureRandom();
   if (roll >= winChance) {
-    return { minWin, bonusWin: 0 };
+    return { minWin: 0, bonusWin: 0 }; // No win this game — that's OK
   }
 
-  // Step 6: Calculate bonus amount
-  const expectedBonus = (bonusReturnBudget / winChance) * betAmount;
+  // Calculate bonus amount
+  const expectedBonus = (bonusReturnBudget / winChance) * betAmountInLari;
   const randomMultiplier = 0.5 + secureRandom();
   let bonusWin = expectedBonus * randomMultiplier;
-
-  // Cap at max_win_per_user
   bonusWin = Math.min(bonusWin, config.maxWinPerUser);
-
-  // Cap at available pool
   bonusWin = Math.min(bonusWin, availablePool);
-
-  // Floor at 0, round
   bonusWin = round2(Math.max(0, bonusWin));
 
-  return { minWin, bonusWin };
+  return { minWin: 0, bonusWin };
 }
+
+// ═══════════════════════════════════════
+// MAIN PLAY FUNCTION
+// ═══════════════════════════════════════
 
 export async function playGame(
   userId: string,
   gameType: "slot" | "plinko" | "chicken_rush",
-  betAmount: number
+  coinCost: number
 ): Promise<GameResult> {
   const db = getDb();
 
-  // 1. Read game config
+  // 1. Find active transaction
+  const [tx] = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), eq(transactions.status, "active")))
+    .limit(1);
+  const [bonusTx] = !tx ? await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), eq(transactions.status, "bonus_round")))
+    .limit(1) : [tx];
+  const activeTx = tx || bonusTx;
+
+  if (!activeTx) throw new Error("ქოინები არ გაქვს");
+  if (activeTx.coinsRemaining < coinCost && activeTx.status !== "bonus_round") {
+    throw new Error("არასაკმარისი ქოინები");
+  }
+
+  const isBonusRound = activeTx.status === "bonus_round";
+
+  // 2. Read game config
   const [config] = await db.select().from(gameConfig).where(eq(gameConfig.gameType, gameType)).limit(1);
   if (!config) throw new Error("Game not configured");
-  if (!config.isActive) throw new Error("Game is currently disabled");
+  if (!config.isActive) throw new Error("თამაში დროებით შეჩერებულია");
 
-  // 2. Read pool
+  // 3. Read pool
   const [poolRow] = await db.select().from(pool).limit(1);
   if (!poolRow) throw new Error("Pool not initialized");
   const poolBefore = poolRow.balance;
 
-  // 3. Calculate win
-  const { minWin, bonusWin } = calculateWin(betAmount, {
+  // 4. Calculate win
+  const betInLari = coinCost / 100;
+  const shortfall = isBonusRound
+    ? round2(activeTx.guaranteedMinimum - activeTx.totalCashWon)
+    : 0;
+
+  const { minWin, bonusWin } = calculateWin(betInLari, {
     avgReturnPercent: config.avgReturnPercent,
     maxWinPerUser: config.maxWinPerUser,
     poolMinimumThreshold: config.poolMinimumThreshold,
     fullReturnThreshold: config.fullReturnThreshold,
     minReturnPercent: config.minReturnPercent,
     isActive: config.isActive,
-  }, poolBefore);
+  }, poolBefore, isBonusRound, shortfall);
 
   const totalWin = round2(minWin + bonusWin);
 
-  // 4. If bonus win: deduct from pool
-  if (bonusWin > 0) {
+  // 5. Deduct from pool if bonus win (not from guarantee)
+  if (bonusWin > 0 && !isBonusRound) {
     await db.update(pool).set({
       balance: round2(poolRow.balance - bonusWin),
       totalWon: round2(poolRow.totalWon + bonusWin),
@@ -127,115 +167,170 @@ export async function playGame(
     }).where(eq(pool.id, poolRow.id));
   }
 
-  // 5. Update user balance
+  // 6. Update user cash balance
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw new Error("User not found");
   const newBalance = round2(user.balance + totalWin);
-  await db.update(users).set({
-    balance: newBalance,
-    updatedAt: new Date().toISOString(),
-  }).where(eq(users.id, userId));
+  if (totalWin > 0) {
+    await db.update(users).set({ balance: newBalance, updatedAt: new Date().toISOString() }).where(eq(users.id, userId));
+  }
 
-  // 6. Read pool after
+  // 7. Update transaction
+  const actualCoinDeduct = isBonusRound ? Math.min(coinCost, activeTx.coinsRemaining) : coinCost;
+  const newCoinsRemaining = activeTx.coinsRemaining - actualCoinDeduct;
+  const newTotalCashWon = round2(activeTx.totalCashWon + totalWin);
+
+  await db.update(transactions).set({
+    coinsRemaining: newCoinsRemaining,
+    totalCashWon: newTotalCashWon,
+  }).where(eq(transactions.id, activeTx.id));
+
+  // 8. Check if transaction should complete or trigger bonus round
+  let bonusRoundTriggered = false;
+  let bonusMessage: string | undefined;
+  let freeCoins: number | undefined;
+  let transactionComplete = false;
+
+  if (newCoinsRemaining <= 0) {
+    if (newTotalCashWon >= activeTx.guaranteedMinimum || activeTx.guaranteedMinimum === 0) {
+      // Guarantee met or no guarantee (free coins)
+      await db.update(transactions).set({
+        status: "completed",
+        guaranteeMet: true,
+        completedAt: new Date().toISOString(),
+      }).where(eq(transactions.id, activeTx.id));
+      transactionComplete = true;
+    } else if (isBonusRound) {
+      // Still in bonus round but coins ran out — check if met now
+      if (newTotalCashWon >= activeTx.guaranteedMinimum) {
+        await db.update(transactions).set({
+          status: "completed",
+          guaranteeMet: true,
+          completedAt: new Date().toISOString(),
+        }).where(eq(transactions.id, activeTx.id));
+        transactionComplete = true;
+      } else {
+        // Give more bonus coins
+        const bonusCoins = 10;
+        await db.update(transactions).set({
+          coinsRemaining: bonusCoins,
+          bonusGamesGiven: activeTx.bonusGamesGiven + 1,
+        }).where(eq(transactions.id, activeTx.id));
+        bonusRoundTriggered = true;
+        bonusMessage = "შანსმა შანსი მოგცა! 🎉 ითამაშე უფასოდ!";
+        freeCoins = bonusCoins;
+      }
+    } else {
+      // Normal coins ran out, guarantee NOT met — trigger bonus round
+      const bonusCoins = 10;
+      await db.update(transactions).set({
+        status: "bonus_round",
+        coinsRemaining: bonusCoins,
+        bonusGamesGiven: 1,
+      }).where(eq(transactions.id, activeTx.id));
+      bonusRoundTriggered = true;
+      bonusMessage = "შანსმა შანსი მოგცა! 🎉 ითამაშე უფასოდ!";
+      freeCoins = bonusCoins;
+    }
+  }
+
+  // 9. Log game history
   const [poolAfter] = await db.select().from(pool).limit(1);
-  const poolBalanceAfter = poolAfter?.balance || poolBefore;
-
-  // 7. Log game history
   await db.insert(gameHistory).values({
     id: nanoid(),
     userId,
     gameType,
-    betAmount,
+    betAmount: betInLari,
     winAmount: totalWin,
     poolBalanceBefore: poolBefore,
-    poolBalanceAfter: poolBalanceAfter,
+    poolBalanceAfter: poolAfter?.balance || poolBefore,
   });
 
   return {
-    won: bonusWin > 0,
+    won: totalWin > 0,
     winAmount: totalWin,
     minWin,
     bonusWin,
     totalWin,
     newBalance,
-    poolBalance: poolBalanceAfter,
+    poolBalance: poolAfter?.balance || poolBefore,
+    coinsRemaining: bonusRoundTriggered ? (freeCoins || 0) : newCoinsRemaining,
+    totalCashWon: newTotalCashWon,
+    bonusRound: bonusRoundTriggered,
+    bonusMessage,
+    freeCoins,
+    transactionComplete,
   };
 }
 
 // ═══════════════════════════════════════
-// CHICKEN RUSH (Lucky Step) — Step-based
+// CREATE TRANSACTION (when user gets coins)
 // ═══════════════════════════════════════
 
-export interface ChickenRushResult extends GameResult {
-  maxSafeStep: number;      // How far user can go safely (0-based)
-  trapStep: number;         // Step where trap is placed
-  cashoutUnlockStep: number; // Step where cashout becomes available
-  totalSteps: number;       // Total rows in the grid
-  stepValues: number[];     // ₾ value at each step (cumulative)
-  trapMap: number[];        // Which column has trap per row
-  cols: number;
+export async function createTransaction(
+  userId: string,
+  paymentAmount: number,
+  coinsReceived: number,
+  minReturnPercent: number
+): Promise<string> {
+  const db = getDb();
+  const id = nanoid();
+  const guaranteedMinimum = paymentAmount > 0 ? round2(paymentAmount * minReturnPercent / 100) : 0;
+
+  await db.insert(transactions).values({
+    id,
+    userId,
+    paymentAmount,
+    coinsReceived,
+    coinsRemaining: coinsReceived,
+    guaranteedMinimum,
+    status: "active",
+  });
+
+  return id;
 }
+
+// ═══════════════════════════════════════
+// CHICKEN RUSH (Lucky Step)
+// ═══════════════════════════════════════
 
 export async function playChickenRush(
   userId: string,
-  betAmount: number,
+  coinCost: number,
   difficulty: { cols: number; rows: number; multiplierPerStep: number }
 ): Promise<ChickenRushResult> {
-  // 1. Get base game result from engine (decides total win)
-  const baseResult = await playGame(userId, "chicken_rush", betAmount);
+  const baseResult = await playGame(userId, "chicken_rush", coinCost);
 
   const { rows, cols, multiplierPerStep } = difficulty;
-  const betInLari = betAmount / 100; // coins to lari
+  const betInLari = coinCost / 100;
 
-  // 2. Build step values (cumulative winnings at each step)
-  const stepValues: number[] = [];
-  for (let i = 0; i < rows; i++) {
-    const mult = Math.pow(multiplierPerStep, i + 1);
-    stepValues.push(round2(betInLari * mult * 0.005)); // Scale to actual win range
-  }
-
-  // 3. Find which step matches the server's totalWin
+  // Find maxSafeStep based on win
   let maxSafeStep = 0;
-  if (baseResult.bonusWin > 0) {
-    // User won bonus — find the step closest to totalWin
-    for (let i = 0; i < stepValues.length; i++) {
-      if (stepValues[i] <= baseResult.totalWin) {
-        maxSafeStep = i;
-      } else {
-        break;
-      }
-    }
-    // Ensure at least a few steps for gameplay
+  if (baseResult.totalWin > 0) {
+    maxSafeStep = Math.min(Math.floor(baseResult.totalWin / (betInLari * 0.001 + 0.001)), rows - 2);
     maxSafeStep = Math.max(maxSafeStep, 3);
     maxSafeStep = Math.min(maxSafeStep, rows - 2);
   } else {
-    // No bonus — user can go 2-5 steps before trap
-    const maxSteps = 2 + Math.floor(secureRandom() * 4); // 2-5
-    maxSafeStep = Math.min(maxSteps, rows - 2);
+    maxSafeStep = 2 + Math.floor(secureRandom() * 4);
+    maxSafeStep = Math.min(maxSafeStep, rows - 2);
   }
 
-  // 4. Place trap at maxSafeStep + 1
   const trapStep = maxSafeStep + 1;
+  const cashoutUnlockStep = Math.max(10, Math.floor(maxSafeStep * 0.6));
 
-  // 5. Cashout unlocks after ~60% of maxSafeStep (min step 2)
-  const cashoutUnlockStep = Math.max(2, Math.floor(maxSafeStep * 0.6));
-
-  // 6. Generate trap map (which column is trapped per row)
   const trapMap: number[] = [];
   for (let i = 0; i < rows; i++) {
     trapMap.push(Math.floor(secureRandom() * cols));
   }
 
-  // 7. Recalculate step values to match actual totalWin at maxSafeStep
-  const adjustedStepValues: number[] = [];
+  // Step values: linear from 0 to totalWin
+  const stepValues: number[] = [];
   for (let i = 0; i < rows; i++) {
-    if (i <= maxSafeStep) {
-      // Linear interpolation: step 0 = minWin, step maxSafeStep = totalWin
-      const progress = maxSafeStep > 0 ? i / maxSafeStep : 1;
-      adjustedStepValues.push(round2(baseResult.minWin + (baseResult.totalWin - baseResult.minWin) * progress));
+    if (i <= maxSafeStep && maxSafeStep > 0) {
+      const progress = i / maxSafeStep;
+      stepValues.push(round2(baseResult.totalWin * progress));
     } else {
-      // Steps beyond trap — values don't matter (user can't reach)
-      adjustedStepValues.push(round2(baseResult.totalWin * (1 + (i - maxSafeStep) * 0.2)));
+      stepValues.push(round2(baseResult.totalWin * (1 + (i - maxSafeStep) * 0.2)));
     }
   }
 
@@ -245,7 +340,7 @@ export async function playChickenRush(
     trapStep,
     cashoutUnlockStep,
     totalSteps: rows,
-    stepValues: adjustedStepValues,
+    stepValues,
     trapMap,
     cols,
   };

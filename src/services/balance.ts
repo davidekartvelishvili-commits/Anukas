@@ -13,13 +13,22 @@ export function getCashBalance(): number {
   return val ? parseFloat(val) : 0;
 }
 
-// Force-set test user balance
+// Sync balances from server transaction data
+export function syncFromServer(coinsRemaining: number, cashWon?: number) {
+  setCoinBalance(coinsRemaining);
+  if (cashWon !== undefined) setCashBalance(cashWon);
+}
+
+// Seed test user (temporary)
 export function seedTestUser() {
   if (typeof window === "undefined") return;
   const phone = localStorage.getItem("shansi_phone");
   if (phone?.includes("599474491")) {
-    localStorage.setItem(COIN_KEY, "100");
-    localStorage.setItem(CASH_KEY, "0");
+    // Only seed if no coins set yet
+    const existing = localStorage.getItem(COIN_KEY);
+    if (!existing || existing === "0") {
+      localStorage.setItem(COIN_KEY, "100");
+    }
   }
 }
 

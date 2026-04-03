@@ -71,6 +71,21 @@ export const gameHistory = sqliteTable("game_history", {
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
 });
 
+export const transactions = sqliteTable("transactions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  paymentAmount: real("payment_amount").notNull(),
+  coinsReceived: integer("coins_received").notNull(),
+  coinsRemaining: integer("coins_remaining").notNull(),
+  totalCashWon: real("total_cash_won").default(0).notNull(),
+  guaranteedMinimum: real("guaranteed_minimum").notNull(),
+  guaranteeMet: integer("guarantee_met", { mode: "boolean" }).default(false).notNull(),
+  bonusGamesGiven: integer("bonus_games_given").default(0).notNull(),
+  status: text("status").default("active").notNull(),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+  completedAt: text("completed_at"),
+});
+
 export const adminLogs = sqliteTable("admin_logs", {
   id: text("id").primaryKey(),
   adminId: text("admin_id").notNull().references(() => admins.id),

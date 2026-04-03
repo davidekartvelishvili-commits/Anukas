@@ -6,6 +6,23 @@ export interface GameResult {
   bonusWin: number;
   totalWin: number;
   newBalance: number;
+  coinsRemaining: number;
+  totalCashWon: number;
+  bonusRound: boolean;
+  bonusMessage?: string;
+  freeCoins?: number;
+  transactionComplete: boolean;
+}
+
+export async function getActiveTransaction() {
+  return apiFetch("/games/active-transaction");
+}
+
+export async function createTransaction(paymentAmount: number, coinsReceived: number) {
+  return apiFetch("/games/create-transaction", {
+    method: "POST",
+    body: JSON.stringify({ paymentAmount, coinsReceived }),
+  });
 }
 
 export async function playGame(gameType: "slot" | "plinko" | "chicken_rush"): Promise<GameResult> {
