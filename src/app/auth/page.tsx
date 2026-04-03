@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { sendOtp, pinLogin, verifyBiometric } from "@/services/auth";
+import { sendOtp, pinLogin, checkPhone, verifyBiometric } from "@/services/auth";
 
 function AuthContent() {
   const router = useRouter();
@@ -47,11 +47,27 @@ function AuthContent() {
     if (!isValid || sending) return;
     setSending(true);
     setSendError("");
+    setInfoMsg("");
     try {
+      if (isLogin) {
+        // Check if user exists and has PIN
+        const check = await checkPhone(digits);
+        if (check.exists && check.hasPin) {
+          // Show PIN screen instead of OTP
+          setSending(false);
+          setShowPinLogin(true);
+          return;
+        }
+        if (!check.exists) {
+          setSendError("Account not found. Please sign up first.");
+          setSending(false);
+          return;
+        }
+      }
       await sendOtp(digits);
       router.push(`/auth/verify?phone=${digits}${isLogin ? "&mode=login" : ""}`);
     } catch (err: any) {
-      setSendError(err.message || "Failed to send OTP");
+      setSendError(err.message || "Failed");
     } finally {
       setSending(false);
     }
@@ -78,7 +94,7 @@ function AuthContent() {
     setPinError("");
     if (clean.length === 6) {
       try {
-        await pinLogin(prefillPhone || phone, clean);
+        await pinLogin(phone || prefillPhone, clean);
         router.push("/home");
       } catch (err: any) {
         setPinError(err.message || "Invalid PIN");

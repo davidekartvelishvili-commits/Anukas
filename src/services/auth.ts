@@ -15,6 +15,14 @@ interface VerifyOtpResponse {
   isNewUser: boolean;
 }
 
+export async function checkPhone(phone: string): Promise<{ exists: boolean; hasPin: boolean }> {
+  const formatted = phone.startsWith("+995") ? phone : `+995${phone}`;
+  return apiFetch("/auth/check-phone", {
+    method: "POST",
+    body: JSON.stringify({ phone: formatted }),
+  });
+}
+
 export async function sendOtp(phone: string) {
   // Ensure E.164 format
   const formatted = phone.startsWith("+995") ? phone : `+995${phone}`;

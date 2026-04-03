@@ -18,6 +18,22 @@ const phoneSchema = z.object({
   phone: z.string().regex(/^\+995\d{9}$/, "Invalid Georgian phone number (E.164)"),
 });
 
+// ── POST /auth/check-phone (NO auth) ──
+auth.post("/check-phone", async (c) => {
+  const body = await c.req.json();
+  const parsed = phoneSchema.safeParse(body);
+  if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
+
+  const db = getDb();
+  const [user] = await db.select().from(users).where(eq(users.phone, parsed.data.phone)).limit(1);
+
+  return c.json({
+    success: true,
+    exists: !!user,
+    hasPin: !!user?.pinHash,
+  });
+});
+
 const verifySchema = z.object({
   phone: z.string().regex(/^\+995\d{9}$/),
   code: z.string().length(6),
