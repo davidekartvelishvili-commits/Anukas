@@ -74,8 +74,8 @@ function VerifyContent() {
     try {
       const data = await verifyOtp(phoneRaw, code);
       if (!data.isNewUser && !isLoginMode) {
-        // User already exists but came from signup — redirect to login with phone pre-filled
-        router.push(`/auth?mode=login&phone=${phoneRaw}&msg=registered`);
+        // User already exists but came from signup — already authenticated from verify-otp, go to home
+        router.push("/home");
         return;
       }
       if (data.isNewUser) {
