@@ -14,6 +14,10 @@ export default function ProfilePage() {
   const [showEditCode, setShowEditCode] = useState(false);
   const [referralCode, setReferralCode] = useState("CASHBACK001");
   const [editCodeInput, setEditCodeInput] = useState("");
+  const [showEditName, setShowEditName] = useState(false);
+  const [editNameInput, setEditNameInput] = useState("");
+  const [nameError, setNameError] = useState("");
+  const [username, setUsername] = useState("Cashback User");
   const [showExchange, setShowExchange] = useState(false);
   const [exchangeAmount, setExchangeAmount] = useState("");
   const [cashBalance, setCashBalance] = useState(28);
@@ -93,13 +97,21 @@ export default function ProfilePage() {
               </button>
             </div>
 
-            {/* Username */}
-            <h1
-              className="text-white text-[22px] font-bold"
-              style={{ fontFamily: "var(--font-outfit)" }}
+            {/* Username — tappable to edit */}
+            <button
+              onClick={() => { setEditNameInput(username); setNameError(""); setShowEditName(true); }}
+              className="flex items-center gap-2 active:opacity-70 transition-opacity"
             >
-              Cashback User
-            </h1>
+              <h1
+                className="text-white text-[22px] font-bold"
+                style={{ fontFamily: "var(--font-outfit)" }}
+              >
+                {username}
+              </h1>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 1.5l2.5 2.5M1.5 12.5l.5-2L9.5 3l2.5 2.5L4.5 13l-3 .5z" />
+              </svg>
+            </button>
 
             {/* Level badge */}
             <div className="flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full" style={{ background: "rgba(249,231,65,0.12)", border: "1px solid rgba(249,231,65,0.2)" }}>
@@ -429,7 +441,7 @@ export default function ProfilePage() {
               placeholder="eg. MYCODE123"
               value={editCodeInput}
               onChange={(e) => setEditCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 20))}
-              className="w-full px-5 py-4 rounded-[12px] text-[16px] text-white placeholder-[#666] outline-none mb-2"
+              className="w-full px-5 py-4 rounded-full text-[16px] text-white placeholder-[#666] outline-none mb-2"
               style={{
                 background: "rgba(255,255,255,0.06)",
                 border: "1px solid rgba(255,255,255,0.1)",
@@ -585,6 +597,80 @@ export default function ProfilePage() {
             >
               This feature is coming soon
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Username Modal (bottom sheet) ── */}
+      {showEditName && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setShowEditName(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative w-full max-w-[430px] rounded-t-[36px] pb-8 pt-3 px-5"
+            style={{ background: "rgba(50,50,50,0.08)", backdropFilter: "blur(12px) saturate(200%)", WebkitBackdropFilter: "blur(12px) saturate(200%)", borderTop: "1px solid rgba(255,255,255,0.2)", animation: "slideUp 0.3s ease-out" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-[36px] h-[5px] rounded-full bg-white/30 mx-auto mb-6" />
+
+            <div className="flex justify-center mb-4">
+              <svg width="40" height="40" viewBox="0 0 20 20" fill="none" stroke="#FFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="10" cy="7" r="4" />
+                <path d="M3 18c0-3.87 3.13-7 7-7s7 3.13 7 7" />
+              </svg>
+            </div>
+
+            <h3 className="text-white text-[22px] font-bold text-center mb-3" style={{ fontFamily: "var(--font-outfit)" }}>
+              Edit Username
+            </h3>
+
+            <p className="text-[#999] text-[15px] text-center mb-6 leading-relaxed" style={{ fontFamily: "var(--font-dm-sans)" }}>
+              Max 20 characters. Letters, numbers, _ and - only.
+            </p>
+
+            <input
+              type="text"
+              placeholder="eg. cool_user"
+              value={editNameInput}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\s/g, "").slice(0, 20);
+                setEditNameInput(v);
+                if (v.length > 0 && v.length < 3) setNameError("Minimum 3 characters");
+                else if (!/^[a-zA-Z0-9_-]*$/.test(v)) setNameError("Only letters, numbers, _ and -");
+                else setNameError("");
+              }}
+              className="w-full px-5 py-4 rounded-full text-[16px] text-white placeholder-[#666] outline-none mb-2"
+              style={{ background: "rgba(255,255,255,0.06)", border: nameError ? "1px solid #EF4444" : "1px solid rgba(255,255,255,0.1)", fontFamily: "var(--font-dm-sans)" }}
+              maxLength={20}
+              autoFocus
+            />
+
+            <div className="flex items-center justify-between px-2 mb-6">
+              {nameError ? (
+                <p className="text-[#EF4444] text-[12px]" style={{ fontFamily: "var(--font-dm-sans)" }}>{nameError}</p>
+              ) : <span />}
+              <span className="text-[#666] text-[12px]" style={{ fontFamily: "var(--font-dm-sans)" }}>{editNameInput.length}/20</span>
+            </div>
+
+            <div className="flex items-center justify-between px-4">
+              <button onClick={() => setShowEditName(false)} className="active:opacity-60 transition-opacity">
+                <span className="text-white text-[17px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>Cancel</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (editNameInput.length >= 3 && !nameError) {
+                    setUsername(editNameInput);
+                    setShowEditName(false);
+                    // Save to backend
+                    import("@/services/api").then(({ apiFetch }) => {
+                      apiFetch("/user/profile", { method: "PATCH", body: JSON.stringify({ name: editNameInput }) }).catch(() => {});
+                    });
+                  }
+                }}
+                className="active:opacity-60 transition-opacity"
+              >
+                <span className={`text-[17px] font-bold ${editNameInput.length >= 3 && !nameError ? "text-white" : "text-[#555]"}`} style={{ fontFamily: "var(--font-outfit)" }}>Save</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
