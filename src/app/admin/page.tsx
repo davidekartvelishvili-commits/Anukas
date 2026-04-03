@@ -2,16 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import AdminAuthGuard from "@/components/admin/AdminAuthGuard";
+import { getDashboard, logoutAdmin } from "@/services/admin";
 
-/* ── MOCK DATA ── */
+/* ── DEFAULT STATS (replaced by API on mount) ── */
 const MOCK_STATS = {
-  poolBalance: 142580.50,
-  poolMinimum: 50000,
-  todayTxCount: 1847,
-  todayTxAmount: 28450.00,
-  todayWinnings: 245.30,
-  activeUsers: 312,
-  newRegistrations: 47,
+  poolBalance: 0,
+  poolMinimum: 1000,
+  todayTxCount: 0,
+  todayTxAmount: 0,
+  todayWinnings: 0,
+  activeUsers: 0,
+  newRegistrations: 0,
 };
 
 const POOL_HISTORY = [
@@ -99,26 +101,41 @@ function MiniChart({ data }: { data: { day: string; value: number }[] }) {
   );
 }
 
-export default function AdminPage() {
+function AdminDashboardContent() {
   const router = useRouter();
   const [now, setNow] = useState(new Date());
   const [activeNav, setActiveNav] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [stats, setStats] = useState(MOCK_STATS);
 
   useEffect(() => {
     const iv = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(iv);
   }, []);
 
-  // Auth placeholder
-  // const session = await getServerSession();
-  // if (!session?.user?.isAdmin) redirect("/home");
+  // Fetch real dashboard data
+  useEffect(() => {
+    getDashboard().then((data: any) => {
+      if (data.success && data.dashboard) {
+        const d = data.dashboard;
+        setStats({
+          poolBalance: d.poolBalance || 0,
+          poolMinimum: 1000,
+          todayTxCount: d.gamesToday || 0,
+          todayTxAmount: d.totalCashbackPaid || 0,
+          todayWinnings: d.totalCashbackPaid || 0,
+          activeUsers: d.totalUsers || 0,
+          newRegistrations: 0,
+        });
+      }
+    }).catch(() => {});
+  }, []);
 
-  const avgPercent = MOCK_STATS.todayTxAmount > 0
-    ? ((MOCK_STATS.todayWinnings / MOCK_STATS.todayTxAmount) * 100).toFixed(2)
+  const avgPercent = stats.todayTxAmount > 0
+    ? ((stats.todayWinnings / stats.todayTxAmount) * 100).toFixed(2)
     : "0.00";
   const avgNum = parseFloat(avgPercent);
-  const poolHealthy = MOCK_STATS.poolBalance > MOCK_STATS.poolMinimum;
+  const poolHealthy = stats.poolBalance > stats.poolMinimum;
 
   return (
     <div className="min-h-[100dvh] flex" style={{ background: "#000000", fontFamily: "system-ui, -apple-system, sans-serif" }}>
@@ -205,7 +222,7 @@ export default function AdminPage() {
                 textShadow: poolHealthy ? "0 0 20px rgba(249,231,65,0.3)" : "0 0 20px rgba(239,68,68,0.3)",
                 animation: "pulse 3s ease-in-out infinite",
               }}>
-                ₾{MOCK_STATS.poolBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                ₾{stats.poolBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
               </p>
               <p className="text-[11px] mt-1" style={{ color: poolHealthy ? "#22C55E" : "#EF4444" }}>
                 {poolHealthy ? "● Healthy" : "● Below minimum"}
@@ -215,14 +232,14 @@ export default function AdminPage() {
             {/* Today's Transactions */}
             <div className="rounded-[12px] p-4 border" style={{ background: "#111111", borderColor: "#252525" }}>
               <p className="text-[11px] font-medium uppercase tracking-wider mb-1" style={{ color: "#666666" }}>Transactions / დღის</p>
-              <p className="text-[24px] font-extrabold leading-none text-white">{MOCK_STATS.todayTxCount.toLocaleString()}</p>
-              <p className="text-[11px] mt-1" style={{ color: "#A0A0A0" }}>₾{MOCK_STATS.todayTxAmount.toLocaleString()}</p>
+              <p className="text-[24px] font-extrabold leading-none text-white">{stats.todayTxCount.toLocaleString()}</p>
+              <p className="text-[11px] mt-1" style={{ color: "#A0A0A0" }}>₾{stats.todayTxAmount.toLocaleString()}</p>
             </div>
 
             {/* Today's Winnings */}
             <div className="rounded-[12px] p-4 border" style={{ background: "#111111", borderColor: "#252525" }}>
               <p className="text-[11px] font-medium uppercase tracking-wider mb-1" style={{ color: "#666666" }}>Winnings / მოგება</p>
-              <p className="text-[24px] font-extrabold leading-none" style={{ color: "#22C55E" }}>₾{MOCK_STATS.todayWinnings.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
+              <p className="text-[24px] font-extrabold leading-none" style={{ color: "#22C55E" }}>₾{stats.todayWinnings.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
               <p className="text-[11px] mt-1" style={{ color: "#A0A0A0" }}>Paid out today</p>
             </div>
 
@@ -238,14 +255,14 @@ export default function AdminPage() {
             {/* Active Users */}
             <div className="rounded-[12px] p-4 border" style={{ background: "#111111", borderColor: "#252525" }}>
               <p className="text-[11px] font-medium uppercase tracking-wider mb-1" style={{ color: "#666666" }}>Active Users / აქტიური</p>
-              <p className="text-[24px] font-extrabold leading-none" style={{ color: "#3B82F6" }}>{MOCK_STATS.activeUsers}</p>
+              <p className="text-[24px] font-extrabold leading-none" style={{ color: "#3B82F6" }}>{stats.activeUsers}</p>
               <p className="text-[11px] mt-1" style={{ color: "#A0A0A0" }}>Unique today</p>
             </div>
 
             {/* New Registrations */}
             <div className="rounded-[12px] p-4 border" style={{ background: "#111111", borderColor: "#252525" }}>
               <p className="text-[11px] font-medium uppercase tracking-wider mb-1" style={{ color: "#666666" }}>New Signups / ახალი</p>
-              <p className="text-[24px] font-extrabold leading-none" style={{ color: "#3B82F6" }}>{MOCK_STATS.newRegistrations}</p>
+              <p className="text-[24px] font-extrabold leading-none" style={{ color: "#3B82F6" }}>{stats.newRegistrations}</p>
               <p className="text-[11px] mt-1" style={{ color: "#A0A0A0" }}>Registrations today</p>
             </div>
           </div>
@@ -309,5 +326,13 @@ export default function AdminPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <AdminAuthGuard>
+      <AdminDashboardContent />
+    </AdminAuthGuard>
   );
 }
