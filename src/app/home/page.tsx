@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { getCoinBalance, getCashBalance, exchange as doExchange } from "@/services/balance";
 
 /* ───────── ICONS ───────── */
 
@@ -112,13 +113,15 @@ export default function HomePage() {
   const [showBalanceModal, setShowBalanceModal] = useState(false);
   const [showExchange, setShowExchange] = useState(false);
   const [exchangeAmount, setExchangeAmount] = useState("");
-  const [cashBalance, setCashBalance] = useState(28);
-  const [coinBalance, setCoinBalance] = useState(5000);
+  const [cashBalance, setCashBalanceState] = useState(28);
+  const [coinBalance, setCoinBalanceState] = useState(5000);
   const [gender, setGender] = useState("Male");
   const countdown = useCountdown(15.58);
 
   useEffect(() => {
     setActiveTab(0);
+    setCashBalanceState(getCashBalance());
+    setCoinBalanceState(getCoinBalance());
     const saved = localStorage.getItem("user-gender");
     if (saved) setGender(saved);
     const t = setTimeout(() => setMounted(true), 50);
@@ -552,9 +555,9 @@ export default function HomePage() {
             <button
               onClick={() => {
                 const amt = parseFloat(exchangeAmount);
-                if (amt > 0 && amt <= cashBalance) {
-                  setCashBalance((b) => b - amt);
-                  setCoinBalance((c) => c + amt * 100);
+                if (doExchange(amt)) {
+                  setCashBalanceState(getCashBalance());
+                  setCoinBalanceState(getCoinBalance());
                   setShowExchange(false);
                   setExchangeAmount("");
                 }

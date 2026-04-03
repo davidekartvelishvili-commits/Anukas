@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getCoinBalance, getCashBalance, exchange as doExchange } from "@/services/balance";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -34,10 +35,12 @@ export default function ProfilePage() {
   });
   const [showExchange, setShowExchange] = useState(false);
   const [exchangeAmount, setExchangeAmount] = useState("");
-  const [cashBalance, setCashBalance] = useState(28);
-  const [coinBalance, setCoinBalance] = useState(5000);
+  const [cashBalance, setCashBalanceState] = useState(28);
+  const [coinBalance, setCoinBalanceState] = useState(5000);
 
   useEffect(() => {
+    setCashBalanceState(getCashBalance());
+    setCoinBalanceState(getCoinBalance());
     const saved = localStorage.getItem("user-gender");
     if (saved) setGender(saved);
     const t = setTimeout(() => setMounted(true), 50);
@@ -758,7 +761,7 @@ export default function ProfilePage() {
             <button
               onClick={() => {
                 const amt = parseFloat(exchangeAmount);
-                if (amt > 0 && amt <= cashBalance) { setCashBalance((b) => b - amt); setCoinBalance((c) => c + amt * 100); setShowExchange(false); setExchangeAmount(""); }
+                if (doExchange(amt)) { setCashBalanceState(getCashBalance()); setCoinBalanceState(getCoinBalance()); setShowExchange(false); setExchangeAmount(""); }
               }}
               disabled={!exchangeAmount || parseFloat(exchangeAmount) <= 0 || parseFloat(exchangeAmount) > cashBalance}
               className="mx-auto block px-10 py-8 rounded-full text-[16px] font-bold transition-all active:scale-[0.97] disabled:opacity-40"

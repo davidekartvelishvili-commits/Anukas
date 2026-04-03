@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getCoinBalance, getCashBalance } from "@/services/balance";
 
 /* ───────── GAMES DATA ───────── */
 
@@ -156,10 +157,14 @@ export default function GamesPage() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState(1);
   const [playedGames, setPlayedGames] = useState<string[]>([]);
+  const [coins, setCoins] = useState(5000);
+  const [cash, setCash] = useState(28);
   const [mode, setMode] = useState<"cash" | "coins">("coins");
   const [showCashNotif, setShowCashNotif] = useState(false);
 
   useEffect(() => {
+    setCoins(getCoinBalance());
+    setCash(getCashBalance());
     setPlayedGames(getPlayedGames());
     const t = setTimeout(() => setMounted(true), 50);
     return () => clearTimeout(t);
@@ -205,7 +210,7 @@ export default function GamesPage() {
                 style={{ background: mode === "cash" ? "#FFFFFF" : "transparent" }}
               >
                 <CashIcon />
-                <span className={`text-[11px] font-bold ${mode === "cash" ? "text-black" : "text-white"}`} style={{ fontFamily: "var(--font-outfit)" }}>28</span>
+                <span className={`text-[11px] font-bold ${mode === "cash" ? "text-black" : "text-white"}`} style={{ fontFamily: "var(--font-outfit)" }}>{cash}</span>
               </button>
               <button
                 onClick={() => setMode("coins")}
@@ -213,7 +218,7 @@ export default function GamesPage() {
                 style={{ background: mode === "coins" ? "#FFFFFF" : "transparent" }}
               >
                 <img src="/images/coin-icon.png" alt="Coin" width={16} height={16} style={{ objectFit: "contain" }} />
-                <span className={`text-[11px] font-bold ${mode === "coins" ? "text-black" : "text-white"}`} style={{ fontFamily: "var(--font-outfit)" }}>5,000</span>
+                <span className={`text-[11px] font-bold ${mode === "coins" ? "text-black" : "text-white"}`} style={{ fontFamily: "var(--font-outfit)" }}>{coins.toLocaleString()}</span>
               </button>
             </div>
             <div className="flex-1 flex justify-end">
