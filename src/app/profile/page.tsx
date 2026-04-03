@@ -33,6 +33,7 @@ export default function ProfilePage() {
     } catch {}
     return "Cashback User";
   });
+  const [showCoinNotif, setShowCoinNotif] = useState(false);
   const [showExchange, setShowExchange] = useState(false);
   const [exchangeAmount, setExchangeAmount] = useState("");
   const [cashBalance, setCashBalanceState] = useState(28);
@@ -144,7 +145,7 @@ export default function ProfilePage() {
           {/* ── Balance row: Coins + Lari + Card ── */}
           <div className="flex items-end justify-center gap-0 mb-10" style={stagger(2)}>
             {/* Coins (for playing) */}
-            <div className="flex-1 flex flex-col items-center">
+            <div className="flex-1 flex flex-col items-center cursor-pointer active:scale-[0.97] transition-transform" onClick={() => setShowCoinNotif(true)}>
               <img
                 src="/images/coin-icon.png"
                 alt="Coin"
@@ -614,6 +615,26 @@ export default function ProfilePage() {
               style={{ fontFamily: "var(--font-dm-sans)" }}
             >
               This feature is coming soon
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Coin Notification ── */}
+      {showCoinNotif && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowCoinNotif(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative rounded-[20px] px-8 py-10 flex flex-col items-center max-w-[320px] w-full"
+            style={{ background: "rgba(50,50,50,0.08)", backdropFilter: "blur(12px) saturate(200%)", WebkitBackdropFilter: "blur(12px) saturate(200%)", border: "1px solid rgba(255,255,255,0.2)", animation: "fadeIn 0.2s ease-out" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img src="/images/coin-icon.png" alt="Coin" width={48} height={48} style={{ objectFit: "contain" }} className="mb-4" />
+            <h3 className="text-white text-[20px] font-bold text-center mb-2" style={{ fontFamily: "var(--font-outfit)" }}>
+              Get Coins
+            </h3>
+            <p className="text-[#999] text-[14px] text-center leading-relaxed" style={{ fontFamily: "var(--font-dm-sans)" }}>
+              You need to scan QR code in our partner company location to get coins
             </p>
           </div>
         </div>
