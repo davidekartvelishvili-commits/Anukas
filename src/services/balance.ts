@@ -19,6 +19,7 @@ export function seedTestUser() {
   const phone = localStorage.getItem("shansi_phone");
   if (phone?.includes("599474491")) {
     localStorage.setItem(COIN_KEY, "100");
+    localStorage.setItem(CASH_KEY, "0");
   }
 }
 
