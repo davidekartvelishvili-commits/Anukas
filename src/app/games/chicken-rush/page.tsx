@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { DIFFICULTIES, type Difficulty, type StartResult, type StepResult } from "./game-config";
+import { playGame as playGameApi } from "@/services/games";
 
 type TileState = "hidden" | "safe" | "trap" | "revealed-trap";
 interface GameState {
@@ -58,25 +59,44 @@ export default function ChickenRushPage() {
   }, [game?.currentRow]);
 
   // Auto-start on first load
+  const serverResultRef = useRef<{ won: boolean; totalWin: number; newBalance: number } | null>(null);
+
   const startRound = useCallback(async () => {
     if (balance < betAmount) return;
     setBalance((b) => b - betAmount);
     setResultText("");
     setShowWin(false);
 
-    const res = await fetch("/api/chicken-rush/start", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ difficulty, betAmount }),
-    });
-    const data: StartResult = await res.json();
-    const tiles: TileState[][] = [];
-    for (let r = 0; r < data.rows; r++) tiles.push(Array(data.cols).fill("hidden"));
+    // Get server outcome FIRST
+    try {
+      const serverResult = await playGameApi("chicken_rush");
+      serverResultRef.current = serverResult;
+    } catch (err: any) {
+      setBalance((b) => b + betAmount);
+      if (err.message?.includes("disabled")) {
+        alert("თამაში დროებით შეჩერებულია");
+      }
+      return;
+    }
 
-    setGame({
-      roundId: data.roundId, rows: data.rows, cols: data.cols,
-      currentRow: 0, multiplier: 1, tiles, chickenPos: null,
-      gameOver: false, won: false,
-    });
+    // Still use local start API for tile grid (visual only)
+    try {
+      const res = await fetch("/api/chicken-rush/start", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ difficulty, betAmount }),
+      });
+      const data: StartResult = await res.json();
+      const tiles: TileState[][] = [];
+      for (let r = 0; r < data.rows; r++) tiles.push(Array(data.cols).fill("hidden"));
+
+      setGame({
+        roundId: data.roundId, rows: data.rows, cols: data.cols,
+        currentRow: 0, multiplier: 1, tiles, chickenPos: null,
+        gameOver: false, won: false,
+      });
+    } catch {
+      setBalance((b) => b + betAmount);
+    }
   }, [betAmount, balance, difficulty]);
 
   useEffect(() => {
@@ -159,15 +179,15 @@ export default function ChickenRushPage() {
 
   const handleCashout = useCallback(async () => {
     if (!game || game.gameOver || game.currentRow === 0) return;
-    const res = await fetch("/api/chicken-rush/cashout", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roundId: game.roundId, betAmount }),
-    });
-    const data = await res.json();
-    setBalance((b) => b + data.winAmount);
-    setWinAmount(data.winAmount);
+    // Use server result for win amount
+    const sr = serverResultRef.current;
+    const winAmt = sr ? sr.totalWin : betAmount * game.multiplier;
+    const newBal = sr ? sr.newBalance : balance + winAmt;
+
+    setBalance(newBal);
+    setWinAmount(winAmt);
     setShowWin(true);
-    setResultText(`Cashed out! +${data.winAmount}`);
+    setResultText(`Cashed out! +${winAmt}`);
     setGame((g) => g ? { ...g, gameOver: true, won: true } : g);
     setTimeout(() => setShowWin(false), 2500);
     // Auto-restart after cashout

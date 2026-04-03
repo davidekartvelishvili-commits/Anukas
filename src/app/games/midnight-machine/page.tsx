@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { SYMBOLS, BET_COST, type SpinResult } from "./slot-config";
+import { playGame } from "@/services/games";
 
 const SlotMachine = dynamic(() => import("./SlotMachine"), { ssr: false });
 
@@ -28,31 +29,44 @@ export default function MidnightMachinePage() {
     setShowWin(false);
 
     try {
-      const res = await fetch("/api/spin", { method: "POST" });
-      const data: SpinResult = await res.json();
+      // Server decides outcome FIRST
+      const serverResult = await playGame("slot");
 
-      setTargetSymbols(data.symbols);
+      // Map server result to visual symbols
+      const symbols: [string, string, string] = serverResult.won
+        ? ["Crown", "Crown", "Crown"]
+        : ["Cherry", "Melon", "Banana"];
+      const spinData: SpinResult = {
+        symbols,
+        winType: serverResult.won ? "triple" : "none",
+        winAmount: serverResult.totalWin,
+        multiplier: serverResult.won ? serverResult.totalWin / betAmount : 0,
+        winSymbol: serverResult.won ? "Crown" : undefined,
+      };
+
+      setTargetSymbols(spinData.symbols);
       setSpinTrigger((t) => t + 1);
 
       setTimeout(() => {
-        setResult(data);
+        setResult(spinData);
         setIsSpinning(false);
+        setBalance(serverResult.newBalance);
 
-        if (data.winAmount > 0) {
-          setBalance((b) => b + data.winAmount);
+        if (serverResult.totalWin > 0 && serverResult.won) {
           setShowWin(true);
-          spawnParticles(
-            data.winType === "triple" && data.winSymbol === "Covrd" ? 60 : 25
-          );
+          spawnParticles(serverResult.bonusWin > 50 ? 60 : 25);
           setTimeout(() => setShowWin(false), 2500);
         } else {
           setShowNoLuck(true);
           setTimeout(() => setShowNoLuck(false), 4000);
         }
       }, 6500);
-    } catch {
+    } catch (err: any) {
       setIsSpinning(false);
       setBalance((b) => b + betAmount);
+      if (err.message?.includes("disabled")) {
+        alert("თამაში დროებით შეჩერებულია");
+      }
     }
   }, [isSpinning, balance, betAmount]);
 

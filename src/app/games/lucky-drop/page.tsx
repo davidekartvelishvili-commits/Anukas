@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { MULTIPLIERS, SLOT_COLORS, BET_COST, type RiskLevel, type DropResult } from "./drop-config";
+import { playGame } from "@/services/games";
 
 const ROWS = 12;
 const BASE_GRAVITY = 0.4;
@@ -333,12 +334,25 @@ export default function LuckyDropPage() {
     const gravity = gravities[n % gravities.length];
 
     try {
-      const res = await fetch("/api/lucky-drop", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ risk }),
+      // Server decides outcome FIRST
+      const serverResult = await playGame("plinko");
+
+      // Map server totalWin to a slot index (find closest multiplier)
+      const mults = MULTIPLIERS[risk];
+      const mult = betAmount > 0 ? serverResult.totalWin / betAmount : 0;
+      let closestIdx = 5; // center
+      let closestDiff = Infinity;
+      mults.forEach((m, i) => {
+        const diff = Math.abs(m - mult);
+        if (diff < closestDiff) { closestDiff = diff; closestIdx = i; }
       });
-      const data: DropResult = await res.json();
+
+      const data: DropResult = {
+        slotIndex: closestIdx,
+        multiplier: mults[closestIdx],
+        winAmount: serverResult.totalWin,
+        risk,
+      };
 
       const s = stateRef.current;
       const ballR = Math.max(8, s.W * 0.015);
@@ -353,18 +367,21 @@ export default function LuckyDropPage() {
       };
 
       (ball as any)._onSettle = () => {
-        if (data.winAmount > 0) {
-          setBalance((b) => b + data.winAmount);
-          setWinAmount(data.winAmount);
-          setBigWinText(`+${data.winAmount}`);
-          spawnParticles(data.multiplier >= 40 ? 50 : 20, data.multiplier >= 40);
+        setBalance(serverResult.newBalance);
+        if (serverResult.totalWin > 0 && serverResult.won) {
+          setWinAmount(serverResult.totalWin);
+          setBigWinText(`+${serverResult.totalWin}`);
+          spawnParticles(serverResult.bonusWin > 20 ? 50 : 20, serverResult.bonusWin > 20);
           setTimeout(() => setBigWinText(""), 2000);
         }
       };
 
       s.balls.push(ball);
-    } catch {
+    } catch (err: any) {
       setBalance((b) => b + betAmount);
+      if (err.message?.includes("disabled")) {
+        alert("თამაში დროებით შეჩერებულია");
+      }
     }
   }, [balance, risk, betAmount]);
 
