@@ -516,7 +516,7 @@ export default function HomePage() {
 
             {/* Cash input line */}
             <div className="flex items-center gap-3 py-3 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-              <img src="/images/lari-icon.png" alt="₾" width={32} height={32} style={{ objectFit: "contain" }} />
+              <img src="/images/lari-icon.png" alt="₾" width={44} height={44} style={{ objectFit: "contain" }} />
               <input
                 type="number"
                 placeholder="0"
@@ -527,7 +527,7 @@ export default function HomePage() {
                 min={0}
                 max={cashBalance}
               />
-              <span className="text-[12px] text-[#666] shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>Balance: {cashBalance} ₾</span>
+              <span className="text-[15px] text-[#999] font-semibold shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>Balance: {cashBalance} ₾</span>
             </div>
 
             {/* Arrow */}
@@ -543,12 +543,12 @@ export default function HomePage() {
               <span className="flex-1 text-white text-[22px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
                 {exchangeAmount ? (parseFloat(exchangeAmount) * 100).toLocaleString() : "0"}
               </span>
-              <span className="text-[12px] text-[#666] shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>Coins</span>
+              <span className="text-[15px] text-[#999] font-semibold shrink-0" style={{ fontFamily: "var(--font-dm-sans)" }}>Coins</span>
             </div>
 
             {/* Rate */}
-            <p className="text-[11px] text-[#666] text-center mb-5" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              1 ₾ = 100 Coins
+            <p className="text-[13px] text-[#999] text-center mb-5" style={{ fontFamily: "var(--font-dm-sans)" }}>
+              1₾ Cash = 100 Coin
             </p>
 
             {/* Exchange button */}
