@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { seedTestUser } from "@/services/balance";
 
 export default function SplashScreen() {
   const router = useRouter();
   const [phase, setPhase] = useState(0);
 
   useEffect(() => {
+    seedTestUser();
     // Phase 1: Logo appears (300ms)
     const t1 = setTimeout(() => setPhase(1), 300);
     // Phase 2: Text appears (900ms)

@@ -2,15 +2,26 @@ const COIN_KEY = "shansi_coins";
 const CASH_KEY = "shansi_cash";
 
 export function getCoinBalance(): number {
-  if (typeof window === "undefined") return 5000;
+  if (typeof window === "undefined") return 0;
   const val = localStorage.getItem(COIN_KEY);
-  return val ? parseFloat(val) : 5000;
+  return val ? parseFloat(val) : 0;
 }
 
 export function getCashBalance(): number {
-  if (typeof window === "undefined") return 28;
+  if (typeof window === "undefined") return 0;
   const val = localStorage.getItem(CASH_KEY);
-  return val ? parseFloat(val) : 28;
+  return val ? parseFloat(val) : 0;
+}
+
+// One-time seed for test user
+export function seedTestUser() {
+  if (typeof window === "undefined") return;
+  const phone = localStorage.getItem("shansi_phone");
+  const seeded = localStorage.getItem("shansi_seeded");
+  if (phone?.includes("599474491") && !seeded) {
+    localStorage.setItem(COIN_KEY, "100");
+    localStorage.setItem("shansi_seeded", "1");
+  }
 }
 
 export function setCoinBalance(amount: number) {
