@@ -18,7 +18,17 @@ export default function ProfilePage() {
   const [showNameConfirm, setShowNameConfirm] = useState(false);
   const [editNameInput, setEditNameInput] = useState("");
   const [nameError, setNameError] = useState("");
-  const [username, setUsername] = useState("Cashback User");
+  const [username, setUsername] = useState(() => {
+    if (typeof window === "undefined") return "Cashback User";
+    try {
+      const stored = localStorage.getItem("shansi_user");
+      if (stored) {
+        const user = JSON.parse(stored);
+        return user.name || "Cashback User";
+      }
+    } catch {}
+    return "Cashback User";
+  });
   const [showExchange, setShowExchange] = useState(false);
   const [exchangeAmount, setExchangeAmount] = useState("");
   const [cashBalance, setCashBalance] = useState(28);
