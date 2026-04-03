@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { DIFFICULTIES, type Difficulty, type StartResult, type StepResult } from "./game-config";
 import { startChickenRush, type ChickenRushServerResult } from "@/services/chickenRush";
-import { getCoinBalance, spendCoins, creditCashWinnings, getCashBalance, setCoinBalance as storeCoinBalance } from "@/services/balance";
+import { ensureActiveTransaction } from "@/services/games";
+import { setCoinBalance as storeCoin, setCashBalance as storeCash } from "@/services/balance";
 
 type TileState = "hidden" | "safe" | "trap" | "revealed-trap";
 interface GameState {
@@ -52,7 +53,12 @@ export default function ChickenRushPage() {
   const gridRef = useRef<HTMLDivElement>(null);
   const BET_OPTIONS = [10, 25, 50, 100, 250, 500];
 
-  useEffect(() => { setBalance(getCoinBalance()); }, []);
+  useEffect(() => {
+    ensureActiveTransaction().then((tx) => {
+      setBalance(tx.coinsRemaining);
+      storeCoin(tx.coinsRemaining);
+    }).catch(() => {});
+  }, []);
   const config = DIFFICULTIES[difficulty];
 
   useEffect(() => {
@@ -66,8 +72,7 @@ export default function ChickenRushPage() {
 
   const startRound = useCallback(async () => {
     if (balance < betAmount) return;
-    spendCoins(betAmount);
-    setBalance(getCoinBalance());
+    setBalance(balance - betAmount);
     setResultText("");
     setShowWin(false);
 
@@ -85,7 +90,7 @@ export default function ChickenRushPage() {
         gameOver: false, won: false,
       });
     } catch (err: any) {
-      storeCoinBalance(getCoinBalance() + betAmount); setBalance(getCoinBalance() + betAmount);
+      setBalance(balance + betAmount);
     }
   }, [betAmount, balance, difficulty]);
 
@@ -100,7 +105,7 @@ export default function ChickenRushPage() {
       prevDiff.current = difficulty;
       // Refund current bet if game was just started
       if (game && game.currentRow === 0) {
-        storeCoinBalance(getCoinBalance() + betAmount); setBalance(getCoinBalance() + betAmount);
+        setBalance(balance + betAmount);
       }
       startRound();
     }
@@ -132,7 +137,7 @@ export default function ChickenRushPage() {
       setGame((g) => g ? { ...g, tiles: newTiles, currentRow: nextRow, multiplier: round2(stepValue), chickenPos: { row, col }, gameOver: completed, won: completed } : g);
 
       if (completed) {
-        creditCashWinnings(sr.totalWin);
+        storeCash(sr.totalWin);
         setWinAmount(sr.totalWin);
         setShowWin(true);
         setResultText(`LEGENDARY! +${sr.totalWin}₾`);
@@ -156,7 +161,7 @@ export default function ChickenRushPage() {
         }
       }
       // Credit guaranteed minimum
-      if (sr.minWin > 0) creditCashWinnings(sr.minWin);
+      if (sr.minWin > 0) storeCash(sr.minWin);
       setGame((g) => g ? { ...g, tiles: newTiles, chickenPos: { row, col }, gameOver: true, won: false } : g);
       setResultText("You hit a trap!");
       setTimeout(() => { setResultText(""); startRound(); }, 2000);
@@ -175,8 +180,8 @@ export default function ChickenRushPage() {
     // Cashout: credit the step value at current position
     const currentStepIdx = Math.max(0, game.currentRow - 1);
     const winAmt = sr.stepValues[currentStepIdx] || sr.minWin;
-    if (winAmt > 0) creditCashWinnings(winAmt);
-    setBalance(getCoinBalance());
+    if (winAmt > 0) storeCash(winAmt);
+    // Balance stays at current coins
     setWinAmount(winAmt);
     setShowWin(true);
     setResultText(`Cashed out! +${winAmt}`);

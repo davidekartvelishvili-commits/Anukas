@@ -26,6 +26,16 @@ export async function createTransaction(paymentAmount: number, coinsReceived: nu
   });
 }
 
+export async function ensureActiveTransaction(): Promise<{ coinsRemaining: number }> {
+  const data = await getActiveTransaction() as any;
+  if (data.hasActiveTransaction) {
+    return { coinsRemaining: data.coinsRemaining };
+  }
+  // No active transaction — create one (100 coins for 10₾ for testing)
+  await createTransaction(10, 100);
+  return { coinsRemaining: 100 };
+}
+
 export async function playGame(gameType: "slot" | "plinko" | "chicken_rush"): Promise<GameResult> {
   const data = await apiFetch<{ result: GameResult }>("/games/play", {
     method: "POST",

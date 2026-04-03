@@ -19,17 +19,9 @@ export function syncFromServer(coinsRemaining: number, cashWon?: number) {
   if (cashWon !== undefined) setCashBalance(cashWon);
 }
 
-// Seed test user (temporary)
+// Seed removed — balances now come from server transactions
 export function seedTestUser() {
-  if (typeof window === "undefined") return;
-  const phone = localStorage.getItem("shansi_phone");
-  if (phone?.includes("599474491")) {
-    // Only seed if no coins set yet
-    const existing = localStorage.getItem(COIN_KEY);
-    if (!existing || existing === "0") {
-      localStorage.setItem(COIN_KEY, "100");
-    }
-  }
+  // no-op
 }
 
 export function setCoinBalance(amount: number) {

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { MULTIPLIERS, SLOT_COLORS, BET_COST, type RiskLevel, type DropResult } from "./drop-config";
-import { playGame } from "@/services/games";
-import { getCoinBalance, spendCoins, creditCashWinnings, getCashBalance, setCoinBalance as storeCoinBalance } from "@/services/balance";
+import { playGame, ensureActiveTransaction } from "@/services/games";
+import { setCoinBalance as storeCoin, setCashBalance as storeCash } from "@/services/balance";
 
 const ROWS = 12;
 const BASE_GRAVITY = 0.4;
@@ -40,7 +40,12 @@ export default function LuckyDropPage() {
   const [betAmount, setBetAmount] = useState(0);
   const [showBetPicker, setShowBetPicker] = useState(true);
 
-  useEffect(() => { setBalance(getCoinBalance()); }, []);
+  useEffect(() => {
+    ensureActiveTransaction().then((tx) => {
+      setBalance(tx.coinsRemaining);
+      storeCoin(tx.coinsRemaining);
+    }).catch(() => {});
+  }, []);
   const [bigWinText, setBigWinText] = useState("");
   const dropCount = useRef(0);
   const BET_OPTIONS = [10, 25, 50, 100, 250, 500];
@@ -328,8 +333,7 @@ export default function LuckyDropPage() {
 
   const handleDrop = useCallback(async () => {
     if (betAmount <= 0 || balance < betAmount) return;
-    spendCoins(betAmount);
-    setBalance(getCoinBalance());
+    setBalance(balance - betAmount);
     dropCount.current++;
 
     // Vary gravity: alternates fast/slow/faster pattern
@@ -371,8 +375,11 @@ export default function LuckyDropPage() {
       };
 
       (ball as any)._onSettle = () => {
+        // Sync from server
+        setBalance(serverResult.coinsRemaining);
+        storeCoin(serverResult.coinsRemaining);
         if (serverResult.totalWin > 0) {
-          creditCashWinnings(serverResult.totalWin);
+          storeCash(serverResult.newBalance);
         }
         if (serverResult.totalWin > 0 && serverResult.won) {
           setWinAmount(serverResult.totalWin);
@@ -384,8 +391,7 @@ export default function LuckyDropPage() {
 
       s.balls.push(ball);
     } catch (err: any) {
-      storeCoinBalance(getCoinBalance() + betAmount);
-      setBalance(getCoinBalance() + betAmount);
+      setBalance(balance + betAmount);
       if (err.message?.includes("disabled")) {
         alert("თამაში დროებით შეჩერებულია");
       }

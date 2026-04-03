@@ -3,8 +3,8 @@
 import { useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { SYMBOLS, BET_COST, type SpinResult } from "./slot-config";
-import { playGame } from "@/services/games";
-import { getCoinBalance, spendCoins, creditCashWinnings, getCashBalance } from "@/services/balance";
+import { playGame, ensureActiveTransaction } from "@/services/games";
+import { setCoinBalance as storeCoin, setCashBalance as storeCash } from "@/services/balance";
 
 const SlotMachine = dynamic(() => import("./SlotMachine"), { ssr: false });
 
@@ -23,16 +23,17 @@ export default function MidnightMachinePage() {
   const BET_OPTIONS = [10, 25, 50, 100, 250, 500];
 
   useEffect(() => {
-    setCoinBalance(getCoinBalance());
-    setCashBalance(getCashBalance());
+    ensureActiveTransaction().then((tx) => {
+      setCoinBalance(tx.coinsRemaining);
+      storeCoin(tx.coinsRemaining);
+    }).catch(() => {});
   }, []);
 
   const handleSpin = useCallback(async () => {
     if (isSpinning || betAmount <= 0 || coinBalance < betAmount) return;
 
     setIsSpinning(true);
-    spendCoins(betAmount);
-    setCoinBalance(getCoinBalance());
+    setCoinBalance(coinBalance - betAmount);
     setResult(null);
     setShowWin(false);
 
@@ -58,9 +59,12 @@ export default function MidnightMachinePage() {
       setTimeout(() => {
         setResult(spinData);
         setIsSpinning(false);
+        // Sync balances from server
+        setCoinBalance(serverResult.coinsRemaining);
+        storeCoin(serverResult.coinsRemaining);
         if (serverResult.totalWin > 0) {
-          creditCashWinnings(serverResult.totalWin);
-          setCashBalance(getCashBalance());
+          setCashBalance(serverResult.newBalance);
+          storeCash(serverResult.newBalance);
         }
 
         if (serverResult.totalWin > 0 && serverResult.won) {
@@ -74,9 +78,7 @@ export default function MidnightMachinePage() {
       }, 6500);
     } catch (err: any) {
       setIsSpinning(false);
-      // Refund coins on error
-      setCoinBalance(getCoinBalance() + betAmount);
-      import("@/services/balance").then(m => m.setCoinBalance(getCoinBalance() + betAmount));
+      setCoinBalance(coinBalance + betAmount);
       if (err.message?.includes("disabled")) {
         alert("თამაში დროებით შეჩერებულია");
       }
