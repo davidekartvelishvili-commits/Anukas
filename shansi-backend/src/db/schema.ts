@@ -47,6 +47,7 @@ export const gameConfig = sqliteTable("game_config", {
   maxWinPerUser: real("max_win_per_user").default(100).notNull(),
   poolMinimumThreshold: real("pool_minimum_threshold").default(1000).notNull(),
   fullReturnThreshold: real("full_return_threshold").default(5).notNull(),
+  minReturnPercent: real("min_return_percent").default(0.5).notNull(),
   isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
   updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
 });

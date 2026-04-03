@@ -72,6 +72,7 @@ async function migrate() {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
     `ALTER TABLE admins ADD COLUMN permissions TEXT`,
+    `ALTER TABLE game_config ADD COLUMN min_return_percent REAL NOT NULL DEFAULT 0.5`,
     `CREATE TABLE IF NOT EXISTS admin_logs (
       id TEXT PRIMARY KEY,
       admin_id TEXT NOT NULL REFERENCES admins(id),

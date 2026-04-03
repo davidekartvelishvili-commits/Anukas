@@ -32,6 +32,7 @@ const gameConfigUpdateSchema = z.object({
   maxWinPerUser: z.number().min(0).optional(),
   poolMinimumThreshold: z.number().min(0).optional(),
   fullReturnThreshold: z.number().min(0).optional(),
+  minReturnPercent: z.number().min(0.1).max(5).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -203,6 +204,7 @@ admin.patch("/game-config/:gameType", adminMiddleware, async (c) => {
   if (parsed.data.maxWinPerUser !== undefined) updates.maxWinPerUser = parsed.data.maxWinPerUser;
   if (parsed.data.poolMinimumThreshold !== undefined) updates.poolMinimumThreshold = parsed.data.poolMinimumThreshold;
   if (parsed.data.fullReturnThreshold !== undefined) updates.fullReturnThreshold = parsed.data.fullReturnThreshold;
+  if (parsed.data.minReturnPercent !== undefined) updates.minReturnPercent = parsed.data.minReturnPercent;
   if (parsed.data.isActive !== undefined) updates.isActive = parsed.data.isActive;
 
   await db.update(gameConfig).set(updates).where(eq(gameConfig.id, existing.id));

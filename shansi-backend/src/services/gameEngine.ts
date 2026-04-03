@@ -29,6 +29,7 @@ interface Config {
   maxWinPerUser: number;
   poolMinimumThreshold: number;
   fullReturnThreshold: number;
+  minReturnPercent: number;
   isActive: boolean;
 }
 
@@ -37,8 +38,9 @@ function calculateWin(
   config: Config,
   poolBalance: number
 ): { minWin: number; bonusWin: number } {
-  // Step 1: Guaranteed minimum — everyone wins 0.5%
-  const minWin = round2(betAmount * 0.005);
+  // Step 1: Guaranteed minimum — from admin config (ZERO hardcoded)
+  const minReturnDecimal = config.minReturnPercent / 100;
+  const minWin = round2(betAmount * minReturnDecimal);
 
   // Step 2: Check if bonus wins are possible
   if (!config.isActive) return { minWin, bonusWin: 0 };
@@ -46,7 +48,6 @@ function calculateWin(
 
   // Step 3: Determine bonus budget
   const avgReturnDecimal = config.avgReturnPercent / 100;
-  const minReturnDecimal = 0.005;
   const bonusReturnBudget = avgReturnDecimal - minReturnDecimal;
 
   if (bonusReturnBudget <= 0) return { minWin, bonusWin: 0 };
@@ -111,6 +112,7 @@ export async function playGame(
     maxWinPerUser: config.maxWinPerUser,
     poolMinimumThreshold: config.poolMinimumThreshold,
     fullReturnThreshold: config.fullReturnThreshold,
+    minReturnPercent: config.minReturnPercent,
     isActive: config.isActive,
   }, poolBefore);
 

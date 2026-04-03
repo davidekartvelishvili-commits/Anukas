@@ -70,6 +70,7 @@ function AlgorithmContent() {
     { key: "maxWinPerUser", label: "მაქს. მოგება 1 ადამიანზე", value: 100, suffix: "₾", description: "ერთ თამაშზე მაქსიმუმ რამდენის მოგება შეუძლია", min: 1, max: 1000, step: 1 },
     { key: "poolMinimumThreshold", label: "Pool მინიმუმის ზღვარი", value: 1000, suffix: "₾", description: "ამ თანხაზე ქვემოთ ბონუს მოგებები ავტომატურად ჩერდება, მხოლოდ 0.5% მინიმუმი გაიცემა", min: 0, max: 10000, step: 1 },
     { key: "fullReturnThreshold", label: "100% ზღვარი (დაბალი თანხა)", value: 5, suffix: "₾", description: "ამ თანხამდე გადახდებზე 100% დაბრუნების შანსი მაღალია (~20%)", min: 1, max: 50, step: 0.5 },
+    { key: "minReturnPercent", label: "მინიმუმ გარანტირებული დაბრუნება %", value: 0.5, suffix: "%", description: "ყველა მომხმარებელი ყოველ თამაშზე მინიმუმ ამდენ %-ს იგებს", min: 0.1, max: 5, step: 0.1 },
   ]);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState(0);
