@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { adminFetch } from "@/services/adminApi";
+import AdminAuthGuard from "@/components/admin/AdminAuthGuard";
 
 /* ── SVG ICONS (NavIcon) ── */
 function NavIcon({ id, active }: { id: string; active: boolean }) {
@@ -72,25 +74,16 @@ function WarningIcon() {
   return <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 2L1.5 17h17L10 2z" /><path d="M10 8v4M10 14v.5" /></svg>;
 }
 
-/* ── MOCK DATA ── */
-const CURRENT_ADMIN_EMAIL = "giorgi@shansi.ge";
-
+/* ── TYPES ── */
 interface Admin {
-  id: number;
+  id: string;
   name: string;
   email: string;
-  role: "super" | "admin" | "viewer";
-  lastLogin: string;
-  status: "active" | "inactive";
+  role: "super_admin" | "admin";
+  permissions?: string[];
+  isActive: boolean;
+  createdAt: string;
 }
-
-const MOCK_ADMINS: Admin[] = [
-  { id: 1, name: "Giorgi Kapanadze", email: "giorgi@shansi.ge", role: "super", lastLogin: "2026-03-29 14:22", status: "active" },
-  { id: 2, name: "Nino Lomidze", email: "nino@shansi.ge", role: "admin", lastLogin: "2026-03-29 11:05", status: "active" },
-  { id: 3, name: "Davit Tsereteli", email: "davit@shansi.ge", role: "admin", lastLogin: "2026-03-28 18:30", status: "active" },
-  { id: 4, name: "Mariam Javakhishvili", email: "mariam@shansi.ge", role: "viewer", lastLogin: "2026-03-27 09:15", status: "inactive" },
-  { id: 5, name: "Luka Beridze", email: "luka@shansi.ge", role: "viewer", lastLogin: "2026-03-29 13:40", status: "active" },
-];
 
 interface LogEntry {
   id: number;
@@ -129,17 +122,71 @@ const MOCK_LOGS: LogEntry[] = [
 const ADMIN_NAMES_FILTER = ["ყველა", ...Array.from(new Set(MOCK_LOGS.map((l) => l.adminName)))];
 
 /* ── PAGE ── */
-export default function SystemPage() {
+function SystemContent() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<"admins" | "logs" | "export" | "settings">("admins");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
   // Admin Accounts state
-  const [admins, setAdmins] = useState<Admin[]>(MOCK_ADMINS);
+  const [admins, setAdmins] = useState<Admin[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
-  const [newAdmin, setNewAdmin] = useState({ name: "", email: "", role: "admin" as "super" | "admin" | "viewer", password: "" });
-  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [newAdmin, setNewAdmin] = useState({ name: "", email: "", role: "admin" as "super_admin" | "admin", password: "" });
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  // Load admins from API
+  useEffect(() => {
+    adminFetch("/admin/admins")
+      .then((data: any) => {
+        if (data.success && data.admins) {
+          setAdmins(data.admins);
+        }
+      })
+      .catch(() => {});
+    // Check if current user is super_admin
+    try {
+      const stored = localStorage.getItem("adminToken");
+      if (stored) {
+        const payload = JSON.parse(atob(stored.split(".")[1]));
+        setIsSuperAdmin(payload.role === "super_admin");
+      }
+    } catch {}
+  }, []);
+
+  const showSuccess = (msg: string) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(""), 3000); };
+  const showError = (msg: string) => { setErrorMsg(msg); setTimeout(() => setErrorMsg(""), 3000); };
+
+  const handleCreateAdmin = async () => {
+    if (!newAdmin.name || !newAdmin.email || !newAdmin.password) return;
+    try {
+      const data = await adminFetch("/admin/admins/create", {
+        method: "POST",
+        body: JSON.stringify({ name: newAdmin.name, email: newAdmin.email, password: newAdmin.password, role: newAdmin.role }),
+      }) as any;
+      if (data.success) {
+        setAdmins((prev) => [...prev, { ...data.admin, isActive: true, createdAt: new Date().toISOString() }]);
+        setShowAddModal(false);
+        setNewAdmin({ name: "", email: "", role: "admin", password: "" });
+        showSuccess("Admin created successfully");
+      }
+    } catch (err: any) {
+      showError(err.message || "Failed to create admin");
+    }
+  };
+
+  const handleDeactivateAdmin = async (id: string) => {
+    try {
+      await adminFetch(`/admin/admins/${id}`, { method: "DELETE" });
+      setAdmins((prev) => prev.map((a) => a.id === id ? { ...a, isActive: false } : a));
+      setDeleteConfirmId(null);
+      showSuccess("Admin deactivated");
+    } catch (err: any) {
+      showError(err.message || "Failed to deactivate");
+    }
+  };
 
   // Activity Log state
   const [logPage, setLogPage] = useState(1);
@@ -170,20 +217,7 @@ export default function SystemPage() {
   const pagedLogs = filteredLogs.slice((logPage - 1) * LOGS_PER_PAGE, logPage * LOGS_PER_PAGE);
 
   // Handlers
-  function handleAddAdmin() {
-    if (!newAdmin.name || !newAdmin.email || !newAdmin.password) return;
-    const next: Admin = {
-      id: Math.max(...admins.map((a) => a.id)) + 1,
-      name: newAdmin.name,
-      email: newAdmin.email,
-      role: newAdmin.role,
-      lastLogin: "-",
-      status: "active",
-    };
-    setAdmins([...admins, next]);
-    setNewAdmin({ name: "", email: "", role: "admin", password: "" });
-    setShowAddModal(false);
-  }
+  // handleCreateAdmin replaced by handleCreateAdmin above
 
   function handleEditAdmin() {
     if (!editingAdmin) return;
@@ -191,10 +225,6 @@ export default function SystemPage() {
     setEditingAdmin(null);
   }
 
-  function handleDeleteAdmin(id: number) {
-    setAdmins(admins.filter((a) => a.id !== id));
-    setDeleteConfirmId(null);
-  }
 
   function handleExport(type: string) {
     setExportingType(type);
@@ -353,11 +383,11 @@ export default function SystemPage() {
                               {admin.role}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-[12px]" style={{ color: "#666666" }}>{admin.lastLogin}</td>
+                          <td className="px-4 py-3 text-[12px]" style={{ color: "#666666" }}>{admin.createdAt?.split("T")[0] || "—"}</td>
                           <td className="px-4 py-3">
-                            <span className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: admin.status === "active" ? "#22C55E" : "#666666" }}>
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: admin.status === "active" ? "#22C55E" : "#666666" }} />
-                              {admin.status === "active" ? "აქტიური" : "არააქტიური"}
+                            <span className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: admin.isActive ? "#22C55E" : "#666666" }}>
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: admin.isActive ? "#22C55E" : "#666666" }} />
+                              {admin.isActive ? "აქტიური" : "არააქტიური"}
                             </span>
                           </td>
                           <td className="px-4 py-3">
@@ -370,7 +400,7 @@ export default function SystemPage() {
                               >
                                 <EditIcon />
                               </button>
-                              {admin.email !== CURRENT_ADMIN_EMAIL && (
+                              {true && (
                                 <button
                                   onClick={() => setDeleteConfirmId(admin.id)}
                                   className="w-7 h-7 flex items-center justify-center rounded-md transition-all duration-200 hover:bg-[#EF444420]"
@@ -709,9 +739,9 @@ export default function SystemPage() {
                   className="w-full text-[13px] px-3 py-2.5 rounded-[8px] border outline-none transition-all duration-200 focus:border-[#F9E741]"
                   style={{ background: "#1A1A1A", borderColor: "#252525", color: "#FFFFFF" }}
                 >
-                  <option value="super">Super Admin</option>
+                  <option value="super_admin">Super Admin</option>
                   <option value="admin">Admin</option>
-                  <option value="viewer">Viewer</option>
+                  
                 </select>
               </div>
               <div>
@@ -735,7 +765,7 @@ export default function SystemPage() {
                 გაუქმება
               </button>
               <button
-                onClick={handleAddAdmin}
+                onClick={handleCreateAdmin}
                 className="flex-1 px-4 py-2.5 rounded-[12px] text-[12px] font-semibold transition-all duration-200 hover:brightness-110 active:scale-95"
                 style={{ background: "linear-gradient(135deg, #F9E741, #E5D336)", color: "#000000" }}
               >
@@ -786,16 +816,16 @@ export default function SystemPage() {
                   className="w-full text-[13px] px-3 py-2.5 rounded-[8px] border outline-none transition-all duration-200 focus:border-[#F9E741]"
                   style={{ background: "#1A1A1A", borderColor: "#252525", color: "#FFFFFF" }}
                 >
-                  <option value="super">Super Admin</option>
+                  <option value="super_admin">Super Admin</option>
                   <option value="admin">Admin</option>
-                  <option value="viewer">Viewer</option>
+                  
                 </select>
               </div>
               <div>
                 <label className="block text-[11px] font-medium mb-1.5" style={{ color: "#A0A0A0" }}>სტატუსი</label>
                 <select
-                  value={editingAdmin.status}
-                  onChange={(e) => setEditingAdmin({ ...editingAdmin, status: e.target.value as Admin["status"] })}
+                  value={editingAdmin.isActive ? "active" : "inactive"}
+                  onChange={(e) => setEditingAdmin({ ...editingAdmin, isActive: e.target.value === "active" })}
                   className="w-full text-[13px] px-3 py-2.5 rounded-[8px] border outline-none transition-all duration-200 focus:border-[#F9E741]"
                   style={{ background: "#1A1A1A", borderColor: "#252525", color: "#FFFFFF" }}
                 >
@@ -849,7 +879,7 @@ export default function SystemPage() {
                   გაუქმება
                 </button>
                 <button
-                  onClick={() => handleDeleteAdmin(deleteConfirmId)}
+                  onClick={() => handleDeactivateAdmin(deleteConfirmId!)}
                   className="flex-1 px-4 py-2.5 rounded-[12px] text-[12px] font-semibold transition-all duration-200 hover:brightness-110 active:scale-95"
                   style={{ background: "#EF4444", color: "#FFFFFF" }}
                 >
@@ -941,6 +971,20 @@ export default function SystemPage() {
           </div>
         </div>
       )}
+      {successMsg && (
+        <div className="fixed top-4 right-4 z-50 px-4 py-2 rounded-[8px] text-[13px] font-medium" style={{ background: "#22C55E20", color: "#22C55E", border: "1px solid #22C55E40" }}>{successMsg}</div>
+      )}
+      {errorMsg && (
+        <div className="fixed top-4 right-4 z-50 px-4 py-2 rounded-[8px] text-[13px] font-medium" style={{ background: "#EF444420", color: "#EF4444", border: "1px solid #EF444440" }}>{errorMsg}</div>
+      )}
     </div>
+  );
+}
+
+export default function SystemPage() {
+  return (
+    <AdminAuthGuard>
+      <SystemContent />
+    </AdminAuthGuard>
   );
 }
