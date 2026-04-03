@@ -293,35 +293,6 @@ function AuthContent() {
           {sending ? "Sending..." : "Continue"}
         </button>
 
-        {/* Face ID login button — only on login mode */}
-        {isLogin && (
-          <>
-            <div className="flex items-center gap-3 my-5">
-              <div className="flex-1 h-[0.5px]" style={{ background: "#2A2A2A" }} />
-              <span className="text-[13px] text-[#6B7280]" style={{ fontFamily: "var(--font-dm-sans)" }}>or</span>
-              <div className="flex-1 h-[0.5px]" style={{ background: "#2A2A2A" }} />
-            </div>
-
-            <button
-              onClick={() => { setShowFaceId(true); setFaceAttempts(0); handleFaceScan(); }}
-              className="w-full h-[64px] rounded-[32px] text-[18px] font-bold transition-all duration-200 active:scale-[0.97] flex items-center justify-center gap-3"
-              style={{
-                fontFamily: "var(--font-outfit), system-ui, sans-serif",
-                background: "#1C1C1E",
-                color: "#FFFFFF",
-                border: "1.5px solid #2A2A2A",
-              }}
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="4" y="4" width="16" height="16" rx="4" />
-                <circle cx="9" cy="10" r="1" fill="#FFF" />
-                <circle cx="15" cy="10" r="1" fill="#FFF" />
-                <path d="M9 15c.7 1 2 1.5 3 1.5s2.3-.5 3-1.5" />
-              </svg>
-              Login with Face ID
-            </button>
-          </>
-        )}
       </div>
 
       {/* ── Face ID Scanning Overlay ── */}
