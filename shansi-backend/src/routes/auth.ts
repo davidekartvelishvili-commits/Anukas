@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import { eq, and, or, desc } from "drizzle-orm";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { users, sessions, otpRateLimits, transactions } from "../db/schema.js";
+import { users, sessions, otpRateLimits, transactions, referrals, referralConfig } from "../db/schema.js";
 import { sendOtp, verifyOtp } from "../services/otp.js";
 import { signToken } from "../services/token.js";
 import { hashPin, verifyPin } from "../services/pin.js";
@@ -20,6 +20,29 @@ async function getUserCoinBalance(userId: string): Promise<number> {
     .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
     .orderBy(desc(transactions.createdAt)).limit(1);
   return tx?.coinsRemaining || 0;
+}
+
+// Helper: generate unique referral code
+async function generateReferralCode(): Promise<string> {
+  const db = getDb();
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  for (let i = 0; i < 10; i++) {
+    let code = "SHANSI-";
+    for (let j = 0; j < 6; j++) code += chars[Math.floor(Math.random() * chars.length)];
+    const [existing] = await db.select().from(users).where(eq(users.referralCode, code)).limit(1);
+    if (!existing) return code;
+  }
+  return "SHANSI-" + nanoid(6).toUpperCase();
+}
+
+// Helper: ensure user has a referral code
+async function ensureReferralCode(userId: string): Promise<string> {
+  const db = getDb();
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (user?.referralCode) return user.referralCode;
+  const code = await generateReferralCode();
+  await db.update(users).set({ referralCode: code }).where(eq(users.id, userId));
+  return code;
 }
 
 // ── Schemas ──
@@ -46,6 +69,7 @@ auth.post("/check-phone", async (c) => {
 const verifySchema = z.object({
   phone: z.string().regex(/^\+995\d{9}$/),
   code: z.string().length(6),
+  referralCode: z.string().optional(),
 });
 
 const pinSchema = z.object({
@@ -115,7 +139,7 @@ auth.post("/verify-otp", async (c) => {
     throw new BadRequestError(parsed.error.errors[0].message);
   }
 
-  const { phone, code } = parsed.data;
+  const { phone, code, referralCode: inputReferralCode } = parsed.data;
   const approved = await verifyOtp(phone, code);
   if (!approved) {
     throw new UnauthorizedError("Invalid or expired OTP");
@@ -126,16 +150,80 @@ auth.post("/verify-otp", async (c) => {
   // Find or create user
   let [user] = await db.select().from(users).where(eq(users.phone, phone)).limit(1);
   let isNewUser = false;
+  let referralReward: { coinsEarned: number } | null = null;
 
   if (!user) {
     isNewUser = true;
     const userId = nanoid();
+    const newReferralCode = await generateReferralCode();
     await db.insert(users).values({
       id: userId,
       phone,
       balance: 0,
+      referralCode: newReferralCode,
     });
     [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+    // Handle referral if code provided
+    if (inputReferralCode && inputReferralCode.trim()) {
+      try {
+        const refCode = inputReferralCode.trim().toUpperCase();
+        const [referrer] = await db.select().from(users).where(eq(users.referralCode, refCode)).limit(1);
+        if (referrer && referrer.id !== userId) {
+          const [config] = await db.select().from(referralConfig).limit(1);
+          if (config && config.isActive) {
+            await db.insert(referrals).values({
+              id: nanoid(),
+              referrerId: referrer.id,
+              referredId: userId,
+              referralCode: refCode,
+              rewardGivenToReferrer: true,
+              rewardGivenToReferred: true,
+              referrerCoinsRewarded: config.referrerRewardCoins,
+              referredCoinsRewarded: config.referredRewardCoins,
+            });
+            await db.update(users).set({ referredBy: referrer.id }).where(eq(users.id, userId));
+            await db.update(users).set({ totalReferrals: (referrer.totalReferrals || 0) + 1 }).where(eq(users.id, referrer.id));
+
+            // Give coins to new user
+            if (config.referredRewardCoins > 0) {
+              await db.insert(transactions).values({
+                id: nanoid(), userId, paymentAmount: 0,
+                coinsReceived: config.referredRewardCoins, coinsRemaining: config.referredRewardCoins,
+                totalCashWon: 0, guaranteedMinimum: 0, status: "active",
+              });
+            }
+            // Give coins to referrer
+            if (config.referrerRewardCoins > 0) {
+              const [existingTx] = await db.select().from(transactions)
+                .where(and(eq(transactions.userId, referrer.id), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
+                .orderBy(desc(transactions.createdAt)).limit(1);
+              if (existingTx) {
+                await db.update(transactions).set({
+                  coinsRemaining: existingTx.coinsRemaining + config.referrerRewardCoins,
+                  coinsReceived: existingTx.coinsReceived + config.referrerRewardCoins,
+                }).where(eq(transactions.id, existingTx.id));
+              } else {
+                await db.insert(transactions).values({
+                  id: nanoid(), userId: referrer.id, paymentAmount: 0,
+                  coinsReceived: config.referrerRewardCoins, coinsRemaining: config.referrerRewardCoins,
+                  totalCashWon: 0, guaranteedMinimum: 0, status: "active",
+                });
+              }
+            }
+            referralReward = { coinsEarned: config.referredRewardCoins };
+          }
+        }
+      } catch (e) {
+        console.error("Referral error:", e);
+      }
+    }
+  } else {
+    // Existing user — ensure they have a referral code
+    if (!user.referralCode) {
+      await ensureReferralCode(user.id);
+      [user] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
+    }
   }
 
   // Generate JWT
@@ -161,9 +249,11 @@ auth.post("/verify-otp", async (c) => {
       name: user.name,
       balance: user.balance,
       coinBalance,
+      referralCode: user.referralCode,
       hasPin: !!user.pinHash,
     },
     isNewUser,
+    ...(referralReward ? { referralReward } : {}),
   });
 });
 
@@ -261,6 +351,7 @@ auth.post("/pin/login", async (c) => {
     expiresAt: expiresAt.toISOString(),
   });
 
+  const userReferralCode = user.referralCode || await ensureReferralCode(user.id);
   const coinBalance = await getUserCoinBalance(user.id);
 
   return c.json({
@@ -272,6 +363,7 @@ auth.post("/pin/login", async (c) => {
       name: user.name,
       balance: user.balance,
       coinBalance,
+      referralCode: userReferralCode,
       hasPin: true,
     },
   });
@@ -306,9 +398,14 @@ auth.post("/biometric/verify", authMiddleware, async (c) => {
   const userId = c.get("userId") as string;
   const db = getDb();
 
-  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  let [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) {
     throw new UnauthorizedError("User not found");
+  }
+
+  if (!user.referralCode) {
+    await ensureReferralCode(user.id);
+    [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   }
 
   const coinBalance = await getUserCoinBalance(user.id);
@@ -321,6 +418,7 @@ auth.post("/biometric/verify", authMiddleware, async (c) => {
       name: user.name,
       balance: user.balance,
       coinBalance,
+      referralCode: user.referralCode,
       hasPin: !!user.pinHash,
     },
   });
@@ -331,9 +429,14 @@ auth.get("/me", authMiddleware, async (c) => {
   const userId = c.get("userId") as string;
   const db = getDb();
 
-  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  let [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) {
     throw new UnauthorizedError("User not found");
+  }
+
+  if (!user.referralCode) {
+    await ensureReferralCode(user.id);
+    [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   }
 
   const coinBalance = await getUserCoinBalance(user.id);
@@ -346,6 +449,7 @@ auth.get("/me", authMiddleware, async (c) => {
       name: user.name,
       balance: user.balance,
       coinBalance,
+      referralCode: user.referralCode,
       hasPin: !!user.pinHash,
     },
   });

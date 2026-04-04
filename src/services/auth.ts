@@ -7,6 +7,7 @@ export interface User {
   name: string | null;
   balance: number;
   coinBalance?: number;
+  referralCode?: string;
   hasPin: boolean;
 }
 
@@ -40,11 +41,13 @@ export async function sendOtp(phone: string) {
   });
 }
 
-export async function verifyOtp(phone: string, code: string): Promise<VerifyOtpResponse> {
+export async function verifyOtp(phone: string, code: string, referralCode?: string): Promise<VerifyOtpResponse> {
   const formatted = phone.startsWith("+995") ? phone : `+995${phone}`;
+  const body: Record<string, string> = { phone: formatted, code };
+  if (referralCode) body.referralCode = referralCode;
   const data = await apiFetch<VerifyOtpResponse>("/auth/verify-otp", {
     method: "POST",
-    body: JSON.stringify({ phone: formatted, code }),
+    body: JSON.stringify(body),
   });
 
   // Store token, user, and phone for PIN login

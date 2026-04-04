@@ -69,6 +69,46 @@ export async function updateUserStatus(userId: string, isActive: boolean) {
   });
 }
 
+// ── Promo Codes ──
+
+export async function getPromoCodes() {
+  return adminFetch("/admin/promo-codes");
+}
+
+export async function createPromoCode(data: {
+  code: string; description?: string; coin_reward_for_user: number;
+  coin_reward_for_creator?: number; max_uses?: number | null;
+  max_uses_per_user?: number; starts_at: string; expires_at: string;
+}) {
+  return adminFetch("/admin/promo-codes", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updatePromoCode(id: string, data: Record<string, any>) {
+  return adminFetch(`/admin/promo-codes/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function deletePromoCode(id: string) {
+  return adminFetch(`/admin/promo-codes/${id}`, { method: "DELETE" });
+}
+
+export async function getPromoCodeUses(id: string) {
+  return adminFetch(`/admin/promo-codes/${id}/uses`);
+}
+
+// ── Referrals ──
+
+export async function getReferralConfig() {
+  return adminFetch("/admin/referral-config");
+}
+
+export async function updateReferralConfig(data: { referrer_reward_coins?: number; referred_reward_coins?: number; is_active?: boolean }) {
+  return adminFetch("/admin/referral-config", { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function getReferrals(page = 1) {
+  return adminFetch(`/admin/referrals?page=${page}`);
+}
+
 export async function getGameHistory(filters?: { page?: number; game_type?: string; user_id?: string }) {
   const params = new URLSearchParams();
   if (filters?.page) params.set("page", String(filters.page));

@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, or } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { gameConfig, gameHistory, transactions } from "../db/schema.js";
+import { gameConfig, gameHistory, transactions, promoCodes, promoCodeUses } from "../db/schema.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { playGame, playChickenRush, createTransaction } from "../services/gameEngine.js";
 import { BadRequestError } from "../utils/errors.js";
@@ -193,6 +194,74 @@ games.post("/create-transaction", async (c) => {
 
   const txId = await createTransaction(userId, parsed.data.paymentAmount, parsed.data.coinsReceived, minReturnPercent);
   return c.json({ success: true, transactionId: txId });
+});
+
+// POST /games/use-promo-code
+games.post("/use-promo-code", async (c) => {
+  const userId = c.get("userId") as string;
+  const body = await c.req.json();
+  const code = body.code?.toString().trim().toUpperCase();
+  if (!code) throw new BadRequestError("Code is required");
+
+  const db = getDb();
+
+  // Find promo code (case insensitive)
+  const allCodes = await db.select().from(promoCodes).where(eq(promoCodes.isActive, true));
+  const promo = allCodes.find(p => p.code.toUpperCase() === code);
+
+  if (!promo) throw new BadRequestError("\u10DE\u10E0\u10DD\u10DB\u10DD \u10D9\u10DD\u10D3\u10D8 \u10D5\u10D4\u10E0 \u10DB\u10DD\u10D8\u10EB\u10D4\u10D1\u10DC\u10D0");
+  if (!promo.isActive) throw new BadRequestError("\u10DE\u10E0\u10DD\u10DB\u10DD \u10D9\u10DD\u10D3\u10D8 \u10D0\u10E0 \u10D0\u10E0\u10D8\u10E1 \u10D0\u10E5\u10E2\u10D8\u10E3\u10E0\u10D8");
+
+  const now = new Date().toISOString();
+  if (now < promo.startsAt || now > promo.expiresAt) {
+    throw new BadRequestError("\u10DE\u10E0\u10DD\u10DB\u10DD \u10D9\u10DD\u10D3\u10D8 \u10D5\u10D0\u10D3\u10D0\u10D2\u10D0\u10E1\u10E3\u10DA\u10D8\u10D0");
+  }
+  if (promo.maxUses !== null && promo.currentUses >= promo.maxUses) {
+    throw new BadRequestError("\u10DE\u10E0\u10DD\u10DB\u10DD \u10D9\u10DD\u10D3\u10D8\u10E1 \u10DA\u10D8\u10DB\u10D8\u10E2\u10D8 \u10D0\u10DB\u10DD\u10D8\u10EC\u10E3\u10E0\u10D0");
+  }
+
+  // Check per-user limit
+  const userUses = await db.select().from(promoCodeUses)
+    .where(and(eq(promoCodeUses.promoCodeId, promo.id), eq(promoCodeUses.userId, userId)));
+  if (userUses.length >= promo.maxUsesPerUser) {
+    throw new BadRequestError("\u10E3\u10D9\u10D5\u10D4 \u10D2\u10D0\u10DB\u10DD\u10E7\u10D4\u10DC\u10D4\u10D1\u10E3\u10DA\u10D8 \u10D2\u10D0\u10E5\u10D5\u10E1 \u10D4\u10E1 \u10DE\u10E0\u10DD\u10DB\u10DD \u10D9\u10DD\u10D3\u10D8");
+  }
+
+  const coinsToGive = promo.coinRewardForUser;
+
+  // Add coins to user's active transaction or create new
+  const [activeTx] = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
+    .orderBy(desc(transactions.createdAt)).limit(1);
+
+  if (activeTx) {
+    await db.update(transactions).set({
+      coinsRemaining: activeTx.coinsRemaining + coinsToGive,
+      coinsReceived: activeTx.coinsReceived + coinsToGive,
+    }).where(eq(transactions.id, activeTx.id));
+  } else {
+    await db.insert(transactions).values({
+      id: nanoid(), userId, paymentAmount: 0,
+      coinsReceived: coinsToGive, coinsRemaining: coinsToGive,
+      totalCashWon: 0, guaranteedMinimum: 0, status: "active",
+    });
+  }
+
+  // Record usage
+  await db.insert(promoCodeUses).values({
+    id: nanoid(), promoCodeId: promo.id, userId, coinsRewarded: coinsToGive,
+  });
+
+  // Increment usage count
+  await db.update(promoCodes).set({
+    currentUses: promo.currentUses + 1,
+  }).where(eq(promoCodes.id, promo.id));
+
+  return c.json({
+    success: true,
+    coinsEarned: coinsToGive,
+    message: `\u10DB\u10D8\u10D8\u10E6\u10D4 ${coinsToGive} \u10E5\u10DD\u10D8\u10DC\u10D8! \uD83C\uDF89`,
+  });
 });
 
 export default games;

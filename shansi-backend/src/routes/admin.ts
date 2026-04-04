@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions } from "../db/schema.js";
+import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses } from "../db/schema.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/errors.js";
@@ -84,6 +84,12 @@ admin.post("/auth/setup", async (c) => {
     for (const gt of ["slot", "plinko", "chicken_rush"]) {
       await db.insert(gameConfig).values({ id: nanoid(), gameType: gt });
     }
+  }
+
+  // Seed referral config if empty
+  const refConfigRows = await db.select().from(referralConfig).limit(1);
+  if (refConfigRows.length === 0) {
+    await db.insert(referralConfig).values({ id: "default", referrerRewardCoins: 200, referredRewardCoins: 100 });
   }
 
   return c.json({ success: true, admin: { id, email: parsed.data.email, name: parsed.data.name } });
@@ -342,6 +348,22 @@ admin.get("/users/:id", adminMiddleware, async (c) => {
     .where(and(eq(transactions.userId, id), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
     .orderBy(desc(transactions.createdAt)).limit(1);
 
+  // Get referral info
+  const userReferrals = await db.select().from(referrals).where(eq(referrals.referrerId, id)).orderBy(desc(referrals.createdAt));
+  const enrichedReferrals = await Promise.all(
+    userReferrals.map(async (r) => {
+      const [referred] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, r.referredId)).limit(1);
+      return { ...r, referredPhone: referred?.phone, referredName: referred?.name };
+    })
+  );
+
+  // Who referred this user
+  let referredByUser = null;
+  if (user.referredBy) {
+    const [rb] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, user.referredBy)).limit(1);
+    if (rb) referredByUser = rb;
+  }
+
   return c.json({
     success: true,
     user: {
@@ -356,6 +378,9 @@ admin.get("/users/:id", adminMiddleware, async (c) => {
       total_cash_won: Number(stats?.totalCashWon) || 0,
       total_coins_spent: Number(stats?.totalCoinsSpent) || 0,
       last_active: stats?.lastActive || null,
+      referral_code: user.referralCode,
+      referred_by: user.referredBy,
+      total_referrals: user.totalReferrals || 0,
     },
     gameHistory: history,
     activeTransaction: activeTx ? {
@@ -363,6 +388,8 @@ admin.get("/users/:id", adminMiddleware, async (c) => {
       total_cash_won: activeTx.totalCashWon,
       guaranteed_minimum: activeTx.guaranteedMinimum,
     } : null,
+    referredByUser,
+    userReferrals: enrichedReferrals,
   });
 });
 
@@ -468,6 +495,192 @@ admin.get("/game-history", adminMiddleware, async (c) => {
     success: true,
     history,
     pagination: { page, limit, total: allHistory.length },
+  });
+});
+
+// ══════════════════════════════════════
+// PROMO CODES
+// ══════════════════════════════════════
+
+const promoCodeCreateSchema = z.object({
+  code: z.string().min(1).max(30),
+  description: z.string().optional(),
+  coin_reward_for_user: z.number().int().positive(),
+  coin_reward_for_creator: z.number().int().min(0).optional().default(0),
+  max_uses: z.number().int().positive().nullable().optional(),
+  max_uses_per_user: z.number().int().positive().optional().default(1),
+  starts_at: z.string(),
+  expires_at: z.string(),
+});
+
+// GET /admin/promo-codes
+admin.get("/promo-codes", adminMiddleware, async (c) => {
+  const db = getDb();
+  const codes = await db.select().from(promoCodes).orderBy(desc(promoCodes.createdAt));
+  return c.json({ success: true, promoCodes: codes });
+});
+
+// POST /admin/promo-codes
+admin.post("/promo-codes", adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const parsed = promoCodeCreateSchema.safeParse(body);
+  if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
+
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  const existing = await db.select().from(promoCodes).where(eq(promoCodes.code, parsed.data.code.toUpperCase()));
+  if (existing.length > 0) throw new BadRequestError("Code already exists");
+
+  const id = nanoid();
+  await db.insert(promoCodes).values({
+    id,
+    code: parsed.data.code.toUpperCase(),
+    description: parsed.data.description || null,
+    coinRewardForUser: parsed.data.coin_reward_for_user,
+    coinRewardForCreator: parsed.data.coin_reward_for_creator || 0,
+    maxUses: parsed.data.max_uses ?? null,
+    currentUses: 0,
+    maxUsesPerUser: parsed.data.max_uses_per_user || 1,
+    startsAt: parsed.data.starts_at,
+    expiresAt: parsed.data.expires_at,
+    createdBy: adminId,
+  });
+
+  await logAction(adminId, "create_promo_code", JSON.stringify({ code: parsed.data.code }));
+
+  const [created] = await db.select().from(promoCodes).where(eq(promoCodes.id, id)).limit(1);
+  return c.json({ success: true, promoCode: created });
+});
+
+// PATCH /admin/promo-codes/:id
+admin.patch("/promo-codes/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id") as string;
+  const body = await c.req.json();
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  const [existing] = await db.select().from(promoCodes).where(eq(promoCodes.id, id)).limit(1);
+  if (!existing) return c.json({ success: false, message: "Not found" }, 404);
+
+  const updates: Record<string, any> = {};
+  if (body.description !== undefined) updates.description = body.description;
+  if (body.coin_reward_for_user !== undefined) updates.coinRewardForUser = body.coin_reward_for_user;
+  if (body.coin_reward_for_creator !== undefined) updates.coinRewardForCreator = body.coin_reward_for_creator;
+  if (body.max_uses !== undefined) updates.maxUses = body.max_uses;
+  if (body.max_uses_per_user !== undefined) updates.maxUsesPerUser = body.max_uses_per_user;
+  if (body.starts_at !== undefined) updates.startsAt = body.starts_at;
+  if (body.expires_at !== undefined) updates.expiresAt = body.expires_at;
+  if (body.is_active !== undefined) updates.isActive = body.is_active;
+
+  if (Object.keys(updates).length > 0) {
+    await db.update(promoCodes).set(updates).where(eq(promoCodes.id, id));
+  }
+
+  await logAction(adminId, "update_promo_code", JSON.stringify({ id, updates }));
+  const [updated] = await db.select().from(promoCodes).where(eq(promoCodes.id, id)).limit(1);
+  return c.json({ success: true, promoCode: updated });
+});
+
+// DELETE /admin/promo-codes/:id (soft delete)
+admin.delete("/promo-codes/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id") as string;
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+  await db.update(promoCodes).set({ isActive: false }).where(eq(promoCodes.id, id));
+  await logAction(adminId, "deactivate_promo_code", JSON.stringify({ id }));
+  return c.json({ success: true });
+});
+
+// GET /admin/promo-codes/:id/uses
+admin.get("/promo-codes/:id/uses", adminMiddleware, async (c) => {
+  const id = c.req.param("id") as string;
+  const db = getDb();
+  const uses = await db.select().from(promoCodeUses).where(eq(promoCodeUses.promoCodeId, id)).orderBy(desc(promoCodeUses.usedAt));
+  const enriched = await Promise.all(
+    uses.map(async (u) => {
+      const [user] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, u.userId)).limit(1);
+      return { ...u, userPhone: user?.phone, userName: user?.name };
+    })
+  );
+  return c.json({ success: true, uses: enriched });
+});
+
+// ══════════════════════════════════════
+// REFERRALS
+// ══════════════════════════════════════
+
+// GET /admin/referral-config
+admin.get("/referral-config", adminMiddleware, async (c) => {
+  const db = getDb();
+  const [config] = await db.select().from(referralConfig).limit(1);
+  return c.json({
+    success: true,
+    config: config || { id: "default", referrerRewardCoins: 200, referredRewardCoins: 100, isActive: true },
+  });
+});
+
+// PATCH /admin/referral-config
+admin.patch("/referral-config", adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  const [existing] = await db.select().from(referralConfig).limit(1);
+  if (!existing) {
+    await db.insert(referralConfig).values({
+      id: "default",
+      referrerRewardCoins: body.referrer_reward_coins ?? 200,
+      referredRewardCoins: body.referred_reward_coins ?? 100,
+      isActive: body.is_active ?? true,
+    });
+  } else {
+    const updates: Record<string, any> = { updatedAt: new Date().toISOString() };
+    if (body.referrer_reward_coins !== undefined) updates.referrerRewardCoins = body.referrer_reward_coins;
+    if (body.referred_reward_coins !== undefined) updates.referredRewardCoins = body.referred_reward_coins;
+    if (body.is_active !== undefined) updates.isActive = body.is_active;
+    await db.update(referralConfig).set(updates).where(eq(referralConfig.id, existing.id));
+  }
+
+  await logAction(adminId, "update_referral_config", JSON.stringify(body));
+  const [config] = await db.select().from(referralConfig).limit(1);
+  return c.json({ success: true, config });
+});
+
+// GET /admin/referrals
+admin.get("/referrals", adminMiddleware, async (c) => {
+  const db = getDb();
+  const page = parseInt(c.req.query("page") || "1");
+  const limit = 20;
+  const offset = (page - 1) * limit;
+
+  const allReferrals = await db.select().from(referrals).orderBy(desc(referrals.createdAt)).limit(limit).offset(offset);
+  const [totalResult] = await db.select({ count: sql<number>`count(*)` }).from(referrals);
+  const total = Number(totalResult?.count) || 0;
+
+  const enriched = await Promise.all(
+    allReferrals.map(async (r) => {
+      const [referrer] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, r.referrerId)).limit(1);
+      const [referred] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, r.referredId)).limit(1);
+      return { ...r, referrerPhone: referrer?.phone, referrerName: referrer?.name, referredPhone: referred?.phone, referredName: referred?.name };
+    })
+  );
+
+  const [statsResult] = await db.select({
+    totalReferrals: sql<number>`count(*)`,
+    totalCoinsGiven: sql<number>`coalesce(sum(${referrals.referrerCoinsRewarded} + ${referrals.referredCoinsRewarded}), 0)`,
+  }).from(referrals);
+
+  const topReferrers = await db.select({
+    userId: users.id, phone: users.phone, name: users.name, totalReferrals: users.totalReferrals,
+  }).from(users).where(sql`${users.totalReferrals} > 0`).orderBy(desc(users.totalReferrals)).limit(10);
+
+  return c.json({
+    success: true,
+    referrals: enriched,
+    pagination: { page, limit, total },
+    stats: { totalReferrals: Number(statsResult?.totalReferrals) || 0, totalCoinsGiven: Number(statsResult?.totalCoinsGiven) || 0 },
+    topReferrers,
   });
 });
 

@@ -22,6 +22,8 @@ function VerifyContent() {
 
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [verifying, setVerifying] = useState(false);
+  const [referralCode, setReferralCode] = useState("");
+  const [referralToast, setReferralToast] = useState("");
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Focus first input on mount
@@ -72,9 +74,12 @@ function VerifyContent() {
     setVerifying(true);
     setVerifyError("");
     try {
-      const data = await verifyOtp(phoneRaw, code);
+      const data = await verifyOtp(phoneRaw, code, referralCode.trim() || undefined) as any;
+      if (data.referralReward) {
+        setReferralToast(`\u10DB\u10D8\u10D8\u10E6\u10D4 ${data.referralReward.coinsEarned} \u10E5\u10DD\u10D8\u10DC\u10D8 \u10E0\u10D4\u10E4\u10D4\u10E0\u10D0\u10DA \u10D1\u10DD\u10DC\u10E3\u10E1\u10D8! \uD83C\uDF89`);
+        await new Promise(r => setTimeout(r, 2000));
+      }
       if (!data.isNewUser && !isLoginMode) {
-        // User already exists but came from signup — already authenticated from verify-otp, go to home
         router.push("/home");
         return;
       }
@@ -176,6 +181,30 @@ function VerifyContent() {
             ))}
           </div>
         </div>
+
+        {/* ── Referral Code Input ── */}
+        <div className="px-6 mt-6 shrink-0">
+          <input
+            type="text"
+            placeholder={"\u10E0\u10D4\u10E4\u10D4\u10E0\u10D0\u10DA \u10D9\u10DD\u10D3\u10D8 (\u10D0\u10E0\u10D0\u10E1\u10D0\u10D5\u10D0\u10DA\u10D3\u10D4\u10D1\u10E3\u10DA\u10DD)"}
+            value={referralCode}
+            onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+            className="w-full px-4 py-3 rounded-[12px] text-[14px] text-white placeholder-[#666] outline-none text-center"
+            style={{ background: "#1C1C1E", fontFamily: "var(--font-dm-sans), system-ui, sans-serif" }}
+          />
+          <p className="text-[11px] text-center mt-1.5" style={{ color: "#666666", fontFamily: "var(--font-dm-sans)" }}>
+            {"\u10DB\u10D0\u10D2: SHANSI-A7B3K9"}
+          </p>
+        </div>
+
+        {/* ── Referral Toast ── */}
+        {referralToast && (
+          <div className="px-6 mt-3 shrink-0">
+            <div className="rounded-[12px] px-4 py-3 text-center" style={{ background: "#22C55E20" }}>
+              <p className="text-[14px] font-bold" style={{ color: "#22C55E", fontFamily: "var(--font-outfit)" }}>{referralToast}</p>
+            </div>
+          </div>
+        )}
 
         {/* ── Spacer ── */}
         <div className="flex-1" />

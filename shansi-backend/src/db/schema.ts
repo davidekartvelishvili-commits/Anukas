@@ -8,6 +8,9 @@ export const users = sqliteTable("users", {
   pinHash: text("pin_hash"),
   balance: real("balance").default(0).notNull(),
   isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  referralCode: text("referral_code").unique(),
+  referredBy: text("referred_by"),
+  totalReferrals: integer("total_referrals").default(0).notNull(),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
   updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
 });
@@ -95,4 +98,48 @@ export const adminLogs = sqliteTable("admin_logs", {
   action: text("action").notNull(),
   details: text("details"),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const referrals = sqliteTable("referrals", {
+  id: text("id").primaryKey(),
+  referrerId: text("referrer_id").notNull().references(() => users.id),
+  referredId: text("referred_id").notNull().references(() => users.id),
+  referralCode: text("referral_code").notNull(),
+  rewardGivenToReferrer: integer("reward_given_to_referrer", { mode: "boolean" }).default(false).notNull(),
+  rewardGivenToReferred: integer("reward_given_to_referred", { mode: "boolean" }).default(false).notNull(),
+  referrerCoinsRewarded: integer("referrer_coins_rewarded").default(0).notNull(),
+  referredCoinsRewarded: integer("referred_coins_rewarded").default(0).notNull(),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const referralConfig = sqliteTable("referral_config", {
+  id: text("id").primaryKey(),
+  referrerRewardCoins: integer("referrer_reward_coins").default(200).notNull(),
+  referredRewardCoins: integer("referred_reward_coins").default(100).notNull(),
+  isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const promoCodes = sqliteTable("promo_codes", {
+  id: text("id").primaryKey(),
+  code: text("code").unique().notNull(),
+  description: text("description"),
+  coinRewardForUser: integer("coin_reward_for_user").notNull(),
+  coinRewardForCreator: integer("coin_reward_for_creator").default(0).notNull(),
+  maxUses: integer("max_uses"),
+  currentUses: integer("current_uses").default(0).notNull(),
+  maxUsesPerUser: integer("max_uses_per_user").default(1).notNull(),
+  startsAt: text("starts_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  createdBy: text("created_by").references(() => admins.id),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const promoCodeUses = sqliteTable("promo_code_uses", {
+  id: text("id").primaryKey(),
+  promoCodeId: text("promo_code_id").notNull().references(() => promoCodes.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  coinsRewarded: integer("coins_rewarded").notNull(),
+  usedAt: text("used_at").default(sql`(datetime('now'))`).notNull(),
 });
