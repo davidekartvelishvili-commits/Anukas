@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { nanoid } from "nanoid";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, like, or, and, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits } from "../db/schema.js";
+import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions } from "../db/schema.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/errors.js";
@@ -41,6 +41,15 @@ async function logAction(adminId: string, action: string, details?: string) {
   const db = getDb();
   await db.insert(adminLogs).values({ id: nanoid(), adminId, action, details: details || null });
 }
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+const adjustBalanceSchema = z.object({
+  type: z.enum(["coin", "cash"]),
+  action: z.enum(["add", "subtract"]),
+  amount: z.number().positive(),
+  reason: z.string().min(1),
+});
 
 // ══════════════════════════════════════
 // AUTH (no middleware)
@@ -248,17 +257,66 @@ admin.post("/pool/fund", adminMiddleware, async (c) => {
 admin.get("/users", adminMiddleware, async (c) => {
   const db = getDb();
   const page = parseInt(c.req.query("page") || "1");
-  const limit = 20;
+  const limit = parseInt(c.req.query("limit") || "20");
   const offset = (page - 1) * limit;
   const search = c.req.query("search");
+  const status = c.req.query("status");
 
-  const allUsers = await db.select().from(users).limit(limit).offset(offset).orderBy(desc(users.createdAt));
-  const totalUsers = await db.select().from(users);
+  const conditions: ReturnType<typeof eq>[] = [];
+  if (search) {
+    const searchCondition = or(
+      like(users.phone, `%${search}%`),
+      like(users.name, `%${search}%`)
+    );
+    if (searchCondition) conditions.push(searchCondition as any);
+  }
+  if (status === "active") conditions.push(eq(users.isActive, true) as any);
+  if (status === "blocked") conditions.push(eq(users.isActive, false) as any);
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const userList = await db.select().from(users)
+    .where(whereClause)
+    .orderBy(desc(users.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  const [totalResult] = await db.select({ count: sql<number>`count(*)` }).from(users).where(whereClause);
+  const total = Number(totalResult?.count) || 0;
+
+  const enrichedUsers = await Promise.all(
+    userList.map(async (u) => {
+      const [stats] = await db.select({
+        totalGames: sql<number>`count(*)`,
+        totalCashWon: sql<number>`coalesce(sum(${gameHistory.winAmount}), 0)`,
+        totalCoinsSpent: sql<number>`coalesce(sum(${gameHistory.betAmount}), 0)`,
+        lastActive: sql<string>`max(${gameHistory.createdAt})`,
+      }).from(gameHistory).where(eq(gameHistory.userId, u.id));
+
+      const [activeTx] = await db.select().from(transactions)
+        .where(and(eq(transactions.userId, u.id), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
+        .orderBy(desc(transactions.createdAt)).limit(1);
+
+      return {
+        id: u.id,
+        phone: u.phone,
+        name: u.name,
+        coin_balance: activeTx?.coinsRemaining || 0,
+        cash_balance: u.balance,
+        is_active: u.isActive,
+        created_at: u.createdAt,
+        total_games_played: Number(stats?.totalGames) || 0,
+        total_cash_won: Number(stats?.totalCashWon) || 0,
+        total_coins_spent: Number(stats?.totalCoinsSpent) || 0,
+        last_active: stats?.lastActive || null,
+      };
+    })
+  );
 
   return c.json({
     success: true,
-    users: allUsers.map((u) => ({ id: u.id, phone: u.phone, name: u.name, balance: u.balance, isActive: u.isActive, createdAt: u.createdAt })),
-    pagination: { page, limit, total: totalUsers.length },
+    users: enrichedUsers,
+    pagination: { page, limit, total },
   });
 });
 
@@ -269,13 +327,129 @@ admin.get("/users/:id", adminMiddleware, async (c) => {
   const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
   if (!user) return c.json({ success: false, message: "User not found" }, 404);
 
-  const history = await db.select().from(gameHistory).where(eq(gameHistory.userId, id as string)).orderBy(desc(gameHistory.createdAt)).limit(50);
+  const [stats] = await db.select({
+    totalGames: sql<number>`count(*)`,
+    totalCashWon: sql<number>`coalesce(sum(${gameHistory.winAmount}), 0)`,
+    totalCoinsSpent: sql<number>`coalesce(sum(${gameHistory.betAmount}), 0)`,
+    lastActive: sql<string>`max(${gameHistory.createdAt})`,
+  }).from(gameHistory).where(eq(gameHistory.userId, id));
+
+  const history = await db.select().from(gameHistory)
+    .where(eq(gameHistory.userId, id))
+    .orderBy(desc(gameHistory.createdAt)).limit(50);
+
+  const [activeTx] = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, id), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
+    .orderBy(desc(transactions.createdAt)).limit(1);
 
   return c.json({
     success: true,
-    user: { id: user.id, phone: user.phone, name: user.name, balance: user.balance, isActive: user.isActive, createdAt: user.createdAt },
+    user: {
+      id: user.id,
+      phone: user.phone,
+      name: user.name,
+      coin_balance: activeTx?.coinsRemaining || 0,
+      cash_balance: user.balance,
+      is_active: user.isActive,
+      created_at: user.createdAt,
+      total_games_played: Number(stats?.totalGames) || 0,
+      total_cash_won: Number(stats?.totalCashWon) || 0,
+      total_coins_spent: Number(stats?.totalCoinsSpent) || 0,
+      last_active: stats?.lastActive || null,
+    },
     gameHistory: history,
+    activeTransaction: activeTx ? {
+      coins_remaining: activeTx.coinsRemaining,
+      total_cash_won: activeTx.totalCashWon,
+      guaranteed_minimum: activeTx.guaranteedMinimum,
+    } : null,
   });
+});
+
+// POST /admin/users/:id/adjust-balance
+admin.post("/users/:id/adjust-balance", adminMiddleware, async (c) => {
+  const id = c.req.param("id") as string;
+  const body = await c.req.json();
+  const parsed = adjustBalanceSchema.safeParse(body);
+  if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
+
+  const { type, action, amount, reason } = parsed.data;
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  if (!user) return c.json({ success: false, message: "User not found" }, 404);
+
+  if (type === "cash") {
+    const balanceBefore = user.balance;
+    const newBalance = action === "add" ? round2(balanceBefore + amount) : round2(balanceBefore - amount);
+    if (newBalance < 0) throw new BadRequestError("Insufficient cash balance");
+
+    await db.update(users).set({ balance: newBalance, updatedAt: new Date().toISOString() }).where(eq(users.id, id));
+
+    await logAction(adminId, "balance_adjustment", JSON.stringify({
+      target_user_id: id, type, action, amount, reason,
+      balance_before: balanceBefore, balance_after: newBalance,
+    }));
+
+    const [activeTx] = await db.select().from(transactions)
+      .where(and(eq(transactions.userId, id), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
+      .orderBy(desc(transactions.createdAt)).limit(1);
+
+    return c.json({ success: true, newCoinBalance: activeTx?.coinsRemaining || 0, newCashBalance: newBalance });
+  } else {
+    const [activeTx] = await db.select().from(transactions)
+      .where(and(eq(transactions.userId, id), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
+      .orderBy(desc(transactions.createdAt)).limit(1);
+
+    const coinsBefore = activeTx?.coinsRemaining || 0;
+    const newCoins = action === "add" ? coinsBefore + amount : coinsBefore - amount;
+    if (newCoins < 0) throw new BadRequestError("Insufficient coin balance");
+
+    if (activeTx) {
+      await db.update(transactions).set({ coinsRemaining: newCoins }).where(eq(transactions.id, activeTx.id));
+    } else if (action === "add") {
+      await db.insert(transactions).values({
+        id: nanoid(),
+        userId: id,
+        paymentAmount: 0,
+        coinsReceived: amount,
+        coinsRemaining: amount,
+        totalCashWon: 0,
+        guaranteedMinimum: 0,
+        status: "active",
+      });
+    } else {
+      throw new BadRequestError("No active transaction to subtract coins from");
+    }
+
+    await logAction(adminId, "balance_adjustment", JSON.stringify({
+      target_user_id: id, type, action, amount, reason,
+      balance_before: coinsBefore, balance_after: Math.max(0, newCoins),
+    }));
+
+    return c.json({ success: true, newCoinBalance: Math.max(0, newCoins), newCashBalance: user.balance });
+  }
+});
+
+// PATCH /admin/users/:id/status
+admin.patch("/users/:id/status", adminMiddleware, async (c) => {
+  const id = c.req.param("id") as string;
+  const body = await c.req.json();
+  const { is_active } = body;
+  if (typeof is_active !== "boolean") throw new BadRequestError("is_active must be a boolean");
+
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  if (!user) return c.json({ success: false, message: "User not found" }, 404);
+
+  await db.update(users).set({ isActive: is_active, updatedAt: new Date().toISOString() }).where(eq(users.id, id));
+
+  await logAction(adminId, is_active ? "unblock_user" : "block_user", JSON.stringify({ target_user_id: id, user_phone: user.phone }));
+
+  return c.json({ success: true, user: { id: user.id, phone: user.phone, name: user.name, isActive: is_active } });
 });
 
 // GET /admin/game-history

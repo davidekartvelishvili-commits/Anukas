@@ -44,14 +44,29 @@ export async function fundPool(amount: number) {
   });
 }
 
-export async function getUsers(page = 1, search?: string) {
+export async function getUsers(page = 1, search?: string, status?: string) {
   const params = new URLSearchParams({ page: String(page) });
   if (search) params.set("search", search);
+  if (status) params.set("status", status);
   return adminFetch(`/admin/users?${params}`);
 }
 
 export async function getUser(id: string) {
   return adminFetch(`/admin/users/${id}`);
+}
+
+export async function adjustBalance(userId: string, type: "coin" | "cash", action: "add" | "subtract", amount: number, reason: string) {
+  return adminFetch(`/admin/users/${userId}/adjust-balance`, {
+    method: "POST",
+    body: JSON.stringify({ type, action, amount, reason }),
+  });
+}
+
+export async function updateUserStatus(userId: string, isActive: boolean) {
+  return adminFetch(`/admin/users/${userId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ is_active: isActive }),
+  });
 }
 
 export async function getGameHistory(filters?: { page?: number; game_type?: string; user_id?: string }) {
