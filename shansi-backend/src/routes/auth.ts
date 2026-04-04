@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { nanoid } from "nanoid";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, desc } from "drizzle-orm";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { users, sessions, otpRateLimits } from "../db/schema.js";
+import { users, sessions, otpRateLimits, transactions } from "../db/schema.js";
 import { sendOtp, verifyOtp } from "../services/otp.js";
 import { signToken } from "../services/token.js";
 import { hashPin, verifyPin } from "../services/pin.js";
@@ -12,6 +12,15 @@ import { authMiddleware } from "../middleware/auth.js";
 import { BadRequestError, RateLimitError, UnauthorizedError } from "../utils/errors.js";
 
 const auth = new Hono<AppEnv>();
+
+// Helper: get coin balance from active transaction
+async function getUserCoinBalance(userId: string): Promise<number> {
+  const db = getDb();
+  const [tx] = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
+    .orderBy(desc(transactions.createdAt)).limit(1);
+  return tx?.coinsRemaining || 0;
+}
 
 // ── Schemas ──
 const phoneSchema = z.object({
@@ -141,6 +150,8 @@ auth.post("/verify-otp", async (c) => {
     expiresAt: expiresAt.toISOString(),
   });
 
+  const coinBalance = await getUserCoinBalance(user.id);
+
   return c.json({
     success: true,
     token,
@@ -149,6 +160,7 @@ auth.post("/verify-otp", async (c) => {
       phone: user.phone,
       name: user.name,
       balance: user.balance,
+      coinBalance,
       hasPin: !!user.pinHash,
     },
     isNewUser,
@@ -249,6 +261,8 @@ auth.post("/pin/login", async (c) => {
     expiresAt: expiresAt.toISOString(),
   });
 
+  const coinBalance = await getUserCoinBalance(user.id);
+
   return c.json({
     success: true,
     token,
@@ -257,6 +271,7 @@ auth.post("/pin/login", async (c) => {
       phone: user.phone,
       name: user.name,
       balance: user.balance,
+      coinBalance,
       hasPin: true,
     },
   });
@@ -296,6 +311,8 @@ auth.post("/biometric/verify", authMiddleware, async (c) => {
     throw new UnauthorizedError("User not found");
   }
 
+  const coinBalance = await getUserCoinBalance(user.id);
+
   return c.json({
     success: true,
     user: {
@@ -303,6 +320,7 @@ auth.post("/biometric/verify", authMiddleware, async (c) => {
       phone: user.phone,
       name: user.name,
       balance: user.balance,
+      coinBalance,
       hasPin: !!user.pinHash,
     },
   });
@@ -318,6 +336,8 @@ auth.get("/me", authMiddleware, async (c) => {
     throw new UnauthorizedError("User not found");
   }
 
+  const coinBalance = await getUserCoinBalance(user.id);
+
   return c.json({
     success: true,
     user: {
@@ -325,6 +345,7 @@ auth.get("/me", authMiddleware, async (c) => {
       phone: user.phone,
       name: user.name,
       balance: user.balance,
+      coinBalance,
       hasPin: !!user.pinHash,
     },
   });

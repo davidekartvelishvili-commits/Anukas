@@ -1,11 +1,19 @@
 import { apiFetch } from "./api";
+import { setCoinBalance, setCashBalance } from "./balance";
 
 export interface User {
   id: string;
   phone: string;
   name: string | null;
   balance: number;
+  coinBalance?: number;
   hasPin: boolean;
+}
+
+// Sync balance localStorage from server user data
+function syncBalances(user: User) {
+  if (user.coinBalance !== undefined) setCoinBalance(user.coinBalance);
+  if (user.balance !== undefined) setCashBalance(user.balance);
 }
 
 interface VerifyOtpResponse {
@@ -44,6 +52,7 @@ export async function verifyOtp(phone: string, code: string): Promise<VerifyOtpR
     localStorage.setItem("shansi_token", data.token);
     localStorage.setItem("shansi_user", JSON.stringify(data.user));
     localStorage.setItem("shansi_phone", formatted);
+    syncBalances(data.user);
   }
 
   return data;
@@ -66,6 +75,7 @@ export async function pinLogin(phone: string, pin: string) {
     localStorage.setItem("shansi_token", data.token);
     localStorage.setItem("shansi_user", JSON.stringify(data.user));
     localStorage.setItem("shansi_phone", formatted);
+    syncBalances(data.user);
   }
   return data;
 }
@@ -87,6 +97,7 @@ export async function getMe() {
   const data = await apiFetch<{ user: User }>("/auth/me");
   if (data.success && data.user) {
     localStorage.setItem("shansi_user", JSON.stringify(data.user));
+    syncBalances(data.user);
   }
   return data;
 }

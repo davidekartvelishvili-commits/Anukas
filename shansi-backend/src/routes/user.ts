@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, and, or, desc } from "drizzle-orm";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { users } from "../db/schema.js";
+import { users, transactions } from "../db/schema.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { BadRequestError } from "../utils/errors.js";
 
@@ -23,6 +23,11 @@ user.get("/profile", async (c) => {
   const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!u) return c.json({ success: false, message: "Not found" }, 404);
 
+  // Get coin balance from active transaction
+  const [activeTx] = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
+    .orderBy(desc(transactions.createdAt)).limit(1);
+
   return c.json({
     success: true,
     user: {
@@ -30,6 +35,7 @@ user.get("/profile", async (c) => {
       phone: u.phone,
       name: u.name,
       balance: u.balance,
+      coinBalance: activeTx?.coinsRemaining || 0,
       hasPin: !!u.pinHash,
       isActive: u.isActive,
       createdAt: u.createdAt,

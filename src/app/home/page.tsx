@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getCoinBalance, getCashBalance, exchange as doExchange, seedTestUser } from "@/services/balance";
+import { getMe, getStoredToken } from "@/services/auth";
 
 /* ───────── ICONS ───────── */
 
@@ -121,8 +122,16 @@ export default function HomePage() {
   useEffect(() => {
     seedTestUser();
     setActiveTab(0);
+    // Read cached values immediately for fast render
     setCashBalanceState(getCashBalance());
     setCoinBalanceState(getCoinBalance());
+    // Then fetch fresh from server and sync
+    if (getStoredToken()) {
+      getMe().then(() => {
+        setCashBalanceState(getCashBalance());
+        setCoinBalanceState(getCoinBalance());
+      }).catch(() => {});
+    }
     const saved = localStorage.getItem("user-gender");
     if (saved) setGender(saved);
     const t = setTimeout(() => setMounted(true), 50);
