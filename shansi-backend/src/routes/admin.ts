@@ -483,18 +483,61 @@ admin.patch("/users/:id/status", adminMiddleware, async (c) => {
 admin.get("/game-history", adminMiddleware, async (c) => {
   const db = getDb();
   const page = parseInt(c.req.query("page") || "1");
-  const limit = 50;
+  const limit = parseInt(c.req.query("limit") || "50");
   const offset = (page - 1) * limit;
-  const gameType = c.req.query("game_type");
-  const userId = c.req.query("user_id");
 
   const history = await db.select().from(gameHistory).orderBy(desc(gameHistory.createdAt)).limit(limit).offset(offset);
-  const allHistory = await db.select().from(gameHistory);
+  const [totalResult] = await db.select({ count: sql<number>`count(*)` }).from(gameHistory);
+  const total = Number(totalResult?.count) || 0;
+
+  // Enrich with user info
+  const enriched = await Promise.all(
+    history.map(async (h) => {
+      const [user] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, h.userId)).limit(1);
+      return { ...h, userPhone: user?.phone || null, userName: user?.name || null };
+    })
+  );
 
   return c.json({
     success: true,
-    history,
-    pagination: { page, limit, total: allHistory.length },
+    history: enriched,
+    pagination: { page, limit, total },
+  });
+});
+
+// GET /admin/pool/history
+admin.get("/pool/history", adminMiddleware, async (c) => {
+  const db = getDb();
+  const days = parseInt(c.req.query("days") || "7");
+
+  // Get daily game stats for last N days
+  const results: { date: string; totalWon: number; totalGames: number }[] = [];
+  const now = new Date();
+
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().split("T")[0];
+
+    const [dayStats] = await db.select({
+      totalWon: sql<number>`coalesce(sum(${gameHistory.winAmount}), 0)`,
+      totalGames: sql<number>`count(*)`,
+    }).from(gameHistory).where(sql`date(${gameHistory.createdAt}) = ${dateStr}`);
+
+    results.push({
+      date: dateStr,
+      totalWon: Number(dayStats?.totalWon) || 0,
+      totalGames: Number(dayStats?.totalGames) || 0,
+    });
+  }
+
+  // Current pool balance
+  const [poolData] = await db.select().from(pool).limit(1);
+
+  return c.json({
+    success: true,
+    history: results,
+    currentPoolBalance: poolData?.balance || 0,
   });
 });
 

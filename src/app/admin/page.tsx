@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AdminAuthGuard from "@/components/admin/AdminAuthGuard";
-import { getDashboard, logoutAdmin } from "@/services/admin";
+import { getDashboard, getDashboardGameHistory, getPoolHistory, logoutAdmin } from "@/services/admin";
 
 /* ── DEFAULT STATS (replaced by API on mount) ── */
 const MOCK_STATS = {
@@ -16,28 +16,16 @@ const MOCK_STATS = {
   newRegistrations: 0,
 };
 
-const POOL_HISTORY = [
-  { day: "Mon", value: 138000 },
-  { day: "Tue", value: 141200 },
-  { day: "Wed", value: 139800 },
-  { day: "Thu", value: 143500 },
-  { day: "Fri", value: 140200 },
-  { day: "Sat", value: 144100 },
-  { day: "Sun", value: 142580 },
-];
-
-const RECENT_TX = [
-  { time: "14:32", user: "Ana M.", merchant: "Stamba Cafe", amount: 15.50, winnings: 1.55, game: "Spin" },
-  { time: "14:28", user: "David K.", merchant: "Dunkin'", amount: 8.20, winnings: 0, game: "Drop" },
-  { time: "14:25", user: "Nino J.", merchant: "Wendy's", amount: 22.00, winnings: 4.40, game: "Spin" },
-  { time: "14:20", user: "Giorgi T.", merchant: "Luca Polare", amount: 35.00, winnings: 0, game: "Step" },
-  { time: "14:15", user: "Mariam S.", merchant: "Coffee Lab", amount: 6.50, winnings: 0.65, game: "Spin" },
-  { time: "14:10", user: "Luka B.", merchant: "Pasanauri", amount: 45.00, winnings: 0, game: "Drop" },
-  { time: "14:05", user: "Elene R.", merchant: "Bread House", amount: 12.00, winnings: 2.40, game: "Step" },
-  { time: "13:58", user: "Tornike A.", merchant: "Stamba Cafe", amount: 9.80, winnings: 0, game: "Spin" },
-  { time: "13:52", user: "Salome K.", merchant: "GPC", amount: 120.00, winnings: 12.00, game: "Spin" },
-  { time: "13:45", user: "Irakli M.", merchant: "Dunkin'", amount: 18.50, winnings: 0, game: "Drop" },
-];
+const GAME_TYPE_LABELS: Record<string, string> = {
+  slot: "Midnight Machine",
+  plinko: "Lucky Drop",
+  chicken_rush: "Lucky Step",
+};
+const GAME_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
+  slot: { bg: "#F9E74120", color: "#F9E741" },
+  plinko: { bg: "#3B82F620", color: "#3B82F6" },
+  chicken_rush: { bg: "#22C55E20", color: "#22C55E" },
+};
 
 /* ── SVG ICONS ── */
 function NavIcon({ id, active }: { id: string; active: boolean }) {
@@ -111,6 +99,10 @@ function AdminDashboardContent() {
   const [activeNav, setActiveNav] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [stats, setStats] = useState(MOCK_STATS);
+  const [recentGames, setRecentGames] = useState<any[]>([]);
+  const [poolHistory, setPoolHistory] = useState<{ day: string; value: number }[]>([]);
+  const [loadingTx, setLoadingTx] = useState(true);
+  const [loadingChart, setLoadingChart] = useState(true);
 
   useEffect(() => {
     const iv = setInterval(() => setNow(new Date()), 1000);
@@ -133,6 +125,27 @@ function AdminDashboardContent() {
         });
       }
     }).catch(() => {});
+
+    // Fetch recent game history
+    getDashboardGameHistory(20).then((data: any) => {
+      if (data.success) setRecentGames(data.history || []);
+    }).catch(() => {}).finally(() => setLoadingTx(false));
+
+    // Fetch pool history
+    getPoolHistory(7).then((data: any) => {
+      if (data.success && data.history) {
+        const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        let runningBalance = data.currentPoolBalance || 0;
+        // Build chart: reverse to calculate backwards from current balance
+        const reversed = [...data.history].reverse();
+        const chartPoints: { day: string; value: number }[] = [];
+        for (const entry of reversed) {
+          chartPoints.unshift({ day: dayNames[new Date(entry.date).getDay()], value: Math.max(0, runningBalance) });
+          runningBalance += entry.totalWon; // add back what was won (going backwards)
+        }
+        setPoolHistory(chartPoints);
+      }
+    }).catch(() => {}).finally(() => setLoadingChart(false));
   }, []);
 
   const avgPercent = stats.todayTxAmount > 0
@@ -274,51 +287,75 @@ function AdminDashboardContent() {
           {/* ── POOL CHART ── */}
           <div className="rounded-[12px] p-4 border mb-6" style={{ background: "#111111", borderColor: "#252525" }}>
             <p className="text-[13px] font-semibold mb-3" style={{ color: "#A0A0A0" }}>Pool Balance — Last 7 Days</p>
-            <MiniChart data={POOL_HISTORY} />
-            <div className="flex justify-between mt-2">
-              {POOL_HISTORY.map((d) => (
-                <span key={d.day} className="text-[10px]" style={{ color: "#666666" }}>{d.day}</span>
-              ))}
-            </div>
+            {loadingChart ? (
+              <div className="flex items-center justify-center h-[120px]">
+                <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#F9E741", borderTopColor: "transparent" }} />
+              </div>
+            ) : poolHistory.length > 0 ? (
+              <>
+                <MiniChart data={poolHistory} />
+                <div className="flex justify-between mt-2">
+                  {poolHistory.map((d, i) => (
+                    <span key={i} className="text-[10px]" style={{ color: "#666666" }}>{d.day}</span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-[120px]">
+                <p className="text-[12px]" style={{ color: "#666666" }}>No pool data yet</p>
+              </div>
+            )}
           </div>
 
           {/* ── RECENT TRANSACTIONS ── */}
           <div className="rounded-[12px] border overflow-hidden" style={{ background: "#111111", borderColor: "#252525" }}>
             <div className="px-4 py-3 border-b" style={{ borderColor: "#252525" }}>
-              <p className="text-[13px] font-semibold" style={{ color: "#A0A0A0" }}>Recent Transactions</p>
+              <p className="text-[13px] font-semibold" style={{ color: "#A0A0A0" }}>Recent Games</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[600px]">
-                <thead>
-                  <tr style={{ borderBottom: "1px solid #252525" }}>
-                    {["Time", "User", "Merchant", "Amount", "Winnings", "Game"].map((h) => (
-                      <th key={h} className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wider" style={{ color: "#666666" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {RECENT_TX.map((tx, i) => (
-                    <tr key={i} style={{ borderBottom: i < RECENT_TX.length - 1 ? "1px solid #1A1A1A" : "none" }}>
-                      <td className="px-4 py-2.5 text-[12px]" style={{ color: "#666666" }}>{tx.time}</td>
-                      <td className="px-4 py-2.5 text-[12px] font-medium" style={{ color: "#FFFFFF" }}>{tx.user}</td>
-                      <td className="px-4 py-2.5 text-[12px]" style={{ color: "#A0A0A0" }}>{tx.merchant}</td>
-                      <td className="px-4 py-2.5 text-[12px] font-medium" style={{ color: "#FFFFFF" }}>₾{tx.amount.toFixed(2)}</td>
-                      <td className="px-4 py-2.5 text-[12px] font-medium" style={{ color: tx.winnings > 0 ? "#22C55E" : "#666666" }}>
-                        {tx.winnings > 0 ? `₾${tx.winnings.toFixed(2)}` : "—"}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{
-                          background: tx.game === "Spin" ? "#F9E74120" : tx.game === "Drop" ? "#3B82F620" : "#22C55E20",
-                          color: tx.game === "Spin" ? "#F9E741" : tx.game === "Drop" ? "#3B82F6" : "#22C55E",
-                        }}>
-                          {tx.game}
-                        </span>
-                      </td>
+            {loadingTx ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#F9E741", borderTopColor: "transparent" }} />
+                <span className="ml-2 text-[12px]" style={{ color: "#666666" }}>Loading...</span>
+              </div>
+            ) : recentGames.length === 0 ? (
+              <div className="px-4 py-8 text-center">
+                <p className="text-[13px]" style={{ color: "#666666" }}>{"\u10EF\u10D4\u10E0 \u10D0\u10E0 \u10D0\u10E0\u10D8\u10E1 \u10E2\u10E0\u10D0\u10DC\u10D6\u10D0\u10E5\u10EA\u10D8\u10D4\u10D1\u10D8"}</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px]">
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid #252525" }}>
+                      {["\u10DB\u10DD\u10DB\u10EE\u10DB\u10D0\u10E0\u10D4\u10D1\u10D4\u10DA\u10D8", "\u10D7\u10D0\u10DB\u10D0\u10E8\u10D8", "\u10E5\u10DD\u10D8\u10DC\u10D8", "\u10DB\u10DD\u10D2\u10D4\u10D1\u10D0", "\u10D7\u10D0\u10E0\u10D8\u10E6\u10D8"].map((h) => (
+                        <th key={h} className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wider" style={{ color: "#666666" }}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {recentGames.map((g: any, i: number) => {
+                      const gameColors = GAME_TYPE_COLORS[g.gameType] || { bg: "#A0A0A020", color: "#A0A0A0" };
+                      return (
+                        <tr key={g.id || i} style={{ borderBottom: i < recentGames.length - 1 ? "1px solid #1A1A1A" : "none" }}>
+                          <td className="px-4 py-2.5 text-[12px] font-medium" style={{ color: "#FFFFFF" }}>{g.userName || g.userPhone || "Unknown"}</td>
+                          <td className="px-4 py-2.5">
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: gameColors.bg, color: gameColors.color }}>
+                              {GAME_TYPE_LABELS[g.gameType] || g.gameType}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-[12px] font-medium" style={{ color: "#F9E741" }}>{g.betAmount?.toFixed(2)}</td>
+                          <td className="px-4 py-2.5 text-[12px] font-medium" style={{ color: g.winAmount > 0 ? "#22C55E" : "#666666" }}>
+                            {g.winAmount > 0 ? `\u20BE${g.winAmount.toFixed(2)}` : "\u2014"}
+                          </td>
+                          <td className="px-4 py-2.5 text-[12px]" style={{ color: "#666666" }}>
+                            {g.createdAt ? new Date(g.createdAt).toLocaleString("ka-GE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       </main>

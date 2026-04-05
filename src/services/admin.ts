@@ -109,6 +109,14 @@ export async function getReferrals(page = 1) {
   return adminFetch(`/admin/referrals?page=${page}`);
 }
 
+export async function getDashboardGameHistory(limit = 20) {
+  return adminFetch(`/admin/game-history?limit=${limit}`);
+}
+
+export async function getPoolHistory(days = 7) {
+  return adminFetch(`/admin/pool/history?days=${days}`);
+}
+
 export async function getGameHistory(filters?: { page?: number; game_type?: string; user_id?: string }) {
   const params = new URLSearchParams();
   if (filters?.page) params.set("page", String(filters.page));
