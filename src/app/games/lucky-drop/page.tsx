@@ -39,7 +39,8 @@ export default function LuckyDropPage() {
   const [winAmount, setWinAmount] = useState(0);
   const [betAmount, setBetAmount] = useState(0);
   const [showBetPicker, setShowBetPicker] = useState(true);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const apiQueueRef = useRef(Promise.resolve());
+  const [pendingDrops, setPendingDrops] = useState(0);
 
   useEffect(() => {
     ensureActiveTransaction().then((tx) => {
@@ -332,76 +333,78 @@ export default function LuckyDropPage() {
     }
   }
 
-  const handleDrop = useCallback(async () => {
-    if (isPlaying || betAmount <= 0 || balance < betAmount) return;
-    setIsPlaying(true);
+  const handleDrop = useCallback(() => {
+    if (betAmount <= 0 || balance < betAmount) return;
+
+    // Deduct locally for instant UI feedback, then server corrects
+    setBalance((prev) => prev - betAmount);
+    setPendingDrops((p) => p + 1);
     dropCount.current++;
 
-    // Vary gravity: alternates fast/slow/faster pattern
     const n = dropCount.current;
     const gravities = [0.35, 0.5, 0.3, 0.55, 0.42, 0.48];
     const gravity = gravities[n % gravities.length];
+    const currentRisk = risk;
 
-    try {
-      // Server decides outcome FIRST — coins deducted server-side
-      const serverResult = await playGame("plinko");
+    // Queue API calls sequentially so responses arrive in order
+    apiQueueRef.current = apiQueueRef.current.then(async () => {
+      try {
+        const serverResult = await playGame("plinko");
 
-      // Map server totalWin to a slot index (find closest multiplier)
-      const mults = MULTIPLIERS[risk];
-      const mult = betAmount > 0 ? serverResult.totalWin / betAmount : 0;
-      let closestIdx = 5; // center
-      let closestDiff = Infinity;
-      mults.forEach((m, i) => {
-        const diff = Math.abs(m - mult);
-        if (diff < closestDiff) { closestDiff = diff; closestIdx = i; }
-      });
+        // Map server totalWin to slot index
+        const mults = MULTIPLIERS[currentRisk];
+        const mult = betAmount > 0 ? serverResult.totalWin / betAmount : 0;
+        let closestIdx = 5;
+        let closestDiff = Infinity;
+        mults.forEach((m, i) => {
+          const diff = Math.abs(m - mult);
+          if (diff < closestDiff) { closestDiff = diff; closestIdx = i; }
+        });
 
-      const data: DropResult = {
-        slotIndex: closestIdx,
-        multiplier: mults[closestIdx],
-        winAmount: serverResult.totalWin,
-        risk,
-      };
+        const data: DropResult = {
+          slotIndex: closestIdx,
+          multiplier: mults[closestIdx],
+          winAmount: serverResult.totalWin,
+          risk: currentRisk,
+        };
 
-      // Immediately sync coin balance from server (after deduction)
-      setBalance(serverResult.coinsRemaining);
-      storeCoin(serverResult.coinsRemaining);
+        // Sync coin balance from server (authoritative)
+        setBalance(serverResult.coinsRemaining);
+        storeCoin(serverResult.coinsRemaining);
 
-      const s = stateRef.current;
-      const ballR = Math.max(8, s.W * 0.015);
-      const ball: Ball = {
-        x: s.W / 2 + (Math.random() - 0.5) * s.gapX * 0.6,
-        y: s.startY - 40,
-        vx: (Math.random() - 0.5) * 1.5,
-        vy: 0, r: ballR,
-        alive: true, settled: false,
-        trail: [], targetSlot: data.slotIndex,
-        data, gravity,
-      };
+        const s = stateRef.current;
+        const ballR = Math.max(8, s.W * 0.015);
+        const ball: Ball = {
+          x: s.W / 2 + (Math.random() - 0.5) * s.gapX * 0.6,
+          y: s.startY - 40,
+          vx: (Math.random() - 0.5) * 1.5,
+          vy: 0, r: ballR,
+          alive: true, settled: false,
+          trail: [], targetSlot: data.slotIndex,
+          data, gravity,
+        };
 
-      (ball as any)._onSettle = () => {
-        // Ball finished animation — sync cash and unlock button
-        if (serverResult.totalWin > 0) {
-          storeCash(serverResult.newBalance);
-        }
-        if (serverResult.totalWin > 0 && serverResult.won) {
-          setWinAmount(serverResult.totalWin);
-          setBigWinText(`+${serverResult.totalWin}`);
-          spawnParticles(serverResult.bonusWin > 20 ? 50 : 20, serverResult.bonusWin > 20);
-          setTimeout(() => setBigWinText(""), 2000);
-        }
-        setIsPlaying(false);
-      };
+        (ball as any)._onSettle = () => {
+          if (serverResult.totalWin > 0) {
+            storeCash(serverResult.newBalance);
+          }
+          if (serverResult.totalWin > 0 && serverResult.won) {
+            setWinAmount(serverResult.totalWin);
+            setBigWinText(`+${serverResult.totalWin}`);
+            spawnParticles(serverResult.bonusWin > 20 ? 50 : 20, serverResult.bonusWin > 20);
+            setTimeout(() => setBigWinText(""), 2000);
+          }
+          setPendingDrops((p) => Math.max(0, p - 1));
+        };
 
-      s.balls.push(ball);
-    } catch (err: any) {
-      // API failed — don't change balance (server didn't deduct)
-      setIsPlaying(false);
-      if (err.message?.includes("disabled")) {
-        alert("\u10D7\u10D0\u10DB\u10D0\u10E8\u10D8 \u10D3\u10E0\u10DD\u10D4\u10D1\u10D8\u10D7 \u10E8\u10D4\u10E9\u10D4\u10E0\u10D4\u10D1\u10E3\u10DA\u10D8\u10D0");
+        s.balls.push(ball);
+      } catch (err: any) {
+        // API failed — restore the local deduction
+        setBalance((prev) => prev + betAmount);
+        setPendingDrops((p) => Math.max(0, p - 1));
       }
-    }
-  }, [isPlaying, balance, risk, betAmount]);
+    });
+  }, [balance, risk, betAmount]);
 
   return (
     <div className="relative w-full h-[100dvh] bg-[#050a1a] overflow-hidden">
@@ -494,12 +497,12 @@ export default function LuckyDropPage() {
         {!showBetPicker && betAmount > 0 && (
           <button
             onClick={handleDrop}
-            disabled={isPlaying || balance < betAmount}
+            disabled={balance < betAmount}
             className="pointer-events-auto px-12 py-6 rounded-full text-[19px] font-black tracking-wide transition-all duration-150 active:scale-[0.97] disabled:bg-[#3a3a4a] disabled:text-[#777] disabled:cursor-not-allowed"
             style={{
-              background: (isPlaying || balance < betAmount) ? "#3a3a4a" : "#FFD700",
-              color: (isPlaying || balance < betAmount) ? "#777" : "#1a1a2e",
-              boxShadow: (isPlaying || balance < betAmount) ? "none" : "0 4px 24px rgba(255,215,0,.25), inset 0 1px 0 rgba(255,255,255,.3)",
+              background: balance < betAmount ? "#3a3a4a" : "#FFD700",
+              color: balance < betAmount ? "#777" : "#1a1a2e",
+              boxShadow: balance < betAmount ? "none" : "0 4px 24px rgba(255,215,0,.25), inset 0 1px 0 rgba(255,255,255,.3)",
               fontFamily: "var(--font-outfit)",
             }}
           >
