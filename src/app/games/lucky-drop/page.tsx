@@ -39,6 +39,7 @@ export default function LuckyDropPage() {
   const [winAmount, setWinAmount] = useState(0);
   const [betAmount, setBetAmount] = useState(0);
   const [showBetPicker, setShowBetPicker] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     ensureActiveTransaction().then((tx) => {
@@ -332,8 +333,8 @@ export default function LuckyDropPage() {
   }
 
   const handleDrop = useCallback(async () => {
-    if (betAmount <= 0 || balance < betAmount) return;
-    setBalance(balance - betAmount);
+    if (isPlaying || betAmount <= 0 || balance < betAmount) return;
+    setIsPlaying(true);
     dropCount.current++;
 
     // Vary gravity: alternates fast/slow/faster pattern
@@ -342,7 +343,7 @@ export default function LuckyDropPage() {
     const gravity = gravities[n % gravities.length];
 
     try {
-      // Server decides outcome FIRST
+      // Server decides outcome FIRST — coins deducted server-side
       const serverResult = await playGame("plinko");
 
       // Map server totalWin to a slot index (find closest multiplier)
@@ -362,6 +363,10 @@ export default function LuckyDropPage() {
         risk,
       };
 
+      // Immediately sync coin balance from server (after deduction)
+      setBalance(serverResult.coinsRemaining);
+      storeCoin(serverResult.coinsRemaining);
+
       const s = stateRef.current;
       const ballR = Math.max(8, s.W * 0.015);
       const ball: Ball = {
@@ -375,9 +380,7 @@ export default function LuckyDropPage() {
       };
 
       (ball as any)._onSettle = () => {
-        // Sync from server
-        setBalance(serverResult.coinsRemaining);
-        storeCoin(serverResult.coinsRemaining);
+        // Ball finished animation — sync cash and unlock button
         if (serverResult.totalWin > 0) {
           storeCash(serverResult.newBalance);
         }
@@ -387,16 +390,18 @@ export default function LuckyDropPage() {
           spawnParticles(serverResult.bonusWin > 20 ? 50 : 20, serverResult.bonusWin > 20);
           setTimeout(() => setBigWinText(""), 2000);
         }
+        setIsPlaying(false);
       };
 
       s.balls.push(ball);
     } catch (err: any) {
-      setBalance(balance + betAmount);
+      // API failed — don't change balance (server didn't deduct)
+      setIsPlaying(false);
       if (err.message?.includes("disabled")) {
-        alert("თამაში დროებით შეჩერებულია");
+        alert("\u10D7\u10D0\u10DB\u10D0\u10E8\u10D8 \u10D3\u10E0\u10DD\u10D4\u10D1\u10D8\u10D7 \u10E8\u10D4\u10E9\u10D4\u10E0\u10D4\u10D1\u10E3\u10DA\u10D8\u10D0");
       }
     }
-  }, [balance, risk, betAmount]);
+  }, [isPlaying, balance, risk, betAmount]);
 
   return (
     <div className="relative w-full h-[100dvh] bg-[#050a1a] overflow-hidden">
@@ -489,12 +494,12 @@ export default function LuckyDropPage() {
         {!showBetPicker && betAmount > 0 && (
           <button
             onClick={handleDrop}
-            disabled={balance < betAmount}
+            disabled={isPlaying || balance < betAmount}
             className="pointer-events-auto px-12 py-6 rounded-full text-[19px] font-black tracking-wide transition-all duration-150 active:scale-[0.97] disabled:bg-[#3a3a4a] disabled:text-[#777] disabled:cursor-not-allowed"
             style={{
-              background: balance < betAmount ? "#3a3a4a" : "#FFD700",
-              color: balance < betAmount ? "#777" : "#1a1a2e",
-              boxShadow: balance < betAmount ? "none" : "0 4px 24px rgba(255,215,0,.25), inset 0 1px 0 rgba(255,255,255,.3)",
+              background: (isPlaying || balance < betAmount) ? "#3a3a4a" : "#FFD700",
+              color: (isPlaying || balance < betAmount) ? "#777" : "#1a1a2e",
+              boxShadow: (isPlaying || balance < betAmount) ? "none" : "0 4px 24px rgba(255,215,0,.25), inset 0 1px 0 rgba(255,255,255,.3)",
               fontFamily: "var(--font-outfit)",
             }}
           >

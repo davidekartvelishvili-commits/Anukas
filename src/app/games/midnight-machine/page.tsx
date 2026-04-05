@@ -33,13 +33,16 @@ export default function MidnightMachinePage() {
     if (isSpinning || betAmount <= 0 || coinBalance < betAmount) return;
 
     setIsSpinning(true);
-    setCoinBalance(coinBalance - betAmount);
     setResult(null);
     setShowWin(false);
 
     try {
-      // Server decides outcome FIRST
+      // Server decides outcome FIRST — coins deducted server-side
       const serverResult = await playGame("slot");
+
+      // Immediately sync coin balance from server (after deduction)
+      setCoinBalance(serverResult.coinsRemaining);
+      storeCoin(serverResult.coinsRemaining);
 
       // Map server result to visual symbols
       const symbols: [string, string, string] = serverResult.won
@@ -59,9 +62,7 @@ export default function MidnightMachinePage() {
       setTimeout(() => {
         setResult(spinData);
         setIsSpinning(false);
-        // Sync balances from server
-        setCoinBalance(serverResult.coinsRemaining);
-        storeCoin(serverResult.coinsRemaining);
+        // Sync cash from server
         if (serverResult.totalWin > 0) {
           setCashBalance(serverResult.newBalance);
           storeCash(serverResult.newBalance);
@@ -78,9 +79,9 @@ export default function MidnightMachinePage() {
       }, 6500);
     } catch (err: any) {
       setIsSpinning(false);
-      setCoinBalance(coinBalance + betAmount);
+      // API failed — don't change balance (server didn't deduct)
       if (err.message?.includes("disabled")) {
-        alert("თამაში დროებით შეჩერებულია");
+        alert("\u10D7\u10D0\u10DB\u10D0\u10E8\u10D8 \u10D3\u10E0\u10DD\u10D4\u10D1\u10D8\u10D7 \u10E8\u10D4\u10E9\u10D4\u10E0\u10D4\u10D1\u10E3\u10DA\u10D8\u10D0");
       }
     }
   }, [isSpinning, coinBalance, betAmount]);

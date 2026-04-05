@@ -72,7 +72,6 @@ export default function ChickenRushPage() {
 
   const startRound = useCallback(async () => {
     if (balance < betAmount) return;
-    setBalance(balance - betAmount);
     setResultText("");
     setShowWin(false);
 
@@ -81,7 +80,7 @@ export default function ChickenRushPage() {
       const sr = await startChickenRush(betAmount, difficulty);
       serverResultRef.current = sr;
 
-      // Sync coin balance from server (authoritative)
+      // Sync coin balance from server (authoritative — coins already deducted)
       setBalance(sr.coinsRemaining);
       storeCoin(sr.coinsRemaining);
 
@@ -94,7 +93,7 @@ export default function ChickenRushPage() {
         gameOver: false, won: false,
       });
     } catch (err: any) {
-      setBalance(balance + betAmount);
+      // API failed — don't change balance (server didn't deduct)
     }
   }, [betAmount, balance, difficulty]);
 
