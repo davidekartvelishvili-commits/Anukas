@@ -483,16 +483,52 @@ admin.patch("/users/:id/status", adminMiddleware, async (c) => {
 admin.get("/game-history", adminMiddleware, async (c) => {
   const db = getDb();
   const page = parseInt(c.req.query("page") || "1");
-  const limit = parseInt(c.req.query("limit") || "50");
+  const limit = parseInt(c.req.query("limit") || "20");
   const offset = (page - 1) * limit;
+  const gameType = c.req.query("game_type");
+  const userId = c.req.query("user_id");
+  const dateFrom = c.req.query("date_from");
+  const dateTo = c.req.query("date_to");
+  const search = c.req.query("search");
 
-  const history = await db.select().from(gameHistory).orderBy(desc(gameHistory.createdAt)).limit(limit).offset(offset);
-  const [totalResult] = await db.select({ count: sql<number>`count(*)` }).from(gameHistory);
-  const total = Number(totalResult?.count) || 0;
+  // Build conditions
+  const conditions: any[] = [];
+  if (gameType) conditions.push(eq(gameHistory.gameType, gameType));
+  if (userId) conditions.push(eq(gameHistory.userId, userId));
+  if (dateFrom) conditions.push(sql`${gameHistory.createdAt} >= ${dateFrom}`);
+  if (dateTo) conditions.push(sql`${gameHistory.createdAt} <= ${dateTo + "T23:59:59"}`);
+
+  // If search, find matching user IDs first
+  let searchUserIds: string[] | null = null;
+  if (search) {
+    const matchingUsers = await db.select({ id: users.id }).from(users)
+      .where(or(like(users.phone, `%${search}%`), like(users.name, `%${search}%`)));
+    searchUserIds = matchingUsers.map(u => u.id);
+    if (searchUserIds.length === 0) {
+      return c.json({ success: true, history: [], pagination: { page, limit, total: 0 } });
+    }
+  }
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  // Query with conditions
+  let historyQuery = db.select().from(gameHistory);
+  if (whereClause) historyQuery = historyQuery.where(whereClause) as any;
+
+  let allRows = await historyQuery.orderBy(desc(gameHistory.createdAt));
+
+  // Filter by search user IDs in application layer (simpler than dynamic IN clause)
+  if (searchUserIds) {
+    const idSet = new Set(searchUserIds);
+    allRows = allRows.filter(r => idSet.has(r.userId));
+  }
+
+  const total = allRows.length;
+  const paginated = allRows.slice(offset, offset + limit);
 
   // Enrich with user info
   const enriched = await Promise.all(
-    history.map(async (h) => {
+    paginated.map(async (h) => {
       const [user] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, h.userId)).limit(1);
       return { ...h, userPhone: user?.phone || null, userName: user?.name || null };
     })

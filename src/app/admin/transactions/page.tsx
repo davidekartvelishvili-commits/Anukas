@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo, Fragment } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { useRouter } from "next/navigation";
+import { getGameHistory } from "@/services/admin";
 
 /* ── SVG ICONS ── */
 function NavIcon({ id, active }: { id: string; active: boolean }) {
@@ -38,164 +39,79 @@ const NAV_ITEMS = [
   { label: "System", id: "system", href: "/admin/system" },
 ];
 
-/* ── MOCK DATA: 100 TRANSACTIONS ── */
-const MERCHANTS = ["Stamba Cafe", "Dunkin'", "Wendy's", "Luca Polare", "Coffee Lab", "Pasanauri", "Bread House", "GPC", "Goodwill", "Nikora"];
-const USERS = ["Ana M.", "David K.", "Nino J.", "Giorgi T.", "Mariam S.", "Luka B.", "Elene R.", "Tornike A.", "Salome K.", "Irakli M.", "Tamara G.", "Nikoloz P.", "Ketevan D.", "Sandro V.", "Natia L.", "Levan C.", "Maia Z.", "Zurab N.", "Tamar B.", "Giga F."];
-const GAME_TYPES: ("Spin" | "Drop" | "Step")[] = ["Spin", "Drop", "Step"];
-const RESULT_TYPES: ("won_minimum" | "won_bonus" | "won_100" | "no_win")[] = ["won_minimum", "won_bonus", "won_100", "no_win"];
-const STATUSES: ("completed" | "pending" | "failed")[] = ["completed", "completed", "completed", "completed", "completed", "completed", "completed", "completed", "pending", "failed"];
-
-function seededRandom(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-}
-
-interface Transaction {
-  id: number;
-  code: string;
-  timestamp: Date;
-  user: string;
-  merchant: string;
-  amount: number;
-  winnings: number;
-  winPercent: number;
-  gameType: "Spin" | "Drop" | "Step";
-  resultType: "won_minimum" | "won_bonus" | "won_100" | "no_win";
-  status: "completed" | "pending" | "failed";
-  algorithmSeed: number;
-  poolAtTime: number;
-  tierApplied: string;
-}
-
-function generateTransactions(): Transaction[] {
-  const rng = seededRandom(42);
-  const txs: Transaction[] = [];
-  const baseDate = new Date(2026, 2, 29, 14, 30, 0);
-
-  for (let i = 0; i < 100; i++) {
-    const amount = Math.round((rng() * 200 + 1.5) * 100) / 100;
-    const resultType = RESULT_TYPES[Math.floor(rng() * RESULT_TYPES.length)];
-    let winPercent = 0;
-    let winnings = 0;
-
-    if (resultType === "won_minimum") {
-      winPercent = 0.5;
-      winnings = Math.round(amount * 0.005 * 100) / 100;
-    } else if (resultType === "won_bonus") {
-      winPercent = Math.round((rng() * 8 + 1) * 100) / 100;
-      winnings = Math.round(amount * (winPercent / 100) * 100) / 100;
-    } else if (resultType === "won_100") {
-      winPercent = 100;
-      winnings = amount;
-    }
-
-    const minutesBack = i * 3 + Math.floor(rng() * 3);
-    const txDate = new Date(baseDate.getTime() - minutesBack * 60000);
-
-    txs.push({
-      id: i + 1,
-      code: `TX-${(100000 + Math.floor(rng() * 900000)).toString()}`,
-      timestamp: txDate,
-      user: USERS[Math.floor(rng() * USERS.length)],
-      merchant: MERCHANTS[Math.floor(rng() * MERCHANTS.length)],
-      amount,
-      winnings,
-      winPercent,
-      gameType: GAME_TYPES[Math.floor(rng() * GAME_TYPES.length)],
-      resultType,
-      status: STATUSES[Math.floor(rng() * STATUSES.length)],
-      algorithmSeed: Math.floor(rng() * 999999),
-      poolAtTime: Math.round((120000 + rng() * 30000) * 100) / 100,
-      tierApplied: amount < 5 ? "Low-Amount (100% eligible)" : amount < 50 ? "Standard" : "High-Amount (capped)",
-    });
-  }
-  return txs;
-}
-
-const ALL_TRANSACTIONS = generateTransactions();
-
-/* ── RESULT TYPE LABELS ── */
-const RESULT_LABELS: Record<string, string> = {
-  all: "All / ყველა",
-  won_minimum: "Won Minimum / მინიმუმი",
-  won_bonus: "Won Bonus / ბონუსი",
-  won_100: "Won 100% / სრული",
-  no_win: "No Win / არ მოიგო",
-};
-
-/* ── GAME BADGE COLORS ── */
+const GAME_TYPE_LABELS: Record<string, string> = { slot: "Midnight Machine", plinko: "Lucky Drop", chicken_rush: "Lucky Step" };
 const GAME_COLORS: Record<string, { bg: string; color: string }> = {
-  Spin: { bg: "#F9E74120", color: "#F9E741" },
-  Drop: { bg: "#3B82F620", color: "#3B82F6" },
-  Step: { bg: "#22C55E20", color: "#22C55E" },
+  slot: { bg: "#F9E74120", color: "#F9E741" },
+  plinko: { bg: "#3B82F620", color: "#3B82F6" },
+  chicken_rush: { bg: "#22C55E20", color: "#22C55E" },
 };
 
-const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  completed: { bg: "#22C55E18", color: "#22C55E" },
-  pending: { bg: "#F9E74118", color: "#F9E741" },
-  failed: { bg: "#EF444418", color: "#EF4444" },
-};
+const PER_PAGE = 20;
 
-/* ── MAIN PAGE ── */
 export default function TransactionsPage() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  /* Data */
+  const [history, setHistory] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+
   /* Filters */
-  const [searchCode, setSearchCode] = useState("");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [merchantFilter, setMerchantFilter] = useState("all");
-  const [amountMin, setAmountMin] = useState("");
-  const [amountMax, setAmountMax] = useState("");
-  const [resultFilter, setResultFilter] = useState("all");
+  const [gameFilter, setGameFilter] = useState("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   /* Pagination */
   const [page, setPage] = useState(1);
-  const perPage = 50;
 
   /* Expanded rows */
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  /* Filtered data */
-  const filtered = useMemo(() => {
-    return ALL_TRANSACTIONS.filter((tx) => {
-      if (searchCode && !tx.code.toLowerCase().includes(searchCode.toLowerCase())) return false;
-      if (merchantFilter !== "all" && tx.merchant !== merchantFilter) return false;
-      if (resultFilter !== "all" && tx.resultType !== resultFilter) return false;
-      if (amountMin && tx.amount < parseFloat(amountMin)) return false;
-      if (amountMax && tx.amount > parseFloat(amountMax)) return false;
-      if (dateFrom) {
-        const from = new Date(dateFrom);
-        if (tx.timestamp < from) return false;
-      }
-      if (dateTo) {
-        const to = new Date(dateTo);
-        to.setHours(23, 59, 59, 999);
-        if (tx.timestamp > to) return false;
-      }
-      return true;
-    });
-  }, [searchCode, merchantFilter, resultFilter, amountMin, amountMax, dateFrom, dateTo]);
+  /* Debounce search */
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
-  const currentPage = Math.min(page, totalPages);
-  const paginated = filtered.slice((currentPage - 1) * perPage, currentPage * perPage);
+  /* Fetch data */
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const filters: any = { page, limit: PER_PAGE };
+      if (gameFilter !== "all") filters.game_type = gameFilter;
+      if (dateFrom) filters.date_from = dateFrom;
+      if (dateTo) filters.date_to = dateTo;
+      if (debouncedSearch) filters.search = debouncedSearch;
+
+      const data = await getGameHistory(filters);
+      setHistory(data.history || []);
+      setTotal(data.pagination?.total || 0);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, gameFilter, dateFrom, dateTo, debouncedSearch]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { setPage(1); }, [debouncedSearch, gameFilter, dateFrom, dateTo]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
 
   /* Summary stats */
-  const totalAmount = filtered.reduce((s, t) => s + t.amount, 0);
-  const totalWinnings = filtered.reduce((s, t) => s + t.winnings, 0);
-  const avgPercent = totalAmount > 0 ? (totalWinnings / totalAmount) * 100 : 0;
+  const totalBet = history.reduce((s, t) => s + (t.betAmount || 0), 0);
+  const totalWin = history.reduce((s, t) => s + (t.winAmount || 0), 0);
+  const avgPercent = totalBet > 0 ? (totalWin / totalBet) * 100 : 0;
 
   /* CSV Export */
   const handleExport = () => {
-    const header = "Code,Time,User,Merchant,Amount,Winnings,Win%,Game,Result,Status\n";
-    const rows = filtered.map((tx) =>
-      `${tx.code},${tx.timestamp.toISOString()},${tx.user},${tx.merchant},${tx.amount},${tx.winnings},${tx.winPercent},${tx.gameType},${tx.resultType},${tx.status}`
+    const header = "ID,Time,User,Phone,Game,Bet,Win,PoolBefore,PoolAfter\n";
+    const rows = history.map((tx: any) =>
+      `${tx.id},${tx.createdAt},${tx.userName || ""},${tx.userPhone || ""},${tx.gameType},${tx.betAmount},${tx.winAmount},${tx.poolBalanceBefore || ""},${tx.poolBalanceAfter || ""}`
     ).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -263,7 +179,7 @@ export default function TransactionsPage() {
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M7 1v8M4 6l3 3 3-3" /><path d="M1 10v2a1 1 0 001 1h10a1 1 0 001-1v-2" />
             </svg>
-            CSV ექსპორტი
+            CSV
           </button>
         </header>
 
@@ -276,13 +192,11 @@ export default function TransactionsPage() {
             </svg>
             <input
               type="text"
-              value={searchCode}
-              onChange={(e) => { setSearchCode(e.target.value); setPage(1); }}
-              placeholder="ტრანზაქციის კოდით ძიება / Search by TX code..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={"\u10DB\u10DD\u10DB\u10EE\u10DB\u10D0\u10E0\u10D4\u10D1\u10DA\u10D8\u10E1 \u10EB\u10D8\u10D4\u10D1\u10D0 / Search user..."}
               className="w-full pl-11 pr-4 py-3 rounded-[12px] text-[14px] font-medium outline-none transition-all focus:ring-2"
               style={{ background: "#111111", color: "#FFFFFF", border: "1px solid #252525", caretColor: "#F9E741" }}
-              onFocus={(e) => (e.target.style.borderColor = "#F9E741")}
-              onBlur={(e) => (e.target.style.borderColor = "#252525")}
             />
           </div>
 
@@ -295,7 +209,7 @@ export default function TransactionsPage() {
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#A0A0A0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M1 2h12M3 5h8M5 8h4M6 11h2" />
             </svg>
-            ფილტრები / Filters
+            {"\u10E4\u10D8\u10DA\u10E2\u10E0\u10D4\u10D1\u10D8 / Filters"}
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" style={{ transform: filtersOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }}>
               <polyline points="3,4 6,7 9,4" />
             </svg>
@@ -303,63 +217,34 @@ export default function TransactionsPage() {
 
           {filtersOpen && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 rounded-[12px] p-4 border" style={{ background: "#111111", borderColor: "#252525" }}>
-              {/* Date Range */}
               <div>
-                <label className="block text-[11px] font-medium mb-1.5 uppercase tracking-wider" style={{ color: "#666666" }}>თარიღი (დან)</label>
-                <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                <label className="block text-[11px] font-medium mb-1.5 uppercase tracking-wider" style={{ color: "#666666" }}>{"\u10D7\u10D0\u10E0\u10D8\u10E6\u10D8 (\u10D3\u10D0\u10DC)"}</label>
+                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
                   className="w-full px-3 py-2 rounded-[8px] text-[12px] outline-none transition-all"
                   style={{ background: "#1A1A1A", color: "#FFFFFF", border: "1px solid #252525" }} />
               </div>
               <div>
-                <label className="block text-[11px] font-medium mb-1.5 uppercase tracking-wider" style={{ color: "#666666" }}>თარიღი (მდე)</label>
-                <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                <label className="block text-[11px] font-medium mb-1.5 uppercase tracking-wider" style={{ color: "#666666" }}>{"\u10D7\u10D0\u10E0\u10D8\u10E6\u10D8 (\u10DB\u10D3\u10D4)"}</label>
+                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
                   className="w-full px-3 py-2 rounded-[8px] text-[12px] outline-none transition-all"
                   style={{ background: "#1A1A1A", color: "#FFFFFF", border: "1px solid #252525" }} />
               </div>
-
-              {/* Merchant */}
               <div>
-                <label className="block text-[11px] font-medium mb-1.5 uppercase tracking-wider" style={{ color: "#666666" }}>მერჩანტი</label>
-                <select value={merchantFilter} onChange={(e) => { setMerchantFilter(e.target.value); setPage(1); }}
+                <label className="block text-[11px] font-medium mb-1.5 uppercase tracking-wider" style={{ color: "#666666" }}>{"\u10D7\u10D0\u10DB\u10D0\u10E8\u10D8"}</label>
+                <select value={gameFilter} onChange={(e) => setGameFilter(e.target.value)}
                   className="w-full px-3 py-2 rounded-[8px] text-[12px] outline-none transition-all appearance-none cursor-pointer"
                   style={{ background: "#1A1A1A", color: "#FFFFFF", border: "1px solid #252525" }}>
-                  <option value="all">ყველა / All</option>
-                  {MERCHANTS.map((m) => <option key={m} value={m}>{m}</option>)}
+                  <option value="all">{"\u10E7\u10D5\u10D4\u10DA\u10D0 / All"}</option>
+                  <option value="slot">Midnight Machine</option>
+                  <option value="plinko">Lucky Drop</option>
+                  <option value="chicken_rush">Lucky Step</option>
                 </select>
               </div>
-
-              {/* Result Type */}
-              <div>
-                <label className="block text-[11px] font-medium mb-1.5 uppercase tracking-wider" style={{ color: "#666666" }}>შედეგი</label>
-                <select value={resultFilter} onChange={(e) => { setResultFilter(e.target.value); setPage(1); }}
-                  className="w-full px-3 py-2 rounded-[8px] text-[12px] outline-none transition-all appearance-none cursor-pointer"
-                  style={{ background: "#1A1A1A", color: "#FFFFFF", border: "1px solid #252525" }}>
-                  {Object.entries(RESULT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-              </div>
-
-              {/* Amount Range */}
-              <div>
-                <label className="block text-[11px] font-medium mb-1.5 uppercase tracking-wider" style={{ color: "#666666" }}>თანხა მინ.</label>
-                <input type="number" value={amountMin} onChange={(e) => { setAmountMin(e.target.value); setPage(1); }}
-                  placeholder="0.00" min="0" step="0.01"
-                  className="w-full px-3 py-2 rounded-[8px] text-[12px] outline-none transition-all"
-                  style={{ background: "#1A1A1A", color: "#FFFFFF", border: "1px solid #252525" }} />
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium mb-1.5 uppercase tracking-wider" style={{ color: "#666666" }}>თანხა მაქს.</label>
-                <input type="number" value={amountMax} onChange={(e) => { setAmountMax(e.target.value); setPage(1); }}
-                  placeholder="999.99" min="0" step="0.01"
-                  className="w-full px-3 py-2 rounded-[8px] text-[12px] outline-none transition-all"
-                  style={{ background: "#1A1A1A", color: "#FFFFFF", border: "1px solid #252525" }} />
-              </div>
-
-              {/* Clear */}
-              <div className="flex items-end lg:col-span-2">
-                <button onClick={() => { setSearchCode(""); setDateFrom(""); setDateTo(""); setMerchantFilter("all"); setAmountMin(""); setAmountMax(""); setResultFilter("all"); setPage(1); }}
+              <div className="flex items-end">
+                <button onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setGameFilter("all"); }}
                   className="px-4 py-2 rounded-[8px] text-[12px] font-semibold transition-all active:scale-[0.97] hover:brightness-125"
                   style={{ background: "#1A1A1A", color: "#A0A0A0", border: "1px solid #252525" }}>
-                  ფილტრების გასუფთავება / Clear
+                  {"\u10D2\u10D0\u10E1\u10E3\u10E4\u10D7\u10D0\u10D5\u10D4\u10D1\u10D0 / Clear"}
                 </button>
               </div>
             </div>
@@ -368,200 +253,187 @@ export default function TransactionsPage() {
           {/* ═══ SUMMARY BAR ═══ */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="rounded-[12px] p-3 border" style={{ background: "#111111", borderColor: "#252525" }}>
-              <p className="text-[10px] font-medium uppercase tracking-wider mb-0.5" style={{ color: "#666666" }}>ნაჩვენები TX</p>
-              <p className="text-[20px] font-extrabold leading-none" style={{ color: "#FFFFFF" }}>{filtered.length}</p>
+              <p className="text-[10px] font-medium uppercase tracking-wider mb-0.5" style={{ color: "#666666" }}>{"\u10E1\u10E3\u10DA TX"}</p>
+              <p className="text-[20px] font-extrabold leading-none" style={{ color: "#FFFFFF" }}>{total}</p>
             </div>
             <div className="rounded-[12px] p-3 border" style={{ background: "#111111", borderColor: "#252525" }}>
-              <p className="text-[10px] font-medium uppercase tracking-wider mb-0.5" style={{ color: "#666666" }}>ჯამი თანხა</p>
-              <p className="text-[20px] font-extrabold leading-none" style={{ color: "#FFFFFF" }}>{totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[12px] font-semibold" style={{ color: "#666666" }}>GEL</span></p>
+              <p className="text-[10px] font-medium uppercase tracking-wider mb-0.5" style={{ color: "#666666" }}>{"\u10EF\u10D0\u10DB\u10D8 \u10E4\u10E1\u10DD\u10DC\u10D8"}</p>
+              <p className="text-[20px] font-extrabold leading-none" style={{ color: "#FFFFFF" }}>{totalBet.toFixed(2)}</p>
             </div>
             <div className="rounded-[12px] p-3 border" style={{ background: "#111111", borderColor: "#252525" }}>
-              <p className="text-[10px] font-medium uppercase tracking-wider mb-0.5" style={{ color: "#666666" }}>ჯამი მოგება</p>
-              <p className="text-[20px] font-extrabold leading-none" style={{ color: "#22C55E" }}>{totalWinnings.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[12px] font-semibold" style={{ color: "#666666" }}>GEL</span></p>
+              <p className="text-[10px] font-medium uppercase tracking-wider mb-0.5" style={{ color: "#666666" }}>{"\u10EF\u10D0\u10DB\u10D8 \u10DB\u10DD\u10D2\u10D4\u10D1\u10D0"}</p>
+              <p className="text-[20px] font-extrabold leading-none" style={{ color: "#22C55E" }}>{totalWin.toFixed(2)} <span className="text-[12px] font-semibold" style={{ color: "#666666" }}>GEL</span></p>
             </div>
             <div className="rounded-[12px] p-3 border" style={{ background: "#111111", borderColor: "#252525" }}>
-              <p className="text-[10px] font-medium uppercase tracking-wider mb-0.5" style={{ color: "#666666" }}>საშუალო %</p>
+              <p className="text-[10px] font-medium uppercase tracking-wider mb-0.5" style={{ color: "#666666" }}>{"\u10E1\u10D0\u10E8\u10E3\u10D0\u10DA\u10DD %"}</p>
               <p className="text-[20px] font-extrabold leading-none" style={{ color: avgPercent < 1 ? "#22C55E" : avgPercent < 2 ? "#F9E741" : "#EF4444" }}>{avgPercent.toFixed(2)}%</p>
             </div>
           </div>
 
           {/* ═══ TRANSACTIONS TABLE ═══ */}
           <div className="rounded-[12px] border overflow-hidden" style={{ background: "#111111", borderColor: "#252525" }}>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
-                <thead>
-                  <tr style={{ borderBottom: "1px solid #252525" }}>
-                    {["", "TX Code", "დრო", "მომხმ.", "მერჩანტი", "თანხა", "მოგება", "Win %", "თამაში", "სტატუსი"].map((h) => (
-                      <th key={h} className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#666666" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginated.length === 0 && (
-                    <tr>
-                      <td colSpan={10} className="px-4 py-10 text-center text-[13px]" style={{ color: "#666666" }}>
-                        ტრანზაქციები ვერ მოიძებნა / No transactions found
-                      </td>
+            {loading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#F9E741", borderTopColor: "transparent" }} />
+                <span className="ml-3 text-[13px]" style={{ color: "#666666" }}>Loading...</span>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px]">
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid #252525" }}>
+                      {["", "\u10DB\u10DD\u10DB\u10EE\u10DB.", "\u10D7\u10D0\u10DB\u10D0\u10E8\u10D8", "\u10E4\u10E1\u10DD\u10DC\u10D8", "\u10DB\u10DD\u10D2\u10D4\u10D1\u10D0", "\u10DE\u10E3\u10DA\u10D8 (before)", "\u10D7\u10D0\u10E0\u10D8\u10E6\u10D8"].map((h) => (
+                        <th key={h} className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#666666" }}>{h}</th>
+                      ))}
                     </tr>
-                  )}
-                  {paginated.map((tx) => {
-                    const isExpanded = expandedId === tx.id;
-                    const gameCol = GAME_COLORS[tx.gameType];
-                    const statusCol = STATUS_COLORS[tx.status];
+                  </thead>
+                  <tbody>
+                    {history.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-10 text-center text-[13px]" style={{ color: "#666666" }}>
+                          {"\u10E2\u10E0\u10D0\u10DC\u10D6\u10D0\u10E5\u10EA\u10D8\u10D4\u10D1\u10D8 \u10EF\u10D4\u10E0 \u10D0\u10E0 \u10D0\u10E0\u10D8\u10E1"}
+                        </td>
+                      </tr>
+                    )}
+                    {history.map((tx: any, i: number) => {
+                      const isExpanded = expandedId === tx.id;
+                      const gameCol = GAME_COLORS[tx.gameType] || { bg: "#A0A0A020", color: "#A0A0A0" };
 
-                    return (
-                      <Fragment key={tx.id}>
-                        <tr
-                          className="transition-all cursor-pointer hover:brightness-110"
-                          style={{ borderBottom: "1px solid #1A1A1A", background: isExpanded ? "#1A1A1A" : "transparent" }}
-                          onClick={() => setExpandedId(isExpanded ? null : tx.id)}
-                        >
-                          {/* Expand icon */}
-                          <td className="pl-3 pr-1 py-2.5">
-                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round"
-                              style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0)", transition: "transform 0.2s" }}>
-                              <polyline points="4,2 8,6 4,10" />
-                            </svg>
-                          </td>
-                          <td className="px-3 py-2.5 text-[12px] font-mono font-medium" style={{ color: "#F9E741" }}>{tx.code}</td>
-                          <td className="px-3 py-2.5 text-[11px]" style={{ color: "#666666" }}>
-                            {tx.timestamp.toLocaleTimeString("ka-GE", { hour: "2-digit", minute: "2-digit" })}
-                          </td>
-                          <td className="px-3 py-2.5 text-[12px] font-medium" style={{ color: "#FFFFFF" }}>{tx.user}</td>
-                          <td className="px-3 py-2.5 text-[12px]" style={{ color: "#A0A0A0" }}>{tx.merchant}</td>
-                          <td className="px-3 py-2.5 text-[12px] font-semibold" style={{ color: "#FFFFFF" }}>{tx.amount.toFixed(2)}</td>
-                          <td className="px-3 py-2.5 text-[12px] font-semibold" style={{ color: tx.winnings > 0 ? "#22C55E" : "#666666" }}>
-                            {tx.winnings > 0 ? tx.winnings.toFixed(2) : "--"}
-                          </td>
-                          <td className="px-3 py-2.5 text-[12px] font-semibold" style={{ color: tx.winPercent === 100 ? "#F9E741" : tx.winPercent > 0 ? "#22C55E" : "#666666" }}>
-                            {tx.winPercent > 0 ? `${tx.winPercent}%` : "--"}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: gameCol.bg, color: gameCol.color }}>
-                              {tx.gameType}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize" style={{ background: statusCol.bg, color: statusCol.color }}>
-                              {tx.status}
-                            </span>
-                          </td>
-                        </tr>
-
-                        {/* Expanded Detail Row */}
-                        {isExpanded && (
-                          <tr style={{ borderBottom: "1px solid #252525" }}>
-                            <td colSpan={10} className="px-4 py-4" style={{ background: "#0D0D0D" }}>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {/* Transaction Details */}
-                                <div className="rounded-[8px] p-3 border" style={{ background: "#111111", borderColor: "#252525" }}>
-                                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#666666" }}>ტრანზაქციის დეტალები</p>
-                                  <div className="space-y-1.5 text-[12px]">
-                                    <div className="flex justify-between">
-                                      <span style={{ color: "#666666" }}>კოდი:</span>
-                                      <span className="font-mono font-medium" style={{ color: "#F9E741" }}>{tx.code}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span style={{ color: "#666666" }}>თარიღი:</span>
-                                      <span style={{ color: "#A0A0A0" }}>{tx.timestamp.toLocaleDateString("ka-GE")}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span style={{ color: "#666666" }}>დრო:</span>
-                                      <span style={{ color: "#A0A0A0" }}>{tx.timestamp.toLocaleTimeString("ka-GE")}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span style={{ color: "#666666" }}>თანხა:</span>
-                                      <span className="font-semibold" style={{ color: "#FFFFFF" }}>{tx.amount.toFixed(2)} GEL</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span style={{ color: "#666666" }}>მოგება:</span>
-                                      <span className="font-semibold" style={{ color: tx.winnings > 0 ? "#22C55E" : "#666666" }}>{tx.winnings > 0 ? `${tx.winnings.toFixed(2)} GEL` : "--"}</span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Algorithm Decision */}
-                                <div className="rounded-[8px] p-3 border" style={{ background: "#111111", borderColor: "#252525" }}>
-                                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#666666" }}>ალგორითმის გადაწყვეტილება</p>
-                                  <div className="space-y-1.5 text-[12px]">
-                                    <div className="flex justify-between">
-                                      <span style={{ color: "#666666" }}>Seed:</span>
-                                      <span className="font-mono" style={{ color: "#A0A0A0" }}>{tx.algorithmSeed}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span style={{ color: "#666666" }}>Pool (TX time):</span>
-                                      <span style={{ color: "#A0A0A0" }}>{tx.poolAtTime.toLocaleString("en-US", { minimumFractionDigits: 2 })} GEL</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span style={{ color: "#666666" }}>Tier:</span>
-                                      <span style={{ color: "#F9E741" }}>{tx.tierApplied}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span style={{ color: "#666666" }}>Result:</span>
-                                      <span className="font-semibold" style={{ color: tx.resultType === "no_win" ? "#EF4444" : "#22C55E" }}>
-                                        {tx.resultType === "won_minimum" ? "Min 0.5%" : tx.resultType === "won_bonus" ? `Bonus ${tx.winPercent}%` : tx.resultType === "won_100" ? "Full 100%" : "No Win"}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* User & Merchant */}
-                                <div className="rounded-[8px] p-3 border" style={{ background: "#111111", borderColor: "#252525" }}>
-                                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#666666" }}>მომხმარებელი & მერჩანტი</p>
-                                  <div className="space-y-1.5 text-[12px]">
-                                    <div className="flex justify-between">
-                                      <span style={{ color: "#666666" }}>User:</span>
-                                      <span className="font-medium" style={{ color: "#FFFFFF" }}>{tx.user}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span style={{ color: "#666666" }}>Merchant:</span>
-                                      <span style={{ color: "#A0A0A0" }}>{tx.merchant}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span style={{ color: "#666666" }}>Game:</span>
-                                      <span style={{ color: GAME_COLORS[tx.gameType].color }}>{tx.gameType}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span style={{ color: "#666666" }}>Status:</span>
-                                      <span className="font-semibold capitalize" style={{ color: STATUS_COLORS[tx.status].color }}>{tx.status}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
+                      return (
+                        <Fragment key={tx.id || i}>
+                          <tr
+                            className="transition-all cursor-pointer hover:brightness-110"
+                            style={{ borderBottom: "1px solid #1A1A1A", background: isExpanded ? "#1A1A1A" : "transparent" }}
+                            onClick={() => setExpandedId(isExpanded ? null : tx.id)}
+                          >
+                            <td className="pl-3 pr-1 py-2.5">
+                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round"
+                                style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0)", transition: "transform 0.2s" }}>
+                                <polyline points="4,2 8,6 4,10" />
+                              </svg>
+                            </td>
+                            <td className="px-3 py-2.5 text-[12px] font-medium" style={{ color: "#FFFFFF" }}>{tx.userName || tx.userPhone || "Unknown"}</td>
+                            <td className="px-3 py-2.5">
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: gameCol.bg, color: gameCol.color }}>
+                                {GAME_TYPE_LABELS[tx.gameType] || tx.gameType}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-[12px] font-semibold" style={{ color: "#F9E741" }}>{tx.betAmount?.toFixed(2)}</td>
+                            <td className="px-3 py-2.5 text-[12px] font-semibold" style={{ color: tx.winAmount > 0 ? "#22C55E" : "#666666" }}>
+                              {tx.winAmount > 0 ? `${tx.winAmount.toFixed(2)} \u20BE` : "\u2014"}
+                            </td>
+                            <td className="px-3 py-2.5 text-[11px]" style={{ color: "#A0A0A0" }}>
+                              {tx.poolBalanceBefore != null ? tx.poolBalanceBefore.toFixed(2) : "\u2014"}
+                            </td>
+                            <td className="px-3 py-2.5 text-[11px]" style={{ color: "#666666" }}>
+                              {tx.createdAt ? new Date(tx.createdAt).toLocaleString("ka-GE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
                             </td>
                           </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+
+                          {isExpanded && (
+                            <tr style={{ borderBottom: "1px solid #252525" }}>
+                              <td colSpan={7} className="px-4 py-4" style={{ background: "#0D0D0D" }}>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                  <div className="rounded-[8px] p-3 border" style={{ background: "#111111", borderColor: "#252525" }}>
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#666666" }}>{"\u10D3\u10D4\u10E2\u10D0\u10DA\u10D4\u10D1\u10D8"}</p>
+                                    <div className="space-y-1.5 text-[12px]">
+                                      <div className="flex justify-between">
+                                        <span style={{ color: "#666666" }}>ID:</span>
+                                        <span className="font-mono text-[10px]" style={{ color: "#F9E741" }}>{tx.id}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span style={{ color: "#666666" }}>{"\u10D7\u10D0\u10E0\u10D8\u10E6\u10D8"}:</span>
+                                        <span style={{ color: "#A0A0A0" }}>{tx.createdAt ? new Date(tx.createdAt).toLocaleString("ka-GE") : ""}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span style={{ color: "#666666" }}>{"\u10E4\u10E1\u10DD\u10DC\u10D8"}:</span>
+                                        <span className="font-semibold" style={{ color: "#F9E741" }}>{tx.betAmount?.toFixed(2)}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span style={{ color: "#666666" }}>{"\u10DB\u10DD\u10D2\u10D4\u10D1\u10D0"}:</span>
+                                        <span className="font-semibold" style={{ color: tx.winAmount > 0 ? "#22C55E" : "#666666" }}>{tx.winAmount > 0 ? `${tx.winAmount.toFixed(2)} \u20BE` : "\u2014"}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="rounded-[8px] p-3 border" style={{ background: "#111111", borderColor: "#252525" }}>
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#666666" }}>{"\u10DE\u10E3\u10DA\u10D8"}</p>
+                                    <div className="space-y-1.5 text-[12px]">
+                                      <div className="flex justify-between">
+                                        <span style={{ color: "#666666" }}>Before:</span>
+                                        <span style={{ color: "#A0A0A0" }}>{tx.poolBalanceBefore != null ? `${tx.poolBalanceBefore.toFixed(2)} \u20BE` : "\u2014"}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span style={{ color: "#666666" }}>After:</span>
+                                        <span style={{ color: "#A0A0A0" }}>{tx.poolBalanceAfter != null ? `${tx.poolBalanceAfter.toFixed(2)} \u20BE` : "\u2014"}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span style={{ color: "#666666" }}>Change:</span>
+                                        <span className="font-semibold" style={{ color: tx.winAmount > 0 ? "#EF4444" : "#666666" }}>
+                                          {tx.poolBalanceBefore != null && tx.poolBalanceAfter != null ? `${(tx.poolBalanceAfter - tx.poolBalanceBefore).toFixed(2)} \u20BE` : "\u2014"}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="rounded-[8px] p-3 border" style={{ background: "#111111", borderColor: "#252525" }}>
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#666666" }}>{"\u10DB\u10DD\u10DB\u10EE\u10DB\u10D0\u10E0\u10D4\u10D1\u10D4\u10DA\u10D8"}</p>
+                                    <div className="space-y-1.5 text-[12px]">
+                                      <div className="flex justify-between">
+                                        <span style={{ color: "#666666" }}>User:</span>
+                                        <span className="font-medium" style={{ color: "#FFFFFF" }}>{tx.userName || "\u2014"}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span style={{ color: "#666666" }}>Phone:</span>
+                                        <span style={{ color: "#A0A0A0" }}>{tx.userPhone || "\u2014"}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span style={{ color: "#666666" }}>Game:</span>
+                                        <span style={{ color: gameCol.color }}>{GAME_TYPE_LABELS[tx.gameType] || tx.gameType}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             {/* ═══ PAGINATION ═══ */}
             <div className="flex items-center justify-between px-4 py-3 border-t" style={{ borderColor: "#252525" }}>
               <p className="text-[11px]" style={{ color: "#666666" }}>
-                {filtered.length > 0 ? `${(currentPage - 1) * perPage + 1}-${Math.min(currentPage * perPage, filtered.length)} / ${filtered.length}` : "0 results"}
+                {total > 0 ? `${(page - 1) * PER_PAGE + 1}-${Math.min(page * PER_PAGE, total)} / ${total}` : "0 results"}
               </p>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage <= 1}
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  disabled={page <= 1}
                   className="w-8 h-8 flex items-center justify-center rounded-md transition-all active:scale-95 disabled:opacity-30"
                   style={{ background: "#1A1A1A" }}
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#A0A0A0" strokeWidth="2" strokeLinecap="round"><polyline points="9,3 5,7 9,11" /></svg>
                 </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <button key={p} onClick={() => setPage(p)}
-                    className="w-8 h-8 flex items-center justify-center rounded-md text-[12px] font-semibold transition-all active:scale-95"
-                    style={{ background: p === currentPage ? "#F9E741" : "#1A1A1A", color: p === currentPage ? "#000000" : "#A0A0A0" }}>
-                    {p}
-                  </button>
-                ))}
+                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                  let p: number;
+                  if (totalPages <= 7) p = i + 1;
+                  else if (page <= 4) p = i + 1;
+                  else if (page >= totalPages - 3) p = totalPages - 6 + i;
+                  else p = page - 3 + i;
+                  return (
+                    <button key={p} onClick={() => setPage(p)}
+                      className="w-8 h-8 flex items-center justify-center rounded-md text-[12px] font-semibold transition-all active:scale-95"
+                      style={{ background: p === page ? "#F9E741" : "#1A1A1A", color: p === page ? "#000000" : "#A0A0A0" }}>
+                      {p}
+                    </button>
+                  );
+                })}
                 <button
-                  onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage >= totalPages}
+                  onClick={() => setPage(Math.min(totalPages, page + 1))}
+                  disabled={page >= totalPages}
                   className="w-8 h-8 flex items-center justify-center rounded-md transition-all active:scale-95 disabled:opacity-30"
                   style={{ background: "#1A1A1A" }}
                 >

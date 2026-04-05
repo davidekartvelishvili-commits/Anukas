@@ -9,7 +9,13 @@
       "Bash(git push:*)",
       "Bash(npx tsc:*)",
       "Bash(npx next:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(node:*)",
+      "Bash(ls /c/Users/T0Y40RB0YS/desktop/cashbackapp/src/app/admin/*/page.tsx)",
+      "Read(//c/Users/T0Y40RB0YS/desktop/cashbackapp/shansi-backend/**)",
+      "Bash(grep -r \"NEXT_PUBLIC_API_URL\" /c/Users/T0Y40RB0YS/desktop/cashbackapp/.env* /c/Users/T0Y40RB0YS/desktop/cashbackapp/.vercel/)",
+      "Bash(grep -r \"NEXT_PUBLIC_API_URL\" /c/Users/T0Y40RB0YS/desktop/cashbackapp/next.config*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Success:', d.get\\('success'\\)\\); print\\('Has token:', bool\\(d.get\\('token'\\)\\)\\)\")"
     ]
   }
 }
