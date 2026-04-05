@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import BackHeader from "@/components/BackHeader";
 import BottomNav from "@/components/BottomNav";
+import { getGameHistory } from "@/services/games";
 
 /* ───────── SVG ICONS ───────── */
 
@@ -72,46 +73,16 @@ function WalletSmallIcon({ color = "#00E88F" }: { color?: string }) {
   );
 }
 
-/* ───────── TYPES + DATA ───────── */
+/* ───────── TYPES ───────── */
 
-type TxStatus = "won" | "lost" | "jackpot" | "pending";
+const GAME_LABELS: Record<string, string> = { slot: "Midnight Machine", plinko: "Lucky Drop", chicken_rush: "Lucky Step" };
 
-interface Transaction {
-  id: number;
-  place: string;
-  category: string;
-  amount: number;
-  cashback: number;
-  percent: number;
-  status: TxStatus;
-  time: string;
-  date: string;
-  dateLabel: string;
-}
-
-const TRANSACTIONS: Transaction[] = [
-  { id: 1, place: "Coffee Lab", category: "კაფე", amount: 4.50, cashback: 3.60, percent: 80, status: "won", time: "14:23", date: "2026-03-27", dateLabel: "დღეს, 27 მარტი" },
-  { id: 2, place: "Pizza House", category: "რესტორანი", amount: 22.00, cashback: 0, percent: 0, status: "lost", time: "12:05", date: "2026-03-27", dateLabel: "დღეს, 27 მარტი" },
-  { id: 3, place: "პური გულით", category: "საცხობი", amount: 3.20, cashback: 3.20, percent: 100, status: "jackpot", time: "09:15", date: "2026-03-27", dateLabel: "დღეს, 27 მარტი" },
-  { id: 4, place: "Stamba Café", category: "კაფე", amount: 8.90, cashback: 0, percent: 0, status: "pending", time: "18:40", date: "2026-03-27", dateLabel: "დღეს, 27 მარტი" },
-  { id: 5, place: "Nike Store", category: "მაღაზია", amount: 89.00, cashback: 44.50, percent: 50, status: "won", time: "16:30", date: "2026-03-26", dateLabel: "გუშინ, 26 მარტი" },
-  { id: 6, place: "Entrée", category: "რესტორანი", amount: 45.00, cashback: 0, percent: 0, status: "lost", time: "13:20", date: "2026-03-26", dateLabel: "გუშინ, 26 მარტი" },
-  { id: 7, place: "შემოხტა", category: "რესტორანი", amount: 32.50, cashback: 16.25, percent: 50, status: "won", time: "20:10", date: "2026-03-26", dateLabel: "გუშინ, 26 მარტი" },
-  { id: 8, place: "Lolita", category: "კაფე", amount: 6.00, cashback: 6.00, percent: 100, status: "jackpot", time: "11:45", date: "2026-03-25", dateLabel: "25 მარტი" },
-  { id: 9, place: "Bread House", category: "საცხობი", amount: 2.80, cashback: 0.56, percent: 20, status: "won", time: "08:30", date: "2026-03-25", dateLabel: "25 მარტი" },
-  { id: 10, place: "Coffee Lab", category: "კაფე", amount: 5.20, cashback: 0, percent: 0, status: "lost", time: "15:00", date: "2026-03-25", dateLabel: "25 მარტი" },
-  { id: 11, place: "Cinema City", category: "გართობა", amount: 15.00, cashback: 10.50, percent: 70, status: "won", time: "19:00", date: "2026-03-24", dateLabel: "24 მარტი" },
-  { id: 12, place: "Stamba Café", category: "კაფე", amount: 7.50, cashback: 0, percent: 0, status: "lost", time: "10:15", date: "2026-03-24", dateLabel: "24 მარტი" },
-];
-
-type FilterKey = "all" | "won" | "lost" | "jackpot" | "pending";
+type FilterKey = "all" | "won" | "lost";
 
 const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: "all", label: "ყველა" },
-  { key: "won", label: "მოგებული" },
-  { key: "lost", label: "წაგებული" },
-  { key: "jackpot", label: "ჯეკპოტი" },
-  { key: "pending", label: "მომლოდინე" },
+  { key: "all", label: "\u10E7\u10D5\u10D4\u10DA\u10D0" },
+  { key: "won", label: "\u10DB\u10DD\u10D2\u10D4\u10D1\u10E3\u10DA\u10D8" },
+  { key: "lost", label: "\u10EC\u10D0\u10D2\u10D4\u10D1\u10E3\u10DA\u10D8" },
 ];
 
 /* ───────── MAIN ───────── */
@@ -119,42 +90,77 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 export default function HistoryPage() {
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
+  const [games, setGames] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 50);
     return () => clearTimeout(t);
   }, []);
 
+  // Fetch game history
+  const fetchHistory = useCallback(async (pageNum: number, append = false) => {
+    if (pageNum === 1) setLoading(true);
+    else setLoadingMore(true);
+    try {
+      const data = await getGameHistory(pageNum) as any;
+      const items = data.history || [];
+      if (append) setGames((prev) => [...prev, ...items]);
+      else setGames(items);
+      setHasMore(items.length >= (data.pagination?.limit || 20));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchHistory(1); }, [fetchHistory]);
+
+  const handleLoadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchHistory(nextPage, true);
+  };
+
   // Filter
-  const filtered = useMemo(() => {
-    if (activeFilter === "all") return TRANSACTIONS;
-    if (activeFilter === "won") return TRANSACTIONS.filter((t) => t.status === "won");
-    if (activeFilter === "lost") return TRANSACTIONS.filter((t) => t.status === "lost");
-    if (activeFilter === "jackpot") return TRANSACTIONS.filter((t) => t.status === "jackpot");
-    return TRANSACTIONS.filter((t) => t.status === "pending");
-  }, [activeFilter]);
+  const filtered = activeFilter === "all" ? games
+    : activeFilter === "won" ? games.filter((g: any) => g.winAmount > 0)
+    : games.filter((g: any) => g.winAmount === 0);
 
   // Group by date
-  const grouped = useMemo(() => {
-    const groups: Record<string, { label: string; transactions: Transaction[] }> = {};
-    filtered.forEach((tx) => {
-      if (!groups[tx.date]) groups[tx.date] = { label: tx.dateLabel, transactions: [] };
-      groups[tx.date].transactions.push(tx);
+  const grouped = (() => {
+    const groups: Record<string, { label: string; transactions: any[] }> = {};
+    const today = new Date().toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    filtered.forEach((g: any) => {
+      const date = g.createdAt ? g.createdAt.split("T")[0] : "unknown";
+      if (!groups[date]) {
+        let label = date;
+        if (date === today) label = "\u10D3\u10E6\u10D4\u10E1";
+        else if (date === yesterday) label = "\u10D2\u10E3\u10E8\u10D8\u10DC";
+        else {
+          const d = new Date(date);
+          label = d.toLocaleDateString("ka-GE", { day: "numeric", month: "long" });
+        }
+        groups[date] = { label, transactions: [] };
+      }
+      groups[date].transactions.push(g);
     });
     return Object.entries(groups);
-  }, [filtered]);
+  })();
 
-  // Stats (from ALL transactions, not filtered)
-  const stats = useMemo(() => {
-    const totalSpent = TRANSACTIONS.reduce((s, t) => s + t.amount, 0);
-    const totalWon = TRANSACTIONS.reduce((s, t) => s + t.cashback, 0);
-    const wonCount = TRANSACTIONS.filter((t) => t.status === "won" || t.status === "jackpot").length;
-    const decidedCount = TRANSACTIONS.filter((t) => t.status !== "pending").length;
-    const winRate = decidedCount > 0 ? Math.round((wonCount / decidedCount) * 100) : 0;
-    return { totalSpent, totalWon, winRate };
-  }, []);
+  // Stats
+  const totalBet = games.reduce((s: number, g: any) => s + (g.betAmount || 0), 0);
+  const totalWon = games.reduce((s: number, g: any) => s + (g.winAmount || 0), 0);
+  const wonCount = games.filter((g: any) => g.winAmount > 0).length;
+  const winRate = games.length > 0 ? Math.round((wonCount / games.length) * 100) : 0;
 
   const stagger = (i: number) => ({
     opacity: visible ? 1 : 0,
@@ -162,41 +168,10 @@ export default function HistoryPage() {
     transition: `all 0.4s ease-out ${i * 0.08}s`,
   });
 
-  const getStatusIcon = (status: TxStatus) => {
-    switch (status) {
-      case "won":
-        return { icon: <Icon name="check" size={18} color="#00E88F" />, bg: "rgba(0,232,143,0.06)", border: "rgba(0,232,143,0.12)" };
-      case "lost":
-        return { icon: <Icon name="x" size={18} color="#FF5757" />, bg: "rgba(255,87,87,0.06)", border: "rgba(255,87,87,0.12)" };
-      case "jackpot":
-        return { icon: <CrownIcon />, bg: "rgba(255,215,0,0.06)", border: "rgba(255,215,0,0.12)" };
-      case "pending":
-        return { icon: <Icon name="clock" size={18} color="#FFB800" />, bg: "rgba(255,184,0,0.06)", border: "rgba(255,184,0,0.12)" };
-    }
-  };
-
-  const getResultText = (tx: Transaction) => {
-    if (tx.status === "pending") return { text: "მიმდინარე", color: "#FFB800" };
-    if (tx.status === "lost") return { text: "0%", color: "rgba(255,87,87,0.56)" };
-    if (tx.status === "jackpot") return { text: `+${tx.cashback.toFixed(2)}₾ (${tx.percent}%)`, color: "#FFD700" };
-    return { text: `+${tx.cashback.toFixed(2)}₾ (${tx.percent}%)`, color: "#00E88F" };
-  };
-
-  const getStatusBadge = (status: TxStatus) => {
-    const map = {
-      won: { text: "მოგებული", bg: "rgba(0,232,143,0.1)", color: "#00E88F" },
-      lost: { text: "წაგებული", bg: "rgba(255,87,87,0.1)", color: "#FF5757" },
-      jackpot: { text: "ჯეკპოტი", bg: "rgba(255,215,0,0.1)", color: "#FFD700" },
-      pending: { text: "მომლოდინე", bg: "rgba(255,184,0,0.1)", color: "#FFB800" },
-    };
-    return map[status];
-  };
-
-  const getSpinColor = (percent: number) => {
-    if (percent === 0) return "#FF5757";
-    if (percent >= 100) return "#FFD700";
-    if (percent >= 50) return "#00E88F";
-    return "#00C777";
+  const getStatusIcon = (won: boolean) => {
+    return won
+      ? { icon: <Icon name="check" size={18} color="#00E88F" />, bg: "rgba(0,232,143,0.06)", border: "rgba(0,232,143,0.12)" }
+      : { icon: <Icon name="x" size={18} color="#FF5757" />, bg: "rgba(255,87,87,0.06)", border: "rgba(255,87,87,0.12)" };
   };
 
   return (
@@ -227,7 +202,7 @@ export default function HistoryPage() {
             </div>
             <p className="text-[11px] text-[#475569] mb-1" style={{ fontFamily: "var(--font-dm-sans)" }}>დახარჯული</p>
             <p className="text-[18px] sm:text-[20px] font-bold text-[#F1F5F9] leading-tight" style={{ fontFamily: "var(--font-outfit)" }}>
-              {stats.totalSpent.toFixed(0)}₾
+              {totalBet.toFixed(2)}₾
             </p>
           </div>
 
@@ -238,7 +213,7 @@ export default function HistoryPage() {
             </div>
             <p className="text-[11px] text-[#475569] mb-1" style={{ fontFamily: "var(--font-dm-sans)" }}>მოგებული</p>
             <p className="text-[18px] sm:text-[20px] font-bold text-[#00E88F] leading-tight" style={{ fontFamily: "var(--font-outfit)" }}>
-              {stats.totalWon.toFixed(0)}₾
+              {totalWon.toFixed(2)}₾
             </p>
           </div>
 
@@ -249,7 +224,7 @@ export default function HistoryPage() {
             </div>
             <p className="text-[11px] text-[#475569] mb-1" style={{ fontFamily: "var(--font-dm-sans)" }}>მოგების %</p>
             <p className="text-[18px] sm:text-[20px] font-bold text-[#FFB800] leading-tight" style={{ fontFamily: "var(--font-outfit)" }}>
-              {stats.winRate}%
+              {winRate}%
             </p>
           </div>
         </div>
@@ -288,10 +263,15 @@ export default function HistoryPage() {
         </div>
 
         {/* ── Transaction list ── */}
-        {grouped.length > 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20" style={stagger(4)}>
+            <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#00E88F", borderTopColor: "transparent" }} />
+            <p className="text-[14px] text-[#475569] mt-4" style={{ fontFamily: "var(--font-dm-sans)" }}>Loading...</p>
+          </div>
+        ) : grouped.length > 0 ? (
           <div className="flex flex-col gap-5">
             {grouped.map(([date, group], gi) => {
-              const dayTotal = group.transactions.reduce((s, t) => s + t.amount, 0);
+              const dayBet = group.transactions.reduce((s: number, t: any) => s + (t.betAmount || 0), 0);
               return (
                 <div key={date} style={stagger(4 + gi)}>
                   {/* Date header */}
@@ -300,66 +280,54 @@ export default function HistoryPage() {
                       {group.label}
                     </span>
                     <span className="text-[12px] text-[#334155]" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                      -{dayTotal.toFixed(2)}₾
+                      {dayBet.toFixed(2)} bet
                     </span>
                   </div>
 
                   {/* Cards */}
                   <div className="flex flex-col gap-2.5">
-                    {group.transactions.map((tx) => {
-                      const si = getStatusIcon(tx.status);
-                      const result = getResultText(tx);
-                      const isExpanded = expandedId === tx.id;
-                      const isJackpot = tx.status === "jackpot";
-                      const badge = getStatusBadge(tx.status);
+                    {group.transactions.map((g: any) => {
+                      const won = g.winAmount > 0;
+                      const si = getStatusIcon(won);
+                      const isExpanded = expandedId === g.id;
+                      const gameLabel = GAME_LABELS[g.gameType] || g.gameType;
+                      const timeStr = g.createdAt ? new Date(g.createdAt).toLocaleTimeString("ka-GE", { hour: "2-digit", minute: "2-digit" }) : "";
 
                       return (
-                        <div key={tx.id}>
+                        <div key={g.id}>
                           <button
-                            onClick={() => setExpandedId(isExpanded ? null : tx.id)}
-                            className={`w-full text-left rounded-[14px] p-3.5 transition-all duration-200 active:scale-[0.98] ${isJackpot ? "animate-jackpotGlow" : ""}`}
+                            onClick={() => setExpandedId(isExpanded ? null : g.id)}
+                            className="w-full text-left rounded-[14px] p-3.5 transition-all duration-200 active:scale-[0.98]"
                             style={{
-                              background: isJackpot ? "linear-gradient(135deg, #141B2D, #1C1F10)" : "#141B2D",
-                              border: `1px solid ${isJackpot ? "rgba(255,215,0,0.2)" : "#1C2539"}`,
+                              background: "#141B2D",
+                              border: "1px solid #1C2539",
                               borderBottomLeftRadius: isExpanded ? 0 : 14,
                               borderBottomRightRadius: isExpanded ? 0 : 14,
                             }}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
-                                {/* Status icon */}
                                 <div
                                   className="w-[40px] h-[40px] rounded-[12px] flex items-center justify-center shrink-0"
                                   style={{ background: si.bg, border: `1px solid ${si.border}` }}
                                 >
                                   {si.icon}
                                 </div>
-
-                                {/* Info */}
                                 <div>
-                                  <div className="flex items-center gap-1.5">
-                                    <p className="text-[15px] font-bold text-[#F1F5F9] leading-tight" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                                      {tx.place}
-                                    </p>
-                                    {isJackpot && (
-                                      <span className="px-1.5 py-px rounded-[4px] text-[9px] font-bold text-[#FFD700]" style={{ fontFamily: "var(--font-outfit)", background: "rgba(255,215,0,0.15)" }}>
-                                        JACKPOT
-                                      </span>
-                                    )}
-                                  </div>
+                                  <p className="text-[15px] font-bold text-[#F1F5F9] leading-tight" style={{ fontFamily: "var(--font-dm-sans)" }}>
+                                    {gameLabel}
+                                  </p>
                                   <p className="text-[12px] text-[#475569] mt-0.5" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                                    {tx.category} · {tx.time}
+                                    {timeStr}
                                   </p>
                                 </div>
                               </div>
-
-                              {/* Amount + result */}
                               <div className="text-right shrink-0">
                                 <p className="text-[15px] font-bold text-[#F1F5F9]" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                                  {tx.amount.toFixed(2)}₾
+                                  {g.betAmount?.toFixed(2)} coin
                                 </p>
-                                <p className="text-[12px] font-semibold mt-0.5" style={{ fontFamily: "var(--font-dm-sans)", color: result.color }}>
-                                  {result.text}
+                                <p className="text-[12px] font-semibold mt-0.5" style={{ fontFamily: "var(--font-dm-sans)", color: won ? "#00E88F" : "rgba(255,87,87,0.56)" }}>
+                                  {won ? `+${g.winAmount.toFixed(2)}\u20BE` : "\u2014"}
                                 </p>
                               </div>
                             </div>
@@ -368,65 +336,40 @@ export default function HistoryPage() {
                           {/* Expanded details */}
                           <div
                             className="overflow-hidden transition-all duration-300 ease-out"
-                            style={{
-                              maxHeight: isExpanded ? 220 : 0,
-                              opacity: isExpanded ? 1 : 0,
-                            }}
+                            style={{ maxHeight: isExpanded ? 200 : 0, opacity: isExpanded ? 1 : 0 }}
                           >
                             <div
                               className="px-3.5 pb-3.5 pt-3 rounded-b-[14px] flex flex-col gap-2.5"
-                              style={{
-                                background: isJackpot ? "linear-gradient(135deg, #141B2D, #1C1F10)" : "#141B2D",
-                                borderLeft: `1px solid ${isJackpot ? "rgba(255,215,0,0.2)" : "#1C2539"}`,
-                                borderRight: `1px solid ${isJackpot ? "rgba(255,215,0,0.2)" : "#1C2539"}`,
-                                borderBottom: `1px solid ${isJackpot ? "rgba(255,215,0,0.2)" : "#1C2539"}`,
-                                borderTop: "1px solid #1C2539",
-                              }}
+                              style={{ background: "#141B2D", borderLeft: "1px solid #1C2539", borderRight: "1px solid #1C2539", borderBottom: "1px solid #1C2539", borderTop: "1px solid #1C2539" }}
                             >
-                              {/* Detail rows */}
                               <div className="flex items-center justify-between">
-                                <span className="text-[12px] text-[#475569]" style={{ fontFamily: "var(--font-dm-sans)" }}>თანხა</span>
-                                <span className="text-[13px] text-[#CBD5E1] font-medium" style={{ fontFamily: "var(--font-dm-sans)" }}>{tx.amount.toFixed(2)}₾</span>
+                                <span className="text-[12px] text-[#475569]" style={{ fontFamily: "var(--font-dm-sans)" }}>{"\u10D7\u10D0\u10DB\u10D0\u10E8\u10D8"}</span>
+                                <span className="text-[13px] text-[#CBD5E1] font-medium" style={{ fontFamily: "var(--font-dm-sans)" }}>{gameLabel}</span>
                               </div>
                               <div className="flex items-center justify-between">
-                                <span className="text-[12px] text-[#475569]" style={{ fontFamily: "var(--font-dm-sans)" }}>სპინის შედეგი</span>
-                                <span className="text-[13px] font-bold" style={{ fontFamily: "var(--font-outfit)", color: getSpinColor(tx.percent) }}>{tx.percent}%</span>
+                                <span className="text-[12px] text-[#475569]" style={{ fontFamily: "var(--font-dm-sans)" }}>{"\u10E4\u10E1\u10DD\u10DC\u10D8"}</span>
+                                <span className="text-[13px] font-bold" style={{ fontFamily: "var(--font-outfit)", color: "#F9E741" }}>{g.betAmount?.toFixed(2)}</span>
                               </div>
                               <div className="flex items-center justify-between">
-                                <span className="text-[12px] text-[#475569]" style={{ fontFamily: "var(--font-dm-sans)" }}>მოგება</span>
-                                <span className="text-[13px] font-medium" style={{ fontFamily: "var(--font-dm-sans)", color: tx.cashback > 0 ? (isJackpot ? "#FFD700" : "#00E88F") : "#475569" }}>
-                                  {tx.cashback > 0 ? `${tx.cashback.toFixed(2)}₾` : "—"}
+                                <span className="text-[12px] text-[#475569]" style={{ fontFamily: "var(--font-dm-sans)" }}>{"\u10DB\u10DD\u10D2\u10D4\u10D1\u10D0"}</span>
+                                <span className="text-[13px] font-medium" style={{ fontFamily: "var(--font-dm-sans)", color: won ? "#00E88F" : "#475569" }}>
+                                  {won ? `${g.winAmount.toFixed(2)}\u20BE` : "\u2014"}
                                 </span>
                               </div>
                               <div className="flex items-center justify-between">
-                                <span className="text-[12px] text-[#475569]" style={{ fontFamily: "var(--font-dm-sans)" }}>სტატუსი</span>
-                                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold" style={{ fontFamily: "var(--font-dm-sans)", background: badge.bg, color: badge.color }}>
-                                  {badge.text}
+                                <span className="text-[12px] text-[#475569]" style={{ fontFamily: "var(--font-dm-sans)" }}>{"\u10E1\u10E2\u10D0\u10E2\u10E3\u10E1\u10D8"}</span>
+                                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold" style={{
+                                  fontFamily: "var(--font-dm-sans)",
+                                  background: won ? "rgba(0,232,143,0.1)" : "rgba(255,87,87,0.1)",
+                                  color: won ? "#00E88F" : "#FF5757",
+                                }}>
+                                  {won ? "\u10DB\u10DD\u10D2\u10D4\u10D1\u10E3\u10DA\u10D8" : "\u10EC\u10D0\u10D2\u10D4\u10D1\u10E3\u10DA\u10D8"}
                                 </span>
                               </div>
                               <div className="flex items-center justify-between">
-                                <span className="text-[12px] text-[#475569]" style={{ fontFamily: "var(--font-dm-sans)" }}>დრო</span>
-                                <span className="text-[13px] text-[#CBD5E1]" style={{ fontFamily: "var(--font-dm-sans)" }}>{tx.time}</span>
+                                <span className="text-[12px] text-[#475569]" style={{ fontFamily: "var(--font-dm-sans)" }}>{"\u10D3\u10E0\u10DD"}</span>
+                                <span className="text-[13px] text-[#CBD5E1]" style={{ fontFamily: "var(--font-dm-sans)" }}>{timeStr}</span>
                               </div>
-
-                              {/* Cashback progress bar */}
-                              {tx.status !== "pending" && (
-                                <div className="mt-1">
-                                  <div className="w-full h-[6px] rounded-full bg-[#0A0F1C] overflow-hidden">
-                                    <div
-                                      className="h-full rounded-full transition-all duration-700 ease-out"
-                                      style={{
-                                        width: `${tx.percent}%`,
-                                        background: isJackpot
-                                          ? "linear-gradient(90deg, #FFD700, #FFA500)"
-                                          : tx.percent > 0
-                                          ? "linear-gradient(90deg, #00E88F, #00C777)"
-                                          : "#FF5757",
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                              )}
                             </div>
                           </div>
                         </div>
@@ -438,23 +381,24 @@ export default function HistoryPage() {
             })}
           </div>
         ) : (
-          /* Empty state */
           <div className="flex flex-col items-center justify-center py-20" style={stagger(4)}>
             <EmptyClockIcon />
             <p className="text-[16px] text-[#475569] font-medium mt-4" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              ტრანზაქცია ვერ მოიძებნა
+              {"\u10EF\u10D4\u10E0 \u10D0\u10E0 \u10D2\u10D0\u10E5\u10D5\u10E1 \u10D7\u10D0\u10DB\u10D0\u10E8\u10D4\u10D1\u10D8\u10E1 \u10D8\u10E1\u10E2\u10DD\u10E0\u10D8\u10D0"}
             </p>
           </div>
         )}
 
         {/* ── Load more ── */}
-        {grouped.length > 0 && (
+        {!loading && hasMore && games.length > 0 && (
           <button
-            className="w-full h-[44px] rounded-[12px] flex items-center justify-center gap-1.5 text-[14px] font-medium text-[#64748B] mt-5 transition-all duration-200 hover:bg-[#1C2539]/50 active:scale-[0.97]"
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="w-full h-[44px] rounded-[12px] flex items-center justify-center gap-1.5 text-[14px] font-medium text-[#64748B] mt-5 transition-all duration-200 hover:bg-[#1C2539]/50 active:scale-[0.97] disabled:opacity-50"
             style={{ ...stagger(8), fontFamily: "var(--font-dm-sans)", background: "#141B2D", border: "1px solid #1C2539" }}
           >
-            მეტის ჩატვირთვა
-            <ChevronDownIcon color="#64748B" />
+            {loadingMore ? "..." : "\u10DB\u10D4\u10E2\u10D8\u10E1 \u10E9\u10D0\u10E2\u10D5\u10D8\u10E0\u10D7\u10D5\u10D0"}
+            {!loadingMore && <ChevronDownIcon color="#64748B" />}
           </button>
         )}
       </div>
