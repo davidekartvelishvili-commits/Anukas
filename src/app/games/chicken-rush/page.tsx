@@ -40,7 +40,7 @@ function spawnFirework(x: number, y: number) {
 }
 
 export default function ChickenRushPage() {
-  const [balance, setBalance] = useState(5000);
+  const [balance, setBalance] = useState(0);
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [betAmount, setBetAmount] = useState(10);
   const [showBetPicker, setShowBetPicker] = useState(false);
@@ -81,6 +81,10 @@ export default function ChickenRushPage() {
       const sr = await startChickenRush(betAmount, difficulty);
       serverResultRef.current = sr;
 
+      // Sync coin balance from server (authoritative)
+      setBalance(sr.coinsRemaining);
+      storeCoin(sr.coinsRemaining);
+
       const tiles: TileState[][] = [];
       for (let r = 0; r < sr.totalSteps; r++) tiles.push(Array(sr.cols).fill("hidden"));
 
@@ -103,13 +107,12 @@ export default function ChickenRushPage() {
   useEffect(() => {
     if (prevDiff.current !== difficulty && autoStarted) {
       prevDiff.current = difficulty;
-      // Refund current bet if game was just started
+      // Don't refund locally — server handles balance. Just start new round.
       if (game && game.currentRow === 0) {
-        setBalance(balance + betAmount);
+        startRound();
       }
-      startRound();
     }
-  }, [difficulty, autoStarted, startRound, game, betAmount]);
+  }, [difficulty, autoStarted, startRound, game]);
 
 
   const handleTileClick = useCallback(async (row: number, col: number, e: React.MouseEvent | React.TouchEvent) => {

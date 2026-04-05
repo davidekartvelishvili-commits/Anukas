@@ -12,6 +12,8 @@ export interface ChickenRushServerResult {
   totalWin: number;
   bonusWin: number;
   won: boolean;
+  coinsRemaining: number;
+  newBalance: number;
 }
 
 export async function startChickenRush(

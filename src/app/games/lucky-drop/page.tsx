@@ -32,7 +32,7 @@ export default function LuckyDropPage() {
     rightWall: [] as { x1: number; y1: number; x2: number; y2: number }[],
   });
 
-  const [balance, setBalance] = useState(5000);
+  const [balance, setBalance] = useState(0);
   const [risk, setRisk] = useState<RiskLevel>("low");
   const [result, setResult] = useState<{ text: string; isJP: boolean } | null>(null);
   const [showWin, setShowWin] = useState(false);

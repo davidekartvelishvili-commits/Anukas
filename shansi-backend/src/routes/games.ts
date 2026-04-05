@@ -90,6 +90,8 @@ games.post("/chicken-rush", async (c) => {
         totalWin: result.totalWin,
         bonusWin: result.bonusWin,
         won: result.won,
+        coinsRemaining: result.coinsRemaining,
+        newBalance: result.newBalance,
       },
     });
   } catch (err: any) {

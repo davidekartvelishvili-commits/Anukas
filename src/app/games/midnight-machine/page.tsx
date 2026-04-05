@@ -9,7 +9,7 @@ import { setCoinBalance as storeCoin, setCashBalance as storeCash } from "@/serv
 const SlotMachine = dynamic(() => import("./SlotMachine"), { ssr: false });
 
 export default function MidnightMachinePage() {
-  const [coinBalance, setCoinBalance] = useState(5000);
+  const [coinBalance, setCoinBalance] = useState(0);
   const [cashBalance, setCashBalance] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinTrigger, setSpinTrigger] = useState(0);

@@ -31,9 +31,8 @@ export async function ensureActiveTransaction(): Promise<{ coinsRemaining: numbe
   if (data.hasActiveTransaction) {
     return { coinsRemaining: data.coinsRemaining };
   }
-  // No active transaction — create one (100 coins for 10₾ for testing)
-  await createTransaction(10, 100);
-  return { coinsRemaining: 100 };
+  // No active transaction — user has 0 coins, must purchase to play
+  return { coinsRemaining: 0 };
 }
 
 export async function playGame(gameType: "slot" | "plinko" | "chicken_rush"): Promise<GameResult> {
