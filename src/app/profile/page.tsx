@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getCoinBalance, getCashBalance, exchange as doExchange } from "@/services/balance";
+import { getMe, getStoredUser } from "@/services/auth";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -13,35 +13,41 @@ export default function ProfilePage() {
   const [activeFilter, setActiveFilter] = useState("All Activity");
   const [gender, setGender] = useState("Male");
   const [showEditCode, setShowEditCode] = useState(false);
-  const [referralCode, setReferralCode] = useState(() => {
-    if (typeof window === "undefined") return "CASHBACK001";
-    return localStorage.getItem("shansi_referral") || "CASHBACK001";
-  });
+  const [referralCode, setReferralCode] = useState("");
   const [editCodeInput, setEditCodeInput] = useState("");
   const [showEditName, setShowEditName] = useState(false);
   const [showNameConfirm, setShowNameConfirm] = useState(false);
   const [editNameInput, setEditNameInput] = useState("");
   const [nameError, setNameError] = useState("");
-  const [username, setUsername] = useState(() => {
-    if (typeof window === "undefined") return "Cashback User";
-    try {
-      const stored = localStorage.getItem("shansi_user");
-      if (stored) {
-        const user = JSON.parse(stored);
-        return user.name || "Cashback User";
-      }
-    } catch {}
-    return "Cashback User";
-  });
+  const [username, setUsername] = useState("");
   const [showCoinNotif, setShowCoinNotif] = useState(false);
   const [showExchange, setShowExchange] = useState(false);
   const [exchangeAmount, setExchangeAmount] = useState("");
-  const [cashBalance, setCashBalanceState] = useState(28);
-  const [coinBalance, setCoinBalanceState] = useState(5000);
+  const [cashBalance, setCashBalanceState] = useState(0);
+  const [coinBalance, setCoinBalanceState] = useState(0);
+  const [userPhone, setUserPhone] = useState("");
 
   useEffect(() => {
-    setCashBalanceState(getCashBalance());
-    setCoinBalanceState(getCoinBalance());
+    // Load cached data first for instant render
+    const stored = getStoredUser() as any;
+    if (stored) {
+      setUsername(stored.name || "");
+      setUserPhone(stored.phone || "");
+      if (stored.referralCode) setReferralCode(stored.referralCode);
+      if (stored.coinBalance !== undefined) setCoinBalanceState(stored.coinBalance);
+      if (stored.balance !== undefined) setCashBalanceState(stored.balance);
+    }
+    // Then fetch fresh from server
+    getMe().then((data: any) => {
+      if (data.success && data.user) {
+        const u = data.user;
+        setUsername(u.name || "");
+        setUserPhone(u.phone || "");
+        setCoinBalanceState(u.coinBalance || 0);
+        setCashBalanceState(u.balance || 0);
+        if (u.referralCode) setReferralCode(u.referralCode);
+      }
+    }).catch(() => {});
     const saved = localStorage.getItem("user-gender");
     if (saved) setGender(saved);
     const t = setTimeout(() => setMounted(true), 50);
@@ -124,7 +130,7 @@ export default function ProfilePage() {
                 className="text-white text-[22px] font-bold"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
-                {username}
+                {username || userPhone || "User"}
               </h1>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M10 1.5l2.5 2.5M1.5 12.5l.5-2L9.5 3l2.5 2.5L4.5 13l-3 .5z" />
@@ -492,7 +498,7 @@ export default function ProfilePage() {
                 onClick={() => {
                   if (editCodeInput.length >= 4) {
                     setReferralCode(editCodeInput);
-                    localStorage.setItem("shansi_referral", editCodeInput);
+                    // Referral code is read-only from server
                     setShowEditCode(false);
                   }
                 }}
@@ -784,14 +790,11 @@ export default function ProfilePage() {
             <p className="text-[13px] text-[#999] text-center mb-5" style={{ fontFamily: "var(--font-dm-sans)" }}>1₾ Cash = 100 Coin</p>
 
             <button
-              onClick={() => {
-                const amt = parseFloat(exchangeAmount);
-                if (doExchange(amt)) { setCashBalanceState(getCashBalance()); setCoinBalanceState(getCoinBalance()); setShowExchange(false); setExchangeAmount(""); }
-              }}
-              disabled={!exchangeAmount || parseFloat(exchangeAmount) <= 0 || parseFloat(exchangeAmount) > cashBalance}
-              className="mx-auto block px-10 py-8 rounded-full text-[16px] font-bold transition-all active:scale-[0.97] disabled:opacity-40"
+              disabled
+              className="mx-auto block px-10 py-8 rounded-full text-[16px] font-bold transition-all disabled:opacity-40"
               style={{ background: "#F9E741", color: "#000", fontFamily: "var(--font-outfit)" }}
-            >Exchange</button>
+            >{"\u10DB\u10D0\u10DA\u10D4"}</button>
+            <p className="text-[11px] text-[#666] text-center mt-2" style={{ fontFamily: "var(--font-dm-sans)" }}>{"\u10DB\u10D0\u10DA\u10D4 \u10EE\u10D4\u10DA\u10DB\u10D8\u10E1\u10D0\u10EC\u10D5\u10D3\u10DD\u10DB\u10D8 \u10D8\u10E5\u10DC\u10D4\u10D1\u10D0"}</p>
           </div>
         </div>
       )}
