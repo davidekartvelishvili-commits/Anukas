@@ -114,13 +114,13 @@ export default function MerchantTransactionsPage() {
                   </div>
                   <div className="w-20 text-center">
                     <p className="text-sm" style={{ color: "#F97316" }}>
-                      {(tx.commission ?? 0).toFixed(2)} ₾
+                      {(tx.commissionAmount ?? 0).toFixed(2)} ₾
                     </p>
                   </div>
                   <div className="w-28 text-right">
                     <p className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
-                      {tx.created_at
-                        ? new Date(tx.created_at).toLocaleString("ka-GE", {
+                      {tx.createdAt
+                        ? new Date(tx.createdAt).toLocaleString("ka-GE", {
                             day: "2-digit",
                             month: "short",
                             year: "numeric",
@@ -128,8 +128,8 @@ export default function MerchantTransactionsPage() {
                         : "—"}
                     </p>
                     <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.25)" }}>
-                      {tx.created_at
-                        ? new Date(tx.created_at).toLocaleString("ka-GE", {
+                      {tx.createdAt
+                        ? new Date(tx.createdAt).toLocaleString("ka-GE", {
                             hour: "2-digit",
                             minute: "2-digit",
                           })

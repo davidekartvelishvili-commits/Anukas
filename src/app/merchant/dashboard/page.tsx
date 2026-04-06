@@ -43,25 +43,25 @@ export default function MerchantDashboardPage() {
   const statCards = [
     {
       label: "დღის შემოსავალი",
-      value: stats?.todayRevenue ?? stats?.today_revenue ?? 0,
+      value: stats?.todayAmount ?? 0,
       suffix: "₾",
       color: "#FFD700",
     },
     {
       label: "სულ შემოსავალი",
-      value: stats?.totalRevenue ?? stats?.total_revenue ?? 0,
+      value: stats?.totalAmount ?? 0,
       suffix: "₾",
       color: "#22C55E",
     },
     {
       label: "სულ ტრანზაქციები",
-      value: stats?.totalTransactions ?? stats?.total_transactions ?? 0,
+      value: stats?.totalTransactions ?? 0,
       suffix: "",
       color: "#3B82F6",
     },
     {
       label: "კომისია",
-      value: stats?.totalCommission ?? stats?.total_commission ?? 0,
+      value: stats?.totalCommission ?? 0,
       suffix: "₾",
       color: "#F97316",
     },
@@ -165,8 +165,8 @@ export default function MerchantDashboardPage() {
                     {(tx.amount ?? 0).toFixed(2)} ₾
                   </p>
                   <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>
-                    {tx.created_at
-                      ? new Date(tx.created_at).toLocaleString("ka-GE", {
+                    {tx.createdAt
+                      ? new Date(tx.createdAt).toLocaleString("ka-GE", {
                           day: "2-digit",
                           month: "short",
                           hour: "2-digit",
@@ -177,7 +177,7 @@ export default function MerchantDashboardPage() {
                 </div>
                 <div className="text-right">
                   <p className="text-xs" style={{ color: "#F97316" }}>
-                    კომისია: {(tx.commission ?? 0).toFixed(2)} ₾
+                    კომისია: {(tx.commissionAmount ?? 0).toFixed(2)} ₾
                   </p>
                 </div>
               </div>

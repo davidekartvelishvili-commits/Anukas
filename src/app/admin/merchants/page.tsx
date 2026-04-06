@@ -309,6 +309,29 @@ export default function MerchantsPage() {
                                     <p className="text-[13px]" style={{ color: "#FFF" }}>{detail.merchant?.contactPerson || "—"}</p>
                                   </div>
                                   <div>
+                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10D9\u10DD\u10DB\u10D8\u10E1\u10D8\u10D0 %"}</p>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="number"
+                                        min="0" max="100" step="0.5"
+                                        defaultValue={detail.merchant?.commissionPercent ?? 3}
+                                        onBlur={async (e) => {
+                                          const val = parseFloat(e.target.value);
+                                          if (!isNaN(val) && val >= 0 && val <= 100) {
+                                            try {
+                                              await updateMerchant(detail.merchant.id, { commission_percent: val });
+                                              showToast("\u10D9\u10DD\u10DB\u10D8\u10E1\u10D8\u10D0 \u10D2\u10D0\u10DC\u10D0\u10EE\u10DA\u10D3\u10D0!");
+                                              fetchMerchants();
+                                            } catch { showToast("\u10E8\u10D4\u10EA\u10D3\u10DD\u10DB\u10D0", "error"); }
+                                          }
+                                        }}
+                                        className="w-16 text-[13px] px-2 py-1 rounded-[6px] outline-none text-center"
+                                        style={{ background: "#252525", color: "#F9E741", border: "1px solid #333" }}
+                                      />
+                                      <span className="text-[13px]" style={{ color: "#666" }}>%</span>
+                                    </div>
+                                  </div>
+                                  <div>
                                     <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10EF\u10D0\u10DB\u10E3\u10E0\u10D8 \u10D9\u10DD\u10DB\u10D8\u10E1\u10D8\u10D0"}</p>
                                     <p className="text-[13px]" style={{ color: "#22C55E" }}>{detail.stats?.totalCommission?.toFixed(2) || "0.00"} {"\u20BE"}</p>
                                   </div>
