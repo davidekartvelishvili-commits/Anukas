@@ -6,18 +6,85 @@ import { playGame, ensureActiveTransaction } from "@/services/games";
 import { setCoinBalance as storeCoin, setCashBalance as storeCash } from "@/services/balance";
 
 const ROWS = 12;
-const BASE_GRAVITY = 0.4;
-const BOUNCE = 0.55;
-const FRICTION = 0.98;
 
 interface Peg { x: number; y: number; r: number; glow: number }
 interface Slot { x: number; y: number; w: number; h: number; mult: number; color: string; glow: number }
 interface TrailPoint { x: number; y: number; a: number }
+
+// Path-based ball: follows pre-calculated waypoints
 interface Ball {
-  x: number; y: number; vx: number; vy: number;
+  x: number; y: number;
   r: number; alive: boolean; settled: boolean;
-  trail: TrailPoint[]; targetSlot: number;
-  data: DropResult; gravity: number;
+  trail: TrailPoint[];
+  targetSlot: number;
+  data: DropResult;
+  // Path animation
+  path: { x: number; y: number }[];
+  pathProgress: number; // 0 to 1
+  pathSpeed: number;
+}
+
+// Generate a natural path from top to target slot
+function generateBallPath(
+  startX: number, startY: number,
+  targetSlotIdx: number, pegs: Peg[], slots: Slot[],
+  gapX: number, gapY: number, rows: number
+): { x: number; y: number }[] {
+  const path: { x: number; y: number }[] = [];
+  path.push({ x: startX, y: startY - 30 });
+
+  // Build peg grid: for each row, get the peg positions
+  const pegRows: { x: number; y: number }[][] = [];
+  let pegIdx = 0;
+  for (let row = 0; row < rows; row++) {
+    const count = row + 3;
+    pegRows.push(pegs.slice(pegIdx, pegIdx + count));
+    pegIdx += count;
+  }
+
+  // Calculate target X from target slot
+  const targetSlot = slots[targetSlotIdx];
+  const targetX = targetSlot ? targetSlot.x + targetSlot.w / 2 : startX;
+
+  // Work backwards: determine which column we need at each row to reach target
+  // At row N, there are N+3 pegs. The ball falls between pegs.
+  // Between peg i and peg i+1, the ball can go left (toward i) or right (toward i+1)
+
+  // Forward approach: start at center, bias toward target
+  let currentX = startX;
+
+  for (let row = 0; row < rows; row++) {
+    const rowPegs = pegRows[row];
+    if (!rowPegs || rowPegs.length === 0) continue;
+
+    // Find closest peg in this row
+    let closestPeg = rowPegs[0];
+    let closestDist = Infinity;
+    for (const p of rowPegs) {
+      const d = Math.abs(p.x - currentX);
+      if (d < closestDist) { closestDist = d; closestPeg = p; }
+    }
+
+    // Decide: go left or right of this peg, biased toward target
+    const biasToTarget = (targetX - currentX) * 0.15;
+    const randomOffset = (Math.random() - 0.5) * gapX * 0.4;
+    const goRight = (biasToTarget + randomOffset) > 0;
+
+    const offsetX = (goRight ? 1 : -1) * gapX * (0.3 + Math.random() * 0.2);
+    currentX = closestPeg.x + offsetX;
+
+    // Add slight wobble point above the peg (ball approaching)
+    const wobbleX = currentX + (Math.random() - 0.5) * gapX * 0.1;
+    path.push({ x: wobbleX, y: closestPeg.y - gapY * 0.15 });
+
+    // Add the bounce point (at peg level)
+    path.push({ x: currentX, y: closestPeg.y + gapY * 0.3 });
+  }
+
+  // Final: land in the target slot
+  path.push({ x: targetX, y: targetSlot ? targetSlot.y + targetSlot.h * 0.3 : startY + rows * gapY });
+
+  return path;
 }
 
 export default function LuckyDropPage() {
@@ -190,92 +257,61 @@ export default function LuckyDropPage() {
         ctx.fillRect(sl.x + sl.w - 0.5, sl.y, 1, sl.h);
       }
 
-      // Balls
+      // Balls — path-based animation
       for (let i = s.balls.length - 1; i >= 0; i--) {
         const b = s.balls[i];
         if (!b.alive) { s.balls.splice(i, 1); continue; }
 
         if (!b.settled) {
-          b.vy += b.gravity;
-          b.vx *= FRICTION;
-          b.x += b.vx; b.y += b.vy;
+          // Advance along path
+          b.pathProgress += b.pathSpeed;
 
-          // Trail
-          b.trail.push({ x: b.x, y: b.y, a: 1 });
-          if (b.trail.length > 12) b.trail.shift();
-          b.trail.forEach((t) => (t.a *= 0.85));
+          if (b.pathProgress >= 1) {
+            // Reached end of path — settle
+            b.pathProgress = 1;
+            b.settled = true;
+            const last = b.path[b.path.length - 1];
+            b.x = last.x;
+            b.y = last.y;
 
-          // Peg collisions
-          for (const peg of s.pegs) {
-            const dx = b.x - peg.x, dy = b.y - peg.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const minD = b.r + peg.r;
-            if (dist < minD) {
-              const nx = dx / dist, ny = dy / dist;
-              const rv = b.vx * nx + b.vy * ny;
-              if (rv < 0) {
-                b.vx -= (1 + BOUNCE) * rv * nx;
-                b.vy -= (1 + BOUNCE) * rv * ny;
-                b.vx += (Math.random() - 0.5) * 1.2;
-              }
-              const ov = minD - dist;
-              b.x += nx * ov; b.y += ny * ov;
-              peg.glow = 1;
-            }
-          }
-
-          // Angled wall collisions — keep ball inside the peg triangle
-          for (const wall of s.leftWall) {
-            const wallY = b.y;
-            if (wallY >= wall.y1 && wallY <= wall.y2) {
-              const t = (wallY - wall.y1) / (wall.y2 - wall.y1);
-              const wallX = wall.x1 + t * (wall.x2 - wall.x1) - s.gapX * 0.5;
-              if (b.x < wallX + b.r) {
-                b.x = wallX + b.r;
-                b.vx = Math.abs(b.vx) * 0.5;
-              }
-            }
-          }
-          for (const wall of s.rightWall) {
-            const wallY = b.y;
-            if (wallY >= wall.y1 && wallY <= wall.y2) {
-              const t = (wallY - wall.y1) / (wall.y2 - wall.y1);
-              const wallX = wall.x1 + t * (wall.x2 - wall.x1) + s.gapX * 0.5;
-              if (b.x > wallX - b.r) {
-                b.x = wallX - b.r;
-                b.vx = -Math.abs(b.vx) * 0.5;
-              }
-            }
-          }
-
-          // Hard screen walls as last resort
-          if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx) * 0.5; }
-          if (b.x > W - b.r) { b.x = W - b.r; b.vx = -Math.abs(b.vx) * 0.5; }
-
-          // Steer ball toward target slot in bottom third
-          const targetSlot = s.slots[b.targetSlot];
-          if (targetSlot && b.y > s.startY + s.gapY * (ROWS * 0.6)) {
-            const targetX = targetSlot.x + targetSlot.w / 2;
-            const dx = targetX - b.x;
-            const progress = Math.min(1, (b.y - s.startY - s.gapY * (ROWS * 0.6)) / (s.gapY * ROWS * 0.4));
-            const steerForce = dx * 0.02 * progress;
-            b.vx += steerForce;
-          }
-
-          // Slot landing — snap to target slot
-          if (b.y >= (s.slots[0]?.y || H)) {
-            b.settled = true; b.vy = 0; b.vx = 0;
-            // Force ball into correct target slot
-            if (targetSlot) {
-              b.x = targetSlot.x + targetSlot.w / 2;
-            }
+            // Glow the landing slot
             for (const sl of s.slots) {
               if (b.x >= sl.x && b.x <= sl.x + sl.w) { sl.glow = 1; break; }
             }
-            // Trigger win display from settled ball
             if (typeof (b as any)._onSettle === "function") (b as any)._onSettle();
-            setTimeout(() => { b.alive = false; }, 400);
+            setTimeout(() => { b.alive = false; }, 500);
+          } else {
+            // Interpolate position along path with easing
+            const totalLen = b.path.length - 1;
+            const rawIdx = b.pathProgress * totalLen;
+            const idx = Math.floor(rawIdx);
+            const frac = rawIdx - idx;
+
+            const p0 = b.path[Math.min(idx, totalLen)];
+            const p1 = b.path[Math.min(idx + 1, totalLen)];
+
+            // Ease-in for Y (gravity feel), smooth for X
+            const easedFrac = frac;
+            b.x = p0.x + (p1.x - p0.x) * easedFrac;
+            b.y = p0.y + (p1.y - p0.y) * easedFrac;
+
+            // Speed up as ball falls (gravity acceleration)
+            b.pathSpeed = Math.min(0.025, b.pathSpeed + 0.00008);
+
+            // Light up nearby pegs
+            for (const peg of s.pegs) {
+              const dx = b.x - peg.x, dy = b.y - peg.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < s.gapY * 0.4) {
+                peg.glow = Math.max(peg.glow, 1 - dist / (s.gapY * 0.4));
+              }
+            }
           }
+
+          // Trail
+          b.trail.push({ x: b.x, y: b.y, a: 1 });
+          if (b.trail.length > 14) b.trail.shift();
+          b.trail.forEach((t) => (t.a *= 0.88));
         }
 
         // Draw trail
@@ -342,9 +378,6 @@ export default function LuckyDropPage() {
     pendingBallsRef.current++;
     dropCount.current++;
 
-    const n = dropCount.current;
-    const gravities = [0.35, 0.5, 0.3, 0.55, 0.42, 0.48];
-    const gravity = gravities[n % gravities.length];
     const currentRisk = risk;
     const currentBet = betAmount;
 
@@ -376,14 +409,18 @@ export default function LuckyDropPage() {
 
       const s = stateRef.current;
       const ballR = Math.max(8, s.W * 0.015);
+      const startX = s.W / 2 + (Math.random() - 0.5) * s.gapX * 0.4;
+      const path = generateBallPath(startX, s.startY, data.slotIndex, s.pegs, s.slots, s.gapX, s.gapY, ROWS);
       const ball: Ball = {
-        x: s.W / 2 + (Math.random() - 0.5) * s.gapX * 0.6,
-        y: s.startY - 40,
-        vx: (Math.random() - 0.5) * 1.5,
-        vy: 0, r: ballR,
+        x: startX,
+        y: s.startY - 30,
+        r: ballR,
         alive: true, settled: false,
         trail: [], targetSlot: data.slotIndex,
-        data, gravity,
+        data,
+        path,
+        pathProgress: 0,
+        pathSpeed: 0.008 + Math.random() * 0.004,
       };
 
       (ball as any)._onSettle = () => {
