@@ -384,8 +384,10 @@ export default function LuckyDropPage() {
 
     // Fire API immediately (parallel — no queue)
     playGame("plinko").then((serverResult: any) => {
-      // Always keep the latest server balance
-      lastServerCoinsRef.current = serverResult.coinsRemaining;
+      // Always keep the LOWEST server balance (most up-to-date after all deductions)
+      if (lastServerCoinsRef.current < 0 || serverResult.coinsRemaining < lastServerCoinsRef.current) {
+        lastServerCoinsRef.current = serverResult.coinsRemaining;
+      }
 
       // Handle bonus round: coins hit 0, then bonus coins added after a delay
       if (serverResult.bonusRound && serverResult.freeCoins) {
@@ -455,10 +457,11 @@ export default function LuckyDropPage() {
         }
         // Always sync to server balance — never let it go UP from local
         setBalance((prev) => Math.min(prev, serverResult.coinsRemaining));
-        // When last ball settles, set exact server balance
+        // When last ball settles, set exact server balance and reset for next batch
         if (pendingBallsRef.current === 0) {
           setBalance(lastServerCoinsRef.current);
           storeCoin(lastServerCoinsRef.current);
+          lastServerCoinsRef.current = -1;
         }
       };
 
@@ -471,6 +474,7 @@ export default function LuckyDropPage() {
       if (pendingBallsRef.current === 0 && lastServerCoinsRef.current >= 0) {
         setBalance(lastServerCoinsRef.current);
         storeCoin(lastServerCoinsRef.current);
+        lastServerCoinsRef.current = -1;
       }
       // Show error briefly
       setBigWinText(err.message || "\u10E8\u10D4\u10EA\u10D3\u10DD\u10DB\u10D0");
