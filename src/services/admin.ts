@@ -195,3 +195,19 @@ export function isAdminAuthenticated(): boolean {
   if (typeof window === "undefined") return false;
   return !!localStorage.getItem("adminToken");
 }
+
+// Algorithm simulation
+export async function startSimulation(userCount: number, minSpend: number, maxSpend: number) {
+  return adminFetch("/admin/algorithm/simulate", {
+    method: "POST",
+    body: JSON.stringify({ userCount, minSpend, maxSpend }),
+  });
+}
+
+export async function pollSimulation(jobId: string) {
+  return adminFetch(`/admin/algorithm/simulate/${jobId}`);
+}
+
+export async function getSimulationHistory() {
+  return adminFetch("/admin/algorithm/simulate-history");
+}

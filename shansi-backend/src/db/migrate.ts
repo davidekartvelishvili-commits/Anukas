@@ -97,6 +97,18 @@ async function migrate() {
       details TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS simulation_runs (
+      id TEXT PRIMARY KEY,
+      admin_id TEXT NOT NULL,
+      user_count INTEGER NOT NULL,
+      min_spend REAL NOT NULL,
+      max_spend REAL NOT NULL,
+      status TEXT NOT NULL DEFAULT 'running',
+      progress INTEGER NOT NULL DEFAULT 0,
+      results TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      completed_at TEXT
+    )`,
   ];
 
   for (const s of statements) {

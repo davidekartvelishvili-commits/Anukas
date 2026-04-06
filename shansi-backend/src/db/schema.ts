@@ -206,3 +206,16 @@ export const systemConfig = sqliteTable("system_config", {
   value: text("value").notNull(),
   updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
 });
+
+export const simulationRuns = sqliteTable("simulation_runs", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(),
+  userCount: integer("user_count").notNull(),
+  minSpend: real("min_spend").notNull(),
+  maxSpend: real("max_spend").notNull(),
+  status: text("status").default("running").notNull(), // running | complete | error
+  progress: integer("progress").default(0).notNull(),
+  results: text("results"), // JSON blob
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+  completedAt: text("completed_at"),
+});

@@ -6,10 +6,11 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments } from "../db/schema.js";
+import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns } from "../db/schema.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/errors.js";
+import { runSimulation } from "../services/simulation.js";
 
 const admin = new Hono<AdminEnv>();
 
@@ -1225,6 +1226,90 @@ admin.post("/transactions/:userId/reset", adminMiddleware, async (c) => {
       totalCashWon: tx.totalCashWon,
       guaranteedMinimum: tx.guaranteedMinimum,
       status: tx.status,
+    })),
+  });
+});
+
+// ── Algorithm Simulation ──
+
+const simulateSchema = z.object({
+  userCount: z.number().int().min(10).max(10000),
+  minSpend: z.number().min(0.5).max(10000),
+  maxSpend: z.number().min(0.5).max(10000),
+});
+
+// POST /admin/algorithm/simulate — start a simulation job
+admin.post("/algorithm/simulate", adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const parsed = simulateSchema.safeParse(body);
+  if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
+  if (parsed.data.maxSpend < parsed.data.minSpend) throw new BadRequestError("maxSpend must be >= minSpend");
+
+  const adminId = c.get("adminId");
+  const db = getDb();
+  const jobId = nanoid();
+
+  // Create job record
+  await db.insert(simulationRuns).values({
+    id: jobId,
+    adminId,
+    userCount: parsed.data.userCount,
+    minSpend: parsed.data.minSpend,
+    maxSpend: parsed.data.maxSpend,
+    status: "running",
+    progress: 0,
+  });
+
+  // Run simulation in background (don't await)
+  runSimulation(jobId, parsed.data.userCount, parsed.data.minSpend, parsed.data.maxSpend).catch(async (err) => {
+    await db.update(simulationRuns).set({
+      status: "error",
+      results: JSON.stringify({ error: err.message }),
+      completedAt: new Date().toISOString(),
+    }).where(eq(simulationRuns.id, jobId));
+  });
+
+  await logAction(adminId, "start_simulation", `Started simulation: ${parsed.data.userCount} users, ${parsed.data.minSpend}-${parsed.data.maxSpend}₾`);
+  return c.json({ success: true, jobId });
+});
+
+// GET /admin/algorithm/simulate/:jobId — poll for results
+admin.get("/algorithm/simulate/:jobId", adminMiddleware, async (c) => {
+  const jobId = c.req.param("jobId")!;
+  if (!jobId) throw new BadRequestError("jobId required");
+
+  const db = getDb();
+  const [job] = await db.select().from(simulationRuns).where(eq(simulationRuns.id, jobId)).limit(1);
+  if (!job) return c.json({ success: false, message: "Job not found" }, 404);
+
+  return c.json({
+    success: true,
+    status: job.status,
+    progress: job.progress,
+    total: job.userCount,
+    results: job.results ? JSON.parse(job.results) : null,
+  });
+});
+
+// GET /admin/algorithm/simulate-history — last 10 test runs
+admin.get("/algorithm/simulate-history", adminMiddleware, async (c) => {
+  const db = getDb();
+  const runs = await db.select().from(simulationRuns)
+    .orderBy(desc(simulationRuns.createdAt))
+    .limit(10);
+
+  return c.json({
+    success: true,
+    runs: runs.map(r => ({
+      id: r.id,
+      userCount: r.userCount,
+      minSpend: r.minSpend,
+      maxSpend: r.maxSpend,
+      status: r.status,
+      progress: r.progress,
+      createdAt: r.createdAt,
+      completedAt: r.completedAt,
+      results: r.results ? JSON.parse(r.results) : null,
     })),
   });
 });
