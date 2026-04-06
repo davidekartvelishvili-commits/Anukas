@@ -197,10 +197,20 @@ export function isAdminAuthenticated(): boolean {
 }
 
 // Algorithm simulation
-export async function startSimulation(userCount: number, minSpend: number, maxSpend: number) {
+export async function startSimulation(params: {
+  userCount: number;
+  minSpend: number;
+  maxSpend: number;
+  gameTypes?: string[];
+  avgReturnPercent?: number;
+  maxWinPerUser?: number;
+  poolMinimumThreshold?: number;
+  fullReturnThreshold?: number;
+  minReturnPercent?: number;
+}) {
   return adminFetch("/admin/algorithm/simulate", {
     method: "POST",
-    body: JSON.stringify({ userCount, minSpend, maxSpend }),
+    body: JSON.stringify(params),
   });
 }
 

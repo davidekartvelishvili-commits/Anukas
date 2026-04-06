@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { startSimulation, pollSimulation, getSimulationHistory } from "@/services/admin";
+import { startSimulation, pollSimulation, getSimulationHistory, getGameConfig } from "@/services/admin";
 import AdminAuthGuard from "@/components/admin/AdminAuthGuard";
 
 /* ── SVG ICONS ── */
@@ -106,6 +106,21 @@ function AlgoTestContent() {
   const [minSpend, setMinSpend] = useState(1);
   const [maxSpend, setMaxSpend] = useState(100);
 
+  // Game types
+  const [availableGameTypes, setAvailableGameTypes] = useState<string[]>([]);
+  const [selectedGameTypes, setSelectedGameTypes] = useState<string[]>(["plinko"]);
+
+  // Algorithm parameters (loaded from DB, editable for test)
+  const [useCustomParams, setUseCustomParams] = useState(false);
+  const [algoParams, setAlgoParams] = useState({
+    avgReturnPercent: 0.5,
+    maxWinPerUser: 100,
+    poolMinimumThreshold: 1000,
+    fullReturnThreshold: 5,
+    minReturnPercent: 0.5,
+  });
+  const [dbParams, setDbParams] = useState(algoParams); // original from DB
+
   // Job state
   const [jobId, setJobId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -126,6 +141,24 @@ function AlgoTestContent() {
 
   useEffect(() => {
     loadHistory();
+    // Load game config from DB
+    getGameConfig().then((data: any) => {
+      if (data.success && data.configs && data.configs.length > 0) {
+        const types = data.configs.map((c: any) => c.gameType);
+        setAvailableGameTypes(types);
+        setSelectedGameTypes(types.length > 0 ? [types[0]] : ["plinko"]);
+        const c = data.configs[0];
+        const p = {
+          avgReturnPercent: c.avgReturnPercent ?? 0.5,
+          maxWinPerUser: c.maxWinPerUser ?? 100,
+          poolMinimumThreshold: c.poolMinimumThreshold ?? 1000,
+          fullReturnThreshold: c.fullReturnThreshold ?? 5,
+          minReturnPercent: c.minReturnPercent ?? 0.5,
+        };
+        setAlgoParams(p);
+        setDbParams(p);
+      }
+    }).catch(() => {});
   }, []);
 
   const loadHistory = async () => {
@@ -180,7 +213,15 @@ function AlgoTestContent() {
     setTotal(userCount);
 
     try {
-      const data = await startSimulation(userCount, minSpend, maxSpend) as any;
+      const params: any = { userCount, minSpend, maxSpend, gameTypes: selectedGameTypes };
+      if (useCustomParams) {
+        params.avgReturnPercent = algoParams.avgReturnPercent;
+        params.maxWinPerUser = algoParams.maxWinPerUser;
+        params.poolMinimumThreshold = algoParams.poolMinimumThreshold;
+        params.fullReturnThreshold = algoParams.fullReturnThreshold;
+        params.minReturnPercent = algoParams.minReturnPercent;
+      }
+      const data = await startSimulation(params) as any;
       if (data.success && data.jobId) {
         setJobId(data.jobId);
         startPolling(data.jobId);
@@ -299,6 +340,71 @@ function AlgoTestContent() {
                   step="0.5"
                 />
               </div>
+            </div>
+
+            {/* Game type selection */}
+            <div className="mb-4">
+              <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>თამაშის ტიპი</label>
+              <div className="flex flex-wrap gap-2">
+                {(availableGameTypes.length > 0 ? availableGameTypes : ["plinko", "slot", "chicken_rush"]).map((gt) => {
+                  const selected = selectedGameTypes.includes(gt);
+                  const labels: Record<string, string> = { plinko: "Lucky Drop", slot: "Slot", chicken_rush: "Lucky Step" };
+                  return (
+                    <button key={gt} onClick={() => {
+                      if (selected && selectedGameTypes.length > 1) {
+                        setSelectedGameTypes(selectedGameTypes.filter(t => t !== gt));
+                      } else if (!selected) {
+                        setSelectedGameTypes([...selectedGameTypes, gt]);
+                      }
+                    }}
+                      className="px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all"
+                      style={{ background: selected ? "#F9E741" : "#1A1A1A", color: selected ? "#000" : "#A0A0A0", border: `1px solid ${selected ? "#F9E741" : "#252525"}` }}>
+                      {labels[gt] || gt}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Algorithm parameters */}
+            <div className="mb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <label className="text-[12px] font-medium" style={{ color: "#A0A0A0" }}>ალგორითმის პარამეტრები</label>
+                <button onClick={() => { setUseCustomParams(!useCustomParams); if (useCustomParams) setAlgoParams(dbParams); }}
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all"
+                  style={{ background: useCustomParams ? "#F9E741" : "#1A1A1A", color: useCustomParams ? "#000" : "#A0A0A0", border: "1px solid #252525" }}>
+                  {useCustomParams ? "Custom" : "DB-დან"}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                {[
+                  { key: "avgReturnPercent", label: "საშუალო დაბრუნება %", suffix: "%", step: 0.1 },
+                  { key: "maxWinPerUser", label: "მაქს. მოგება", suffix: "₾", step: 1 },
+                  { key: "poolMinimumThreshold", label: "Pool მინიმუმი", suffix: "₾", step: 10 },
+                  { key: "fullReturnThreshold", label: "100% ზღვარი", suffix: "₾", step: 0.5 },
+                  { key: "minReturnPercent", label: "მინ. გარანტია %", suffix: "%", step: 0.1 },
+                ].map(({ key, label, suffix, step }) => (
+                  <div key={key}>
+                    <label className="text-[10px] block mb-1" style={{ color: "#666666" }}>{label}</label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={(algoParams as any)[key]}
+                        onChange={(e) => setAlgoParams({ ...algoParams, [key]: parseFloat(e.target.value) || 0 })}
+                        disabled={!useCustomParams}
+                        step={step}
+                        className="w-full rounded-[8px] px-2 py-1.5 text-[13px] outline-none"
+                        style={{ background: useCustomParams ? "#1A1A1A" : "#0A0A0A", border: "1px solid #252525", color: useCustomParams ? "#FFFFFF" : "#666666", opacity: useCustomParams ? 1 : 0.6 }}
+                      />
+                      <span className="text-[11px] shrink-0" style={{ color: "#666" }}>{suffix}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {!useCustomParams && (
+                <p className="text-[10px] mt-1.5" style={{ color: "#555" }}>DB-ში შენახული პარამეტრები გამოიყენება. დააჭირეთ "Custom" ცვლილებისთვის.</p>
+              )}
             </div>
 
             <button

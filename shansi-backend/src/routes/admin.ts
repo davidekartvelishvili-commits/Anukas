@@ -1236,7 +1236,33 @@ const simulateSchema = z.object({
   userCount: z.number().int().min(10).max(10000),
   minSpend: z.number().min(0.5).max(10000),
   maxSpend: z.number().min(0.5).max(10000),
+  gameTypes: z.array(z.string()).min(1).optional(),
+  // Optional config overrides (uses DB values if not provided)
+  avgReturnPercent: z.number().min(0).max(100).optional(),
+  maxWinPerUser: z.number().min(0).optional(),
+  poolMinimumThreshold: z.number().min(0).optional(),
+  fullReturnThreshold: z.number().min(0).optional(),
+  minReturnPercent: z.number().min(0).max(100).optional(),
 });
+
+// Auto-create simulation_runs table if it doesn't exist
+async function ensureSimulationTable() {
+  const db = getDb();
+  try {
+    await (db as any).run(sql`CREATE TABLE IF NOT EXISTS simulation_runs (
+      id TEXT PRIMARY KEY,
+      admin_id TEXT NOT NULL,
+      user_count INTEGER NOT NULL,
+      min_spend REAL NOT NULL,
+      max_spend REAL NOT NULL,
+      status TEXT NOT NULL DEFAULT 'running',
+      progress INTEGER NOT NULL DEFAULT 0,
+      results TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      completed_at TEXT
+    )`);
+  } catch {}
+}
 
 // POST /admin/algorithm/simulate — start a simulation job
 admin.post("/algorithm/simulate", adminMiddleware, async (c) => {
@@ -1244,6 +1270,8 @@ admin.post("/algorithm/simulate", adminMiddleware, async (c) => {
   const parsed = simulateSchema.safeParse(body);
   if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
   if (parsed.data.maxSpend < parsed.data.minSpend) throw new BadRequestError("maxSpend must be >= minSpend");
+
+  await ensureSimulationTable();
 
   const adminId = c.get("adminId");
   const db = getDb();
@@ -1260,8 +1288,16 @@ admin.post("/algorithm/simulate", adminMiddleware, async (c) => {
     progress: 0,
   });
 
+  // Extract config overrides
+  const configOverrides: Record<string, number> = {};
+  if (parsed.data.avgReturnPercent !== undefined) configOverrides.avgReturnPercent = parsed.data.avgReturnPercent;
+  if (parsed.data.maxWinPerUser !== undefined) configOverrides.maxWinPerUser = parsed.data.maxWinPerUser;
+  if (parsed.data.poolMinimumThreshold !== undefined) configOverrides.poolMinimumThreshold = parsed.data.poolMinimumThreshold;
+  if (parsed.data.fullReturnThreshold !== undefined) configOverrides.fullReturnThreshold = parsed.data.fullReturnThreshold;
+  if (parsed.data.minReturnPercent !== undefined) configOverrides.minReturnPercent = parsed.data.minReturnPercent;
+
   // Run simulation in background (don't await)
-  runSimulation(jobId, parsed.data.userCount, parsed.data.minSpend, parsed.data.maxSpend).catch(async (err) => {
+  runSimulation(jobId, parsed.data.userCount, parsed.data.minSpend, parsed.data.maxSpend, parsed.data.gameTypes || ["plinko"], configOverrides).catch(async (err) => {
     await db.update(simulationRuns).set({
       status: "error",
       results: JSON.stringify({ error: err.message }),
@@ -1269,7 +1305,7 @@ admin.post("/algorithm/simulate", adminMiddleware, async (c) => {
     }).where(eq(simulationRuns.id, jobId));
   });
 
-  await logAction(adminId, "start_simulation", `Started simulation: ${parsed.data.userCount} users, ${parsed.data.minSpend}-${parsed.data.maxSpend}₾`);
+  await logAction(adminId, "start_simulation", `Started simulation: ${parsed.data.userCount} users, ${parsed.data.minSpend}-${parsed.data.maxSpend}₾, games: ${(parsed.data.gameTypes || ["plinko"]).join(",")}`);
   return c.json({ success: true, jobId });
 });
 
@@ -1278,6 +1314,7 @@ admin.get("/algorithm/simulate/:jobId", adminMiddleware, async (c) => {
   const jobId = c.req.param("jobId")!;
   if (!jobId) throw new BadRequestError("jobId required");
 
+  await ensureSimulationTable();
   const db = getDb();
   const [job] = await db.select().from(simulationRuns).where(eq(simulationRuns.id, jobId)).limit(1);
   if (!job) return c.json({ success: false, message: "Job not found" }, 404);
@@ -1293,6 +1330,7 @@ admin.get("/algorithm/simulate/:jobId", adminMiddleware, async (c) => {
 
 // GET /admin/algorithm/simulate-history — last 10 test runs
 admin.get("/algorithm/simulate-history", adminMiddleware, async (c) => {
+  await ensureSimulationTable();
   const db = getDb();
   const runs = await db.select().from(simulationRuns)
     .orderBy(desc(simulationRuns.createdAt))

@@ -45,6 +45,7 @@ export interface SimulationResults {
   userCount: number;
   minSpend: number;
   maxSpend: number;
+  gameTypes: string[];
   config: SimConfig;
   masterSwitchOn: boolean;
 
@@ -220,23 +221,43 @@ export async function runSimulation(
   jobId: string,
   userCount: number,
   minSpend: number,
-  maxSpend: number
+  maxSpend: number,
+  gameTypes: string[] = ["plinko"],
+  configOverrides: Record<string, number> = {}
 ): Promise<SimulationResults> {
   const db = getDb();
   const startTime = Date.now();
 
-  // Read real config from DB
-  const [cfg] = await db.select().from(gameConfig).limit(1);
-  if (!cfg) throw new Error("Game config not found");
-
-  const config: SimConfig = {
-    avgReturnPercent: cfg.avgReturnPercent,
-    maxWinPerUser: cfg.maxWinPerUser,
-    poolMinimumThreshold: cfg.poolMinimumThreshold,
-    fullReturnThreshold: cfg.fullReturnThreshold,
-    minReturnPercent: cfg.minReturnPercent,
-    isActive: cfg.isActive,
-  };
+  // Read config for each requested game type, merge with overrides
+  const configs: SimConfig[] = [];
+  for (const gt of gameTypes) {
+    const [cfg] = await db.select().from(gameConfig).where(eq(gameConfig.gameType, gt)).limit(1);
+    if (cfg) {
+      configs.push({
+        avgReturnPercent: configOverrides.avgReturnPercent ?? cfg.avgReturnPercent,
+        maxWinPerUser: configOverrides.maxWinPerUser ?? cfg.maxWinPerUser,
+        poolMinimumThreshold: configOverrides.poolMinimumThreshold ?? cfg.poolMinimumThreshold,
+        fullReturnThreshold: configOverrides.fullReturnThreshold ?? cfg.fullReturnThreshold,
+        minReturnPercent: configOverrides.minReturnPercent ?? cfg.minReturnPercent,
+        isActive: cfg.isActive,
+      });
+    }
+  }
+  // Fallback: if no configs found, read first available
+  if (configs.length === 0) {
+    const [cfg] = await db.select().from(gameConfig).limit(1);
+    if (!cfg) throw new Error("Game config not found");
+    configs.push({
+      avgReturnPercent: configOverrides.avgReturnPercent ?? cfg.avgReturnPercent,
+      maxWinPerUser: configOverrides.maxWinPerUser ?? cfg.maxWinPerUser,
+      poolMinimumThreshold: configOverrides.poolMinimumThreshold ?? cfg.poolMinimumThreshold,
+      fullReturnThreshold: configOverrides.fullReturnThreshold ?? cfg.fullReturnThreshold,
+      minReturnPercent: configOverrides.minReturnPercent ?? cfg.minReturnPercent,
+      isActive: cfg.isActive,
+    });
+  }
+  // Use first config as primary (for report), cycle through for multi-game
+  const config = configs[0];
 
   const [masterRow] = await db.select().from(systemConfig).where(eq(systemConfig.key, "master_switch")).limit(1);
   const masterSwitchOn = masterRow?.value !== "false";
@@ -317,6 +338,7 @@ export async function runSimulation(
     userCount,
     minSpend,
     maxSpend,
+    gameTypes,
     config,
     masterSwitchOn,
 
