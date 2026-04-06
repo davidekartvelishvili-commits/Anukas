@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getCoinBalance, getCashBalance, exchange as doExchange, seedTestUser } from "@/services/balance";
 import { getMe, getStoredToken } from "@/services/auth";
+import { apiFetch } from "@/services/api";
 
 /* ───────── ICONS ───────── */
 
@@ -76,11 +77,10 @@ function TrophyIcon() {
 
 /* ───────── GAMES DATA ───────── */
 
-const GAMES = [
-  { id: 1, name: "Midnight Machine", color: "#4338CA", gradient: "linear-gradient(135deg, #4338CA, #6366F1)" },
-  { id: 2, name: "Coverd 21", color: "#92400E", gradient: "linear-gradient(135deg, #B45309, #D97706)" },
-  { id: 3, name: "Lucky Step", color: "#1a237e", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)" },
-  { id: 4, name: "Lucky Drop", color: "#1a237e", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)" },
+const ALL_GAMES = [
+  { id: 1, name: "Midnight Machine", gameType: "slot", color: "#4338CA", gradient: "linear-gradient(135deg, #4338CA, #6366F1)" },
+  { id: 3, name: "Lucky Step", gameType: "chicken_rush", color: "#1a237e", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)" },
+  { id: 4, name: "Lucky Drop", gameType: "plinko", color: "#1a237e", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)" },
 ];
 
 /* ───────── COUNTDOWN HOOK ───────── */
@@ -117,6 +117,7 @@ export default function HomePage() {
   const [cashBalance, setCashBalanceState] = useState(0);
   const [coinBalance, setCoinBalanceState] = useState(0);
   const [gender, setGender] = useState("Male");
+  const [activeGameTypes, setActiveGameTypes] = useState<string[]>(["slot", "plinko", "chicken_rush"]);
   const countdown = useCountdown(15.58);
 
   useEffect(() => {
@@ -131,6 +132,12 @@ export default function HomePage() {
         if (data?.user) {
           setCoinBalanceState(data.user.coinBalance ?? 0);
           setCashBalanceState(data.user.balance ?? 0);
+        }
+      }).catch(() => {});
+      // Fetch active games
+      apiFetch("/games/config").then((data: any) => {
+        if (data?.games) {
+          setActiveGameTypes(data.games.filter((g: any) => g.isActive).map((g: any) => g.gameType));
         }
       }).catch(() => {});
     }
@@ -193,7 +200,7 @@ export default function HomePage() {
               Featured Games
             </h2>
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-              {GAMES.map((game) => (
+              {ALL_GAMES.filter(g => activeGameTypes.includes(g.gameType)).map((game) => (
                 <div
                   key={game.id}
                   className="shrink-0 w-[130px] h-[130px] rounded-[36px] relative overflow-hidden cursor-pointer active:scale-[0.97] transition-transform"

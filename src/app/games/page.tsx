@@ -3,14 +3,16 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getCoinBalance, getCashBalance } from "@/services/balance";
+import { apiFetch } from "@/services/api";
+import { getStoredToken } from "@/services/auth";
 
 /* ───────── GAMES DATA ───────── */
 
 const ALL_GAMES = [
-  { id: "midnight-machine", name: "Midnight Machine", gradient: "linear-gradient(135deg, #4338CA, #6366F1)", media: "/images/onboarding/slot-machine.mp4", type: "video" as const },
-  { id: "coverd-21", name: "Coverd 21", gradient: "linear-gradient(135deg, #B45309, #D97706)", media: "/images/onboarding/coverd21.mp4", type: "video" as const },
-  { id: "chicken-rush", name: "Lucky Step", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)", media: "/images/lucky-step-cover.png", type: "image" as const },
-  { id: "lucky-drop", name: "Lucky Drop", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)", media: "/images/lucky-drop-cover.png", type: "image" as const },
+  { id: "midnight-machine", gameType: "slot", name: "Midnight Machine", gradient: "linear-gradient(135deg, #4338CA, #6366F1)", media: "/images/onboarding/slot-machine.mp4", type: "video" as const },
+  { id: "coverd-21", gameType: null, name: "Coverd 21", gradient: "linear-gradient(135deg, #B45309, #D97706)", media: "/images/onboarding/coverd21.mp4", type: "video" as const },
+  { id: "chicken-rush", gameType: "chicken_rush", name: "Lucky Step", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)", media: "/images/lucky-step-cover.png", type: "image" as const },
+  { id: "lucky-drop", gameType: "plinko", name: "Lucky Drop", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)", media: "/images/lucky-drop-cover.png", type: "image" as const },
   { id: "wonder-wheel", name: "Wonder Wheel", gradient: "linear-gradient(135deg, #7C3AED, #A855F7)", media: "", type: "gradient" as const },
   { id: "suns-n-moons", name: "Suns N Moons", gradient: "linear-gradient(135deg, #6B7280, #9CA3AF)", media: "", type: "gradient" as const },
   { id: "cctv-game", name: "CCTV Game", gradient: "linear-gradient(135deg, #1E40AF, #3B82F6)", media: "", type: "gradient" as const },
@@ -22,12 +24,12 @@ const ALL_GAMES = [
   { id: "treasure-hunt", name: "Treasure Hunt", gradient: "linear-gradient(135deg, #0E7490, #06B6D4)", media: "", type: "gradient" as const },
 ];
 
-const NEWLY_ADDED = ["cctv-game", "buffalo-extreme", "black-friday", "treasure-hunt"];
-const FAN_FAVORITES = ["wild-tiger", "crash-x", "wanted", "chicken-rush"];
-const COVERD_FAVORITES = ["coverd-21", "midnight-machine"];
+const NEWLY_ADDED = ["lucky-drop", "chicken-rush"];
+const FAN_FAVORITES = ["midnight-machine", "lucky-drop", "chicken-rush"];
+const COVERD_FAVORITES = ["midnight-machine"];
 
 function getGame(id: string) {
-  return ALL_GAMES.find((g) => g.id === id)!;
+  return ALL_GAMES.find((g) => g.id === id);
 }
 
 /* ───────── LOCAL STORAGE HELPERS ───────── */
@@ -157,15 +159,23 @@ export default function GamesPage() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState(1);
   const [playedGames, setPlayedGames] = useState<string[]>([]);
-  const [coins, setCoins] = useState(5000);
-  const [cash, setCash] = useState(28);
+  const [coins, setCoins] = useState(0);
+  const [cash, setCash] = useState(0);
   const [mode, setMode] = useState<"cash" | "coins">("coins");
   const [showCashNotif, setShowCashNotif] = useState(false);
+  const [activeGameTypes, setActiveGameTypes] = useState<string[]>(["slot", "plinko", "chicken_rush"]);
 
   useEffect(() => {
     setCoins(getCoinBalance());
     setCash(getCashBalance());
     setPlayedGames(getPlayedGames());
+    if (getStoredToken()) {
+      apiFetch("/games/config").then((data: any) => {
+        if (data?.games) {
+          setActiveGameTypes(data.games.filter((g: any) => g.isActive).map((g: any) => g.gameType));
+        }
+      }).catch(() => {});
+    }
     const t = setTimeout(() => setMounted(true), 50);
     return () => clearTimeout(t);
   }, []);
@@ -190,7 +200,7 @@ export default function GamesPage() {
     transition: `all 0.5s ease-out ${i * 0.08}s`,
   });
 
-  const favoriteGames = playedGames.map((id) => getGame(id)).filter(Boolean);
+  const favoriteGames = playedGames.map((id) => getGame(id)).filter((g): g is NonNullable<typeof g> => !!g && (!g.gameType || activeGameTypes.includes(g.gameType)));
 
   return (
     <>
@@ -261,6 +271,7 @@ export default function GamesPage() {
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide mb-4">
               {NEWLY_ADDED.map((id) => {
                 const game = getGame(id);
+                if (!game || (game.gameType && !activeGameTypes.includes(game.gameType))) return null;
                 return <GameCard key={id} game={game} onPlay={handlePlay} />;
               })}
             </div>
@@ -272,6 +283,7 @@ export default function GamesPage() {
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide mb-4">
               {FAN_FAVORITES.map((id) => {
                 const game = getGame(id);
+                if (!game || (game.gameType && !activeGameTypes.includes(game.gameType))) return null;
                 return <GameCard key={id} game={game} onPlay={handlePlay} />;
               })}
             </div>
@@ -283,6 +295,7 @@ export default function GamesPage() {
             <div className="flex gap-3 flex-wrap mb-4">
               {COVERD_FAVORITES.map((id) => {
                 const game = getGame(id);
+                if (!game || (game.gameType && !activeGameTypes.includes(game.gameType))) return null;
                 return <GameCard key={id} game={game} size="large" onPlay={handlePlay} />;
               })}
             </div>
