@@ -55,9 +55,27 @@ merchant.post("/register", async (c) => {
   return c.json({ success: true, message: "განაცხადი მიღებულია, მოიცადეთ დამტკიცებას" });
 });
 
+// Helper: find merchant by code OR phone
+async function findMerchantByIdentifier(identifier: string) {
+  const db = getDb();
+  const val = identifier.trim();
+  // Try merchant code first
+  if (val.toUpperCase().startsWith("SH-")) {
+    const [m] = await db.select().from(merchants).where(eq(merchants.merchantCode, val.toUpperCase())).limit(1);
+    if (m) return m;
+  }
+  // Try phone (with or without +995 prefix)
+  const phone = val.startsWith("+") ? val : val.replace(/^995/, "+995").replace(/^5/, "+9955");
+  const [byPhone] = await db.select().from(merchants).where(eq(merchants.phone, phone)).limit(1);
+  if (byPhone) return byPhone;
+  // Try raw value as phone
+  const [byRaw] = await db.select().from(merchants).where(eq(merchants.phone, val)).limit(1);
+  return byRaw || null;
+}
+
 // POST /merchant/setup-pin
 const setupPinSchema = z.object({
-  merchant_code: z.string().min(1),
+  identifier: z.string().min(1),
   pin: z.string().regex(/^\d{4}$/, "PIN must be 4 digits"),
 });
 
@@ -67,22 +85,31 @@ merchant.post("/setup-pin", async (c) => {
   if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
 
   const db = getDb();
-  const { merchant_code, pin } = parsed.data;
-
-  const [m] = await db.select().from(merchants).where(eq(merchants.merchantCode, merchant_code.toUpperCase())).limit(1);
+  const m = await findMerchantByIdentifier(parsed.data.identifier);
   if (!m) throw new BadRequestError("მერჩანტი ვერ მოიძებნა");
   if (!m.isActive) throw new BadRequestError("მერჩანტი ჯერ არ არის დამტკიცებული");
   if (m.pinHash) throw new BadRequestError("PIN უკვე დაყენებულია. გამოიყენეთ პარამეტრები შესაცვლელად");
 
-  const hash = await bcrypt.hash(pin, 10);
+  const hash = await bcrypt.hash(parsed.data.pin, 10);
   await db.update(merchants).set({ pinHash: hash }).where(eq(merchants.id, m.id));
 
-  return c.json({ success: true, message: "PIN დაყენებულია" });
+  // Auto-login: return JWT token so merchant goes straight to app
+  const token = jwt.sign({ merchantId: m.id }, getEnv().JWT_SECRET, { expiresIn: "24h" });
+
+  return c.json({
+    success: true,
+    message: "PIN დაყენებულია",
+    token,
+    merchant: {
+      id: m.id, merchantCode: m.merchantCode, businessName: m.businessName,
+      businessNameKa: m.businessNameKa, category: m.category,
+    },
+  });
 });
 
 // POST /merchant/login
 const loginSchema = z.object({
-  merchant_code: z.string().min(1),
+  identifier: z.string().min(1),
   pin: z.string().regex(/^\d{4}$/),
 });
 
@@ -92,14 +119,12 @@ merchant.post("/login", async (c) => {
   if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
 
   const db = getDb();
-  const { merchant_code, pin } = parsed.data;
-
-  const [m] = await db.select().from(merchants).where(eq(merchants.merchantCode, merchant_code.toUpperCase())).limit(1);
+  const m = await findMerchantByIdentifier(parsed.data.identifier);
   if (!m) throw new BadRequestError("მერჩანტი ვერ მოიძებნა");
   if (!m.isActive) throw new BadRequestError("მერჩანტი არ არის აქტიური");
   if (!m.pinHash) throw new BadRequestError("PIN არ არის დაყენებული. გადადით PIN-ის დაყენების გვერდზე");
 
-  const valid = await bcrypt.compare(pin, m.pinHash);
+  const valid = await bcrypt.compare(parsed.data.pin, m.pinHash);
   if (!valid) throw new BadRequestError("არასწორი PIN");
 
   const token = jwt.sign({ merchantId: m.id }, getEnv().JWT_SECRET, { expiresIn: "24h" });

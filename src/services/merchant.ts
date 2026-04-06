@@ -22,13 +22,21 @@ export async function registerMerchant(data: {
   return merchantFetch("/merchant/register", { method: "POST", body: JSON.stringify(data) });
 }
 
-export async function setupPin(merchantCode: string, pin: string) {
-  return merchantFetch("/merchant/setup-pin", { method: "POST", body: JSON.stringify({ merchant_code: merchantCode, pin }) });
+export async function setupPin(identifier: string, pin: string) {
+  const data = await merchantFetch<{ token: string; merchant: any }>("/merchant/setup-pin", {
+    method: "POST", body: JSON.stringify({ identifier, pin }),
+  });
+  // Auto-login after PIN setup
+  if (data.success && data.token) {
+    localStorage.setItem("merchantToken", data.token);
+    localStorage.setItem("merchantData", JSON.stringify(data.merchant));
+  }
+  return data;
 }
 
-export async function loginMerchant(merchantCode: string, pin: string) {
+export async function loginMerchant(identifier: string, pin: string) {
   const data = await merchantFetch<{ token: string; merchant: any }>("/merchant/login", {
-    method: "POST", body: JSON.stringify({ merchant_code: merchantCode, pin }),
+    method: "POST", body: JSON.stringify({ identifier, pin }),
   });
   if (data.success && data.token) {
     localStorage.setItem("merchantToken", data.token);

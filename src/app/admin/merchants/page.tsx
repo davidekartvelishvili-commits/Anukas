@@ -134,13 +134,19 @@ export default function MerchantsPage() {
   };
 
   /* ── Actions ── */
+  const [approvedCode, setApprovedCode] = useState<string | null>(null);
+
   const handleAction = async (id: string, action: "approve" | "reject") => {
     setActionLoading(id);
     try {
-      await updateMerchant(id, { is_active: action === "approve" });
-      showToast(action === "approve" ? "გააქტიურდა" : "უარყოფილია");
+      const result = await updateMerchant(id, { is_active: action === "approve" }) as any;
+      if (action === "approve" && result.merchant?.merchantCode) {
+        setApprovedCode(result.merchant.merchantCode);
+      } else {
+        showToast(action === "approve" ? "\u10D2\u10D0\u10D0\u10E5\u10E2\u10D8\u10E3\u10E0\u10D3\u10D0" : "\u10E3\u10D0\u10E0\u10E7\u10DD\u10E4\u10D8\u10DA\u10D8\u10D0");
+      }
       fetchMerchants();
-    } catch (e: any) { showToast(e.message || "შეცდომა", "error"); }
+    } catch (e: any) { showToast(e.message || "\u10E8\u10D4\u10EA\u10D3\u10DD\u10DB\u10D0", "error"); }
     finally { setActionLoading(null); }
   };
 
@@ -368,6 +374,30 @@ export default function MerchantsPage() {
             <button onClick={handleSimulate} disabled={simLoading || !simPhone || !simMerchantId || !simAmount} className="w-full mt-4 py-3 rounded-[8px] text-[14px] font-semibold transition-all hover:opacity-80 disabled:opacity-40" style={{ background: "#F9E741", color: "#000" }}>
               {simLoading ? "იგზავნება..." : "სიმულაცია"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Approved merchant ID modal */}
+      {approvedCode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setApprovedCode(null)}>
+          <div className="absolute inset-0 bg-black/70" />
+          <div className="relative rounded-[16px] p-6 w-[90%] max-w-[380px] text-center" style={{ background: "#111111", border: "1px solid #22C55E40" }} onClick={(e) => e.stopPropagation()}>
+            <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "rgba(34,197,94,0.1)" }}>
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#22C55E" strokeWidth="3" strokeLinecap="round"><polyline points="8,16 14,22 24,10" /></svg>
+            </div>
+            <h3 className="text-[18px] font-bold mb-2" style={{ color: "#FFFFFF" }}>{"\u10DB\u10D4\u10E0\u10E9\u10D0\u10DC\u10E2\u10D8 \u10D3\u10D0\u10DB\u10E2\u10D9\u10D8\u10EA\u10D4\u10D1\u10E3\u10DA\u10D8\u10D0!"}</h3>
+            <p className="text-[13px] mb-4" style={{ color: "#A0A0A0" }}>{"\u10DB\u10D4\u10E0\u10E9\u10D0\u10DC\u10E2\u10D8\u10E1 ID \u10D2\u10D0\u10E3\u10D2\u10D6\u10D0\u10D5\u10DC\u10D4\u10D7 \u10DB\u10D4\u10E0\u10E9\u10D0\u10DC\u10E2\u10E1:"}</p>
+            <div className="rounded-[12px] px-4 py-3 mb-4" style={{ background: "#1A1A1A", border: "1px solid #252525" }}>
+              <p className="text-[28px] font-extrabold tracking-[3px] font-mono" style={{ color: "#F9E741" }}>{approvedCode}</p>
+            </div>
+            <button
+              onClick={() => { navigator.clipboard.writeText(approvedCode); showToast("\u10D3\u10D0\u10D9\u10DD\u10DE\u10D8\u10E0\u10D3\u10D0!"); }}
+              className="px-6 py-2.5 rounded-[8px] text-[13px] font-semibold transition-all hover:opacity-80 mb-3"
+              style={{ background: "#F9E741", color: "#000" }}
+            >{"\u10D3\u10D0\u10D9\u10DD\u10DE\u10D8\u10E0\u10D4\u10D1\u10D0"}</button>
+            <br />
+            <button onClick={() => setApprovedCode(null)} className="text-[13px] mt-2" style={{ color: "#666666" }}>{"\u10D3\u10D0\u10EE\u10E3\u10E0\u10D5\u10D0"}</button>
           </div>
         </div>
       )}

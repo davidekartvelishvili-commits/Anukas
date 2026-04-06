@@ -24,7 +24,7 @@ export default function MerchantLoginPage() {
     setLoading(true);
     setError("");
     try {
-      await loginMerchant(merchantCode.toUpperCase(), pin);
+      await loginMerchant(merchantCode.trim(), pin);
       router.push("/merchant/qr");
     } catch (err: any) {
       setError(err.message || "შესვლა ვერ მოხერხდა");
@@ -58,16 +58,16 @@ export default function MerchantLoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Merchant ID */}
           <div>
-            <label className="block text-sm text-[#999] mb-1.5">მერჩანტის ID</label>
+            <label className="block text-sm text-[#999] mb-1.5">{"\u10E2\u10D4\u10DA\u10D4\u10E4\u10DD\u10DC\u10D8 \u10D0\u10DC \u10DB\u10D4\u10E0\u10E9\u10D0\u10DC\u10E2 ID"}</label>
             <input
               type="text"
               value={merchantCode}
               onChange={(e) => {
-                setMerchantCode(e.target.value.toUpperCase());
+                setMerchantCode(e.target.value);
                 setError("");
               }}
-              placeholder="SH-00001"
-              className="w-full bg-[#1C1C1E] rounded-[8px] px-4 py-3 text-white placeholder-[#555] outline-none border border-transparent focus:border-[#FFD700]/50 transition-colors tracking-wider font-mono"
+              placeholder="SH-00001 ან 5XXXXXXXX"
+              className="w-full bg-[#1C1C1E] rounded-[8px] px-4 py-3 text-white placeholder-[#555] outline-none border border-transparent focus:border-[#FFD700]/50 transition-colors"
             />
           </div>
 
