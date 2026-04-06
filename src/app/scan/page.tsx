@@ -3,12 +3,17 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import jsQR from "jsqr";
+import { apiFetch } from "@/services/api";
 
 export default function ScanPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [cameraError, setCameraError] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
+  const [paymentInfo, setPaymentInfo] = useState<{ paymentId: string; merchantName: string; amount: number } | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [paymentDone, setPaymentDone] = useState<{ coinsAwarded: number; merchantName: string } | null>(null);
+  const [scanError, setScanError] = useState("");
   const [box, setBox] = useState({ x: 0, y: 0, size: 260 });
   const [isSnapping, setIsSnapping] = useState(false);
   const [screenSize, setScreenSize] = useState({ w: 430, h: 932 });
@@ -106,9 +111,19 @@ export default function ScanPage() {
         if (scanTimerRef.current) clearInterval(scanTimerRef.current);
         scanTimerRef.current = null;
 
-        setTimeout(() => {
-          setScanResult(code.data);
+        setTimeout(async () => {
+          const qrData = code.data;
+          setScanResult(qrData);
           setIsSnapping(false);
+          // Process the QR code
+          try {
+            const result = await apiFetch("/user/scan-qr", { method: "POST", body: JSON.stringify({ qr_code: qrData }) }) as any;
+            if (result.type === "payment" && result.paymentId) {
+              setPaymentInfo({ paymentId: result.paymentId, merchantName: result.merchant.nameKa || result.merchant.name, amount: result.amount });
+            }
+          } catch (e: any) {
+            setScanError(e.message || "\u10E8\u10D4\u10EA\u10D3\u10DD\u10DB\u10D0");
+          }
         }, 400);
       }
     }, 250);
@@ -160,6 +175,9 @@ export default function ScanPage() {
 
   const resetScan = () => {
     setScanResult(null);
+    setPaymentInfo(null);
+    setPaymentDone(null);
+    setScanError("");
     setBox({ x: (screenSize.w - 260) / 2, y: (screenSize.h - 260) / 2, size: 260 });
   };
 
@@ -259,34 +277,51 @@ export default function ScanPage() {
               paddingBottom: "max(32px, calc(env(safe-area-inset-bottom, 0px) + 24px))",
             }}
           >
-            {scanResult ? (
+            {paymentDone ? (
               <div className="flex flex-col items-center gap-3">
-                <div
-                  className="px-5 py-3 rounded-[16px]"
-                  style={{
-                    background: "rgba(50, 50, 50, 0.08)",
-                    backdropFilter: "blur(12px) saturate(200%)",
-                    WebkitBackdropFilter: "blur(12px) saturate(200%)",
-                    border: "1px solid rgba(255,255,255,0.15)",
-                  }}
-                >
-                  <p className="text-white text-[14px] font-medium break-all" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                    {scanResult}
-                  </p>
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mb-2" style={{ background: "rgba(0,232,143,0.15)" }}>
+                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#00E88F" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="8,16 14,22 24,10" /></svg>
                 </div>
-                <button
-                  onClick={resetScan}
-                  className="px-6 py-2 rounded-full active:scale-[0.95] transition-transform"
-                  style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)" }}
-                >
-                  <span className="text-white text-[14px] font-medium" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                    Scan Again
-                  </span>
+                <p className="text-white text-[18px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>{"\u10D2\u10D0\u10D3\u10D0\u10EE\u10D3\u10D0 \u10DB\u10D8\u10E6\u10D4\u10D1\u10E3\u10DA\u10D8\u10D0!"}</p>
+                <p className="text-[#00E88F] text-[22px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>+{paymentDone.coinsAwarded} {"\u10E5\u10DD\u10D8\u10DC\u10D8"}</p>
+                <p className="text-[#999] text-[13px]" style={{ fontFamily: "var(--font-dm-sans)" }}>{paymentDone.merchantName}</p>
+                <button onClick={() => { setPaymentDone(null); resetScan(); }} className="px-8 py-3 rounded-full mt-2 active:scale-95 transition-transform" style={{ background: "#FFD700", color: "#000" }}>
+                  <span className="text-[14px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>OK</span>
                 </button>
+              </div>
+            ) : paymentInfo ? (
+              <div className="flex flex-col items-center gap-3">
+                <div className="px-6 py-4 rounded-[16px] w-full max-w-[300px]" style={{ background: "rgba(50,50,50,0.9)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                  <p className="text-white text-[18px] font-bold text-center" style={{ fontFamily: "var(--font-outfit)" }}>{paymentInfo.merchantName}</p>
+                  <p className="text-[#FFD700] text-[32px] font-bold text-center mt-2" style={{ fontFamily: "var(--font-outfit)" }}>{paymentInfo.amount.toFixed(2)} {"\u20BE"}</p>
+                </div>
+                {scanError && <p className="text-[#EF4444] text-[13px]" style={{ fontFamily: "var(--font-dm-sans)" }}>{scanError}</p>}
+                <button
+                  onClick={async () => {
+                    setConfirming(true); setScanError("");
+                    try {
+                      const data = await apiFetch("/user/confirm-payment", { method: "POST", body: JSON.stringify({ payment_id: paymentInfo.paymentId }) }) as any;
+                      setPaymentDone({ coinsAwarded: data.coinsAwarded, merchantName: data.merchantName });
+                      setPaymentInfo(null);
+                    } catch (e: any) { setScanError(e.message || "\u10E8\u10D4\u10EA\u10D3\u10DD\u10DB\u10D0"); }
+                    finally { setConfirming(false); }
+                  }}
+                  disabled={confirming}
+                  className="px-10 py-4 rounded-full active:scale-95 transition-transform disabled:opacity-50"
+                  style={{ background: "#FFD700", color: "#000" }}
+                >
+                  <span className="text-[16px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>{confirming ? "..." : "\u10D3\u10D0\u10D3\u10D0\u10E1\u10E2\u10E3\u10E0\u10D4\u10D1\u10D0"}</span>
+                </button>
+                <button onClick={() => { setPaymentInfo(null); resetScan(); }} className="text-[#999] text-[13px] mt-1" style={{ fontFamily: "var(--font-dm-sans)" }}>{"\u10D2\u10D0\u10E3\u10E5\u10DB\u10D4\u10D1\u10D0"}</button>
+              </div>
+            ) : scanResult ? (
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#FFD700", borderTopColor: "transparent" }} />
+                <p className="text-[#999] text-[13px]" style={{ fontFamily: "var(--font-dm-sans)" }}>{"\u10DB\u10E3\u10E8\u10D0\u10D5\u10D3\u10D4\u10D1\u10D0..."}</p>
               </div>
             ) : (
               <p className="text-[14px]" style={{ fontFamily: "var(--font-dm-sans)", color: "rgba(255,255,255,0.5)" }}>
-                Point camera at a QR code — it will scan automatically
+                {"\u10DB\u10D8\u10DB\u10D0\u10E0\u10D7\u10D4 \u10D9\u10D0\u10DB\u10D4\u10E0\u10D0 QR \u10D9\u10DD\u10D3\u10D6\u10D4"}
               </p>
             )}
           </div>

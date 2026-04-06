@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig } from "../db/schema.js";
+import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments } from "../db/schema.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/errors.js";
@@ -840,6 +840,16 @@ admin.patch("/merchants/:id", adminMiddleware, async (c) => {
     if (body.is_active && !existing.approvedAt) {
       updates.approvedAt = new Date().toISOString();
       updates.approvedBy = adminId;
+      // Generate sequential merchant code on first approval
+      if (!existing.merchantCode) {
+        const allMerchants = await db.select({ merchantCode: merchants.merchantCode }).from(merchants);
+        const maxNum = allMerchants.reduce((max, m) => {
+          if (!m.merchantCode) return max;
+          const num = parseInt(m.merchantCode.replace("SH-", ""));
+          return isNaN(num) ? max : Math.max(max, num);
+        }, 0);
+        updates.merchantCode = `SH-${String(maxNum + 1).padStart(5, "0")}`;
+      }
     }
   }
   if (body.is_verified !== undefined) updates.isVerified = body.is_verified;

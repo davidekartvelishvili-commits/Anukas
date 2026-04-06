@@ -11,3 +11,9 @@ export type AdminEnv = {
     adminRole: string;
   };
 };
+
+export type MerchantEnv = {
+  Variables: {
+    merchantId: string;
+  };
+};

@@ -146,6 +146,7 @@ export const promoCodeUses = sqliteTable("promo_code_uses", {
 
 export const merchants = sqliteTable("merchants", {
   id: text("id").primaryKey(),
+  merchantCode: text("merchant_code").unique(),
   businessName: text("business_name").notNull(),
   businessNameKa: text("business_name_ka"),
   category: text("category").notNull(),
@@ -153,6 +154,7 @@ export const merchants = sqliteTable("merchants", {
   email: text("email"),
   address: text("address"),
   commissionPercent: real("commission_percent").default(3.0).notNull(),
+  pinHash: text("pin_hash"),
   qrCode: text("qr_code").unique(),
   isActive: integer("is_active", { mode: "boolean" }).default(false).notNull(),
   isVerified: integer("is_verified", { mode: "boolean" }).default(false).notNull(),
@@ -160,6 +162,15 @@ export const merchants = sqliteTable("merchants", {
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
   approvedAt: text("approved_at"),
   approvedBy: text("approved_by"),
+});
+
+export const pendingPayments = sqliteTable("pending_payments", {
+  id: text("id").primaryKey(),
+  merchantId: text("merchant_id").notNull().references(() => merchants.id),
+  amount: real("amount").notNull(),
+  status: text("status").default("pending").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
 });
 
 export const paymentTransactions = sqliteTable("payment_transactions", {

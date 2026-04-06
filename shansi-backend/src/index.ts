@@ -7,6 +7,7 @@ import auth from "./routes/auth.js";
 import user from "./routes/user.js";
 import admin from "./routes/admin.js";
 import games from "./routes/games.js";
+import merchant from "./routes/merchant.js";
 import { AppError } from "./utils/errors.js";
 import { getEnv } from "./utils/env.js";
 
@@ -47,6 +48,7 @@ app.route("/auth", auth);
 app.route("/user", user);
 app.route("/admin", admin);
 app.route("/games", games);
+app.route("/merchant", merchant);
 
 // ── Health check ──
 app.get("/health", (c) => {

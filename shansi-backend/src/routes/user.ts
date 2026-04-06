@@ -3,7 +3,7 @@ import { z } from "zod";
 import { eq, and, or, desc, sql } from "drizzle-orm";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { users, transactions, referrals, merchants, paymentTransactions, withdrawals, systemConfig } from "../db/schema.js";
+import { users, transactions, referrals, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, gameConfig } from "../db/schema.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { BadRequestError } from "../utils/errors.js";
 import { nanoid } from "nanoid";
@@ -204,10 +204,92 @@ user.post("/scan-qr", async (c) => {
   if (!qrCode) throw new BadRequestError("QR code required");
 
   const db = getDb();
+
+  // Try structured QR: SHANSI:merchantId:paymentId:amount
+  if (qrCode.startsWith("SHANSI:")) {
+    const parts = qrCode.split(":");
+    if (parts.length >= 4) {
+      const [, merchantId, paymentId, amountStr] = parts;
+      const [payment] = await db.select().from(pendingPayments).where(eq(pendingPayments.id, paymentId)).limit(1);
+      if (!payment) throw new BadRequestError("გადახდა ვერ მოიძებნა");
+      if (payment.status !== "pending") throw new BadRequestError("გადახდა უკვე დასრულებულია");
+      if (new Date(payment.expiresAt) < new Date()) throw new BadRequestError("QR კოდი ვადაგასულია");
+
+      const [m] = await db.select().from(merchants).where(and(eq(merchants.id, merchantId), eq(merchants.isActive, true))).limit(1);
+      if (!m) throw new BadRequestError("მერჩანტი ვერ მოიძებნა");
+
+      return c.json({
+        success: true,
+        type: "payment",
+        paymentId,
+        merchant: { id: m.id, name: m.businessName, nameKa: m.businessNameKa, category: m.category },
+        amount: payment.amount,
+      });
+    }
+  }
+
+  // Legacy: static QR code
   const [merchant] = await db.select().from(merchants).where(and(eq(merchants.qrCode, qrCode), eq(merchants.isActive, true))).limit(1);
   if (!merchant) throw new BadRequestError("მერჩანტი ვერ მოიძებნა");
 
-  return c.json({ success: true, merchant: { id: merchant.id, name: merchant.businessName, nameKa: merchant.businessNameKa, category: merchant.category } });
+  return c.json({ success: true, type: "merchant", merchant: { id: merchant.id, name: merchant.businessName, nameKa: merchant.businessNameKa, category: merchant.category } });
+});
+
+// ── POST /user/confirm-payment ──
+user.post("/confirm-payment", async (c) => {
+  const userId = c.get("userId") as string;
+  const body = await c.req.json();
+  const { payment_id } = body;
+  if (!payment_id) throw new BadRequestError("payment_id required");
+
+  const db = getDb();
+
+  // Find pending payment
+  const [payment] = await db.select().from(pendingPayments).where(eq(pendingPayments.id, payment_id)).limit(1);
+  if (!payment) throw new BadRequestError("გადახდა ვერ მოიძებნა");
+  if (payment.status !== "pending") throw new BadRequestError("გადახდა უკვე დასრულებულია");
+  if (new Date(payment.expiresAt) < new Date()) throw new BadRequestError("QR კოდი ვადაგასულია");
+
+  // Find merchant
+  const [m] = await db.select().from(merchants).where(eq(merchants.id, payment.merchantId)).limit(1);
+  if (!m || !m.isActive) throw new BadRequestError("მერჩანტი არ არის აქტიური");
+
+  const amount = payment.amount;
+
+  // Get config
+  const [coinsConfig] = await db.select().from(systemConfig).where(eq(systemConfig.key, "coins_per_lari")).limit(1);
+  const coinsPerLari = parseInt(coinsConfig?.value || "100");
+  const [cfg] = await db.select().from(gameConfig).limit(1);
+  const minReturnPercent = cfg?.minReturnPercent || 0.5;
+
+  const commissionAmount = Math.round(amount * m.commissionPercent / 100 * 100) / 100;
+  const merchantAmount = Math.round((amount - commissionAmount) * 100) / 100;
+  const coinsAwarded = Math.round(amount * coinsPerLari);
+  const guaranteedMinimum = Math.round(amount * minReturnPercent / 100 * 100) / 100;
+
+  // Create payment transaction
+  await db.insert(paymentTransactions).values({
+    id: nanoid(), userId, merchantId: m.id,
+    amount, commissionAmount, merchantAmount, coinsAwarded,
+  });
+
+  // Create coin transaction for user
+  await db.insert(transactions).values({
+    id: nanoid(), userId, paymentAmount: amount,
+    coinsReceived: coinsAwarded, coinsRemaining: coinsAwarded,
+    totalCashWon: 0, guaranteedMinimum, status: "active",
+  });
+
+  // Mark pending payment as completed
+  await db.update(pendingPayments).set({ status: "completed" }).where(eq(pendingPayments.id, payment_id));
+
+  return c.json({
+    success: true,
+    coinsAwarded,
+    amount,
+    merchantName: m.businessName,
+    message: `მიიღე ${coinsAwarded} ქოინი!`,
+  });
 });
 
 export default user;
