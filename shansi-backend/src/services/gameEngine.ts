@@ -337,7 +337,7 @@ export async function playGame(
     totalWin,
     newBalance,
     poolBalance: poolAfter?.balance || poolBefore,
-    coinsRemaining: bonusRoundTriggered ? (freeCoins || 0) : newCoinsRemaining,
+    coinsRemaining: newCoinsRemaining,
     totalCashWon: newTotalCashWon,
     bonusRound: bonusRoundTriggered,
     bonusMessage,

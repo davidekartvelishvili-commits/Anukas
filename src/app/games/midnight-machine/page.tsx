@@ -45,9 +45,17 @@ export default function MidnightMachinePage() {
       setCoinBalance(serverResult.coinsRemaining);
       storeCoin(serverResult.coinsRemaining);
 
-      // Detect bonus round
+      // Handle bonus round: show 0 first, then bonus coins after notification
       if (serverResult.bonusRound && serverResult.freeCoins) {
-        setBonusRoundInfo({ coins: serverResult.freeCoins, gamesLeft: serverResult.bonusGamesLeft || 0 });
+        setCoinBalance(0);
+        storeCoin(0);
+        setTimeout(() => {
+          setBonusRoundInfo({ coins: serverResult.freeCoins || 0, gamesLeft: serverResult.bonusGamesLeft || 0 });
+          setTimeout(() => {
+            setCoinBalance(serverResult.freeCoins || 0);
+            storeCoin(serverResult.freeCoins || 0);
+          }, 800);
+        }, 500);
       } else if (serverResult.transactionComplete) {
         setBonusRoundInfo(null);
       }

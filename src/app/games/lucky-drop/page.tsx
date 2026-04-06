@@ -384,12 +384,22 @@ export default function LuckyDropPage() {
 
     // Fire API immediately (parallel — no queue)
     playGame("plinko").then((serverResult: any) => {
-      // Always keep the lowest (most recent) server balance
+      // Always keep the latest server balance
       lastServerCoinsRef.current = serverResult.coinsRemaining;
 
-      // Detect bonus round
+      // Handle bonus round: coins hit 0, then bonus coins added after a delay
       if (serverResult.bonusRound && serverResult.freeCoins) {
-        setBonusRoundInfo({ coins: serverResult.freeCoins, gamesLeft: serverResult.bonusGamesLeft || 0 });
+        // Balance should show 0 first, then bonus coins appear after notification
+        lastServerCoinsRef.current = 0;
+        setTimeout(() => {
+          setBonusRoundInfo({ coins: serverResult.freeCoins, gamesLeft: serverResult.bonusGamesLeft || 0 });
+          // Update balance to bonus coins after showing notification
+          setTimeout(() => {
+            setBalance(serverResult.freeCoins);
+            storeCoin(serverResult.freeCoins);
+            lastServerCoinsRef.current = serverResult.freeCoins;
+          }, 800);
+        }, 500);
       } else if (serverResult.transactionComplete) {
         setBonusRoundInfo(null);
       }
