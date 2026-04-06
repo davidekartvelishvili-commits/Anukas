@@ -83,11 +83,8 @@ function VerifyContent() {
         router.push("/home");
         return;
       }
-      if (data.isNewUser) {
-        router.push("/auth/onboarding");
-      } else {
-        router.push("/home");
-      }
+      // All users go to home after verification
+      router.push("/home");
     } catch (err: any) {
       setVerifyError(err.message || "Invalid code");
       setVerifying(false);

@@ -147,13 +147,13 @@ games.get("/active-transaction", async (c) => {
   const userId = c.get("userId") as string;
   const db = getDb();
 
-  const [tx] = await db.select().from(transactions)
-    .where(and(eq(transactions.userId, userId), eq(transactions.status, "active")))
-    .limit(1);
-  const [bonusTx] = !tx ? await db.select().from(transactions)
-    .where(and(eq(transactions.userId, userId), eq(transactions.status, "bonus_round")))
-    .limit(1) : [tx];
-  const activeTx = tx || bonusTx;
+  // Get the most recent active transaction with coins remaining
+  const activeTxList = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
+    .orderBy(desc(transactions.createdAt));
+
+  // Find the one with coins remaining, or the newest
+  const activeTx = activeTxList.find(t => t.coinsRemaining > 0) || activeTxList[0] || null;
 
   if (!activeTx) {
     return c.json({ success: true, hasActiveTransaction: false, coinsRemaining: 0, totalCashWon: 0, guaranteedMinimum: 0, isBonusRound: false, paymentAmount: 0 });
