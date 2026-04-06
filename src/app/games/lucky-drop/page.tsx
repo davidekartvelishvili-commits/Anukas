@@ -40,7 +40,7 @@ export default function LuckyDropPage() {
   const [betAmount, setBetAmount] = useState(0);
   const [showBetPicker, setShowBetPicker] = useState(true);
   const pendingBallsRef = useRef(0);
-  const latestServerBalRef = useRef(-1);
+  const lastServerCoinsRef = useRef(-1);
 
   useEffect(() => {
     ensureActiveTransaction().then((tx) => {
@@ -351,12 +351,8 @@ export default function LuckyDropPage() {
 
     // Fire API immediately (parallel — no queue)
     playGame("plinko").then((serverResult: any) => {
-      // Track the lowest server balance (= most up-to-date after all deductions)
-      if (latestServerBalRef.current < 0) {
-        latestServerBalRef.current = serverResult.coinsRemaining;
-      } else {
-        latestServerBalRef.current = Math.min(latestServerBalRef.current, serverResult.coinsRemaining);
-      }
+      // Always keep the lowest (most recent) server balance
+      lastServerCoinsRef.current = serverResult.coinsRemaining;
 
       // Map server totalWin to slot index
       const mults = MULTIPLIERS[currentRisk];
@@ -399,11 +395,12 @@ export default function LuckyDropPage() {
           spawnParticles(serverResult.bonusWin > 20 ? 50 : 20, serverResult.bonusWin > 20);
           setTimeout(() => setBigWinText(""), 2000);
         }
-        // When last ball settles, sync authoritative balance from server
+        // Always sync to server balance — never let it go UP from local
+        setBalance((prev) => Math.min(prev, serverResult.coinsRemaining));
+        // When last ball settles, set exact server balance
         if (pendingBallsRef.current === 0) {
-          setBalance(latestServerBalRef.current);
-          storeCoin(latestServerBalRef.current);
-          latestServerBalRef.current = -1;
+          setBalance(lastServerCoinsRef.current);
+          storeCoin(lastServerCoinsRef.current);
         }
       };
 
@@ -413,10 +410,9 @@ export default function LuckyDropPage() {
       console.error("Drop API error:", err.message);
       pendingBallsRef.current--;
       setBalance((prev) => prev + currentBet);
-      if (pendingBallsRef.current === 0 && latestServerBalRef.current >= 0) {
-        setBalance(latestServerBalRef.current);
-        storeCoin(latestServerBalRef.current);
-        latestServerBalRef.current = -1;
+      if (pendingBallsRef.current === 0 && lastServerCoinsRef.current >= 0) {
+        setBalance(lastServerCoinsRef.current);
+        storeCoin(lastServerCoinsRef.current);
       }
       // Show error briefly
       setBigWinText(err.message || "\u10E8\u10D4\u10EA\u10D3\u10DD\u10DB\u10D0");
