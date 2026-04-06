@@ -127,9 +127,11 @@ export default function HomePage() {
     setCoinBalanceState(getCoinBalance());
     // Then fetch fresh from server and sync
     if (getStoredToken()) {
-      getMe().then(() => {
-        setCashBalanceState(getCashBalance());
-        setCoinBalanceState(getCoinBalance());
+      getMe().then((data: any) => {
+        if (data?.user) {
+          setCoinBalanceState(data.user.coinBalance ?? 0);
+          setCashBalanceState(data.user.balance ?? 0);
+        }
       }).catch(() => {});
     }
     const saved = localStorage.getItem("user-gender");
