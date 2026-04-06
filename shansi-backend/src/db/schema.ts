@@ -143,3 +143,55 @@ export const promoCodeUses = sqliteTable("promo_code_uses", {
   coinsRewarded: integer("coins_rewarded").notNull(),
   usedAt: text("used_at").default(sql`(datetime('now'))`).notNull(),
 });
+
+export const merchants = sqliteTable("merchants", {
+  id: text("id").primaryKey(),
+  businessName: text("business_name").notNull(),
+  businessNameKa: text("business_name_ka"),
+  category: text("category").notNull(),
+  phone: text("phone").notNull(),
+  email: text("email"),
+  address: text("address"),
+  commissionPercent: real("commission_percent").default(3.0).notNull(),
+  qrCode: text("qr_code").unique(),
+  isActive: integer("is_active", { mode: "boolean" }).default(false).notNull(),
+  isVerified: integer("is_verified", { mode: "boolean" }).default(false).notNull(),
+  contactPerson: text("contact_person"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+  approvedAt: text("approved_at"),
+  approvedBy: text("approved_by"),
+});
+
+export const paymentTransactions = sqliteTable("payment_transactions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  merchantId: text("merchant_id").notNull().references(() => merchants.id),
+  amount: real("amount").notNull(),
+  commissionAmount: real("commission_amount").notNull(),
+  merchantAmount: real("merchant_amount").notNull(),
+  coinsAwarded: integer("coins_awarded").notNull(),
+  status: text("status").default("completed").notNull(),
+  paymentReference: text("payment_reference"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const withdrawals = sqliteTable("withdrawals", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  amount: real("amount").notNull(),
+  iban: text("iban").notNull(),
+  bankName: text("bank_name"),
+  accountHolderName: text("account_holder_name").notNull(),
+  status: text("status").default("pending").notNull(),
+  adminNote: text("admin_note"),
+  processedBy: text("processed_by"),
+  processedAt: text("processed_at"),
+  completedAt: text("completed_at"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const systemConfig = sqliteTable("system_config", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
+});

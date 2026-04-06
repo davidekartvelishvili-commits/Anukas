@@ -132,6 +132,52 @@ export async function getGameHistory(filters?: {
   return adminFetch(`/admin/game-history?${params}`);
 }
 
+// ── Merchants ──
+
+export async function getMerchants(status?: string, page = 1) {
+  const params = new URLSearchParams({ page: String(page) });
+  if (status && status !== "all") params.set("status", status);
+  return adminFetch(`/admin/merchants?${params}`);
+}
+
+export async function getMerchant(id: string) {
+  return adminFetch(`/admin/merchants/${id}`);
+}
+
+export async function updateMerchant(id: string, data: Record<string, any>) {
+  return adminFetch(`/admin/merchants/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function simulatePayment(userPhone: string, merchantId: string, amount: number) {
+  return adminFetch("/admin/simulate-payment", {
+    method: "POST",
+    body: JSON.stringify({ user_phone: userPhone, merchant_id: merchantId, amount }),
+  });
+}
+
+export async function getPaymentTransactions(page = 1) {
+  return adminFetch(`/admin/transactions/payments?page=${page}`);
+}
+
+export async function getFinance() {
+  return adminFetch("/admin/finance");
+}
+
+// ── Withdrawals ──
+
+export async function getWithdrawals(status?: string, page = 1) {
+  const params = new URLSearchParams({ page: String(page) });
+  if (status) params.set("status", status);
+  return adminFetch(`/admin/withdrawals?${params}`);
+}
+
+export async function updateWithdrawal(id: string, status: string, adminNote?: string) {
+  return adminFetch(`/admin/withdrawals/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, admin_note: adminNote }),
+  });
+}
+
 export function logoutAdmin() {
   localStorage.removeItem("adminToken");
   window.location.href = "/admin/login";

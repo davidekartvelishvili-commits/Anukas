@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses } from "../db/schema.js";
+import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig } from "../db/schema.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/errors.js";
@@ -760,6 +760,262 @@ admin.get("/referrals", adminMiddleware, async (c) => {
     pagination: { page, limit, total },
     stats: { totalReferrals: Number(statsResult?.totalReferrals) || 0, totalCoinsGiven: Number(statsResult?.totalCoinsGiven) || 0 },
     topReferrers,
+  });
+});
+
+// ══════════════════════════════════════
+// MERCHANTS
+// ══════════════════════════════════════
+
+// GET /admin/merchants
+admin.get("/merchants", adminMiddleware, async (c) => {
+  const db = getDb();
+  const status = c.req.query("status") || "all";
+  const page = parseInt(c.req.query("page") || "1");
+  const limit = 20;
+  const offset = (page - 1) * limit;
+
+  let merchantList;
+  if (status === "pending") {
+    merchantList = await db.select().from(merchants).where(eq(merchants.isActive, false)).orderBy(desc(merchants.createdAt)).limit(limit).offset(offset);
+  } else if (status === "active") {
+    merchantList = await db.select().from(merchants).where(eq(merchants.isActive, true)).orderBy(desc(merchants.createdAt)).limit(limit).offset(offset);
+  } else {
+    merchantList = await db.select().from(merchants).orderBy(desc(merchants.createdAt)).limit(limit).offset(offset);
+  }
+
+  const [totalResult] = await db.select({ count: sql<number>`count(*)` }).from(merchants);
+
+  // Enrich with transaction stats
+  const enriched = await Promise.all(
+    merchantList.map(async (m) => {
+      const [stats] = await db.select({
+        totalTx: sql<number>`count(*)`,
+        totalAmount: sql<number>`coalesce(sum(${paymentTransactions.amount}), 0)`,
+        totalCommission: sql<number>`coalesce(sum(${paymentTransactions.commissionAmount}), 0)`,
+      }).from(paymentTransactions).where(eq(paymentTransactions.merchantId, m.id));
+      return { ...m, totalTransactions: Number(stats?.totalTx) || 0, totalAmount: Number(stats?.totalAmount) || 0, totalCommission: Number(stats?.totalCommission) || 0 };
+    })
+  );
+
+  return c.json({ success: true, merchants: enriched, pagination: { page, limit, total: Number(totalResult?.count) || 0 } });
+});
+
+// GET /admin/merchants/:id
+admin.get("/merchants/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id") as string;
+  const db = getDb();
+  const [merchant] = await db.select().from(merchants).where(eq(merchants.id, id)).limit(1);
+  if (!merchant) return c.json({ success: false, message: "Not found" }, 404);
+
+  const txHistory = await db.select().from(paymentTransactions).where(eq(paymentTransactions.merchantId, id)).orderBy(desc(paymentTransactions.createdAt)).limit(50);
+
+  const enrichedTx = await Promise.all(txHistory.map(async (tx) => {
+    const [user] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, tx.userId)).limit(1);
+    return { ...tx, userPhone: user?.phone, userName: user?.name };
+  }));
+
+  const [stats] = await db.select({
+    totalTx: sql<number>`count(*)`,
+    totalAmount: sql<number>`coalesce(sum(${paymentTransactions.amount}), 0)`,
+    totalCommission: sql<number>`coalesce(sum(${paymentTransactions.commissionAmount}), 0)`,
+  }).from(paymentTransactions).where(eq(paymentTransactions.merchantId, id));
+
+  return c.json({ success: true, merchant, transactions: enrichedTx, stats: { totalTransactions: Number(stats?.totalTx) || 0, totalAmount: Number(stats?.totalAmount) || 0, totalCommission: Number(stats?.totalCommission) || 0 } });
+});
+
+// PATCH /admin/merchants/:id
+admin.patch("/merchants/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id") as string;
+  const body = await c.req.json();
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  const [existing] = await db.select().from(merchants).where(eq(merchants.id, id)).limit(1);
+  if (!existing) return c.json({ success: false, message: "Not found" }, 404);
+
+  const updates: Record<string, any> = {};
+  if (body.is_active !== undefined) {
+    updates.isActive = body.is_active;
+    if (body.is_active && !existing.approvedAt) {
+      updates.approvedAt = new Date().toISOString();
+      updates.approvedBy = adminId;
+    }
+  }
+  if (body.is_verified !== undefined) updates.isVerified = body.is_verified;
+  if (body.commission_percent !== undefined) updates.commissionPercent = body.commission_percent;
+
+  if (Object.keys(updates).length > 0) {
+    await db.update(merchants).set(updates).where(eq(merchants.id, id));
+  }
+
+  await logAction(adminId, "update_merchant", JSON.stringify({ merchantId: id, updates }));
+  const [updated] = await db.select().from(merchants).where(eq(merchants.id, id)).limit(1);
+  return c.json({ success: true, merchant: updated });
+});
+
+// ══════════════════════════════════════
+// PAYMENTS & TRANSACTIONS
+// ══════════════════════════════════════
+
+// POST /admin/simulate-payment
+admin.post("/simulate-payment", adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const { user_phone, merchant_id, amount } = body;
+  if (!user_phone || !merchant_id || !amount || amount <= 0) throw new BadRequestError("Missing required fields");
+
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  const phone = user_phone.startsWith("+995") ? user_phone : `+995${user_phone}`;
+  const [user] = await db.select().from(users).where(eq(users.phone, phone)).limit(1);
+  if (!user) throw new BadRequestError("User not found");
+
+  const [merchant] = await db.select().from(merchants).where(eq(merchants.id, merchant_id)).limit(1);
+  if (!merchant || !merchant.isActive) throw new BadRequestError("Merchant not found or inactive");
+
+  // Get coins_per_lari from system_config
+  const [coinsConfig] = await db.select().from(systemConfig).where(eq(systemConfig.key, "coins_per_lari")).limit(1);
+  const coinsPerLari = parseInt(coinsConfig?.value || "100");
+
+  // Get min_return_percent from game config
+  const [cfg] = await db.select().from(gameConfig).limit(1);
+  const minReturnPercent = cfg?.minReturnPercent || 0.5;
+
+  const commissionAmount = Math.round(amount * merchant.commissionPercent / 100 * 100) / 100;
+  const merchantAmount = Math.round((amount - commissionAmount) * 100) / 100;
+  const coinsAwarded = Math.round(amount * coinsPerLari);
+  const guaranteedMinimum = Math.round(amount * minReturnPercent / 100 * 100) / 100;
+
+  // Create payment transaction
+  await db.insert(paymentTransactions).values({
+    id: nanoid(), userId: user.id, merchantId: merchant_id,
+    amount, commissionAmount, merchantAmount, coinsAwarded,
+  });
+
+  // Create coin transaction for user
+  await db.insert(transactions).values({
+    id: nanoid(), userId: user.id, paymentAmount: amount,
+    coinsReceived: coinsAwarded, coinsRemaining: coinsAwarded,
+    totalCashWon: 0, guaranteedMinimum, status: "active",
+  });
+
+  await logAction(adminId, "simulate_payment", JSON.stringify({ userId: user.id, merchantId: merchant_id, amount, coinsAwarded, commission: commissionAmount }));
+
+  return c.json({ success: true, coinsAwarded, commission: commissionAmount, merchantAmount, guaranteedMinimum });
+});
+
+// GET /admin/transactions/payments
+admin.get("/transactions/payments", adminMiddleware, async (c) => {
+  const db = getDb();
+  const page = parseInt(c.req.query("page") || "1");
+  const limit = 20;
+  const offset = (page - 1) * limit;
+
+  const txList = await db.select().from(paymentTransactions).orderBy(desc(paymentTransactions.createdAt)).limit(limit).offset(offset);
+  const [totalResult] = await db.select({ count: sql<number>`count(*)` }).from(paymentTransactions);
+
+  const enriched = await Promise.all(txList.map(async (tx) => {
+    const [user] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, tx.userId)).limit(1);
+    const [merchant] = await db.select({ businessName: merchants.businessName }).from(merchants).where(eq(merchants.id, tx.merchantId)).limit(1);
+    return { ...tx, userPhone: user?.phone, userName: user?.name, merchantName: merchant?.businessName };
+  }));
+
+  return c.json({ success: true, transactions: enriched, pagination: { page, limit, total: Number(totalResult?.count) || 0 } });
+});
+
+// ══════════════════════════════════════
+// WITHDRAWALS
+// ══════════════════════════════════════
+
+// GET /admin/withdrawals
+admin.get("/withdrawals", adminMiddleware, async (c) => {
+  const db = getDb();
+  const status = c.req.query("status");
+  const page = parseInt(c.req.query("page") || "1");
+  const limit = 20;
+  const offset = (page - 1) * limit;
+
+  const conditions: any[] = [];
+  if (status) conditions.push(eq(withdrawals.status, status));
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const list = await db.select().from(withdrawals).where(whereClause).orderBy(desc(withdrawals.createdAt)).limit(limit).offset(offset);
+  const [totalResult] = await db.select({ count: sql<number>`count(*)` }).from(withdrawals).where(whereClause);
+
+  const enriched = await Promise.all(list.map(async (w) => {
+    const [user] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, w.userId)).limit(1);
+    return { ...w, userPhone: user?.phone, userName: user?.name };
+  }));
+
+  return c.json({ success: true, withdrawals: enriched, pagination: { page, limit, total: Number(totalResult?.count) || 0 } });
+});
+
+// PATCH /admin/withdrawals/:id
+admin.patch("/withdrawals/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id") as string;
+  const body = await c.req.json();
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  const [w] = await db.select().from(withdrawals).where(eq(withdrawals.id, id)).limit(1);
+  if (!w) return c.json({ success: false, message: "Not found" }, 404);
+
+  const updates: Record<string, any> = { processedBy: adminId, processedAt: new Date().toISOString() };
+  if (body.status === "approved") updates.status = "approved";
+  else if (body.status === "completed") { updates.status = "completed"; updates.completedAt = new Date().toISOString(); }
+  else if (body.status === "rejected") {
+    updates.status = "rejected";
+    if (body.admin_note) updates.adminNote = body.admin_note;
+    // Refund cash balance
+    const [user] = await db.select().from(users).where(eq(users.id, w.userId)).limit(1);
+    if (user) {
+      await db.update(users).set({ balance: user.balance + w.amount, updatedAt: new Date().toISOString() }).where(eq(users.id, w.userId));
+    }
+  }
+
+  await db.update(withdrawals).set(updates).where(eq(withdrawals.id, id));
+  await logAction(adminId, `withdrawal_${body.status}`, JSON.stringify({ withdrawalId: id, amount: w.amount }));
+
+  return c.json({ success: true });
+});
+
+// ══════════════════════════════════════
+// FINANCE
+// ══════════════════════════════════════
+
+// GET /admin/finance
+admin.get("/finance", adminMiddleware, async (c) => {
+  const db = getDb();
+  const [commissionStats] = await db.select({
+    totalCommission: sql<number>`coalesce(sum(${paymentTransactions.commissionAmount}), 0)`,
+    totalPayments: sql<number>`count(*)`,
+    totalVolume: sql<number>`coalesce(sum(${paymentTransactions.amount}), 0)`,
+  }).from(paymentTransactions);
+
+  const [withdrawalStats] = await db.select({
+    totalPaidOut: sql<number>`coalesce(sum(${withdrawals.amount}), 0)`,
+  }).from(withdrawals).where(eq(withdrawals.status, "completed"));
+
+  const [pendingWithdrawals] = await db.select({
+    totalPending: sql<number>`coalesce(sum(${withdrawals.amount}), 0)`,
+    count: sql<number>`count(*)`,
+  }).from(withdrawals).where(eq(withdrawals.status, "pending"));
+
+  const totalCommission = Number(commissionStats?.totalCommission) || 0;
+  const totalPaidOut = Number(withdrawalStats?.totalPaidOut) || 0;
+
+  return c.json({
+    success: true,
+    finance: {
+      totalCommission,
+      totalPayments: Number(commissionStats?.totalPayments) || 0,
+      totalVolume: Number(commissionStats?.totalVolume) || 0,
+      totalPaidOut,
+      pendingWithdrawals: Number(pendingWithdrawals?.totalPending) || 0,
+      pendingCount: Number(pendingWithdrawals?.count) || 0,
+      profit: Math.round((totalCommission - totalPaidOut) * 100) / 100,
+    },
   });
 });
 
