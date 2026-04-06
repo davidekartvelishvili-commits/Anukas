@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { getGameConfig, updateGameConfig } from "@/services/admin";
 
 /* ── SVG ICONS (NavIcon) ── */
 function NavIcon({ id, active }: { id: string; active: boolean }) {
@@ -114,44 +115,48 @@ export default function GamesPage() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const [games, setGames] = useState<GameData[]>([
-    {
-      id: "slot-machine",
-      name: "Slot Machine",
-      nameKa: "სლოტ მანქანა",
-      icon: <SlotMachineIcon />,
-      enabled: true,
-      playsToday: 1247,
-      playsTotal: 89432,
-      totalWon: 14320.50,
-      avgWin: 2.85,
-      xpPerPlay: 10,
-    },
-    {
-      id: "lucky-drop",
-      name: "Lucky Drop",
-      nameKa: "იღბლიანი წვეთი",
-      icon: <LuckyDropIcon />,
-      enabled: true,
-      playsToday: 834,
-      playsTotal: 56210,
-      totalWon: 8745.20,
-      avgWin: 1.95,
-      xpPerPlay: 15,
-    },
-    {
-      id: "lucky-step",
-      name: "Lucky Step",
-      nameKa: "იღბლიანი ნაბიჯი",
-      icon: <LuckyStepIcon />,
-      enabled: false,
-      playsToday: 0,
-      playsTotal: 12340,
-      totalWon: 3210.80,
-      avgWin: 3.40,
-      xpPerPlay: 20,
-    },
-  ]);
+  const GAME_META: Record<string, { name: string; nameKa: string; icon: JSX.Element }> = {
+    slot: { name: "Midnight Machine", nameKa: "\u10E1\u10DA\u10DD\u10E2 \u10DB\u10D0\u10DC\u10E5\u10D0\u10DC\u10D0", icon: <SlotMachineIcon /> },
+    plinko: { name: "Lucky Drop", nameKa: "\u10D8\u10E6\u10D1\u10DA\u10D8\u10D0\u10DC\u10D8 \u10EC\u10D5\u10D4\u10D7\u10D8", icon: <LuckyDropIcon /> },
+    chicken_rush: { name: "Lucky Step", nameKa: "\u10D8\u10E6\u10D1\u10DA\u10D8\u10D0\u10DC\u10D8 \u10DC\u10D0\u10D1\u10D8\u10EF\u10D8", icon: <LuckyStepIcon /> },
+  };
+
+  const [games, setGames] = useState<GameData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [confirmToggle, setConfirmToggle] = useState<{ gameType: string; currentEnabled: boolean } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [toggling, setToggling] = useState(false);
+
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const fetchGames = useCallback(async () => {
+    try {
+      const data = await getGameConfig();
+      if (data.configs) {
+        setGames(data.configs.map((c: any) => {
+          const meta = GAME_META[c.gameType] || { name: c.gameType, nameKa: c.gameType, icon: <SlotMachineIcon /> };
+          return {
+            id: c.gameType,
+            name: meta.name,
+            nameKa: meta.nameKa,
+            icon: meta.icon,
+            enabled: c.isActive,
+            playsToday: 0,
+            playsTotal: 0,
+            totalWon: 0,
+            avgWin: 0,
+            xpPerPlay: 10,
+          };
+        }));
+      }
+    } catch { }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchGames(); }, [fetchGames]);
 
   const [editingXp, setEditingXp] = useState<string | null>(null);
   const [xpValue, setXpValue] = useState(0);
@@ -163,9 +168,28 @@ export default function GamesPage() {
   const [cardDropSaved, setCardDropSaved] = useState(false);
 
   const toggleGame = (id: string) => {
-    setGames((prev) =>
-      prev.map((g) => (g.id === id ? { ...g, enabled: !g.enabled } : g))
-    );
+    const game = games.find(g => g.id === id);
+    if (game) setConfirmToggle({ gameType: id, currentEnabled: game.enabled });
+  };
+
+  const confirmToggleAction = async () => {
+    if (!confirmToggle) return;
+    setToggling(true);
+    try {
+      await updateGameConfig(confirmToggle.gameType, { isActive: !confirmToggle.currentEnabled });
+      showToast(
+        confirmToggle.currentEnabled
+          ? `${GAME_META[confirmToggle.gameType]?.name || confirmToggle.gameType} \u10D2\u10D0\u10D7\u10D8\u10E8\u10E3\u10DA\u10D8\u10D0 \u2014 \u10DB\u10DD\u10DB\u10EE\u10DB\u10D0\u10E0\u10D4\u10D1\u10DA\u10D4\u10D1\u10E1 \u10D0\u10E0 \u10D3\u10D0\u10D8\u10DC\u10D0\u10EE\u10D0\u10D5\u10D4\u10DC`
+          : `${GAME_META[confirmToggle.gameType]?.name || confirmToggle.gameType} \u10D2\u10D0\u10D0\u10E5\u10E2\u10D8\u10E3\u10E0\u10D3\u10D0`,
+        "success"
+      );
+      fetchGames();
+    } catch (e: any) {
+      showToast(e.message || "\u10E8\u10D4\u10EA\u10D3\u10DD\u10DB\u10D0", "error");
+    } finally {
+      setToggling(false);
+      setConfirmToggle(null);
+    }
   };
 
   const handleSaveXp = (id: string) => {
@@ -636,6 +660,51 @@ export default function GamesPage() {
           </button>
         </div>
       </main>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 px-4 py-3 rounded-[12px] shadow-lg transition-all" style={{ background: toast.type === "success" ? "#22C55E20" : "#EF444420", border: `1px solid ${toast.type === "success" ? "#22C55E40" : "#EF444440"}` }}>
+          <p className="text-[13px] font-medium" style={{ color: toast.type === "success" ? "#22C55E" : "#EF4444" }}>{toast.message}</p>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmToggle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setConfirmToggle(null)}>
+          <div className="absolute inset-0 bg-black/70" />
+          <div className="relative rounded-[16px] p-6 w-[90%] max-w-[360px]" style={{ background: "#111111", border: `1px solid ${confirmToggle.currentEnabled ? "#EF444440" : "#22C55E40"}` }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-3">
+              {confirmToggle.currentEnabled ? (
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"><path d="M10 2L1 18h18L10 2z" /><line x1="10" y1="8" x2="10" y2="12" /><circle cx="10" cy="15" r="0.5" fill="#EF4444" /></svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round"><polyline points="4,10 8,14 16,6" /></svg>
+              )}
+              <h3 className="text-[16px] font-bold" style={{ color: confirmToggle.currentEnabled ? "#EF4444" : "#22C55E" }}>
+                {confirmToggle.currentEnabled ? "\u10D7\u10D0\u10DB\u10D0\u10E8\u10D8\u10E1 \u10D2\u10D0\u10D7\u10D8\u10E8\u10D5\u10D0" : "\u10D7\u10D0\u10DB\u10D0\u10E8\u10D8\u10E1 \u10D2\u10D0\u10D0\u10E5\u10E2\u10D8\u10E3\u10E0\u10D4\u10D1\u10D0"}
+              </h3>
+            </div>
+            <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "#A0A0A0" }}>
+              {confirmToggle.currentEnabled
+                ? <><span className="font-bold text-white">{GAME_META[confirmToggle.gameType]?.name}</span> {"\u10D2\u10D0\u10D8\u10D7\u10D8\u10E8\u10D4\u10D1\u10D0 \u10D3\u10D0 \u10DB\u10DD\u10DB\u10EE\u10DB\u10D0\u10E0\u10D4\u10D1\u10DA\u10D4\u10D1\u10E1 \u10D0\u10E0 \u10D3\u10D0\u10D8\u10DC\u10D0\u10EE\u10D0\u10D5\u10D4\u10DC. \u10D3\u10D0\u10E0\u10EC\u10DB\u10E3\u10DC\u10D4\u10D1\u10E3\u10DA\u10D8 \u10EE\u10D0\u10E0?"}</>
+                : <><span className="font-bold text-white">{GAME_META[confirmToggle.gameType]?.name}</span> {"\u10D2\u10D0\u10D0\u10E5\u10E2\u10D8\u10E3\u10E0\u10D3\u10D4\u10D1\u10D0 \u10D3\u10D0 \u10DB\u10DD\u10DB\u10EE\u10DB\u10D0\u10E0\u10D4\u10D1\u10DA\u10D4\u10D1\u10E1 \u10D3\u10D0\u10D8\u10DC\u10D0\u10EE\u10D0\u10D5\u10D4\u10DC. \u10D3\u10D0\u10E0\u10EC\u10DB\u10E3\u10DC\u10D4\u10D1\u10E3\u10DA\u10D8 \u10EE\u10D0\u10E0?"}</>
+              }
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={confirmToggleAction}
+                disabled={toggling}
+                className="flex-1 py-3 rounded-[8px] text-[14px] font-bold transition-all active:scale-95 disabled:opacity-50"
+                style={{ background: confirmToggle.currentEnabled ? "#EF4444" : "#22C55E", color: "#FFFFFF" }}
+              >
+                {toggling ? "..." : confirmToggle.currentEnabled ? "\u10D2\u10D0\u10D7\u10D8\u10E8\u10D5\u10D0" : "\u10D2\u10D0\u10D0\u10E5\u10E2\u10D8\u10E3\u10E0\u10D4\u10D1\u10D0"}
+              </button>
+              <button onClick={() => setConfirmToggle(null)} className="flex-1 py-3 rounded-[8px] text-[14px] font-bold transition-all active:scale-95" style={{ background: "#1A1A1A", color: "#A0A0A0" }}>
+                {"\u10D2\u10D0\u10E3\u10E5\u10DB\u10D4\u10D1\u10D0"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
