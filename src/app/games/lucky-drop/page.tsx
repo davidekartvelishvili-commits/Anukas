@@ -116,6 +116,7 @@ export default function LuckyDropPage() {
     }).catch(() => {});
   }, []);
   const [bigWinText, setBigWinText] = useState("");
+  const [bonusRoundInfo, setBonusRoundInfo] = useState<{ coins: number; gamesLeft: number } | null>(null);
   const dropCount = useRef(0);
   const BET_OPTIONS = [10, 25, 50, 100, 250, 500];
 
@@ -386,6 +387,13 @@ export default function LuckyDropPage() {
       // Always keep the lowest (most recent) server balance
       lastServerCoinsRef.current = serverResult.coinsRemaining;
 
+      // Detect bonus round
+      if (serverResult.bonusRound && serverResult.freeCoins) {
+        setBonusRoundInfo({ coins: serverResult.freeCoins, gamesLeft: serverResult.bonusGamesLeft || 0 });
+      } else if (serverResult.transactionComplete) {
+        setBonusRoundInfo(null);
+      }
+
       // Map server result to slot: WIN → random green slot, LOSE → random red slot
       const mults = MULTIPLIERS[currentRisk];
       const won = serverResult.totalWin > 0;
@@ -499,6 +507,20 @@ export default function LuckyDropPage() {
           {bigWinText}
         </span>
       </div>
+
+      {/* Bonus round banner */}
+      {bonusRoundInfo && (
+        <div className="absolute left-0 right-0 z-20 flex justify-center" style={{ top: "calc(env(safe-area-inset-top, 0px) + 70px)" }}>
+          <div className="px-5 py-3 rounded-[16px] text-center" style={{ background: "rgba(255,215,0,0.15)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,215,0,0.3)" }}>
+            <p className="text-[14px] font-bold" style={{ color: "#FFD700", fontFamily: "var(--font-outfit)" }}>
+              {"\uD83C\uDF89 \u10D1\u10DD\u10DC\u10E3\u10E1 \u10E0\u10D0\u10E3\u10DC\u10D3\u10D8!"}
+            </p>
+            <p className="text-[12px] mt-1" style={{ color: "rgba(255,215,0,0.7)", fontFamily: "var(--font-dm-sans)" }}>
+              {"\u10E3\u10E4\u10D0\u10E1\u10DD \u10E5\u10DD\u10D8\u10DC\u10D4\u10D1\u10D8: "}{bonusRoundInfo.coins} {bonusRoundInfo.gamesLeft > 0 && ` \u2022 \u10D3\u10D0\u10E0\u10E9\u10D0: ${bonusRoundInfo.gamesLeft}`}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Bottom UI */}
       <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center z-10 pointer-events-none gap-3" style={{ paddingBottom: "max(18px, calc(env(safe-area-inset-bottom, 0px) + 12px))" }}>

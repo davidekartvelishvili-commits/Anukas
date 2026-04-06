@@ -20,6 +20,7 @@ export default function MidnightMachinePage() {
   const [payoutOpen, setPayoutOpen] = useState(false);
   const [showBetPicker, setShowBetPicker] = useState(true);
   const [betAmount, setBetAmount] = useState(0);
+  const [bonusRoundInfo, setBonusRoundInfo] = useState<{ coins: number; gamesLeft: number } | null>(null);
   const BET_OPTIONS = [10, 25, 50, 100, 250, 500];
 
   useEffect(() => {
@@ -43,6 +44,13 @@ export default function MidnightMachinePage() {
       // Immediately sync coin balance from server (after deduction)
       setCoinBalance(serverResult.coinsRemaining);
       storeCoin(serverResult.coinsRemaining);
+
+      // Detect bonus round
+      if (serverResult.bonusRound && serverResult.freeCoins) {
+        setBonusRoundInfo({ coins: serverResult.freeCoins, gamesLeft: serverResult.bonusGamesLeft || 0 });
+      } else if (serverResult.transactionComplete) {
+        setBonusRoundInfo(null);
+      }
 
       // Map server result to visual symbols
       const symbols: [string, string, string] = serverResult.won
@@ -119,6 +127,19 @@ export default function MidnightMachinePage() {
 
   return (
     <div className="relative w-full h-[100dvh] bg-[#050a1a] overflow-hidden">
+      {/* Bonus round banner */}
+      {bonusRoundInfo && (
+        <div className="absolute left-0 right-0 z-30 flex justify-center" style={{ top: "calc(env(safe-area-inset-top, 0px) + 60px)" }}>
+          <div className="px-5 py-3 rounded-[16px] text-center" style={{ background: "rgba(255,215,0,0.15)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,215,0,0.3)" }}>
+            <p className="text-[14px] font-bold" style={{ color: "#FFD700", fontFamily: "var(--font-outfit)" }}>
+              {"\uD83C\uDF89 \u10D1\u10DD\u10DC\u10E3\u10E1 \u10E0\u10D0\u10E3\u10DC\u10D3\u10D8!"}
+            </p>
+            <p className="text-[12px] mt-1" style={{ color: "rgba(255,215,0,0.7)", fontFamily: "var(--font-dm-sans)" }}>
+              {"\u10E3\u10E4\u10D0\u10E1\u10DD \u10E5\u10DD\u10D8\u10DC\u10D4\u10D1\u10D8: "}{bonusRoundInfo.coins}{bonusRoundInfo.gamesLeft > 0 && ` \u2022 \u10D3\u10D0\u10E0\u10E9\u10D0: ${bonusRoundInfo.gamesLeft}`}
+            </p>
+          </div>
+        </div>
+      )}
       <style>{`
         @keyframes particleFall {
           0% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
