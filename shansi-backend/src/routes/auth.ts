@@ -13,13 +13,12 @@ import { BadRequestError, RateLimitError, UnauthorizedError } from "../utils/err
 
 const auth = new Hono<AppEnv>();
 
-// Helper: get coin balance from active transaction
+// Helper: get coin balance — sum of ALL active transactions' remaining coins
 async function getUserCoinBalance(userId: string): Promise<number> {
   const db = getDb();
-  const [tx] = await db.select().from(transactions)
-    .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
-    .orderBy(desc(transactions.createdAt)).limit(1);
-  return tx?.coinsRemaining || 0;
+  const activeTxs = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))));
+  return activeTxs.reduce((sum, tx) => sum + (tx.coinsRemaining || 0), 0);
 }
 
 // Helper: generate unique referral code

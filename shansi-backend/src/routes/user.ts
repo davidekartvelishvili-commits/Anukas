@@ -24,10 +24,10 @@ user.get("/profile", async (c) => {
   const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!u) return c.json({ success: false, message: "Not found" }, 404);
 
-  // Get coin balance from active transaction
-  const [activeTx] = await db.select().from(transactions)
-    .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
-    .orderBy(desc(transactions.createdAt)).limit(1);
+  // Get coin balance — sum of ALL active transactions
+  const profileActiveTxs = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))));
+  const profileCoinBalance = profileActiveTxs.reduce((sum, t) => sum + (t.coinsRemaining || 0), 0);
 
   return c.json({
     success: true,
@@ -36,7 +36,7 @@ user.get("/profile", async (c) => {
       phone: u.phone,
       name: u.name,
       balance: u.balance,
-      coinBalance: activeTx?.coinsRemaining || 0,
+      coinBalance: profileCoinBalance,
       hasPin: !!u.pinHash,
       isActive: u.isActive,
       createdAt: u.createdAt,

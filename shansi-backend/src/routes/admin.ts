@@ -299,15 +299,15 @@ admin.get("/users", adminMiddleware, async (c) => {
         lastActive: sql<string>`max(${gameHistory.createdAt})`,
       }).from(gameHistory).where(eq(gameHistory.userId, u.id));
 
-      const [activeTx] = await db.select().from(transactions)
-        .where(and(eq(transactions.userId, u.id), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
-        .orderBy(desc(transactions.createdAt)).limit(1);
+      const userActiveTxs = await db.select().from(transactions)
+        .where(and(eq(transactions.userId, u.id), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))));
+      const userCoinBalance = userActiveTxs.reduce((sum, t) => sum + (t.coinsRemaining || 0), 0);
 
       return {
         id: u.id,
         phone: u.phone,
         name: u.name,
-        coin_balance: activeTx?.coinsRemaining || 0,
+        coin_balance: userCoinBalance,
         cash_balance: u.balance,
         is_active: u.isActive,
         created_at: u.createdAt,
@@ -344,9 +344,11 @@ admin.get("/users/:id", adminMiddleware, async (c) => {
     .where(eq(gameHistory.userId, id))
     .orderBy(desc(gameHistory.createdAt)).limit(50);
 
-  const [activeTx] = await db.select().from(transactions)
+  const allActiveTx = await db.select().from(transactions)
     .where(and(eq(transactions.userId, id), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
-    .orderBy(desc(transactions.createdAt)).limit(1);
+    .orderBy(desc(transactions.createdAt));
+  const detailCoinBalance = allActiveTx.reduce((sum, t) => sum + (t.coinsRemaining || 0), 0);
+  const activeTx = allActiveTx[0] || null;
 
   // Get referral info
   const userReferrals = await db.select().from(referrals).where(eq(referrals.referrerId, id)).orderBy(desc(referrals.createdAt));
@@ -370,7 +372,7 @@ admin.get("/users/:id", adminMiddleware, async (c) => {
       id: user.id,
       phone: user.phone,
       name: user.name,
-      coin_balance: activeTx?.coinsRemaining || 0,
+      coin_balance: detailCoinBalance,
       cash_balance: user.balance,
       is_active: user.isActive,
       created_at: user.createdAt,
