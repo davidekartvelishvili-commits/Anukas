@@ -91,7 +91,7 @@ export default function MerchantsPage() {
   const [totalPages, setTotalPages] = useState(1);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<MerchantDetail | null>(null);
+  const [detail, setDetail] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -127,8 +127,8 @@ export default function MerchantsPage() {
     setSelectedId(id);
     setDetailLoading(true);
     try {
-      const data = await getMerchant(id);
-      setDetail(data.merchant || data);
+      const data = await getMerchant(id) as any;
+      setDetail(data);
     } catch { showToast("დეტალები ვერ ჩაიტვირთა", "error"); }
     finally { setDetailLoading(false); }
   };
@@ -246,40 +246,42 @@ export default function MerchantsPage() {
                 <table className="w-full text-left">
                   <thead>
                     <tr style={{ borderBottom: "1px solid #252525" }}>
-                      {["სახელი", "კატეგორია", "კომისია %", "ტრანზაქციები", "სტატუსი", ""].map((h) => (
-                        <th key={h} className="px-4 py-3 text-[12px] font-medium" style={{ color: "#666" }}>{h}</th>
+                      {["ID", "\u10E1\u10D0\u10EE\u10D4\u10DA\u10D8", "\u10D9\u10D0\u10E2\u10D4\u10D2\u10DD\u10E0\u10D8\u10D0", "\u10D9\u10DD\u10DB\u10D8\u10E1\u10D8\u10D0 %", "TX", "\u10E1\u10E2\u10D0\u10E2\u10E3\u10E1\u10D8", ""].map((h) => (
+                        <th key={h} className="px-3 py-3 text-[11px] font-medium" style={{ color: "#666" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {merchants.map((m) => (
+                    {merchants.map((m: any) => (
                       <>
                         <tr key={m.id} onClick={() => toggleDetail(m.id)} className="cursor-pointer transition-all hover:bg-white/5" style={{ borderBottom: "1px solid #1A1A1A" }}>
-                          <td className="px-4 py-3 text-[13px]" style={{ color: "#FFF" }}>{m.name}</td>
-                          <td className="px-4 py-3 text-[13px]" style={{ color: "#A0A0A0" }}>{m.category || "—"}</td>
-                          <td className="px-4 py-3 text-[13px]" style={{ color: "#F9E741" }}>{m.commission_percent}%</td>
-                          <td className="px-4 py-3 text-[13px]" style={{ color: "#A0A0A0" }}>{m.total_transactions}</td>
-                          <td className="px-4 py-3">
-                            <span className="inline-block px-2 py-1 rounded-[6px] text-[11px] font-medium" style={{ background: m.is_active ? "rgba(34,197,94,0.15)" : "rgba(249,231,65,0.15)", color: m.is_active ? "#22C55E" : "#F9E741" }}>
-                              {m.is_active ? "აქტიური" : "მოლოდინში"}
+                          <td className="px-3 py-3 text-[12px] font-mono font-bold" style={{ color: "#F9E741" }}>{m.merchantCode || "—"}</td>
+                          <td className="px-3 py-3 text-[13px]" style={{ color: "#FFF" }}>{m.businessName || m.name}</td>
+                          <td className="px-3 py-3 text-[12px]" style={{ color: "#A0A0A0" }}>{m.category || "—"}</td>
+                          <td className="px-3 py-3 text-[12px]" style={{ color: "#F9E741" }}>{m.commissionPercent ?? m.commission_percent}%</td>
+                          <td className="px-3 py-3 text-[12px]" style={{ color: "#A0A0A0" }}>{m.totalTransactions ?? m.total_transactions ?? 0}</td>
+                          <td className="px-3 py-3">
+                            <span className="inline-block px-2 py-1 rounded-[6px] text-[11px] font-medium" style={{ background: m.isActive ? "rgba(34,197,94,0.15)" : "rgba(249,231,65,0.15)", color: m.isActive ? "#22C55E" : "#F9E741" }}>
+                              {m.isActive ? "\u10D0\u10E5\u10E2\u10D8\u10E3\u10E0\u10D8" : "\u10DB\u10DD\u10DA\u10DD\u10D3\u10D8\u10DC\u10E8\u10D8"}
                             </span>
                           </td>
-                          <td className="px-4 py-3">
-                            {!m.is_active && activeTab === "pending" && (
-                              <div className="flex gap-2">
-                                <button disabled={actionLoading === m.id} onClick={(e) => { e.stopPropagation(); handleAction(m.id, "approve"); }} className="px-3 py-1.5 rounded-[6px] text-[12px] font-medium transition-all hover:opacity-80" style={{ background: "rgba(34,197,94,0.15)", color: "#22C55E" }}>
-                                  {actionLoading === m.id ? "..." : "დამტკიცება"}
+                          <td className="px-3 py-3">
+                            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                              {!m.isActive ? (
+                                <button disabled={actionLoading === m.id} onClick={() => handleAction(m.id, "approve")} className="px-3 py-1.5 rounded-[6px] text-[12px] font-medium transition-all hover:opacity-80" style={{ background: "rgba(34,197,94,0.15)", color: "#22C55E" }}>
+                                  {actionLoading === m.id ? "..." : "\u10D3\u10D0\u10DB\u10E2\u10D9\u10D8\u10EA\u10D4\u10D1\u10D0"}
                                 </button>
-                                <button disabled={actionLoading === m.id} onClick={(e) => { e.stopPropagation(); handleAction(m.id, "reject"); }} className="px-3 py-1.5 rounded-[6px] text-[12px] font-medium transition-all hover:opacity-80" style={{ background: "rgba(239,68,68,0.15)", color: "#EF4444" }}>
-                                  უარყოფა
+                              ) : (
+                                <button disabled={actionLoading === m.id} onClick={() => handleAction(m.id, "reject")} className="px-3 py-1.5 rounded-[6px] text-[12px] font-medium transition-all hover:opacity-80" style={{ background: "rgba(239,68,68,0.15)", color: "#EF4444" }}>
+                                  {actionLoading === m.id ? "..." : "\u10D2\u10D0\u10D7\u10D8\u10E8\u10D5\u10D0"}
                                 </button>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </td>
                         </tr>
                         {selectedId === m.id && (
                           <tr key={`${m.id}-detail`}>
-                            <td colSpan={6} className="px-4 py-4" style={{ background: "#1A1A1A" }}>
+                            <td colSpan={7} className="px-4 py-4" style={{ background: "#1A1A1A" }}>
                               {detailLoading ? (
                                 <div className="flex justify-center py-4">
                                   <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#F9E741", borderTopColor: "transparent" }} />
@@ -287,39 +289,55 @@ export default function MerchantsPage() {
                               ) : detail ? (
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                   <div>
-                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>ტელეფონი</p>
-                                    <p className="text-[13px]" style={{ color: "#FFF" }}>{detail.phone || "—"}</p>
+                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10DB\u10D4\u10E0\u10E9\u10D0\u10DC\u10E2 ID"}</p>
+                                    <p className="text-[16px] font-mono font-bold" style={{ color: "#F9E741" }}>{detail.merchant?.merchantCode || "—"}</p>
                                   </div>
                                   <div>
-                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>ელ-ფოსტა</p>
-                                    <p className="text-[13px]" style={{ color: "#FFF" }}>{detail.email || "—"}</p>
+                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10E2\u10D4\u10DA\u10D4\u10E4\u10DD\u10DC\u10D8"}</p>
+                                    <p className="text-[13px]" style={{ color: "#FFF" }}>{detail.merchant?.phone || "—"}</p>
                                   </div>
                                   <div>
-                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>მისამართი</p>
-                                    <p className="text-[13px]" style={{ color: "#FFF" }}>{detail.address || "—"}</p>
+                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10D4\u10DA-\u10E4\u10DD\u10E1\u10E2\u10D0"}</p>
+                                    <p className="text-[13px]" style={{ color: "#FFF" }}>{detail.merchant?.email || "—"}</p>
                                   </div>
                                   <div>
-                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>QR კოდი</p>
-                                    <p className="text-[13px]" style={{ color: "#FFF" }}>{detail.qr_code || "—"}</p>
+                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10DB\u10D8\u10E1\u10D0\u10DB\u10D0\u10E0\u10D7\u10D8"}</p>
+                                    <p className="text-[13px]" style={{ color: "#FFF" }}>{detail.merchant?.address || "—"}</p>
                                   </div>
                                   <div>
-                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>ჯამური კომისია</p>
-                                    <p className="text-[13px]" style={{ color: "#22C55E" }}>{detail.total_commission?.toFixed(2)} ₾</p>
+                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10E1\u10D0\u10D9\u10DD\u10DC\u10E2\u10D0\u10E5\u10E2\u10DD \u10DE\u10D8\u10E0\u10D8"}</p>
+                                    <p className="text-[13px]" style={{ color: "#FFF" }}>{detail.merchant?.contactPerson || "—"}</p>
                                   </div>
                                   <div>
-                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>რეგისტრაცია</p>
-                                    <p className="text-[13px]" style={{ color: "#FFF" }}>{new Date(detail.created_at).toLocaleDateString("ka-GE")}</p>
+                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10EF\u10D0\u10DB\u10E3\u10E0\u10D8 \u10D9\u10DD\u10DB\u10D8\u10E1\u10D8\u10D0"}</p>
+                                    <p className="text-[13px]" style={{ color: "#22C55E" }}>{detail.stats?.totalCommission?.toFixed(2) || "0.00"} {"\u20BE"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10E0\u10D4\u10D2\u10D8\u10E1\u10E2\u10E0\u10D0\u10EA\u10D8\u10D0"}</p>
+                                    <p className="text-[13px]" style={{ color: "#FFF" }}>{detail.merchant?.createdAt ? new Date(detail.merchant.createdAt).toLocaleDateString("ka-GE") : "—"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>PIN</p>
+                                    <p className="text-[13px]" style={{ color: detail.merchant?.pinHash ? "#22C55E" : "#EF4444" }}>{detail.merchant?.pinHash ? "\u10D3\u10D0\u10E7\u10D4\u10DC\u10D4\u10D1\u10E3\u10DA\u10D8\u10D0" : "\u10D0\u10E0 \u10D0\u10E0\u10D8\u10E1 \u10D3\u10D0\u10E7\u10D4\u10DC\u10D4\u10D1\u10E3\u10DA\u10D8"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10E1\u10E2\u10D0\u10E2\u10E3\u10E1\u10D8"}</p>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[13px] font-medium" style={{ color: detail.merchant?.isActive ? "#22C55E" : "#EF4444" }}>
+                                        {detail.merchant?.isActive ? "\u10D0\u10E5\u10E2\u10D8\u10E3\u10E0\u10D8" : "\u10D0\u10E0\u10D0\u10D0\u10E5\u10E2\u10D8\u10E3\u10E0\u10D8"}
+                                      </span>
+                                    </div>
                                   </div>
                                   {detail.transactions && detail.transactions.length > 0 && (
                                     <div className="col-span-full mt-2">
-                                      <p className="text-[12px] font-medium mb-2" style={{ color: "#A0A0A0" }}>ბოლო ტრანზაქციები</p>
+                                      <p className="text-[12px] font-medium mb-2" style={{ color: "#A0A0A0" }}>{"\u10D1\u10DD\u10DA\u10DD \u10E2\u10E0\u10D0\u10DC\u10D6\u10D0\u10E5\u10EA\u10D8\u10D4\u10D1\u10D8"}</p>
                                       <div className="space-y-1">
-                                        {detail.transactions.slice(0, 5).map((tx) => (
+                                        {detail.transactions.slice(0, 5).map((tx: any) => (
                                           <div key={tx.id} className="flex justify-between text-[12px] py-1 border-b" style={{ borderColor: "#252525" }}>
-                                            <span style={{ color: "#A0A0A0" }}>{tx.user_phone}</span>
-                                            <span style={{ color: "#FFF" }}>{tx.amount.toFixed(2)} ₾</span>
-                                            <span style={{ color: "#22C55E" }}>{tx.commission.toFixed(2)} ₾</span>
-                                            <span style={{ color: "#666" }}>{new Date(tx.created_at).toLocaleDateString("ka-GE")}</span>
+                                            <span style={{ color: "#A0A0A0" }}>{tx.userPhone || "—"}</span>
+                                            <span style={{ color: "#FFF" }}>{tx.amount?.toFixed(2)} {"\u20BE"}</span>
+                                            <span style={{ color: "#22C55E" }}>{tx.commissionAmount?.toFixed(2)} {"\u20BE"}</span>
+                                            <span style={{ color: "#666" }}>{tx.createdAt ? new Date(tx.createdAt).toLocaleDateString("ka-GE") : ""}</span>
                                           </div>
                                         ))}
                                       </div>
