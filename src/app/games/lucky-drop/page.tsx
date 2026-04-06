@@ -353,15 +353,19 @@ export default function LuckyDropPage() {
       // Always keep the lowest (most recent) server balance
       lastServerCoinsRef.current = serverResult.coinsRemaining;
 
-      // Map server totalWin to slot index
+      // Map server result to slot: WIN → random green slot, LOSE → random red slot
       const mults = MULTIPLIERS[currentRisk];
-      const mult = currentBet > 0 ? serverResult.totalWin / currentBet : 0;
-      let closestIdx = 5;
-      let closestDiff = Infinity;
-      mults.forEach((m, i) => {
-        const diff = Math.abs(m - mult);
-        if (diff < closestDiff) { closestDiff = diff; closestIdx = i; }
-      });
+      const won = serverResult.totalWin > 0;
+      let closestIdx: number;
+      if (won) {
+        // Pick a random WIN slot (indices where mult > 0)
+        const winSlots = mults.map((m, i) => ({ m, i })).filter(s => s.m > 0);
+        closestIdx = winSlots[Math.floor(Math.random() * winSlots.length)].i;
+      } else {
+        // Pick a random LOSE slot (indices where mult === 0), prefer ones near center
+        const loseSlots = mults.map((m, i) => ({ m, i })).filter(s => s.m === 0);
+        closestIdx = loseSlots[Math.floor(Math.random() * loseSlots.length)].i;
+      }
 
       const data: DropResult = {
         slotIndex: closestIdx,
