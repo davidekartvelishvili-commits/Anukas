@@ -114,8 +114,8 @@ export default function HomePage() {
   const [showBalanceModal, setShowBalanceModal] = useState(false);
   const [showExchange, setShowExchange] = useState(false);
   const [exchangeAmount, setExchangeAmount] = useState("");
-  const [cashBalance, setCashBalanceState] = useState(28);
-  const [coinBalance, setCoinBalanceState] = useState(5000);
+  const [cashBalance, setCashBalanceState] = useState(0);
+  const [coinBalance, setCoinBalanceState] = useState(0);
   const [gender, setGender] = useState("Male");
   const countdown = useCountdown(15.58);
 
