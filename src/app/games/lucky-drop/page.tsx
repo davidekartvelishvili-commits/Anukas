@@ -33,7 +33,7 @@ export default function LuckyDropPage() {
   });
 
   const [balance, setBalance] = useState(0);
-  const [risk, setRisk] = useState<RiskLevel>("low");
+  const risk: RiskLevel = "low";
   const [result, setResult] = useState<{ text: string; isJP: boolean } | null>(null);
   const [showWin, setShowWin] = useState(false);
   const [winAmount, setWinAmount] = useState(0);
@@ -53,7 +53,6 @@ export default function LuckyDropPage() {
   const BET_OPTIONS = [10, 25, 50, 100, 250, 500];
 
   const riskRef = useRef(risk);
-  useEffect(() => { riskRef.current = risk; }, [risk]);
 
   const calcLayout = useCallback(() => {
     const W = window.innerWidth;
@@ -185,7 +184,7 @@ export default function LuckyDropPage() {
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.shadowColor = sl.color; ctx.shadowBlur = 8 + sl.glow * 20;
         ctx.fillStyle = sl.mult === 0 ? "rgba(255,255,255,0.2)" : sl.color;
-        ctx.fillText(sl.mult === 0 ? "0x" : sl.mult + "x", sl.x + sl.w / 2, sl.y + sl.h / 2);
+        ctx.fillText(sl.mult === 0 ? "0" : "WIN", sl.x + sl.w / 2, sl.y + sl.h / 2);
         ctx.shadowBlur = 0;
         ctx.fillStyle = "rgba(255,255,255,0.04)";
         ctx.fillRect(sl.x + sl.w - 0.5, sl.y, 1, sl.h);
@@ -313,7 +312,7 @@ export default function LuckyDropPage() {
     };
   }, [calcLayout]);
 
-  useEffect(() => { calcLayout(); }, [risk, calcLayout]);
+  useEffect(() => { calcLayout(); }, [calcLayout]);
 
   function spawnParticles(count: number, isJP: boolean) {
     const colors = isJP
@@ -418,7 +417,7 @@ export default function LuckyDropPage() {
       setBigWinText(err.message || "\u10E8\u10D4\u10EA\u10D3\u10DD\u10DB\u10D0");
       setTimeout(() => setBigWinText(""), 2000);
     });
-  }, [balance, risk, betAmount]);
+  }, [balance, betAmount]);
 
   return (
     <div className="relative w-full h-[100dvh] bg-[#050a1a] overflow-hidden">
@@ -451,27 +450,7 @@ export default function LuckyDropPage() {
         <div className="w-9" />
       </div>
 
-      {/* Risk Selector */}
-      <div className="absolute left-0 right-0 z-10 flex justify-center gap-2" style={{ top: "calc(env(safe-area-inset-top, 0px) + 80px)" }}>
-        {(["low", "mid", "high"] as RiskLevel[]).map((r) => (
-          <button
-            key={r}
-            onClick={() => setRisk(r)}
-            className={`px-5 py-1.5 rounded-full text-[12px] font-bold border backdrop-blur-lg transition-all active:scale-[0.95] ${
-              risk === r
-                ? r === "low"
-                  ? "bg-green-500/20 text-green-400 border-green-400"
-                  : r === "mid"
-                  ? "bg-yellow-500/20 text-yellow-400 border-yellow-400"
-                  : "bg-red-500/20 text-red-400 border-red-400"
-                : "bg-white/5 text-white/50 border-white/10"
-            }`}
-            style={{ fontFamily: "var(--font-dm-sans)" }}
-          >
-            {r === "low" ? "Low" : r === "mid" ? "Medium" : "High"}
-          </button>
-        ))}
-      </div>
+      {/* Risk selector removed — single mode */}
 
       {/* Big center win text */}
       <div className={`absolute inset-0 z-20 flex items-center justify-center pointer-events-none transition-all duration-300 ${bigWinText ? "opacity-100 scale-100" : "opacity-0 scale-75"}`}>

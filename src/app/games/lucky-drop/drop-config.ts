@@ -1,28 +1,24 @@
 // ============================================
-// Covrd Lucky Drop — Configuration
-// File: app/lucky-drop/drop-config.ts
+// Shansi Lucky Drop — Configuration
 // ============================================
 
-export type RiskLevel = "low" | "mid" | "high";
+export type RiskLevel = "low";
 
 export const BET_COST = 5;
 
-// Multipliers for each slot at the bottom (11 slots)
+// 11 slots: 3 center are WIN (green), rest are LOSE (red, show 0)
 export const MULTIPLIERS: Record<RiskLevel, number[]> = {
-  low:  [0, 0.5, 1, 1.5, 2, 5, 2, 1.5, 1, 0.5, 0],
-  mid:  [0, 0,   0.5, 2, 5, 15, 5, 2, 0.5, 0,   0],
-  high: [0, 0,   0,   1, 5, 40, 5, 1, 0,   0,   0],
+  low: [0, 0, 0, 0, 2, 5, 2, 0, 0, 0, 0],
 };
 
+// Red for 0 slots, green for win slots
 export const SLOT_COLORS: Record<RiskLevel, string[]> = {
-  low:  ["#ff3d00","#ff6d00","#ff9800","#ffc107","#00e676","#00e5ff","#00e676","#ffc107","#ff9800","#ff6d00","#ff3d00"],
-  mid:  ["#ff3d00","#ff3d00","#ff6d00","#ffc107","#00e676","#7c4dff","#00e676","#ffc107","#ff6d00","#ff3d00","#ff3d00"],
-  high: ["#ff3d00","#ff3d00","#ff3d00","#ff6d00","#00e676","#FFD700","#00e676","#ff6d00","#ff3d00","#ff3d00","#ff3d00"],
+  low: ["#EF4444", "#EF4444", "#EF4444", "#EF4444", "#22C55E", "#22C55E", "#22C55E", "#EF4444", "#EF4444", "#EF4444", "#EF4444"],
 };
 
 export interface DropResult {
-  slotIndex: number;   // Which slot (0-10) the ball lands in
-  multiplier: number;  // The multiplier for that slot
-  winAmount: number;   // BET_COST * multiplier
+  slotIndex: number;
+  multiplier: number;
+  winAmount: number;
   risk: RiskLevel;
 }
