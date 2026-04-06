@@ -1187,4 +1187,46 @@ admin.delete("/admins/:id", adminMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
+// ── Reset stuck transaction ──
+// Completes a stuck active transaction and resets user's coin balance to 0
+// so they can start fresh with a new transaction
+admin.post("/transactions/:userId/reset", adminMiddleware, async (c) => {
+  const userId = c.req.param("userId")!;
+  const adminId = c.get("adminId");
+  if (!userId) return c.json({ success: false, message: "userId required" }, 400);
+  const db = getDb();
+
+  // Find all active/bonus_round transactions for this user
+  const activeTxs = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))));
+
+  if (activeTxs.length === 0) {
+    return c.json({ success: false, message: "No active transaction found" }, 404);
+  }
+
+  // Complete all stuck transactions
+  for (const tx of activeTxs) {
+    await db.update(transactions).set({
+      status: "completed",
+      coinsRemaining: 0,
+      completedAt: new Date().toISOString(),
+      guaranteeMet: tx.totalCashWon >= tx.guaranteedMinimum,
+    }).where(eq(transactions.id, tx.id));
+  }
+
+  await logAction(adminId, "reset_transaction", `Reset ${activeTxs.length} stuck transaction(s) for user ${userId}. IDs: ${activeTxs.map(t => t.id).join(", ")}`);
+
+  return c.json({
+    success: true,
+    reset: activeTxs.length,
+    details: activeTxs.map(tx => ({
+      id: tx.id,
+      coinsRemaining: tx.coinsRemaining,
+      totalCashWon: tx.totalCashWon,
+      guaranteedMinimum: tx.guaranteedMinimum,
+      status: tx.status,
+    })),
+  });
+});
+
 export default admin;
