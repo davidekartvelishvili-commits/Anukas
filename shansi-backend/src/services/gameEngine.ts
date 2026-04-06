@@ -295,52 +295,71 @@ async function _playGameInner(
   let freeCoins: number | undefined;
   let transactionComplete = false;
   let bonusGamesLeft = 0;
+  let totalWinOverride: number | undefined;
 
   if (isBonusRound) {
     const played = updatedTx?.bonusGamesPlayed || ((activeTx.bonusGamesPlayed || 0) + 1);
     const total = activeTx.bonusGamesTotal || 0;
     bonusGamesLeft = Math.max(0, total - played);
 
-    if (actualTotalCashWon >= activeTx.guaranteedMinimum || played >= total) {
+    if (actualTotalCashWon >= activeTx.guaranteedMinimum) {
+      // Guarantee met during bonus round
       await db.update(transactions).set({
         status: "completed", guaranteeMet: true, completedAt: new Date().toISOString(),
       }).where(eq(transactions.id, activeTx.id));
       transactionComplete = true;
-    } else if (actualCoinsRemaining <= 0) {
-      const coinsPerGame = 10;
-      const remainingGames = total - played;
-      const bonusCoins = coinsPerGame * remainingGames;
-      await db.update(transactions).set({ coinsRemaining: bonusCoins }).where(eq(transactions.id, activeTx.id));
-      bonusRoundTriggered = true;
-      bonusMessage = `კიდევ ${remainingGames} უფასო თამაში დარჩა`;
-      freeCoins = bonusCoins;
-      bonusGamesLeft = remainingGames;
+    } else if (played >= total || actualCoinsRemaining <= 0) {
+      // Bonus games exhausted but guarantee still not met — auto-award remaining shortfall
+      const shortfall = round2(activeTx.guaranteedMinimum - actualTotalCashWon);
+      console.log(`[GUARANTEE-BONUS] Auto-awarding shortfall ${shortfall}₾ to user ${userId} after bonus round.`);
+
+      await db.update(users).set({
+        balance: sql`ROUND(${users.balance} + ${shortfall}, 2)`,
+        updatedAt: new Date().toISOString(),
+      } as any).where(eq(users.id, userId));
+
+      await db.update(transactions).set({
+        status: "completed",
+        guaranteeMet: true,
+        totalCashWon: sql`ROUND(${transactions.totalCashWon} + ${shortfall}, 2)`,
+        completedAt: new Date().toISOString(),
+      } as any).where(eq(transactions.id, activeTx.id));
+
+      transactionComplete = true;
+      totalWinOverride = shortfall;
+      bonusMessage = `მინიმალური გარანტია: +${shortfall}₾`;
     }
   } else if (actualCoinsRemaining <= 0) {
     if (actualTotalCashWon >= activeTx.guaranteedMinimum || activeTx.guaranteedMinimum === 0) {
+      // Guarantee already met or no guarantee
       await db.update(transactions).set({
         status: "completed", guaranteeMet: true, completedAt: new Date().toISOString(),
       }).where(eq(transactions.id, activeTx.id));
       transactionComplete = true;
     } else {
+      // Guarantee NOT met — auto-award the shortfall directly (no bonus games needed)
       const shortfall = round2(activeTx.guaranteedMinimum - actualTotalCashWon);
-      const plan = generateBonusPlan(shortfall);
-      const totalBonusGames = plan.length;
-      const bonusCoins = 10 * totalBonusGames;
+      console.log(`[GUARANTEE] Auto-awarding shortfall ${shortfall}₾ to user ${userId}. Won ${actualTotalCashWon}, guaranteed ${activeTx.guaranteedMinimum}`);
 
+      // Award shortfall to user's cash balance
+      await db.update(users).set({
+        balance: sql`ROUND(${users.balance} + ${shortfall}, 2)`,
+        updatedAt: new Date().toISOString(),
+      } as any).where(eq(users.id, userId));
+
+      // Mark transaction complete with guarantee met
       await db.update(transactions).set({
-        status: "bonus_round",
-        coinsRemaining: bonusCoins,
-        bonusGamesGiven: totalBonusGames,
-        bonusWinsPlan: JSON.stringify(plan),
-        bonusGamesPlayed: 0,
-        bonusGamesTotal: totalBonusGames,
-      }).where(eq(transactions.id, activeTx.id));
+        status: "completed",
+        guaranteeMet: true,
+        totalCashWon: sql`ROUND(${transactions.totalCashWon} + ${shortfall}, 2)`,
+        completedAt: new Date().toISOString(),
+      } as any).where(eq(transactions.id, activeTx.id));
 
+      transactionComplete = true;
+      // Report the shortfall as a bonus win so client shows it
       bonusRoundTriggered = true;
-      bonusMessage = "შენ მიიღე ბონუს შანსი! 🎉 ითამაშე უფასოდ!";
-      freeCoins = bonusCoins;
-      bonusGamesLeft = totalBonusGames;
+      bonusMessage = `მინიმალური გარანტია: +${shortfall}₾`;
+      totalWinOverride = shortfall;
     }
   }
 
@@ -359,16 +378,21 @@ async function _playGameInner(
   // Re-read user balance for accurate return value
   const [userAfter] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
+  // Re-read transaction for final totalCashWon (includes auto-awarded shortfall)
+  const [finalTx] = await db.select().from(transactions).where(eq(transactions.id, activeTx.id)).limit(1);
+  const finalTotalCashWon = finalTx?.totalCashWon ?? actualTotalCashWon;
+  const finalCoinsRemaining = finalTx?.coinsRemaining ?? actualCoinsRemaining;
+
   return {
-    won: totalWin > 0,
-    winAmount: totalWin,
+    won: totalWin > 0 || (totalWinOverride !== undefined && totalWinOverride > 0),
+    winAmount: totalWinOverride ?? totalWin,
     minWin,
-    bonusWin,
-    totalWin,
+    bonusWin: totalWinOverride ?? bonusWin,
+    totalWin: totalWinOverride ?? totalWin,
     newBalance: userAfter?.balance ?? newBalance,
     poolBalance: poolAfter?.balance || poolBefore,
-    coinsRemaining: actualCoinsRemaining,
-    totalCashWon: actualTotalCashWon,
+    coinsRemaining: finalCoinsRemaining,
+    totalCashWon: finalTotalCashWon,
     bonusRound: bonusRoundTriggered,
     bonusMessage,
     freeCoins,
