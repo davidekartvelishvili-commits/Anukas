@@ -24,11 +24,11 @@ async function withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T>
 // ═══════════════════════════════════════
 // INTEGER MATH HELPERS — all currency in tetri (1/100 GEL) to avoid float drift
 // ═══════════════════════════════════════
-function toTetri(lari: number): number {
+export function toTetri(lari: number): number {
   return Math.round(lari * 100);
 }
 
-function toLari(tetri: number): number {
+export function toLari(tetri: number): number {
   return tetri / 100;
 }
 
@@ -59,16 +59,16 @@ export interface ChickenRushResult extends GameResult {
   cols: number;
 }
 
-function secureRandom(): number {
+export function secureRandom(): number {
   const buf = crypto.randomBytes(4);
   return buf.readUInt32BE(0) / 0x100000000;
 }
 
-function round2(n: number): number {
+export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-interface Config {
+export interface Config {
   avgReturnPercent: number;
   maxWinPerUser: number;
   poolMinimumThreshold: number;
@@ -77,7 +77,8 @@ interface Config {
   isActive: boolean;
 }
 
-function calculateWin(
+// EXPORTED for simulation — this is the SINGLE source of truth for win calculation
+export function calculateWin(
   betAmountInLari: number,
   config: Config,
   poolBalance: number,

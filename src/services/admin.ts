@@ -199,14 +199,8 @@ export function isAdminAuthenticated(): boolean {
 // Algorithm simulation
 export async function startSimulation(params: {
   userCount: number;
-  minSpend: number;
-  maxSpend: number;
+  scenario: string;
   gameTypes?: string[];
-  avgReturnPercent?: number;
-  maxWinPerUser?: number;
-  poolMinimumThreshold?: number;
-  fullReturnThreshold?: number;
-  minReturnPercent?: number;
 }) {
   return adminFetch("/admin/algorithm/simulate", {
     method: "POST",

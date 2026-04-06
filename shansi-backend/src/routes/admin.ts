@@ -1234,15 +1234,8 @@ admin.post("/transactions/:userId/reset", adminMiddleware, async (c) => {
 
 const simulateSchema = z.object({
   userCount: z.number().int().min(10).max(10000),
-  minSpend: z.number().min(0.5).max(10000),
-  maxSpend: z.number().min(0.5).max(10000),
+  scenario: z.enum(["low", "medium", "high", "mixed"]),
   gameTypes: z.array(z.string()).min(1).optional(),
-  // Optional config overrides (uses DB values if not provided)
-  avgReturnPercent: z.number().min(0).max(100).optional(),
-  maxWinPerUser: z.number().min(0).optional(),
-  poolMinimumThreshold: z.number().min(0).optional(),
-  fullReturnThreshold: z.number().min(0).optional(),
-  minReturnPercent: z.number().min(0).max(100).optional(),
 });
 
 // Auto-create simulation_runs table if it doesn't exist
@@ -1269,7 +1262,6 @@ admin.post("/algorithm/simulate", adminMiddleware, async (c) => {
   const body = await c.req.json();
   const parsed = simulateSchema.safeParse(body);
   if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
-  if (parsed.data.maxSpend < parsed.data.minSpend) throw new BadRequestError("maxSpend must be >= minSpend");
 
   await ensureSimulationTable();
 
@@ -1277,27 +1269,24 @@ admin.post("/algorithm/simulate", adminMiddleware, async (c) => {
   const db = getDb();
   const jobId = nanoid();
 
-  // Create job record
+  const scenarioRanges: Record<string, { min: number; max: number }> = {
+    low: { min: 1, max: 5 }, medium: { min: 5, max: 20 },
+    high: { min: 20, max: 100 }, mixed: { min: 1, max: 100 },
+  };
+  const range = scenarioRanges[parsed.data.scenario] || scenarioRanges.mixed;
+
   await db.insert(simulationRuns).values({
     id: jobId,
     adminId,
     userCount: parsed.data.userCount,
-    minSpend: parsed.data.minSpend,
-    maxSpend: parsed.data.maxSpend,
+    minSpend: range.min,
+    maxSpend: range.max,
     status: "running",
     progress: 0,
   });
 
-  // Extract config overrides
-  const configOverrides: Record<string, number> = {};
-  if (parsed.data.avgReturnPercent !== undefined) configOverrides.avgReturnPercent = parsed.data.avgReturnPercent;
-  if (parsed.data.maxWinPerUser !== undefined) configOverrides.maxWinPerUser = parsed.data.maxWinPerUser;
-  if (parsed.data.poolMinimumThreshold !== undefined) configOverrides.poolMinimumThreshold = parsed.data.poolMinimumThreshold;
-  if (parsed.data.fullReturnThreshold !== undefined) configOverrides.fullReturnThreshold = parsed.data.fullReturnThreshold;
-  if (parsed.data.minReturnPercent !== undefined) configOverrides.minReturnPercent = parsed.data.minReturnPercent;
-
-  // Run simulation in background (don't await)
-  runSimulation(jobId, parsed.data.userCount, parsed.data.minSpend, parsed.data.maxSpend, parsed.data.gameTypes || ["plinko"], configOverrides).catch(async (err) => {
+  // Run simulation in background — uses REAL calculateWin from gameEngine
+  runSimulation(jobId, parsed.data.userCount, parsed.data.scenario, parsed.data.gameTypes || ["plinko"]).catch(async (err) => {
     await db.update(simulationRuns).set({
       status: "error",
       results: JSON.stringify({ error: err.message }),
@@ -1305,7 +1294,7 @@ admin.post("/algorithm/simulate", adminMiddleware, async (c) => {
     }).where(eq(simulationRuns.id, jobId));
   });
 
-  await logAction(adminId, "start_simulation", `Started simulation: ${parsed.data.userCount} users, ${parsed.data.minSpend}-${parsed.data.maxSpend}₾, games: ${(parsed.data.gameTypes || ["plinko"]).join(",")}`);
+  await logAction(adminId, "start_simulation", `Simulation: ${parsed.data.userCount} users, scenario=${parsed.data.scenario}, games=${(parsed.data.gameTypes || ["plinko"]).join(",")}`);
   return c.json({ success: true, jobId });
 });
 

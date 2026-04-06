@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { startSimulation, pollSimulation, getSimulationHistory, getGameConfig } from "@/services/admin";
+import { startSimulation, pollSimulation, getSimulationHistory, getGameConfig, getPool } from "@/services/admin";
 import AdminAuthGuard from "@/components/admin/AdminAuthGuard";
 
 /* ── SVG ICONS ── */
@@ -45,28 +45,30 @@ const NAV_ITEMS = [
   { label: "Analytics", id: "analytics", href: "/admin/analytics" },
   { label: "System", id: "system", href: "/admin/system" },
 ];
-
 const CURRENT_PAGE = "algorithm-test";
 
-/* ── HISTOGRAM BAR CHART ── */
+const SCENARIOS = [
+  { id: "low", label: "დაბალი ხარჯი", range: "1-5₾" },
+  { id: "medium", label: "საშუალო ხარჯი", range: "5-20₾" },
+  { id: "high", label: "მაღალი ხარჯი", range: "20-100₾" },
+  { id: "mixed", label: "შერეული", range: "1-100₾" },
+];
+
 function Histogram({ data, maxCount }: { data: { range: string; count: number }[]; maxCount: number }) {
   if (!data || data.length === 0) return null;
-  const barW = Math.max(20, Math.floor(600 / data.length));
-  const chartH = 160;
+  const barW = Math.max(24, Math.floor(560 / data.length));
+  const chartH = 140;
   return (
     <div className="overflow-x-auto">
-      <svg width={data.length * (barW + 4) + 40} height={chartH + 40} viewBox={`0 0 ${data.length * (barW + 4) + 40} ${chartH + 40}`}>
+      <svg width={data.length * (barW + 4) + 40} height={chartH + 40}>
         {data.map((d, i) => {
           const h = maxCount > 0 ? (d.count / maxCount) * chartH : 0;
           const x = 20 + i * (barW + 4);
-          const y = chartH - h;
           return (
             <g key={i}>
-              <rect x={x} y={y} width={barW} height={h} rx={3} fill="#F9E741" opacity={0.8} />
-              <text x={x + barW / 2} y={chartH + 14} textAnchor="middle" fill="#666" fontSize="8">{d.count}</text>
-              {i % 3 === 0 && (
-                <text x={x + barW / 2} y={chartH + 28} textAnchor="middle" fill="#555" fontSize="7">{d.range.split("-")[0]}</text>
-              )}
+              <rect x={x} y={chartH - h} width={barW} height={h} rx={3} fill="#F9E741" opacity={0.8} />
+              <text x={x + barW / 2} y={chartH + 14} textAnchor="middle" fill="#666" fontSize="9">{d.count}</text>
+              {i % 2 === 0 && <text x={x + barW / 2} y={chartH + 28} textAnchor="middle" fill="#555" fontSize="7">{d.range.split("-")[0]}</text>}
             </g>
           );
         })}
@@ -75,7 +77,6 @@ function Histogram({ data, maxCount }: { data: { range: string; count: number }[
   );
 }
 
-/* ── CHECK ITEM ── */
 function CheckItem({ pass, label }: { pass: boolean; label: string }) {
   return (
     <div className="flex items-center gap-2 py-1.5">
@@ -85,7 +86,6 @@ function CheckItem({ pass, label }: { pass: boolean; label: string }) {
   );
 }
 
-/* ── STAT CARD ── */
 function StatCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   return (
     <div className="rounded-2xl p-4 border" style={{ background: "#111111", borderColor: "#252525" }}>
@@ -101,63 +101,41 @@ function AlgoTestContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [now, setNow] = useState(new Date());
 
-  // Input controls
   const [userCount, setUserCount] = useState(1000);
-  const [minSpend, setMinSpend] = useState(1);
-  const [maxSpend, setMaxSpend] = useState(100);
-
-  // Game types
+  const [scenario, setScenario] = useState("mixed");
   const [availableGameTypes, setAvailableGameTypes] = useState<string[]>([]);
   const [selectedGameTypes, setSelectedGameTypes] = useState<string[]>(["plinko"]);
 
-  // Algorithm parameters (loaded from DB, editable for test)
-  const [useCustomParams, setUseCustomParams] = useState(false);
-  const [algoParams, setAlgoParams] = useState({
-    avgReturnPercent: 0.5,
-    maxWinPerUser: 100,
-    poolMinimumThreshold: 1000,
-    fullReturnThreshold: 5,
-    minReturnPercent: 0.5,
-  });
-  const [dbParams, setDbParams] = useState(algoParams); // original from DB
+  // Live DB params (read-only display)
+  const [dbParams, setDbParams] = useState<any>(null);
+  const [poolBalance, setPoolBalance] = useState(0);
 
-  // Job state
-  const [jobId, setJobId] = useState<string | null>(null);
+  // Job
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [total, setTotal] = useState(0);
   const [results, setResults] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showLog, setShowLog] = useState(false);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
   // History
   const [history, setHistory] = useState<any[]>([]);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const iv = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(iv);
-  }, []);
+  useEffect(() => { const iv = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(iv); }, []);
 
   useEffect(() => {
     loadHistory();
-    // Load game config from DB
     getGameConfig().then((data: any) => {
-      if (data.success && data.configs && data.configs.length > 0) {
-        const types = data.configs.map((c: any) => c.gameType);
-        setAvailableGameTypes(types);
-        setSelectedGameTypes(types.length > 0 ? [types[0]] : ["plinko"]);
-        const c = data.configs[0];
-        const p = {
-          avgReturnPercent: c.avgReturnPercent ?? 0.5,
-          maxWinPerUser: c.maxWinPerUser ?? 100,
-          poolMinimumThreshold: c.poolMinimumThreshold ?? 1000,
-          fullReturnThreshold: c.fullReturnThreshold ?? 5,
-          minReturnPercent: c.minReturnPercent ?? 0.5,
-        };
-        setAlgoParams(p);
-        setDbParams(p);
+      if (data.success && data.configs?.length > 0) {
+        setAvailableGameTypes(data.configs.map((c: any) => c.gameType));
+        setSelectedGameTypes([data.configs[0].gameType]);
+        setDbParams(data.configs[0]);
       }
+    }).catch(() => {});
+    getPool().then((data: any) => {
+      if (data.success && data.pool) setPoolBalance(data.pool.balance || 0);
     }).catch(() => {});
   }, []);
 
@@ -168,12 +146,7 @@ function AlgoTestContent() {
     } catch {}
   };
 
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  }, []);
+  const stopPolling = useCallback(() => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } }, []);
 
   const startPolling = useCallback((id: string) => {
     stopPolling();
@@ -183,22 +156,10 @@ function AlgoTestContent() {
         if (data.success) {
           setProgress(data.progress || 0);
           setTotal(data.total || 0);
-          if (data.status === "complete" && data.results) {
-            setResults(data.results);
-            setRunning(false);
-            stopPolling();
-            loadHistory();
-          } else if (data.status === "error") {
-            setError(data.results?.error || "Simulation failed");
-            setRunning(false);
-            stopPolling();
-          }
+          if (data.status === "complete" && data.results) { setResults(data.results); setRunning(false); stopPolling(); loadHistory(); }
+          else if (data.status === "error") { setError(data.results?.error || "Simulation failed"); setRunning(false); stopPolling(); }
         }
-      } catch (err: any) {
-        setError(err.message);
-        setRunning(false);
-        stopPolling();
-      }
+      } catch (err: any) { setError(err.message); setRunning(false); stopPolling(); }
     }, 2000);
   }, [stopPolling]);
 
@@ -206,41 +167,22 @@ function AlgoTestContent() {
 
   const handleRun = async () => {
     if (running) return;
-    setRunning(true);
-    setResults(null);
-    setError(null);
-    setProgress(0);
-    setTotal(userCount);
-
+    setRunning(true); setResults(null); setError(null); setProgress(0); setTotal(userCount); setShowLog(false);
     try {
-      const params: any = { userCount, minSpend, maxSpend, gameTypes: selectedGameTypes };
-      if (useCustomParams) {
-        params.avgReturnPercent = algoParams.avgReturnPercent;
-        params.maxWinPerUser = algoParams.maxWinPerUser;
-        params.poolMinimumThreshold = algoParams.poolMinimumThreshold;
-        params.fullReturnThreshold = algoParams.fullReturnThreshold;
-        params.minReturnPercent = algoParams.minReturnPercent;
-      }
-      const data = await startSimulation(params) as any;
-      if (data.success && data.jobId) {
-        setJobId(data.jobId);
-        startPolling(data.jobId);
-      } else {
-        throw new Error(data.message || "Failed to start");
-      }
-    } catch (err: any) {
-      setError(err.message);
-      setRunning(false);
-    }
+      const data = await startSimulation({ userCount, scenario, gameTypes: selectedGameTypes }) as any;
+      if (data.success && data.jobId) startPolling(data.jobId);
+      else throw new Error(data.message || "Failed to start");
+    } catch (err: any) { setError(err.message); setRunning(false); }
   };
 
-  const r = results; // shorthand
+  const r = results;
   const allPassed = r?.checks && Object.values(r.checks).every(Boolean);
-  const maxHistogramCount = r?.histogram ? Math.max(...r.histogram.map((h: any) => h.count)) : 0;
+  const maxHist = r?.histogram ? Math.max(...r.histogram.map((h: any) => h.count)) : 0;
+  const gameLabels: Record<string, string> = { plinko: "Lucky Drop", slot: "Slot", chicken_rush: "Lucky Step" };
 
   return (
     <div className="min-h-[100dvh] flex" style={{ background: "#000000", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      {/* SIDEBAR (Desktop) */}
+      {/* SIDEBAR */}
       <aside className="hidden lg:flex flex-col w-[220px] shrink-0 border-r" style={{ background: "#111111", borderColor: "#252525" }}>
         <div className="p-5 border-b" style={{ borderColor: "#252525" }}>
           <h1 className="text-[20px] font-extrabold tracking-wider" style={{ color: "#F9E741" }}>SHANSI</h1>
@@ -248,8 +190,7 @@ function AlgoTestContent() {
         </div>
         <nav className="flex-1 py-3 overflow-y-auto">
           {NAV_ITEMS.map((item) => (
-            <button key={item.id} onClick={() => router.push(item.href)}
-              className="w-full flex items-center gap-3 px-5 py-2.5 text-left transition-all"
+            <button key={item.id} onClick={() => router.push(item.href)} className="w-full flex items-center gap-3 px-5 py-2.5 text-left transition-all"
               style={{ background: item.id === CURRENT_PAGE ? "#1A1A1A" : "transparent", borderLeft: item.id === CURRENT_PAGE ? "3px solid #F9E741" : "3px solid transparent" }}>
               <NavIcon id={item.id} active={item.id === CURRENT_PAGE} />
               <span className="text-[13px] font-medium" style={{ color: item.id === CURRENT_PAGE ? "#FFFFFF" : "#A0A0A0" }}>{item.label}</span>
@@ -258,19 +199,14 @@ function AlgoTestContent() {
         </nav>
       </aside>
 
-      {/* MOBILE SIDEBAR */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setSidebarOpen(false)}>
           <div className="absolute inset-0 bg-black/60" />
           <aside className="absolute left-0 top-0 bottom-0 w-[250px] border-r flex flex-col" style={{ background: "#111111", borderColor: "#252525" }} onClick={(e) => e.stopPropagation()}>
-            <div className="p-5 border-b" style={{ borderColor: "#252525" }}>
-              <h1 className="text-[20px] font-extrabold tracking-wider" style={{ color: "#F9E741" }}>SHANSI</h1>
-              <p className="text-[11px] mt-0.5" style={{ color: "#666666" }}>Admin Panel</p>
-            </div>
+            <div className="p-5 border-b" style={{ borderColor: "#252525" }}><h1 className="text-[20px] font-extrabold tracking-wider" style={{ color: "#F9E741" }}>SHANSI</h1></div>
             <nav className="flex-1 py-3 overflow-y-auto">
               {NAV_ITEMS.map((item) => (
-                <button key={item.id} onClick={() => { router.push(item.href); setSidebarOpen(false); }}
-                  className="w-full flex items-center gap-3 px-5 py-2.5 text-left transition-all"
+                <button key={item.id} onClick={() => { router.push(item.href); setSidebarOpen(false); }} className="w-full flex items-center gap-3 px-5 py-2.5 text-left transition-all"
                   style={{ background: item.id === CURRENT_PAGE ? "#1A1A1A" : "transparent", borderLeft: item.id === CURRENT_PAGE ? "3px solid #F9E741" : "3px solid transparent" }}>
                   <NavIcon id={item.id} active={item.id === CURRENT_PAGE} />
                   <span className="text-[13px] font-medium" style={{ color: item.id === CURRENT_PAGE ? "#FFFFFF" : "#A0A0A0" }}>{item.label}</span>
@@ -281,9 +217,7 @@ function AlgoTestContent() {
         </div>
       )}
 
-      {/* MAIN */}
       <main className="flex-1 min-w-0 overflow-y-auto">
-        {/* Header */}
         <header className="sticky top-0 z-20 flex items-center justify-between px-4 lg:px-6 py-3 border-b" style={{ background: "#000000", borderColor: "#252525" }}>
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden w-8 h-8 flex items-center justify-center rounded-md" style={{ background: "#1A1A1A" }}>
@@ -294,150 +228,103 @@ function AlgoTestContent() {
           <p className="text-[11px]" style={{ color: "#666666" }}>{now.toLocaleTimeString("ka-GE", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</p>
         </header>
 
-        <div className="p-4 lg:p-6 space-y-6">
-          {/* ── INPUT CONTROLS ── */}
+        <div className="p-4 lg:p-6 space-y-5">
+
+          {/* ── CURRENT DB PARAMS (read-only) ── */}
+          {dbParams && (
+            <div className="rounded-2xl p-4 border" style={{ background: "#111111", borderColor: "#252525" }}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-[14px] font-bold" style={{ color: "#FFFFFF" }}>მიმდინარე პარამეტრები</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-md" style={{ background: "#3B82F620", color: "#3B82F6" }}>DB-დან</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {[
+                  { label: "საშუალო დაბრუნება", val: `${dbParams.avgReturnPercent}%` },
+                  { label: "მაქს. მოგება", val: `${dbParams.maxWinPerUser}₾` },
+                  { label: "Pool მინიმუმი", val: `${dbParams.poolMinimumThreshold}₾` },
+                  { label: "100% ზღვარი", val: `${dbParams.fullReturnThreshold}₾` },
+                  { label: "მინ. გარანტია", val: `${dbParams.minReturnPercent}%` },
+                  { label: "Pool ბალანსი", val: `${poolBalance.toFixed(2)}₾` },
+                ].map(({ label, val }) => (
+                  <div key={label} className="rounded-xl p-2.5" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
+                    <p className="text-[9px] mb-0.5" style={{ color: "#555" }}>{label}</p>
+                    <p className="text-[15px] font-bold" style={{ color: "#F9E741" }}>{val}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] mt-2" style={{ color: "#444" }}>სიმულაცია ამ პარამეტრებს იყენებს. ცვლილებისთვის — Algorithm Settings.</p>
+            </div>
+          )}
+
+          {/* ── CONTROLS ── */}
           <div className="rounded-2xl p-5 border" style={{ background: "#111111", borderColor: "#252525" }}>
-            <h3 className="text-[14px] font-bold mb-4" style={{ color: "#FFFFFF" }}>სიმულაციის პარამეტრები</h3>
+            <h3 className="text-[14px] font-bold mb-4" style={{ color: "#FFFFFF" }}>სიმულაცია</h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              {/* User count */}
-              <div>
-                <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>მომხმარებლების რაოდენობა</label>
-                <input
-                  type="number" value={userCount} onChange={(e) => setUserCount(Math.max(10, parseInt(e.target.value) || 10))}
-                  className="w-full rounded-[10px] px-3 py-2.5 text-[14px] outline-none"
-                  style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFFFFF" }}
-                />
-                <div className="flex gap-2 mt-2">
-                  {[100, 1000, 5000, 10000].map((n) => (
-                    <button key={n} onClick={() => setUserCount(n)}
-                      className="px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all"
-                      style={{ background: userCount === n ? "#F9E741" : "#1A1A1A", color: userCount === n ? "#000" : "#A0A0A0", border: "1px solid #252525" }}>
-                      {n.toLocaleString()}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Min spend */}
-              <div>
-                <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>მინ. ხარჯი (₾)</label>
-                <input
-                  type="number" value={minSpend} onChange={(e) => setMinSpend(Math.max(0.5, parseFloat(e.target.value) || 0.5))}
-                  className="w-full rounded-[10px] px-3 py-2.5 text-[14px] outline-none"
-                  style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFFFFF" }}
-                  step="0.5"
-                />
-              </div>
-
-              {/* Max spend */}
-              <div>
-                <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>მაქს. ხარჯი (₾)</label>
-                <input
-                  type="number" value={maxSpend} onChange={(e) => setMaxSpend(Math.max(0.5, parseFloat(e.target.value) || 0.5))}
-                  className="w-full rounded-[10px] px-3 py-2.5 text-[14px] outline-none"
-                  style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFFFFF" }}
-                  step="0.5"
-                />
+            {/* User count */}
+            <div className="mb-4">
+              <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>მომხმარებლების რაოდენობა</label>
+              <div className="flex flex-wrap gap-2">
+                {[100, 1000, 5000, 10000].map((n) => (
+                  <button key={n} onClick={() => setUserCount(n)} className="px-4 py-2 rounded-xl text-[13px] font-semibold transition-all"
+                    style={{ background: userCount === n ? "#F9E741" : "#1A1A1A", color: userCount === n ? "#000" : "#A0A0A0", border: `1px solid ${userCount === n ? "#F9E741" : "#252525"}` }}>
+                    {n.toLocaleString()}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Game type selection */}
+            {/* Scenario */}
             <div className="mb-4">
+              <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>ხარჯის სცენარი</label>
+              <div className="flex flex-wrap gap-2">
+                {SCENARIOS.map((s) => (
+                  <button key={s.id} onClick={() => setScenario(s.id)} className="px-4 py-2 rounded-xl text-[12px] font-medium transition-all"
+                    style={{ background: scenario === s.id ? "#F9E741" : "#1A1A1A", color: scenario === s.id ? "#000" : "#A0A0A0", border: `1px solid ${scenario === s.id ? "#F9E741" : "#252525"}` }}>
+                    {s.label} <span className="opacity-60">({s.range})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Game types */}
+            <div className="mb-5">
               <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>თამაშის ტიპი</label>
               <div className="flex flex-wrap gap-2">
                 {(availableGameTypes.length > 0 ? availableGameTypes : ["plinko", "slot", "chicken_rush"]).map((gt) => {
-                  const selected = selectedGameTypes.includes(gt);
-                  const labels: Record<string, string> = { plinko: "Lucky Drop", slot: "Slot", chicken_rush: "Lucky Step" };
+                  const sel = selectedGameTypes.includes(gt);
                   return (
-                    <button key={gt} onClick={() => {
-                      if (selected && selectedGameTypes.length > 1) {
-                        setSelectedGameTypes(selectedGameTypes.filter(t => t !== gt));
-                      } else if (!selected) {
-                        setSelectedGameTypes([...selectedGameTypes, gt]);
-                      }
-                    }}
+                    <button key={gt} onClick={() => sel && selectedGameTypes.length > 1 ? setSelectedGameTypes(selectedGameTypes.filter(t => t !== gt)) : !sel ? setSelectedGameTypes([...selectedGameTypes, gt]) : null}
                       className="px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all"
-                      style={{ background: selected ? "#F9E741" : "#1A1A1A", color: selected ? "#000" : "#A0A0A0", border: `1px solid ${selected ? "#F9E741" : "#252525"}` }}>
-                      {labels[gt] || gt}
+                      style={{ background: sel ? "#F9E741" : "#1A1A1A", color: sel ? "#000" : "#A0A0A0", border: `1px solid ${sel ? "#F9E741" : "#252525"}` }}>
+                      {gameLabels[gt] || gt}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Algorithm parameters */}
-            <div className="mb-4">
-              <div className="flex items-center gap-3 mb-3">
-                <label className="text-[12px] font-medium" style={{ color: "#A0A0A0" }}>ალგორითმის პარამეტრები</label>
-                <button onClick={() => { setUseCustomParams(!useCustomParams); if (useCustomParams) setAlgoParams(dbParams); }}
-                  className="px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all"
-                  style={{ background: useCustomParams ? "#F9E741" : "#1A1A1A", color: useCustomParams ? "#000" : "#A0A0A0", border: "1px solid #252525" }}>
-                  {useCustomParams ? "Custom" : "DB-დან"}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                {[
-                  { key: "avgReturnPercent", label: "საშუალო დაბრუნება %", suffix: "%", step: 0.1 },
-                  { key: "maxWinPerUser", label: "მაქს. მოგება", suffix: "₾", step: 1 },
-                  { key: "poolMinimumThreshold", label: "Pool მინიმუმი", suffix: "₾", step: 10 },
-                  { key: "fullReturnThreshold", label: "100% ზღვარი", suffix: "₾", step: 0.5 },
-                  { key: "minReturnPercent", label: "მინ. გარანტია %", suffix: "%", step: 0.1 },
-                ].map(({ key, label, suffix, step }) => (
-                  <div key={key}>
-                    <label className="text-[10px] block mb-1" style={{ color: "#666666" }}>{label}</label>
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        value={(algoParams as any)[key]}
-                        onChange={(e) => setAlgoParams({ ...algoParams, [key]: parseFloat(e.target.value) || 0 })}
-                        disabled={!useCustomParams}
-                        step={step}
-                        className="w-full rounded-[8px] px-2 py-1.5 text-[13px] outline-none"
-                        style={{ background: useCustomParams ? "#1A1A1A" : "#0A0A0A", border: "1px solid #252525", color: useCustomParams ? "#FFFFFF" : "#666666", opacity: useCustomParams ? 1 : 0.6 }}
-                      />
-                      <span className="text-[11px] shrink-0" style={{ color: "#666" }}>{suffix}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {!useCustomParams && (
-                <p className="text-[10px] mt-1.5" style={{ color: "#555" }}>DB-ში შენახული პარამეტრები გამოიყენება. დააჭირეთ "Custom" ცვლილებისთვის.</p>
-              )}
-            </div>
-
-            <button
-              onClick={handleRun} disabled={running}
-              className="w-full md:w-auto px-8 py-3 rounded-xl text-[14px] font-bold transition-all duration-150"
+            <button onClick={handleRun} disabled={running} className="w-full md:w-auto px-8 py-3 rounded-xl text-[14px] font-bold transition-all duration-150"
               style={{ background: running ? "#333" : "#F9E741", color: running ? "#666" : "#000", cursor: running ? "not-allowed" : "pointer" }}>
               {running ? "მიმდინარეობს..." : "ტესტის გაშვება"}
             </button>
 
-            {/* Progress */}
             {running && (
               <div className="mt-4">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#F9E741", borderTopColor: "transparent" }} />
-                  <span className="text-[13px]" style={{ color: "#A0A0A0" }}>
-                    სიმულაცია მიმდინარეობს... {progress}/{total} მომხმარებელი
-                  </span>
+                  <span className="text-[13px]" style={{ color: "#A0A0A0" }}>სიმულაცია მიმდინარეობს... {progress}/{total}</span>
                 </div>
                 <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "#1A1A1A" }}>
                   <div className="h-full rounded-full transition-all duration-300" style={{ background: "#F9E741", width: `${total > 0 ? (progress / total) * 100 : 0}%` }} />
                 </div>
               </div>
             )}
-
-            {error && (
-              <div className="mt-3 px-3 py-2 rounded-lg text-[13px]" style={{ background: "#EF444420", color: "#EF4444" }}>{error}</div>
-            )}
+            {error && <div className="mt-3 px-3 py-2 rounded-lg text-[13px]" style={{ background: "#EF444420", color: "#EF4444" }}>{error}</div>}
           </div>
 
           {/* ── RESULTS ── */}
           {r && (
             <>
-              {/* Overall pass/fail banner */}
               <div className="rounded-2xl p-4 border" style={{ background: allPassed ? "#22C55E10" : "#EF444410", borderColor: allPassed ? "#22C55E40" : "#EF444440" }}>
                 <div className="flex items-center gap-3">
                   <span className="text-[24px]">{allPassed ? "\u2705" : "\u26A0\uFE0F"}</span>
@@ -446,7 +333,7 @@ function AlgoTestContent() {
                       {allPassed ? "ყველა ტესტი წარმატებულია" : "ზოგიერთი ტესტი ვერ გაიარა"}
                     </p>
                     <p className="text-[11px]" style={{ color: "#A0A0A0" }}>
-                      {r.userCount.toLocaleString()} მომხმარებელი | {r.minSpend}-{r.maxSpend}₾ | {r.durationMs}ms
+                      {r.userCount.toLocaleString()} მომხმარებელი | {r.scenario} | {(r.gameTypes || []).map((g: string) => gameLabels[g] || g).join(", ")} | {r.durationMs}ms
                     </p>
                   </div>
                 </div>
@@ -454,169 +341,126 @@ function AlgoTestContent() {
 
               {/* Summary cards */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                <StatCard
-                  label="საშუალო დაბრუნება %"
-                  value={`${r.actualAvgReturnPercent}%`}
-                  sub={`target: ${r.targetAvgReturnPercent}%`}
-                  color={Math.abs(r.actualAvgReturnPercent - r.targetAvgReturnPercent) <= 0.5 ? "#22C55E" : "#EF4444"}
-                />
-                <StatCard
-                  label="მინიმუმ გარანტია"
-                  value={`${r.userCount - r.guaranteeMissCount}/${r.userCount}`}
-                  sub="მომხმარებელმა მიიღო მინიმუმი"
-                  color={r.guaranteeMissCount === 0 ? "#22C55E" : "#EF4444"}
-                />
-                <StatCard
-                  label="მაქს. მოგების დარღვევა"
-                  value={`${r.maxWinViolationCount}`}
-                  sub="მომხმარებელი"
-                  color={r.maxWinViolationCount === 0 ? "#22C55E" : "#EF4444"}
-                />
-                <StatCard
-                  label="გარანტიის Top-up"
-                  value={`${r.bonusRoundCount}`}
-                  sub="მომხმარებელს დაემატა"
-                  color="#3B82F6"
-                />
-                <StatCard
-                  label="Pool ბალანსი"
-                  value={`${r.poolEndBalance.toFixed(2)}₾`}
-                  sub={`in: ${r.poolTotalIn.toFixed(2)} | out: ${r.poolTotalOut.toFixed(2)}`}
-                  color={r.poolEndBalance >= 0 ? "#22C55E" : "#EF4444"}
-                />
+                <StatCard label="საშუალო დაბრუნება %" value={`${r.actualAvgReturnPercent}%`} sub={`target: ${r.targetAvgReturnPercent}%`}
+                  color={Math.abs(r.actualAvgReturnPercent - r.targetAvgReturnPercent) <= 0.5 ? "#22C55E" : "#EF4444"} />
+                <StatCard label="მინიმუმ გარანტია" value={`${r.userCount - r.guaranteeMissCount}/${r.userCount}`} sub="მომხმარებელმა მიიღო" color={r.guaranteeMissCount === 0 ? "#22C55E" : "#EF4444"} />
+                <StatCard label="გარანტიის Top-up" value={`${r.guaranteeTopUpCount}`} sub="მომხმარებელს დაემატა" color="#3B82F6" />
+                <StatCard label="Pool საწყისი" value={`${r.poolStartBalance.toFixed(2)}₾`} sub={`გაცემა: ${r.poolTotalPaidOut.toFixed(2)}₾`} />
+                <StatCard label="Pool დარჩენილი" value={`${r.poolEndBalance.toFixed(2)}₾`} color={r.poolEndBalance >= 0 ? "#22C55E" : "#EF4444"} />
               </div>
 
-              {/* Detailed stats + checks side by side */}
+              {/* Stats + Checks */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Stats */}
                 <div className="rounded-2xl p-5 border" style={{ background: "#111111", borderColor: "#252525" }}>
-                  <h3 className="text-[14px] font-bold mb-4" style={{ color: "#FFFFFF" }}>დეტალური სტატისტიკა</h3>
-                  <div className="space-y-3">
-                    {[
-                      { label: "მინიმუმ მოგება", value: `${r.minCashback}₾` },
-                      { label: "მაქსიმუმ მოგება", value: `${r.maxCashback}₾` },
-                      { label: "მედიანა", value: `${r.medianCashback}₾` },
-                      { label: "საშუალო", value: `${r.meanCashback}₾` },
-                      { label: "Pool შემოსავალი", value: `${r.poolTotalIn.toFixed(2)}₾` },
-                      { label: "Pool გასავალი", value: `${r.poolTotalOut.toFixed(2)}₾` },
-                    ].map(({ label, value }) => (
-                      <div key={label} className="flex justify-between items-center py-1.5 border-b" style={{ borderColor: "#1A1A1A" }}>
-                        <span className="text-[12px]" style={{ color: "#A0A0A0" }}>{label}</span>
-                        <span className="text-[13px] font-semibold" style={{ color: "#FFFFFF" }}>{value}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <h3 className="text-[14px] font-bold mb-4" style={{ color: "#FFFFFF" }}>სტატისტიკა</h3>
+                  {[
+                    { l: "ჯამური ხარჯი", v: `${r.totalSpend?.toFixed(2)}₾` },
+                    { l: "ჯამური გაცემა", v: `${r.totalCashWon?.toFixed(2)}₾` },
+                    { l: "მინ. cashback", v: `${r.minCashback}₾` },
+                    { l: "მაქს. cashback", v: `${r.maxCashback}₾` },
+                    { l: "მედიანა", v: `${r.medianCashback}₾` },
+                    { l: "საშუალო", v: `${r.meanCashback}₾` },
+                  ].map(({ l, v }) => (
+                    <div key={l} className="flex justify-between py-1.5 border-b" style={{ borderColor: "#1A1A1A" }}>
+                      <span className="text-[12px]" style={{ color: "#A0A0A0" }}>{l}</span>
+                      <span className="text-[13px] font-semibold" style={{ color: "#FFFFFF" }}>{v}</span>
+                    </div>
+                  ))}
                 </div>
-
-                {/* Pass/Fail checklist */}
                 <div className="rounded-2xl p-5 border" style={{ background: "#111111", borderColor: "#252525" }}>
-                  <h3 className="text-[14px] font-bold mb-4" style={{ color: "#FFFFFF" }}>ტესტის შედეგები</h3>
-                  <div className="space-y-1">
-                    <CheckItem pass={r.checks.avgReturnMatch} label={`საშუალო დაბრუნება % ემთხვევა target-ს (±0.5%): ${r.actualAvgReturnPercent}% vs ${r.targetAvgReturnPercent}%`} />
-                    <CheckItem pass={r.checks.allGuaranteesMet} label={`ყველა მომხმარებელმა მიიღო მინიმუმ გარანტია (${r.guaranteeMissCount} miss)`} />
-                    <CheckItem pass={r.checks.noMaxWinViolations} label={`არცერთმა არ გადააჭარბა მაქს. მოგებას (${r.maxWinViolationCount} violation)`} />
-                    <CheckItem pass={r.checks.poolNotNegative} label={`Pool არ წავიდა მინუსში (${r.poolEndBalance.toFixed(2)}₾)`} />
-                    <CheckItem pass={r.checks.fullReturnThresholdWorks} label="100% threshold მუშაობს" />
-                    <CheckItem pass={r.checks.masterSwitchOffTest} label="Master switch OFF — 0 ბონუს cash (გარანტიის გარდა)" />
-                  </div>
+                  <h3 className="text-[14px] font-bold mb-4" style={{ color: "#FFFFFF" }}>ტესტები</h3>
+                  <CheckItem pass={r.checks.avgReturnMatch} label={`საშუალო დაბრუნება: ${r.actualAvgReturnPercent}% vs ${r.targetAvgReturnPercent}% (±0.5%)`} />
+                  <CheckItem pass={r.checks.allGuaranteesMet} label={`გარანტია: ${r.guaranteeMissCount} miss`} />
+                  <CheckItem pass={r.checks.noMaxWinViolations} label={`მაქს. მოგება: ${r.maxWinViolationCount} violation`} />
+                  <CheckItem pass={r.checks.poolNotNegative} label={`Pool: ${r.poolEndBalance.toFixed(2)}₾`} />
+                  <CheckItem pass={r.checks.masterSwitchOffTest} label="Master OFF = 0 ბონუს" />
                 </div>
               </div>
 
               {/* Histogram */}
               <div className="rounded-2xl p-5 border" style={{ background: "#111111", borderColor: "#252525" }}>
-                <h3 className="text-[14px] font-bold mb-4" style={{ color: "#FFFFFF" }}>მოგების განაწილება</h3>
-                <Histogram data={r.histogram} maxCount={maxHistogramCount} />
-                <p className="text-[11px] mt-2" style={{ color: "#666666" }}>X: cashback რეინჯი | Y: მომხმარებლების რაოდენობა</p>
+                <h3 className="text-[14px] font-bold mb-3" style={{ color: "#FFFFFF" }}>მოგების განაწილება</h3>
+                <Histogram data={r.histogram} maxCount={maxHist} />
               </div>
+
+              {/* ── SAMPLE USER LOG (proof) ── */}
+              {r.sampleUsers && r.sampleUsers.length > 0 && (
+                <div className="rounded-2xl p-5 border" style={{ background: "#111111", borderColor: "#252525" }}>
+                  <button onClick={() => setShowLog(!showLog)} className="flex items-center gap-2 w-full text-left">
+                    <span className="text-[14px] font-bold" style={{ color: "#FFFFFF" }}>სიმულაციის ლოგი (პირველი 10 მომხმარებელი)</span>
+                    <span className="text-[12px]" style={{ color: "#666" }}>{showLog ? "▲" : "▼"}</span>
+                  </button>
+                  <p className="text-[10px] mt-1 mb-3" style={{ color: "#555" }}>რეალური ალგორითმის შედეგები — ხელით შეგიძლიათ გადაამოწმოთ</p>
+
+                  {showLog && (
+                    <div className="space-y-2">
+                      {r.sampleUsers.map((u: any) => {
+                        const expectedMin = (u.spendAmount * (r.config?.minReturnPercent || 0) / 100);
+                        return (
+                          <div key={u.index} className="rounded-xl p-3 text-[11px]" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="font-bold" style={{ color: "#F9E741" }}>User #{u.index}</span>
+                              <span className="px-1.5 py-0.5 rounded text-[9px]" style={{ background: u.guaranteeMet ? "#22C55E20" : "#EF444420", color: u.guaranteeMet ? "#22C55E" : "#EF4444" }}>
+                                {u.guaranteeMet ? "GUARANTEE MET" : "GUARANTEE MISS"}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-0.5" style={{ color: "#A0A0A0" }}>
+                              <span>ხარჯი: <b style={{ color: "#FFF" }}>{u.spendAmount}₾</b></span>
+                              <span>თამაშები: <b style={{ color: "#FFF" }}>{u.gamesPlayed}</b> ({u.gamesWon} win)</span>
+                              <span>ბუნებრივი: <b style={{ color: "#FFF" }}>{u.naturalCashback}₾</b></span>
+                              <span>გარანტია: <b style={{ color: "#FFF" }}>{u.guaranteedMinimum}₾</b></span>
+                              <span>Top-up: <b style={{ color: u.guaranteeTopUp > 0 ? "#F9E741" : "#FFF" }}>{u.guaranteeTopUp}₾</b></span>
+                              <span>საბოლოო: <b style={{ color: "#22C55E" }}>{u.finalCashback}₾</b></span>
+                              <span className="md:col-span-2" style={{ color: "#555" }}>მოსალოდნელი მინ: {expectedMin.toFixed(4)}₾</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
 
-          {/* ── TEST HISTORY ── */}
+          {/* ── HISTORY ── */}
           <div className="rounded-2xl p-5 border" style={{ background: "#111111", borderColor: "#252525" }}>
-            <h3 className="text-[14px] font-bold mb-4" style={{ color: "#FFFFFF" }}>ტესტის ისტორია</h3>
+            <h3 className="text-[14px] font-bold mb-4" style={{ color: "#FFFFFF" }}>ისტორია</h3>
             {history.length === 0 ? (
-              <p className="text-[12px]" style={{ color: "#666666" }}>ჯერ ტესტი არ ჩატარებულა</p>
+              <p className="text-[12px]" style={{ color: "#666" }}>ჯერ ტესტი არ ჩატარებულა</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-[12px]">
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid #252525" }}>
-                      <th className="text-left py-2 px-2 font-medium" style={{ color: "#666666" }}>თარიღი</th>
-                      <th className="text-left py-2 px-2 font-medium" style={{ color: "#666666" }}>მომხმარებლები</th>
-                      <th className="text-left py-2 px-2 font-medium" style={{ color: "#666666" }}>ხარჯის რეინჯი</th>
-                      <th className="text-left py-2 px-2 font-medium" style={{ color: "#666666" }}>სტატუსი</th>
-                      <th className="text-left py-2 px-2 font-medium" style={{ color: "#666666" }}>შედეგი</th>
-                      <th className="text-left py-2 px-2 font-medium" style={{ color: "#666666" }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {history.map((run) => {
-                      const allOk = run.results?.checks && Object.values(run.results.checks).every(Boolean);
-                      const expanded = expandedHistoryId === run.id;
-                      return (
-                        <tr key={run.id} style={{ borderBottom: "1px solid #1A1A1A" }}>
-                          <td className="py-2 px-2" style={{ color: "#A0A0A0" }}>
-                            {run.createdAt ? new Date(run.createdAt).toLocaleString("ka-GE", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}
-                          </td>
-                          <td className="py-2 px-2" style={{ color: "#FFFFFF" }}>{run.userCount?.toLocaleString()}</td>
-                          <td className="py-2 px-2" style={{ color: "#FFFFFF" }}>{run.minSpend}-{run.maxSpend}₾</td>
-                          <td className="py-2 px-2">
-                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium" style={{
-                              background: run.status === "complete" ? "#22C55E20" : run.status === "running" ? "#F9E74120" : "#EF444420",
-                              color: run.status === "complete" ? "#22C55E" : run.status === "running" ? "#F9E741" : "#EF4444",
-                            }}>
-                              {run.status === "complete" ? "done" : run.status === "running" ? `${run.progress}/${run.userCount}` : "error"}
-                            </span>
-                          </td>
-                          <td className="py-2 px-2">
-                            {run.status === "complete" && (
-                              <span className="text-[12px]" style={{ color: allOk ? "#22C55E" : "#EF4444" }}>
-                                {allOk ? "PASS" : "FAIL"}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-2 px-2">
-                            {run.status === "complete" && run.results && (
-                              <button
-                                onClick={() => setExpandedHistoryId(expanded ? null : run.id)}
-                                className="text-[11px] px-2 py-0.5 rounded-md transition-all"
-                                style={{ background: "#1A1A1A", color: "#F9E741", border: "1px solid #252525" }}>
-                                {expanded ? "დახურვა" : "დეტალები"}
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
+                  <thead><tr style={{ borderBottom: "1px solid #252525" }}>
+                    <th className="text-left py-2 px-2 font-medium" style={{ color: "#666" }}>თარიღი</th>
+                    <th className="text-left py-2 px-2 font-medium" style={{ color: "#666" }}>მომხმ.</th>
+                    <th className="text-left py-2 px-2 font-medium" style={{ color: "#666" }}>სცენარი</th>
+                    <th className="text-left py-2 px-2 font-medium" style={{ color: "#666" }}>სტატუსი</th>
+                    <th className="text-left py-2 px-2 font-medium" style={{ color: "#666" }}>შედეგი</th>
+                  </tr></thead>
+                  <tbody>{history.map((run) => {
+                    const ok = run.results?.checks && Object.values(run.results.checks).every(Boolean);
+                    return (
+                      <tr key={run.id} style={{ borderBottom: "1px solid #1A1A1A" }} className="cursor-pointer hover:opacity-80" onClick={() => setExpandedHistoryId(expandedHistoryId === run.id ? null : run.id)}>
+                        <td className="py-2 px-2" style={{ color: "#A0A0A0" }}>{run.createdAt ? new Date(run.createdAt).toLocaleString("ka-GE", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}</td>
+                        <td className="py-2 px-2" style={{ color: "#FFF" }}>{run.userCount?.toLocaleString()}</td>
+                        <td className="py-2 px-2" style={{ color: "#FFF" }}>{run.results?.scenario || `${run.minSpend}-${run.maxSpend}₾`}</td>
+                        <td className="py-2 px-2"><span className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: run.status === "complete" ? "#22C55E20" : "#F9E74120", color: run.status === "complete" ? "#22C55E" : "#F9E741" }}>{run.status === "complete" ? "done" : `${run.progress}/${run.userCount}`}</span></td>
+                        <td className="py-2 px-2"><span style={{ color: ok ? "#22C55E" : run.status === "complete" ? "#EF4444" : "#666" }}>{run.status === "complete" ? (ok ? "PASS" : "FAIL") : "..."}</span></td>
+                      </tr>
+                    );
+                  })}</tbody>
                 </table>
-
-                {/* Expanded details for history item */}
-                {history.map((run) => {
-                  if (expandedHistoryId !== run.id || !run.results) return null;
-                  const hr = run.results;
-                  return (
-                    <div key={`detail-${run.id}`} className="mt-3 p-4 rounded-xl" style={{ background: "#0A0A0A", border: "1px solid #252525" }}>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[12px]">
-                        <div><span style={{ color: "#666" }}>Avg Return:</span> <span style={{ color: "#FFF" }}>{hr.actualAvgReturnPercent}%</span></div>
-                        <div><span style={{ color: "#666" }}>Guarantee Miss:</span> <span style={{ color: hr.guaranteeMissCount === 0 ? "#22C55E" : "#EF4444" }}>{hr.guaranteeMissCount}</span></div>
-                        <div><span style={{ color: "#666" }}>Max Win Violations:</span> <span style={{ color: hr.maxWinViolationCount === 0 ? "#22C55E" : "#EF4444" }}>{hr.maxWinViolationCount}</span></div>
-                        <div><span style={{ color: "#666" }}>Pool End:</span> <span style={{ color: "#FFF" }}>{hr.poolEndBalance?.toFixed(2)}₾</span></div>
-                        <div><span style={{ color: "#666" }}>Min Cashback:</span> <span style={{ color: "#FFF" }}>{hr.minCashback}₾</span></div>
-                        <div><span style={{ color: "#666" }}>Max Cashback:</span> <span style={{ color: "#FFF" }}>{hr.maxCashback}₾</span></div>
-                        <div><span style={{ color: "#666" }}>Median:</span> <span style={{ color: "#FFF" }}>{hr.medianCashback}₾</span></div>
-                        <div><span style={{ color: "#666" }}>Mean:</span> <span style={{ color: "#FFF" }}>{hr.meanCashback}₾</span></div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {hr.checks && Object.entries(hr.checks).map(([key, val]) => (
-                          <span key={key} className="text-[10px] px-2 py-0.5 rounded-md" style={{ background: val ? "#22C55E15" : "#EF444415", color: val ? "#22C55E" : "#EF4444" }}>
-                            {val ? "\u2713" : "\u2717"} {key}
-                          </span>
-                        ))}
-                      </div>
+                {history.map((run) => expandedHistoryId === run.id && run.results ? (
+                  <div key={`d-${run.id}`} className="mt-2 p-3 rounded-xl text-[11px]" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2" style={{ color: "#A0A0A0" }}>
+                      <div>Avg Return: <b style={{ color: "#FFF" }}>{run.results.actualAvgReturnPercent}%</b></div>
+                      <div>Guarantee Miss: <b style={{ color: run.results.guaranteeMissCount === 0 ? "#22C55E" : "#EF4444" }}>{run.results.guaranteeMissCount}</b></div>
+                      <div>Pool End: <b style={{ color: "#FFF" }}>{run.results.poolEndBalance?.toFixed(2)}₾</b></div>
+                      <div>Total Spend: <b style={{ color: "#FFF" }}>{run.results.totalSpend?.toFixed(2)}₾</b></div>
                     </div>
-                  );
-                })}
+                  </div>
+                ) : null)}
               </div>
             )}
           </div>
@@ -627,9 +471,5 @@ function AlgoTestContent() {
 }
 
 export default function AlgoTestPage() {
-  return (
-    <AdminAuthGuard>
-      <AlgoTestContent />
-    </AdminAuthGuard>
-  );
+  return <AdminAuthGuard><AlgoTestContent /></AdminAuthGuard>;
 }
