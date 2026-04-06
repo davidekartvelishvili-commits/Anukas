@@ -1,8 +1,26 @@
 import crypto from "crypto";
 import { nanoid } from "nanoid";
-import { eq, and, or, desc } from "drizzle-orm";
+import { eq, and, or, desc, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import { gameConfig, pool, users, gameHistory, transactions, systemConfig } from "../db/schema.js";
+
+// ═══════════════════════════════════════
+// PER-USER MUTEX — prevents parallel drops from causing race conditions
+// ═══════════════════════════════════════
+const userLocks = new Map<string, Promise<any>>();
+
+async function withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  const prev = userLocks.get(userId) || Promise.resolve();
+  const current = prev.then(fn, fn); // run fn after previous completes (even if it failed)
+  userLocks.set(userId, current);
+  // Clean up after completion to avoid memory leak
+  current.finally(() => {
+    if (userLocks.get(userId) === current) {
+      userLocks.delete(userId);
+    }
+  });
+  return current;
+}
 
 export interface GameResult {
   won: boolean;
@@ -164,6 +182,15 @@ export async function playGame(
   gameType: "slot" | "plinko" | "chicken_rush",
   coinCost: number
 ): Promise<GameResult> {
+  // Serialize all game plays per user to prevent parallel race conditions
+  return withUserLock(userId, () => _playGameInner(userId, gameType, coinCost));
+}
+
+async function _playGameInner(
+  userId: string,
+  gameType: "slot" | "plinko" | "chicken_rush",
+  coinCost: number
+): Promise<GameResult> {
   const db = getDb();
 
   // 1. Find active transaction
@@ -224,41 +251,45 @@ export async function playGame(
 
   console.log(`[PLAY] userId=${userId} game=${gameType} coins=${coinCost} betLari=${betInLari} minWin=${minWin} bonusWin=${bonusWin} totalWin=${totalWin} pool=${poolBefore} isBonusRound=${isBonusRound}`);
 
-  // 5. Deduct from pool if bonus win (not from guarantee)
+  // 5. Deduct from pool if bonus win (not from guarantee) — ATOMIC
   if (bonusWin > 0 && !isBonusRound) {
     await db.update(pool).set({
-      balance: round2(poolRow.balance - bonusWin),
-      totalWon: round2(poolRow.totalWon + bonusWin),
+      balance: sql`ROUND(${pool.balance} - ${bonusWin}, 2)`,
+      totalWon: sql`ROUND(${pool.totalWon} + ${bonusWin}, 2)`,
       updatedAt: new Date().toISOString(),
-    }).where(eq(pool.id, poolRow.id));
+    } as any).where(eq(pool.id, poolRow.id));
   }
 
-  // 6. Update user cash balance
+  // 6. Update user cash balance — ATOMIC
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw new Error("User not found");
   const newBalance = round2(user.balance + totalWin);
   if (totalWin > 0) {
-    await db.update(users).set({ balance: newBalance, updatedAt: new Date().toISOString() }).where(eq(users.id, userId));
+    await db.update(users).set({
+      balance: sql`ROUND(${users.balance} + ${totalWin}, 2)`,
+      updatedAt: new Date().toISOString(),
+    } as any).where(eq(users.id, userId));
   }
 
-  // 7. Update transaction
+  // 7. Update transaction — ATOMIC coin deduction
   const actualCoinDeduct = isBonusRound ? Math.min(coinCost, activeTx.coinsRemaining) : coinCost;
   const newCoinsRemaining = Math.max(0, activeTx.coinsRemaining - actualCoinDeduct);
   const newTotalCashWon = round2(activeTx.totalCashWon + totalWin);
 
-  const txUpdates: Record<string, any> = {
-    coinsRemaining: newCoinsRemaining,
-    totalCashWon: newTotalCashWon,
-  };
+  await db.update(transactions).set({
+    coinsRemaining: sql`MAX(0, ${transactions.coinsRemaining} - ${actualCoinDeduct})`,
+    totalCashWon: sql`ROUND(${transactions.totalCashWon} + ${totalWin}, 2)`,
+    ...(isBonusRound ? { bonusGamesPlayed: sql`COALESCE(${transactions.bonusGamesPlayed}, 0) + 1` } : {}),
+  } as any).where(eq(transactions.id, activeTx.id));
 
-  // Track bonus games played
-  if (isBonusRound) {
-    txUpdates.bonusGamesPlayed = (activeTx.bonusGamesPlayed || 0) + 1;
-  }
+  // Re-read the transaction to get accurate values after atomic update
+  const [updatedTx] = await db.select().from(transactions).where(eq(transactions.id, activeTx.id)).limit(1);
 
-  await db.update(transactions).set(txUpdates).where(eq(transactions.id, activeTx.id));
+  // 8. Use ACTUAL values from DB after atomic update
+  const actualCoinsRemaining = updatedTx?.coinsRemaining ?? newCoinsRemaining;
+  const actualTotalCashWon = updatedTx?.totalCashWon ?? newTotalCashWon;
 
-  // 8. Check if transaction should complete or trigger bonus round
+  // 9. Check if transaction should complete or trigger bonus round
   let bonusRoundTriggered = false;
   let bonusMessage: string | undefined;
   let freeCoins: number | undefined;
@@ -266,18 +297,16 @@ export async function playGame(
   let bonusGamesLeft = 0;
 
   if (isBonusRound) {
-    const played = (activeTx.bonusGamesPlayed || 0) + 1;
+    const played = updatedTx?.bonusGamesPlayed || ((activeTx.bonusGamesPlayed || 0) + 1);
     const total = activeTx.bonusGamesTotal || 0;
     bonusGamesLeft = Math.max(0, total - played);
 
-    if (newTotalCashWon >= activeTx.guaranteedMinimum || played >= total) {
-      // All bonus games played or guarantee met
+    if (actualTotalCashWon >= activeTx.guaranteedMinimum || played >= total) {
       await db.update(transactions).set({
         status: "completed", guaranteeMet: true, completedAt: new Date().toISOString(),
       }).where(eq(transactions.id, activeTx.id));
       transactionComplete = true;
-    } else if (newCoinsRemaining <= 0) {
-      // Need more coins for remaining bonus games
+    } else if (actualCoinsRemaining <= 0) {
       const coinsPerGame = 10;
       const remainingGames = total - played;
       const bonusCoins = coinsPerGame * remainingGames;
@@ -287,16 +316,14 @@ export async function playGame(
       freeCoins = bonusCoins;
       bonusGamesLeft = remainingGames;
     }
-  } else if (newCoinsRemaining <= 0) {
-    if (newTotalCashWon >= activeTx.guaranteedMinimum || activeTx.guaranteedMinimum === 0) {
-      // Guarantee met or free coins (no guarantee)
+  } else if (actualCoinsRemaining <= 0) {
+    if (actualTotalCashWon >= activeTx.guaranteedMinimum || activeTx.guaranteedMinimum === 0) {
       await db.update(transactions).set({
         status: "completed", guaranteeMet: true, completedAt: new Date().toISOString(),
       }).where(eq(transactions.id, activeTx.id));
       transactionComplete = true;
     } else {
-      // Normal coins ran out, guarantee NOT met — generate bonus plan
-      const shortfall = round2(activeTx.guaranteedMinimum - newTotalCashWon);
+      const shortfall = round2(activeTx.guaranteedMinimum - actualTotalCashWon);
       const plan = generateBonusPlan(shortfall);
       const totalBonusGames = plan.length;
       const bonusCoins = 10 * totalBonusGames;
@@ -317,7 +344,7 @@ export async function playGame(
     }
   }
 
-  // 9. Log game history
+  // 10. Log game history
   const [poolAfter] = await db.select().from(pool).limit(1);
   await db.insert(gameHistory).values({
     id: nanoid(),
@@ -329,16 +356,19 @@ export async function playGame(
     poolBalanceAfter: poolAfter?.balance || poolBefore,
   });
 
+  // Re-read user balance for accurate return value
+  const [userAfter] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
   return {
     won: totalWin > 0,
     winAmount: totalWin,
     minWin,
     bonusWin,
     totalWin,
-    newBalance,
+    newBalance: userAfter?.balance ?? newBalance,
     poolBalance: poolAfter?.balance || poolBefore,
-    coinsRemaining: newCoinsRemaining,
-    totalCashWon: newTotalCashWon,
+    coinsRemaining: actualCoinsRemaining,
+    totalCashWon: actualTotalCashWon,
     bonusRound: bonusRoundTriggered,
     bonusMessage,
     freeCoins,
