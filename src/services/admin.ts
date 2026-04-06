@@ -132,6 +132,14 @@ export async function getGameHistory(filters?: {
   return adminFetch(`/admin/game-history?${params}`);
 }
 
+export async function getMasterSwitch() {
+  return adminFetch("/admin/master-switch");
+}
+
+export async function setMasterSwitch(enabled: boolean) {
+  return adminFetch("/admin/master-switch", { method: "PATCH", body: JSON.stringify({ enabled }) });
+}
+
 // ── Merchants ──
 
 export async function getMerchants(status?: string, page = 1) {

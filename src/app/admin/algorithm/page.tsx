@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getGameConfig, updateGameConfig, getPool, fundPool } from "@/services/admin";
+import { getGameConfig, updateGameConfig, getPool, fundPool, getMasterSwitch, setMasterSwitch } from "@/services/admin";
 import AdminAuthGuard from "@/components/admin/AdminAuthGuard";
 
 /* ── SVG ICONS (same as dashboard) ── */
@@ -105,14 +105,17 @@ function AlgorithmContent() {
 
     getGameConfig().then((data: any) => {
       if (data.success && data.configs && data.configs.length > 0) {
-        const c = data.configs[0]; // Use first config as reference
+        const c = data.configs[0];
         setGameTypes(data.configs.map((g: any) => g.gameType));
-        setWinningsEnabled(c.isActive);
         setParams((prev) => prev.map((p) => {
           const val = c[p.key];
           return val !== undefined ? { ...p, value: val } : p;
         }));
       }
+    }).catch(() => {});
+
+    getMasterSwitch().then((data: any) => {
+      if (data.success !== undefined) setWinningsEnabled(data.enabled);
     }).catch(() => {});
   }, []);
 
@@ -154,9 +157,7 @@ function AlgorithmContent() {
 
   const handleToggleWinnings = async (enable: boolean) => {
     try {
-      for (const gt of gameTypes) {
-        await updateGameConfig(gt, { isActive: enable });
-      }
+      await setMasterSwitch(enable);
       setWinningsEnabled(enable);
       setShowConfirmOff(false);
     } catch {}

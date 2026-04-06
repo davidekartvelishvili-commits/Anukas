@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { nanoid } from "nanoid";
 import { eq, and, or, desc } from "drizzle-orm";
 import { getDb } from "../db/client.js";
-import { gameConfig, pool, users, gameHistory, transactions } from "../db/schema.js";
+import { gameConfig, pool, users, gameHistory, transactions, systemConfig } from "../db/schema.js";
 
 export interface GameResult {
   won: boolean;
@@ -185,12 +185,16 @@ export async function playGame(
   if (!config) throw new Error("Game not configured");
   if (!config.isActive) throw new Error("თამაში დროებით შეჩერებულია");
 
-  // 3. Read pool
+  // 3. Check master switch — if OFF, force 0 cash winnings
+  const [masterSwitchRow] = await db.select().from(systemConfig).where(eq(systemConfig.key, "master_switch")).limit(1);
+  const masterSwitchOn = masterSwitchRow?.value !== "false";
+
+  // 4. Read pool
   const [poolRow] = await db.select().from(pool).limit(1);
   if (!poolRow) throw new Error("Pool not initialized");
   const poolBefore = poolRow.balance;
 
-  // 4. Calculate win
+  // 5. Calculate win
   const betInLari = coinCost / 100;
   let plannedBonusWin = 0;
 
@@ -201,7 +205,7 @@ export async function playGame(
     plannedBonusWin = plan[played] || 0;
   }
 
-  const { minWin, bonusWin } = calculateWin(betInLari, {
+  let { minWin, bonusWin } = calculateWin(betInLari, {
     avgReturnPercent: config.avgReturnPercent,
     maxWinPerUser: config.maxWinPerUser,
     poolMinimumThreshold: config.poolMinimumThreshold,
@@ -209,6 +213,12 @@ export async function playGame(
     minReturnPercent: config.minReturnPercent,
     isActive: config.isActive,
   }, poolBefore, isBonusRound, plannedBonusWin);
+
+  // MASTER SWITCH: if OFF, zero out all winnings
+  if (!masterSwitchOn) {
+    minWin = 0;
+    bonusWin = 0;
+  }
 
   const totalWin = round2(minWin + bonusWin);
 

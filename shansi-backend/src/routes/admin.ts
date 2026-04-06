@@ -259,6 +259,31 @@ admin.post("/pool/fund", adminMiddleware, async (c) => {
   return c.json({ success: true, newBalance: p.balance + amount });
 });
 
+// GET /admin/master-switch
+admin.get("/master-switch", adminMiddleware, async (c) => {
+  const db = getDb();
+  const [row] = await db.select().from(systemConfig).where(eq(systemConfig.key, "master_switch")).limit(1);
+  return c.json({ success: true, enabled: row?.value !== "false" });
+});
+
+// PATCH /admin/master-switch
+admin.patch("/master-switch", adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const enabled = body.enabled === true;
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  const [existing] = await db.select().from(systemConfig).where(eq(systemConfig.key, "master_switch")).limit(1);
+  if (existing) {
+    await db.update(systemConfig).set({ value: String(enabled), updatedAt: new Date().toISOString() }).where(eq(systemConfig.key, "master_switch"));
+  } else {
+    await db.insert(systemConfig).values({ key: "master_switch", value: String(enabled) });
+  }
+
+  await logAction(adminId, "master_switch_toggle", JSON.stringify({ enabled }));
+  return c.json({ success: true, enabled });
+});
+
 // GET /admin/users
 admin.get("/users", adminMiddleware, async (c) => {
   const db = getDb();
