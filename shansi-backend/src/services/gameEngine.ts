@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { nanoid } from "nanoid";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, desc } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import { gameConfig, pool, users, gameHistory, transactions } from "../db/schema.js";
 
@@ -167,13 +167,11 @@ export async function playGame(
   const db = getDb();
 
   // 1. Find active transaction
-  const [tx] = await db.select().from(transactions)
-    .where(and(eq(transactions.userId, userId), eq(transactions.status, "active")))
-    .limit(1);
-  const [bonusTx] = !tx ? await db.select().from(transactions)
-    .where(and(eq(transactions.userId, userId), eq(transactions.status, "bonus_round")))
-    .limit(1) : [tx];
-  const activeTx = tx || bonusTx;
+  // Find active transaction with coins remaining (newest first)
+  const allActiveTx = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
+    .orderBy(desc(transactions.createdAt));
+  const activeTx = allActiveTx.find(t => t.coinsRemaining >= coinCost) || allActiveTx.find(t => t.coinsRemaining > 0) || allActiveTx[0] || null;
 
   if (!activeTx) throw new Error("ქოინები არ გაქვს");
   if (activeTx.coinsRemaining < coinCost && activeTx.status !== "bonus_round") {

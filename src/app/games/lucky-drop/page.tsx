@@ -58,12 +58,14 @@ export default function LuckyDropPage() {
   const calcLayout = useCallback(() => {
     const W = window.innerWidth;
     const H = window.innerHeight;
-    const pegR = Math.max(4, W * 0.007);
+    const scale = Math.min(W / 430, 1); // Scale relative to iPhone size
+    const pegR = Math.max(3, W * 0.008);
     const cols = ROWS + 2;
-    const gapX = (W - 100) / cols;
-    const gapY = (H * 0.42) / ROWS;
-    const startY = H * 0.22;
-    const slotH = H * 0.065;
+    const sidePad = Math.max(20, W * 0.05);
+    const gapX = (W - sidePad * 2) / cols;
+    const gapY = (H * 0.40) / ROWS;
+    const startY = H * 0.20;
+    const slotH = H * 0.06;
 
     const pegs: Peg[] = [];
     const rowEdges: { left: number; right: number; y: number }[] = [];
@@ -88,8 +90,8 @@ export default function LuckyDropPage() {
 
     const mults = MULTIPLIERS[riskRef.current];
     const count = mults.length;
-    const totalW2 = (ROWS + 2) * gapX;
-    const sx2 = (W - totalW2) / 2;
+    const totalW2 = cols * gapX;
+    const sx2 = sidePad;
     const slotW = totalW2 / count;
     const sy = startY + ROWS * gapY + gapY * 0.6;
     const colors = SLOT_COLORS[riskRef.current];
@@ -348,7 +350,7 @@ export default function LuckyDropPage() {
     const currentBet = betAmount;
 
     // Fire API immediately (parallel — no queue)
-    playGame("plinko").then((serverResult) => {
+    playGame("plinko").then((serverResult: any) => {
       // Track the lowest server balance (= most up-to-date after all deductions)
       if (latestServerBalRef.current < 0) {
         latestServerBalRef.current = serverResult.coinsRemaining;
@@ -406,8 +408,9 @@ export default function LuckyDropPage() {
       };
 
       s.balls.push(ball);
-    }).catch(() => {
+    }).catch((err: any) => {
       // API failed — restore the local deduction
+      console.error("Drop API error:", err.message);
       pendingBallsRef.current--;
       setBalance((prev) => prev + currentBet);
       if (pendingBallsRef.current === 0 && latestServerBalRef.current >= 0) {
@@ -415,6 +418,9 @@ export default function LuckyDropPage() {
         storeCoin(latestServerBalRef.current);
         latestServerBalRef.current = -1;
       }
+      // Show error briefly
+      setBigWinText(err.message || "\u10E8\u10D4\u10EA\u10D3\u10DD\u10DB\u10D0");
+      setTimeout(() => setBigWinText(""), 2000);
     });
   }, [balance, risk, betAmount]);
 
