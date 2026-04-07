@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getGameConfig, updateGameConfig, getPool, fundPool, getMasterSwitch, setMasterSwitch, getBigWinConfig, updateBigWinConfig, getBigWinPrizes, createBigWinPrize, updateBigWinPrize, deleteBigWinPrize } from "@/services/admin";
+import { getGameConfig, updateGameConfig, getPool, fundPool, getMasterSwitch, setMasterSwitch, getBigWinConfig, updateBigWinConfig, getBigWinPrizes, createBigWinPrize, updateBigWinPrize, deleteBigWinPrize, getFinanceData } from "@/services/admin";
 import AdminAuthGuard from "@/components/admin/AdminAuthGuard";
 
 /* ── SVG ICONS (same as dashboard) ── */
@@ -133,6 +133,8 @@ function AlgorithmContent() {
   const [editPrizeAmount, setEditPrizeAmount] = useState("");
   const [editPrizeQty, setEditPrizeQty] = useState("");
 
+  const [pendingAmount, setPendingAmount] = useState(0);
+
   const loadBigWin = async () => {
     try {
       const cfg = await getBigWinConfig() as any;
@@ -142,6 +144,9 @@ function AlgorithmContent() {
       }
       const pz = await getBigWinPrizes() as any;
       if (pz.success) setBigWinPrizes(pz.prizes);
+      // Pending balance from finance endpoint (no date filter)
+      const fin = await getFinanceData() as any;
+      if (fin.success && fin.summary) setPendingAmount(Number(fin.summary.pendingCommission) || 0);
     } catch {}
   };
 
@@ -346,10 +351,12 @@ function AlgorithmContent() {
           {/* ═══ BIG WIN BUDGET ═══ */}
           {bigWinData && (() => {
             const p = bigWinData.pool;
-            const total = p.balance || 1;
+            // Total bar length includes pending so it visually extends beyond pool
+            const total = (p.balance || 0) + (pendingAmount || 0) || 1;
             const thresholdPct = (p.threshold / total) * 100;
             const bigPct = (p.bigWinBudget / total) * 100;
             const regPct = (p.regularBudget / total) * 100;
+            const pendingPct = (pendingAmount / total) * 100;
             const allocated = bigWinPrizes.reduce((s, pr) => s + pr.amount * Math.max(0, pr.quantity - pr.wonCount), 0);
             const free = p.bigWinBudget - allocated;
             return (
@@ -370,11 +377,19 @@ function AlgorithmContent() {
                   <div style={{ width: `${regPct}%`, background: "#22C55E" }} className="flex items-center justify-center">
                     {regPct > 8 && <span className="text-[10px] font-bold text-black">{p.regularBudget.toFixed(0)}₾</span>}
                   </div>
+                  {pendingAmount > 0 && (
+                    <div style={{ width: `${pendingPct}%`, background: "repeating-linear-gradient(45deg, #555, #555 6px, #444 6px, #444 12px)" }} className="flex items-center justify-center" title="მოლოდინში — მერჩანტებიდან მისაღები">
+                      {pendingPct > 8 && <span className="text-[10px] font-bold text-white">{pendingAmount.toFixed(0)}₾</span>}
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-[11px] mb-4">
                   <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm" style={{ background: "#EF4444" }} /><span style={{ color: "#A0A0A0" }}>მინიმუმი {p.threshold.toFixed(0)}₾</span></span>
                   <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm" style={{ background: "#F9E741" }} /><span style={{ color: "#A0A0A0" }}>ბიგ ვინი {bigWinData.config.budgetPercent}% ({p.bigWinBudget.toFixed(2)}₾)</span></span>
                   <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm" style={{ background: "#22C55E" }} /><span style={{ color: "#A0A0A0" }}>ჩვეულებრივი {(100 - bigWinData.config.budgetPercent)}% ({p.regularBudget.toFixed(2)}₾)</span></span>
+                  {pendingAmount > 0 && (
+                    <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm" style={{ background: "#555" }} /><span style={{ color: "#A0A0A0" }}>⬜ მოლოდინში: {pendingAmount.toFixed(2)}₾ (მერჩანტების ფეიაუთი)</span></span>
+                  )}
                 </div>
 
                 {/* Config controls */}

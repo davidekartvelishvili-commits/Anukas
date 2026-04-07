@@ -177,9 +177,11 @@ async function _playGameInner(
   }
 
   // ═══════════════════════════════════════
-  // VILLAGE LEVEL CAP — user's level overrides global maxWin
+  // VILLAGE LEVEL CAP — user's level overrides global maxWin (regular wins only)
+  // Big Win uses ONLY the village level cap (independent from global setting)
   // ═══════════════════════════════════════
   let userMaxWin = config.maxWinPerUser;
+  let userLevelMaxWin = Number.MAX_SAFE_INTEGER; // village level cap alone, used for big wins
   try {
     let [profile] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);
     if (!profile) {
@@ -193,11 +195,11 @@ async function _playGameInner(
       const [lvl] = await db.select().from(villageLevels).where(eq(villageLevels.levelNumber, profile.currentLevel)).limit(1);
       if (lvl) {
         userMaxWin = Math.min(config.maxWinPerUser, lvl.maxWinAmount);
+        userLevelMaxWin = lvl.maxWinAmount; // village cap only
       }
     }
   } catch (e: any) {
     console.error("[village level cap]", e.message);
-    // fall back to global cap
   }
 
   // ═══════════════════════════════════════
@@ -224,11 +226,13 @@ async function _playGameInner(
           const activePrizes = await db.select().from(bigWinPrizes)
             .where(eq(bigWinPrizes.isActive, true));
 
-          // Filter: has remaining + payment eligible + level eligible + budget fit
+          // Filter: has remaining + payment eligible + village level eligible + budget fit
+          // NOTE: Uses userLevelMaxWin (village cap only), NOT userMaxWin (which includes global maxWinPerUser).
+          // Big Win has its own budget so it's independent from the global per-game cap.
           const eligible = activePrizes
             .filter(p => p.quantity - p.wonCount > 0)
             .filter(p => p.amount <= paymentAmount)
-            .filter(p => p.amount <= userMaxWin)
+            .filter(p => p.amount <= userLevelMaxWin)
             .filter(p => p.amount <= bigWinBudget)
             .sort((a, b) => b.amount - a.amount); // largest first
 
@@ -275,28 +279,28 @@ async function _playGameInner(
   const willHaveCoinsLeft = activeTx.coinsRemaining - actualCoinDeduct;
   const isLastGame = willHaveCoinsLeft <= 0;
 
+  // Effective cap for THIS game: village level cap (always) + global cap (only on regular wins)
+  // If big win is included, it bypasses the global cap and uses only the village cap
+  const effectiveCapForGame = bigWinAmount > 0 ? userLevelMaxWin : userMaxWin;
+
   if (isLastGame && activeTx.guaranteedMinimum > 0) {
-    // Use integer math (tetri) to calculate guarantee precisely
     const guaranteedTetri = toTetri(activeTx.guaranteedMinimum);
     const wonSoFarTetri = toTetri(activeTx.totalCashWon);
     const thisWinTetri = toTetri(totalWin);
     const totalAfterThisGame = wonSoFarTetri + thisWinTetri;
-    // VILLAGE LEVEL CAP — session total can never exceed user level max win
-    const levelCapTetri = toTetri(userMaxWin);
+    const levelCapTetri = toTetri(effectiveCapForGame);
 
     if (totalAfterThisGame < guaranteedTetri) {
-      // Shortfall exists — force this game's win to cover it BUT respect level cap
       const targetTetri = Math.min(guaranteedTetri, levelCapTetri);
       const shortfallTetri = Math.max(0, targetTetri - wonSoFarTetri);
       const shortfallLari = toLari(shortfallTetri);
 
-      console.log(`[GUARANTEE] Last game! Won=${toLari(wonSoFarTetri)}₾ guaranteed=${activeTx.guaranteedMinimum}₾ levelCap=${userMaxWin}₾ → topup=${shortfallLari}₾`);
+      console.log(`[GUARANTEE] Last game! Won=${toLari(wonSoFarTetri)}₾ guaranteed=${activeTx.guaranteedMinimum}₾ levelCap=${effectiveCapForGame}₾ → topup=${shortfallLari}₾`);
 
       totalWin = shortfallLari;
       bonusWin = shortfallLari;
       minWin = 0;
     } else {
-      // Already met guarantee — but make sure this game's win doesn't push past level cap
       const remainingRoom = Math.max(0, levelCapTetri - wonSoFarTetri);
       if (thisWinTetri > remainingRoom) {
         totalWin = toLari(remainingRoom);
@@ -305,8 +309,7 @@ async function _playGameInner(
       }
     }
   } else {
-    // Non-last game: also enforce level cap on cumulative session
-    const levelCapTetri = toTetri(userMaxWin);
+    const levelCapTetri = toTetri(effectiveCapForGame);
     const wonSoFarTetri = toTetri(activeTx.totalCashWon);
     const thisWinTetri = toTetri(totalWin);
     if (wonSoFarTetri + thisWinTetri > levelCapTetri) {
