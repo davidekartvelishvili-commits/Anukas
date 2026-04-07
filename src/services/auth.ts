@@ -96,6 +96,10 @@ export async function verifyBiometric() {
   });
 }
 
+export async function getUserActivity(limit = 50) {
+  return apiFetch(`/user/activity?limit=${limit}`);
+}
+
 export async function getMe() {
   const data = await apiFetch<{ user: User }>("/auth/me");
   if (data.success && data.user) {

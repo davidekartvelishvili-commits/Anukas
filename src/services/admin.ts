@@ -197,10 +197,11 @@ export function isAdminAuthenticated(): boolean {
 }
 
 // Finance
-export async function getFinanceData(from?: string, to?: string, page = 1) {
+export async function getFinanceData(from?: string, to?: string, page = 1, q?: string) {
   const params = new URLSearchParams({ page: String(page) });
   if (from) params.set("from", from);
   if (to) params.set("to", to);
+  if (q) params.set("q", q);
   return adminFetch(`/admin/finance?${params}`);
 }
 export async function getPoolFundingHistory() {

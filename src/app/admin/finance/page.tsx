@@ -121,6 +121,8 @@ export default function FinancePage() {
 
   const [from, setFrom] = useState(startOfMonth());
   const [to, setTo] = useState(today());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -136,11 +138,11 @@ export default function FinancePage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const d = await getFinanceData(from, to, page) as any;
+      const d = await getFinanceData(from, to, page, searchQuery) as any;
       if (d.success) setData(d);
     } catch (e) { console.error(e); }
     setLoading(false);
-  }, [from, to, page]);
+  }, [from, to, page, searchQuery]);
 
   const loadPoolHistory = useCallback(async () => {
     try {
@@ -187,9 +189,9 @@ export default function FinancePage() {
   const exportCSV = () => {
     if (!data?.transactions) return;
     const rows = [
-      ["მერჩანტი", "მომხმარებელი", "თანხა", "საკომისიო", "საკომისიო %", "მოგება", "სტატუსი", "თარიღი"],
+      ["TX ID", "მერჩანტი", "მომხმარებელი", "თანხა", "საკომისიო", "საკომისიო %", "მოგება", "სტატუსი", "თარიღი"],
       ...data.transactions.map((t: any) => [
-        t.merchantName, t.userPhone || t.userName,
+        t.id, t.merchantName, t.userPhone || t.userName,
         fmt(t.amount), fmt(t.commissionAmount), fmt(t.commissionPercent),
         fmt(t.userWinnings), t.commissionStatus, t.createdAt,
       ]),
@@ -246,7 +248,7 @@ export default function FinancePage() {
 
         <div className="p-4 lg:p-6 space-y-5">
 
-          {/* DATE FILTERS */}
+          {/* DATE FILTERS + SEARCH */}
           <div className="rounded-2xl p-4 border" style={{ background: "#111111", borderColor: "#252525" }}>
             <div className="flex flex-wrap items-center gap-2 mb-3">
               {[
@@ -269,6 +271,23 @@ export default function FinancePage() {
                 <span className="text-[11px]" style={{ color: "#666" }}>მდე:</span>
                 <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} className="rounded-lg px-2 py-1.5 text-[12px] outline-none" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
               </div>
+              <form
+                onSubmit={(e) => { e.preventDefault(); setPage(1); setSearchQuery(searchInput.trim()); }}
+                className="flex items-center gap-2 flex-1 min-w-[200px]"
+              >
+                <input
+                  type="text"
+                  placeholder="ძებნა: ტელ., სახელი, transaction ID"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="flex-1 rounded-lg px-3 py-1.5 text-[12px] outline-none"
+                  style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }}
+                />
+                <button type="submit" className="px-3 py-1.5 rounded-lg text-[12px] font-medium" style={{ background: "#F9E741", color: "#000" }}>ძებნა</button>
+                {searchQuery && (
+                  <button type="button" onClick={() => { setSearchInput(""); setSearchQuery(""); setPage(1); }} className="px-3 py-1.5 rounded-lg text-[12px]" style={{ background: "#1A1A1A", color: "#A0A0A0", border: "1px solid #252525" }}>×</button>
+                )}
+              </form>
             </div>
           </div>
 
@@ -339,7 +358,7 @@ export default function FinancePage() {
                       <table className="w-full text-left text-[12px]">
                         <thead>
                           <tr style={{ borderBottom: "1px solid #252525" }}>
-                            {["მერჩანტი", "მომხმარებელი", "თანხა ₾", "საკომისიო ₾", "საკ. %", "მოგება ₾", "სტატუსი", "თარიღი", ""].map((h) => (
+                            {["TX ID", "მერჩანტი", "მომხმარებელი", "თანხა ₾", "საკომისიო ₾", "საკ. %", "მოგება ₾", "სტატუსი", "თარიღი", ""].map((h) => (
                               <th key={h} className="px-3 py-2.5 font-medium" style={{ color: "#666" }}>{h}</th>
                             ))}
                           </tr>
@@ -352,6 +371,9 @@ export default function FinancePage() {
                             return (
                               <>
                                 <tr key={tx.id} style={{ borderBottom: "1px solid #1A1A1A" }} className="hover:bg-white/[0.02]">
+                                  <td className="px-3 py-2.5 font-mono text-[10px]" style={{ color: "#666" }} title={tx.id}>
+                                    <button onClick={() => { navigator.clipboard?.writeText(tx.id); }} className="hover:text-yellow-300">{tx.id.slice(0, 8)}…</button>
+                                  </td>
                                   <td className="px-3 py-2.5" style={{ color: "#FFF" }}>{tx.merchantName}</td>
                                   <td className="px-3 py-2.5" style={{ color: "#A0A0A0" }}>{tx.userPhone || tx.userName || "—"}</td>
                                   <td className="px-3 py-2.5 font-medium" style={{ color: "#FFF" }}>{fmt(tx.amount)}</td>
@@ -368,7 +390,8 @@ export default function FinancePage() {
                                 </tr>
                                 {expanded && ud && (
                                   <tr key={`${tx.id}-detail`} style={{ background: "#0A0A0A" }}>
-                                    <td colSpan={9} className="px-3 py-3">
+                                    <td colSpan={10} className="px-3 py-3">
+                                      <p className="text-[10px] mb-2 font-mono" style={{ color: "#666" }}>Transaction ID: <span style={{ color: "#F9E741" }}>{tx.id}</span></p>
                                       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-[11px]">
                                         <div><span style={{ color: "#666" }}>ჯამური ხარჯი:</span> <b style={{ color: "#FFF" }}>{fmt(ud.totalSpend)}₾</b></div>
                                         <div><span style={{ color: "#666" }}>ჯამური მოგება:</span> <b style={{ color: "#22C55E" }}>{fmt(ud.totalWon)}₾</b></div>

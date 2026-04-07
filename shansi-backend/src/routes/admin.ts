@@ -1046,13 +1046,30 @@ admin.get("/finance", adminMiddleware, async (c) => {
 
   const from = c.req.query("from"); // YYYY-MM-DD
   const to = c.req.query("to");
+  const search = (c.req.query("q") || "").trim();
   const page = parseInt(c.req.query("page") || "1");
   const limit = parseInt(c.req.query("limit") || "20");
   const offset = (page - 1) * limit;
 
+  // If search looks like a transaction ID (no spaces, length > 6), look up first
+  let searchUserIds: string[] = [];
+  if (search) {
+    const matchedUsers = await db.select({ id: users.id }).from(users)
+      .where(or(like(users.phone, `%${search}%`), like(users.name, `%${search}%`)));
+    searchUserIds = matchedUsers.map(u => u.id);
+  }
+
   const dateConds: any[] = [];
   if (from) dateConds.push(sql`${paymentTransactions.createdAt} >= ${from}`);
   if (to) dateConds.push(sql`${paymentTransactions.createdAt} <= ${to + "T23:59:59"}`);
+  if (search) {
+    // Either matches a transaction ID directly OR belongs to a matched user
+    const searchConds: any[] = [eq(paymentTransactions.id, search)];
+    if (searchUserIds.length > 0) {
+      searchConds.push(sql`${paymentTransactions.userId} IN (${sql.join(searchUserIds.map(id => sql`${id}`), sql`, `)})`);
+    }
+    dateConds.push(or(...searchConds));
+  }
   const dateWhere = dateConds.length > 0 ? and(...dateConds) : undefined;
 
   // Pool current state (real-time, not date-filtered)
@@ -1194,7 +1211,6 @@ const fundPoolSchema = z.object({
   note: z.string().optional(),
 });
 admin.post("/finance/fund-pool", adminMiddleware, async (c) => {
-  await ensureFinanceTables();
   const body = await c.req.json();
   const parsed = fundPoolSchema.safeParse(body);
   if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
@@ -1203,45 +1219,48 @@ admin.post("/finance/fund-pool", adminMiddleware, async (c) => {
   const db = getDb();
   const { amount, note } = parsed.data;
 
-  // Get current pool
+  // CRITICAL: Update pool first — must always succeed
   const [poolRow] = await db.select().from(pool).limit(1);
   if (!poolRow) throw new BadRequestError("Pool not initialized");
 
-  // Update pool
   await db.update(pool).set({
-    balance: sql`ROUND(${pool.balance} + ${amount}, 2)`,
-    totalFunded: sql`ROUND(${pool.totalFunded} + ${amount}, 2)`,
+    balance: poolRow.balance + amount,
+    totalFunded: poolRow.totalFunded + amount,
     updatedAt: new Date().toISOString(),
-  } as any).where(eq(pool.id, poolRow.id));
+  }).where(eq(pool.id, poolRow.id));
 
-  // Mark oldest pending commissions as in_pool, up to amount
-  const pendingTxs = await db.select().from(paymentTransactions)
-    .where(eq(paymentTransactions.commissionStatus, "pending"))
-    .orderBy(paymentTransactions.createdAt);
-  let remaining = amount;
-  const consumed: string[] = [];
-  for (const tx of pendingTxs) {
-    if (remaining <= 0) break;
-    if (tx.commissionAmount <= remaining + 0.001) {
-      consumed.push(tx.id);
-      remaining -= tx.commissionAmount;
+  await logAction(adminId, "pool_fund", `Added ${amount}₾ to pool${note ? ` — ${note}` : ""}`);
+
+  // Optional: clear pending commissions and log funding (non-critical)
+  let clearedCommissions = 0;
+  try {
+    await ensureFinanceTables();
+
+    // Mark oldest pending commissions as in_pool, up to amount
+    const pendingTxs = await db.select().from(paymentTransactions)
+      .where(eq(paymentTransactions.commissionStatus, "pending"))
+      .orderBy(paymentTransactions.createdAt);
+    let remaining = amount;
+    for (const tx of pendingTxs) {
+      if (remaining <= 0) break;
+      if (tx.commissionAmount <= remaining + 0.001) {
+        await db.update(paymentTransactions).set({ commissionStatus: "in_pool" } as any).where(eq(paymentTransactions.id, tx.id));
+        remaining -= tx.commissionAmount;
+        clearedCommissions++;
+      }
     }
-  }
-  if (consumed.length > 0) {
-    for (const id of consumed) {
-      await db.update(paymentTransactions).set({ commissionStatus: "in_pool" } as any).where(eq(paymentTransactions.id, id));
-    }
-  }
 
-  // Log funding
-  await db.insert(poolFundings).values({
-    id: nanoid(), amount, adminId, note: note || null,
-  });
-
-  await logAction(adminId, "fund_pool", `Added ${amount}₾ to pool. Cleared ${consumed.length} pending commissions.`);
+    // Log funding
+    await db.insert(poolFundings).values({
+      id: nanoid(), amount, adminId, note: note || null,
+    });
+  } catch (err: any) {
+    console.error("[fund-pool] non-critical error:", err.message);
+    // Pool was already funded; just log the failure
+  }
 
   const [updatedPool] = await db.select().from(pool).limit(1);
-  return c.json({ success: true, newBalance: updatedPool?.balance, clearedCommissions: consumed.length });
+  return c.json({ success: true, newBalance: updatedPool?.balance, clearedCommissions });
 });
 
 // GET /admin/finance/user/:userId — user financial breakdown

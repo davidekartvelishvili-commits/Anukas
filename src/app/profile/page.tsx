@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getMe, getStoredUser } from "@/services/auth";
+import { getMe, getStoredUser, getUserActivity } from "@/services/auth";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -26,6 +26,8 @@ export default function ProfilePage() {
   const [cashBalance, setCashBalanceState] = useState(0);
   const [coinBalance, setCoinBalanceState] = useState(0);
   const [userPhone, setUserPhone] = useState("");
+  const [activities, setActivities] = useState<any[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
 
   useEffect(() => {
     // Load cached data first for instant render
@@ -48,6 +50,13 @@ export default function ProfilePage() {
         if (u.referralCode) setReferralCode(u.referralCode);
       }
     }).catch(() => {});
+    // Load activity feed
+    setActivityLoading(true);
+    getUserActivity(50).then((data: any) => {
+      if (data.success && Array.isArray(data.activities)) {
+        setActivities(data.activities);
+      }
+    }).catch(() => {}).finally(() => setActivityLoading(false));
     const saved = localStorage.getItem("user-gender");
     if (saved) setGender(saved);
     const t = setTimeout(() => setMounted(true), 50);
@@ -375,45 +384,63 @@ export default function ProfilePage() {
 
             <div className="h-[0.5px] mb-2" style={{ background: "rgba(255,255,255,0.08)" }} />
 
-            {[
-              { text: "You dropped it like it's hot on Lucky Drop 🎯 1 times in practice! 🎯 Scored 89 Practice Coins in 24 hours", time: "11h" },
-              { text: "You got lucky on Midnight Machine 🎰 7 times in practice! 🎯 Scored 4125 Practice Coins in 24 hours", time: "11h" },
-              { text: "You crushed MYSTERY_BOX 1 times! Won ₾25.00 in 24 hours 🔥", time: "19h" },
-              { text: "Welcome! Cashback helps you pay bills by playing fun games for cash.", time: "19h" },
-            ].map((item, i, arr) => (
-              <div key={i}>
-                <div className="flex items-start gap-4 py-5">
-                  {/* ₾ icon */}
-                  <div
-                    className="w-[52px] h-[52px] rounded-[14px] flex items-center justify-center shrink-0"
-                    style={{ background: "#FFD700" }}
-                  >
-                    <span className="text-black text-[26px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>₾</span>
-                  </div>
+            {(() => {
+              const filtered = activities.filter((a: any) => {
+                if (activeFilter === "All Activity") return true;
+                if (activeFilter === "Rewards") return a.type === "game_win" || a.type === "referral" || a.type === "promo";
+                if (activeFilter === "Redemptions") return a.type === "withdrawal" || a.type === "payment";
+                return true;
+              });
 
-                  {/* Text */}
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className="text-white text-[15px] font-medium leading-[1.5]"
-                      style={{ fontFamily: "var(--font-dm-sans)" }}
+              if (activityLoading) {
+                return <div className="py-8 flex justify-center"><div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#FFD700", borderTopColor: "transparent" }} /></div>;
+              }
+              if (filtered.length === 0) {
+                return <p className="py-8 text-center text-[14px]" style={{ color: "#666" }}>აქტივობა არ არის</p>;
+              }
+
+              const timeAgo = (date: string) => {
+                const diff = Date.now() - new Date(date).getTime();
+                const h = Math.floor(diff / 3600000);
+                const d = Math.floor(h / 24);
+                if (d > 0) return `${d}d`;
+                if (h > 0) return `${h}h`;
+                const m = Math.floor(diff / 60000);
+                return `${m}m`;
+              };
+
+              return filtered.map((a: any, i: number) => (
+                <div key={a.id || i}>
+                  <div className="flex items-start gap-4 py-5">
+                    <div
+                      className="w-[52px] h-[52px] rounded-[14px] flex items-center justify-center shrink-0"
+                      style={{ background: a.color || "#FFD700" }}
                     >
-                      {item.text}
-                    </p>
+                      <span className="text-black text-[22px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
+                        {a.type === "payment" ? "💳" : a.type === "game_win" ? "🏆" : a.type === "game_loss" ? "🎰" : a.type === "withdrawal" ? "↑" : a.type === "referral" ? "👥" : a.type === "promo" ? "🎁" : "₾"}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-[15px] font-semibold leading-[1.4]" style={{ fontFamily: "var(--font-dm-sans)" }}>
+                        {a.title}
+                      </p>
+                      <p className="text-[#999] text-[13px] leading-[1.4] mt-0.5" style={{ fontFamily: "var(--font-dm-sans)" }}>
+                        {a.description}
+                      </p>
+                      {a.transactionId && (
+                        <p className="text-[10px] mt-1 font-mono" style={{ color: "#555" }}>
+                          ID: {a.transactionId.slice(0, 16)}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-[13px] text-[#666] shrink-0 mt-0.5" style={{ fontFamily: "var(--font-dm-sans)" }}>
+                      {timeAgo(a.createdAt)}
+                    </span>
                   </div>
-
-                  {/* Time */}
-                  <span
-                    className="text-[14px] text-[#666] shrink-0 mt-0.5"
-                    style={{ fontFamily: "var(--font-dm-sans)" }}
-                  >
-                    {item.time}
-                  </span>
+                  {i < filtered.length - 1 && <div className="h-[0.5px]" style={{ background: "rgba(255,255,255,0.08)" }} />}
                 </div>
-                {i < arr.length - 1 && (
-                  <div className="h-[0.5px]" style={{ background: "rgba(255,255,255,0.08)" }} />
-                )}
-              </div>
-            ))}
+              ));
+            })()}
           </div>
         </div>
       </main>

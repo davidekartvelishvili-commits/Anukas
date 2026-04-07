@@ -298,36 +298,45 @@ user.get("/activity", async (c) => {
   const db = getDb();
   const limit = parseInt(c.req.query("limit") || "50");
 
-  const activities: { type: string; title: string; description: string; amount?: number; coins?: number; color: string; createdAt: string }[] = [];
+  const activities: { id: string; type: string; title: string; description: string; amount?: number; coins?: number; color: string; createdAt: string; transactionId?: string }[] = [];
 
-  // 1. Merchant payments
+  // 1. Merchant payments — INCLUDE transaction ID
   const payments = await db.select().from(paymentTransactions).where(eq(paymentTransactions.userId, userId)).orderBy(desc(paymentTransactions.createdAt)).limit(limit);
   for (const p of payments) {
     const [m] = await db.select({ businessName: merchants.businessName }).from(merchants).where(eq(merchants.id, p.merchantId)).limit(1);
     activities.push({
-      type: "payment", title: "\u10D2\u10D0\u10D3\u10D0\u10EE\u10D3\u10D0", description: `${m?.businessName || "\u10DB\u10D4\u10E0\u10E9\u10D0\u10DC\u10E2\u10D8"} \u2014 ${p.amount.toFixed(2)}\u20BE`,
+      id: p.id,
+      type: "payment",
+      title: "გადახდა",
+      description: `${m?.businessName || "მერჩანტი"} — ${p.amount.toFixed(2)}₾`,
       amount: p.amount, coins: p.coinsAwarded, color: "#3B82F6", createdAt: p.createdAt,
+      transactionId: p.id,
     });
   }
 
-  // 2. Game plays
+  // 2. Game plays — wins and losses
   const games = await db.select().from(gameHistory).where(eq(gameHistory.userId, userId)).orderBy(desc(gameHistory.createdAt)).limit(limit);
   const gameLabels: Record<string, string> = { slot: "Midnight Machine", plinko: "Lucky Drop", chicken_rush: "Lucky Step" };
   for (const g of games) {
     const won = g.winAmount > 0;
     activities.push({
-      type: won ? "game_win" : "game_loss", title: won ? "\u10DB\u10DD\u10D2\u10D4\u10D1\u10D0" : "\u10D7\u10D0\u10DB\u10D0\u10E8\u10D8",
-      description: `${gameLabels[g.gameType] || g.gameType}${won ? ` \u2014 +${g.winAmount.toFixed(2)}\u20BE` : ""}`,
-      amount: won ? g.winAmount : undefined, color: won ? "#22C55E" : "#EF4444", createdAt: g.createdAt,
+      id: g.id,
+      type: won ? "game_win" : "game_loss",
+      title: won ? "მოგება" : "თამაში",
+      description: `${gameLabels[g.gameType] || g.gameType}${won ? ` — +${g.winAmount.toFixed(2)}₾` : ""}`,
+      amount: won ? g.winAmount : undefined,
+      color: won ? "#22C55E" : "#EF4444",
+      createdAt: g.createdAt,
     });
   }
 
   // 3. Withdrawals
   const wds = await db.select().from(withdrawals).where(eq(withdrawals.userId, userId)).orderBy(desc(withdrawals.createdAt)).limit(limit);
-  const statusLabels: Record<string, string> = { pending: "\u10DB\u10DD\u10DA\u10DD\u10D3\u10D8\u10DC\u10E8\u10D8", approved: "\u10D3\u10D0\u10DB\u10E2\u10D9\u10D8\u10EA\u10D4\u10D1\u10E3\u10DA\u10D8", completed: "\u10D3\u10D0\u10E1\u10E0\u10E3\u10DA\u10D4\u10D1\u10E3\u10DA\u10D8", rejected: "\u10E3\u10D0\u10E0\u10E7\u10DD\u10E4\u10D8\u10DA\u10D8" };
+  const statusLabels: Record<string, string> = { pending: "მოლოდინში", approved: "დამტკიცებული", completed: "დასრულებული", rejected: "უარყოფილი" };
   for (const w of wds) {
     activities.push({
-      type: "withdrawal", title: "\u10D2\u10D0\u10DB\u10DD\u10E2\u10D0\u10DC\u10D0", description: `${w.amount.toFixed(2)}\u20BE \u2014 ${statusLabels[w.status] || w.status}`,
+      id: w.id, type: "withdrawal", title: "გამოტანა",
+      description: `${w.amount.toFixed(2)}₾ — ${statusLabels[w.status] || w.status}`,
       amount: w.amount, color: w.status === "completed" ? "#22C55E" : w.status === "rejected" ? "#EF4444" : "#F59E0B", createdAt: w.createdAt,
     });
   }
@@ -336,7 +345,8 @@ user.get("/activity", async (c) => {
   const refs = await db.select().from(referrals).where(eq(referrals.referrerId, userId)).orderBy(desc(referrals.createdAt)).limit(limit);
   for (const r of refs) {
     activities.push({
-      type: "referral", title: "\u10E0\u10D4\u10E4\u10D4\u10E0\u10D0\u10DA\u10D8", description: `\u10DB\u10D4\u10D2\u10DD\u10D1\u10D0\u10E0\u10D8 \u10E8\u10D4\u10DB\u10DD\u10E3\u10D4\u10E0\u10D7\u10D3\u10D0 \u2014 +${r.referrerCoinsRewarded} \u10E5\u10DD\u10D8\u10DC\u10D8`,
+      id: r.id, type: "referral", title: "რეფერალი",
+      description: `მეგობარი შემოუერთდა — +${r.referrerCoinsRewarded} ქოინი`,
       coins: r.referrerCoinsRewarded, color: "#A855F7", createdAt: r.createdAt,
     });
   }
@@ -346,7 +356,8 @@ user.get("/activity", async (c) => {
   for (const p of promos) {
     const [code] = await db.select({ code: promoCodes.code }).from(promoCodes).where(eq(promoCodes.id, p.promoCodeId)).limit(1);
     activities.push({
-      type: "promo", title: "\u10DE\u10E0\u10DD\u10DB\u10DD \u10D9\u10DD\u10D3\u10D8", description: `${code?.code || "CODE"} \u2014 +${p.coinsRewarded} \u10E5\u10DD\u10D8\u10DC\u10D8`,
+      id: p.id, type: "promo", title: "პრომო კოდი",
+      description: `${code?.code || "CODE"} — +${p.coinsRewarded} ქოინი`,
       coins: p.coinsRewarded, color: "#F59E0B", createdAt: p.usedAt,
     });
   }
