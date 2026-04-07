@@ -1596,6 +1596,9 @@ const simulateSchema = z.object({
   userCount: z.number().int().min(10).max(10000),
   scenario: z.enum(["low", "medium", "high", "mixed"]),
   gameTypes: z.array(z.string()).min(1).optional(),
+  villageEnabled: z.boolean().optional(),
+  levelDistribution: z.enum(["equal", "realistic", "specific"]).optional(),
+  specificLevel: z.number().int().min(1).optional(),
 });
 
 // Auto-create simulation_runs table if it doesn't exist
@@ -1646,7 +1649,12 @@ admin.post("/algorithm/simulate", adminMiddleware, async (c) => {
   });
 
   // Run simulation in background — uses REAL calculateWin from gameEngine
-  runSimulation(jobId, parsed.data.userCount, parsed.data.scenario, parsed.data.gameTypes || ["plinko"]).catch(async (err) => {
+  const villageOpts = {
+    enabled: parsed.data.villageEnabled || false,
+    distribution: parsed.data.levelDistribution || "equal" as const,
+    specificLevel: parsed.data.specificLevel,
+  };
+  runSimulation(jobId, parsed.data.userCount, parsed.data.scenario, parsed.data.gameTypes || ["plinko"], villageOpts).catch(async (err) => {
     await db.update(simulationRuns).set({
       status: "error",
       results: JSON.stringify({ error: err.message }),

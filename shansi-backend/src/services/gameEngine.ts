@@ -227,17 +227,38 @@ async function _playGameInner(
     const wonSoFarTetri = toTetri(activeTx.totalCashWon);
     const thisWinTetri = toTetri(totalWin);
     const totalAfterThisGame = wonSoFarTetri + thisWinTetri;
+    // VILLAGE LEVEL CAP — session total can never exceed user level max win
+    const levelCapTetri = toTetri(userMaxWin);
 
     if (totalAfterThisGame < guaranteedTetri) {
-      // Shortfall exists — force this game's win to cover it
-      const shortfallTetri = guaranteedTetri - wonSoFarTetri;
+      // Shortfall exists — force this game's win to cover it BUT respect level cap
+      const targetTetri = Math.min(guaranteedTetri, levelCapTetri);
+      const shortfallTetri = Math.max(0, targetTetri - wonSoFarTetri);
       const shortfallLari = toLari(shortfallTetri);
 
-      console.log(`[GUARANTEE] Last game! Won so far: ${toLari(wonSoFarTetri)}₾, guaranteed: ${activeTx.guaranteedMinimum}₾, shortfall: ${shortfallLari}₾ — forcing win to cover.`);
+      console.log(`[GUARANTEE] Last game! Won=${toLari(wonSoFarTetri)}₾ guaranteed=${activeTx.guaranteedMinimum}₾ levelCap=${userMaxWin}₾ → topup=${shortfallLari}₾`);
 
-      // Override the win to exactly cover the shortfall
       totalWin = shortfallLari;
       bonusWin = shortfallLari;
+      minWin = 0;
+    } else {
+      // Already met guarantee — but make sure this game's win doesn't push past level cap
+      const remainingRoom = Math.max(0, levelCapTetri - wonSoFarTetri);
+      if (thisWinTetri > remainingRoom) {
+        totalWin = toLari(remainingRoom);
+        bonusWin = totalWin;
+        minWin = 0;
+      }
+    }
+  } else {
+    // Non-last game: also enforce level cap on cumulative session
+    const levelCapTetri = toTetri(userMaxWin);
+    const wonSoFarTetri = toTetri(activeTx.totalCashWon);
+    const thisWinTetri = toTetri(totalWin);
+    if (wonSoFarTetri + thisWinTetri > levelCapTetri) {
+      const remainingRoom = Math.max(0, levelCapTetri - wonSoFarTetri);
+      totalWin = toLari(remainingRoom);
+      bonusWin = totalWin;
       minWin = 0;
     }
   }
@@ -356,22 +377,34 @@ async function _ensureGuarantee(db: ReturnType<typeof getDb>, txId: string, user
   const [tx] = await db.select().from(transactions).where(eq(transactions.id, txId)).limit(1);
   if (!tx) return;
 
+  // VILLAGE LEVEL CAP — read user's level max win (absolute ceiling)
+  let levelCap = Number.MAX_SAFE_INTEGER;
+  try {
+    const [profile] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);
+    if (profile) {
+      const [lvl] = await db.select().from(villageLevels).where(eq(villageLevels.levelNumber, profile.currentLevel)).limit(1);
+      if (lvl) levelCap = lvl.maxWinAmount;
+    }
+  } catch {}
+
   const guaranteedTetri = toTetri(tx.guaranteedMinimum);
   const wonTetri = toTetri(tx.totalCashWon);
+  const levelCapTetri = toTetri(levelCap);
 
-  if (guaranteedTetri > 0 && wonTetri < guaranteedTetri) {
-    const shortfallTetri = guaranteedTetri - wonTetri;
+  // Target = min(guarantee, level cap) — never exceed level cap
+  const targetTetri = Math.min(guaranteedTetri, levelCapTetri);
+
+  if (targetTetri > 0 && wonTetri < targetTetri) {
+    const shortfallTetri = targetTetri - wonTetri;
     const shortfallLari = toLari(shortfallTetri);
 
-    console.log(`[GUARANTEE SAFETY NET] userId=${userId} txId=${txId} won=${toLari(wonTetri)}₾ guaranteed=${tx.guaranteedMinimum}₾ shortfall=${shortfallLari}₾ — auto-awarding.`);
+    console.log(`[GUARANTEE SAFETY NET] userId=${userId} won=${toLari(wonTetri)}₾ guaranteed=${tx.guaranteedMinimum}₾ levelCap=${levelCap}₾ → topup=${shortfallLari}₾`);
 
-    // Credit shortfall to user's cash balance
     await db.update(users).set({
       balance: sql`ROUND(${users.balance} + ${shortfallLari}, 2)`,
       updatedAt: new Date().toISOString(),
     } as any).where(eq(users.id, userId));
 
-    // Update transaction totalCashWon to include the top-up
     await db.update(transactions).set({
       status: "completed",
       guaranteeMet: true,
@@ -379,7 +412,7 @@ async function _ensureGuarantee(db: ReturnType<typeof getDb>, txId: string, user
       completedAt: new Date().toISOString(),
     } as any).where(eq(transactions.id, txId));
   } else {
-    // Guarantee already met — just complete
+    // Already at or above target (could be capped) — just complete
     await db.update(transactions).set({
       status: "completed",
       guaranteeMet: true,

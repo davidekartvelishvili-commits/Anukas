@@ -239,6 +239,9 @@ export async function startSimulation(params: {
   userCount: number;
   scenario: string;
   gameTypes?: string[];
+  villageEnabled?: boolean;
+  levelDistribution?: "equal" | "realistic" | "specific";
+  specificLevel?: number;
 }) {
   return adminFetch("/admin/algorithm/simulate", {
     method: "POST",

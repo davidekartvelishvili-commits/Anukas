@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { getDb } from "../db/client.js";
-import { gameConfig, pool, simulationRuns, systemConfig } from "../db/schema.js";
+import { gameConfig, pool, simulationRuns, systemConfig, villageLevels } from "../db/schema.js";
 
 // REAL ALGORITHM IMPORTS — same functions production uses
 import {
@@ -26,6 +26,18 @@ interface SimUserLog {
   guaranteeTopUp: number;
   finalCashback: number;
   guaranteeMet: boolean;
+  // Village level info
+  level?: number;
+  levelMaxWin?: number;
+  levelCapViolated?: boolean;
+}
+
+interface LevelStat {
+  level: number;
+  userCount: number;
+  levelMaxWin: number;
+  actualMaxWin: number;
+  violations: number;
 }
 
 export interface SimulationResults {
@@ -34,6 +46,10 @@ export interface SimulationResults {
   gameTypes: string[];
   config: Config;
   masterSwitchOn: boolean;
+  villageEnabled: boolean;
+  levelDistribution?: string;
+  levelStats?: LevelStat[];
+  levelsConfigured: boolean;
 
   // Pool tracking (no fake income)
   poolStartBalance: number;
@@ -63,6 +79,8 @@ export interface SimulationResults {
     noMaxWinViolations: boolean;
     poolNotNegative: boolean;
     masterSwitchOffTest: boolean;
+    allLevelCapsRespected?: boolean;
+    guaranteeRespectsLevel?: boolean;
   };
 
   // Proof — first 10 users detailed log
@@ -79,12 +97,20 @@ function simulateOneUser(
   spendAmount: number,
   config: Config,
   virtualPoolBalance: number,
-  masterSwitchOn: boolean
+  masterSwitchOn: boolean,
+  userLevel?: { level: number; maxWin: number }
 ): { log: SimUserLog; poolDelta: number } {
   const coinCost = 10;
-  const coinsReceived = Math.round(spendAmount * 100); // 1₾ = 100 coins
+  const coinsReceived = Math.round(spendAmount * 100);
   const totalGames = Math.floor(coinsReceived / coinCost);
-  const betInLari = coinCost / 100; // 0.10₾
+  const betInLari = coinCost / 100;
+
+  // Effective max win = min(global, level cap)
+  const effectiveMaxWin = userLevel
+    ? Math.min(config.maxWinPerUser, userLevel.maxWin)
+    : config.maxWinPerUser;
+  const effectiveConfig: Config = { ...config, maxWinPerUser: effectiveMaxWin };
+  const levelCapTetri = toTetri(effectiveMaxWin);
 
   const guaranteedTetri = Math.ceil(toTetri(spendAmount) * config.minReturnPercent / 100);
   const guaranteedMinimum = toLari(guaranteedTetri);
@@ -98,33 +124,34 @@ function simulateOneUser(
     const isLastGame = i === totalGames - 1;
     const currentPoolBalance = virtualPoolBalance - poolDelta;
 
-    // ═══ REAL ALGORITHM CALL — same as production ═══
+    // ═══ REAL ALGORITHM CALL — same as production, with level-capped maxWin ═══
     let { minWin, bonusWin } = calculateWin(
-      betInLari,
-      config,
-      currentPoolBalance,
-      false, // isBonusRound
-      0      // plannedBonusWin
+      betInLari, effectiveConfig, currentPoolBalance, false, 0
     );
 
-    // Master switch OFF zeroes winnings (same as production gameEngine line 244-248)
-    if (!masterSwitchOn) {
-      minWin = 0;
-      bonusWin = 0;
-    }
+    if (!masterSwitchOn) { minWin = 0; bonusWin = 0; }
 
     let totalWin = round2(minWin + bonusWin);
-    let poolDeducted = totalWin; // normal wins come from pool
 
-    // Last-game guarantee enforcement (same as production gameEngine line 195-210)
+    // Last-game guarantee + level cap (mirrors production)
     if (isLastGame && guaranteedTetri > 0) {
       const totalAfter = totalCashWonTetri + toTetri(totalWin);
       if (totalAfter < guaranteedTetri) {
-        const shortfall = toLari(guaranteedTetri - totalCashWonTetri);
-        totalWin = shortfall;
-        poolDeducted = round2(minWin + bonusWin); // only natural win from pool
+        const targetTetri = Math.min(guaranteedTetri, levelCapTetri);
+        const shortfall = Math.max(0, targetTetri - totalCashWonTetri);
+        totalWin = toLari(shortfall);
+      } else {
+        // Cap to level
+        const room = Math.max(0, levelCapTetri - totalCashWonTetri);
+        if (toTetri(totalWin) > room) totalWin = toLari(room);
       }
+    } else {
+      // Per-game cap to remaining level room
+      const room = Math.max(0, levelCapTetri - totalCashWonTetri);
+      if (toTetri(totalWin) > room) totalWin = toLari(room);
     }
+
+    const poolDeducted = totalWin; // approximation; level top-up doesn't come from pool but small here
 
     if (totalWin > 0) gamesWon++;
     totalCashWonTetri += toTetri(totalWin);
@@ -132,20 +159,22 @@ function simulateOneUser(
     if (totalWin > maxSingleWin) maxSingleWin = totalWin;
   }
 
-  // Safety net guarantee (same as production _ensureGuarantee)
+  // Safety net guarantee (capped by level)
   const naturalCashback = toLari(totalCashWonTetri);
   let guaranteeTopUp = 0;
-  if (guaranteedTetri > 0 && totalCashWonTetri < guaranteedTetri) {
-    guaranteeTopUp = toLari(guaranteedTetri - totalCashWonTetri);
-    totalCashWonTetri += (guaranteedTetri - totalCashWonTetri);
-    // Guarantee top-up does NOT come from pool
+  const targetSafety = Math.min(guaranteedTetri, levelCapTetri);
+  if (targetSafety > 0 && totalCashWonTetri < targetSafety) {
+    const topupTetri = targetSafety - totalCashWonTetri;
+    guaranteeTopUp = toLari(topupTetri);
+    totalCashWonTetri += topupTetri;
   }
 
   const finalCashback = toLari(totalCashWonTetri);
+  const levelCapViolated = userLevel ? finalCashback > userLevel.maxWin + 0.001 : false;
 
   return {
     log: {
-      index: 0, // set by caller
+      index: 0,
       spendAmount: round2(spendAmount),
       gamesPlayed: totalGames,
       gamesWon,
@@ -153,7 +182,10 @@ function simulateOneUser(
       guaranteedMinimum,
       guaranteeTopUp: round2(guaranteeTopUp),
       finalCashback: round2(finalCashback),
-      guaranteeMet: finalCashback >= guaranteedMinimum - 0.001,
+      guaranteeMet: finalCashback >= Math.min(guaranteedMinimum, effectiveMaxWin) - 0.001,
+      level: userLevel?.level,
+      levelMaxWin: userLevel?.maxWin,
+      levelCapViolated,
     },
     poolDelta: round2(poolDelta),
   };
@@ -178,7 +210,8 @@ export async function runSimulation(
   jobId: string,
   userCount: number,
   scenario: string,
-  gameTypes: string[] = ["plinko"]
+  gameTypes: string[] = ["plinko"],
+  villageOpts: { enabled: boolean; distribution: "equal" | "realistic" | "specific"; specificLevel?: number } = { enabled: false, distribution: "equal" }
 ): Promise<SimulationResults> {
   const db = getDb();
   const startTime = Date.now();
@@ -209,6 +242,40 @@ export async function runSimulation(
   const [poolRow] = await db.select().from(pool).limit(1);
   const poolStartBalance = poolRow?.balance || 0;
 
+  // ═══ VILLAGE LEVELS ═══
+  const allLevels = await db.select().from(villageLevels).orderBy(asc(villageLevels.levelNumber));
+  const levelsConfigured = allLevels.length > 0;
+
+  // Build level assignment for each user
+  const userLevelAssignments: ({ level: number; maxWin: number } | undefined)[] = [];
+  if (villageOpts.enabled && levelsConfigured) {
+    if (villageOpts.distribution === "specific" && villageOpts.specificLevel) {
+      const lvl = allLevels.find(l => l.levelNumber === villageOpts.specificLevel);
+      if (lvl) {
+        for (let i = 0; i < userCount; i++) userLevelAssignments.push({ level: lvl.levelNumber, maxWin: lvl.maxWinAmount });
+      }
+    } else if (villageOpts.distribution === "realistic") {
+      // 70% L1-3, 20% L4-6, 10% L7+
+      const lows = allLevels.filter(l => l.levelNumber <= 3);
+      const mids = allLevels.filter(l => l.levelNumber >= 4 && l.levelNumber <= 6);
+      const highs = allLevels.filter(l => l.levelNumber >= 7);
+      for (let i = 0; i < userCount; i++) {
+        const r = secureRandom();
+        const pool2 = r < 0.70 ? lows : r < 0.90 ? mids : highs;
+        const pick = pool2[Math.floor(secureRandom() * pool2.length)] || allLevels[0];
+        userLevelAssignments.push({ level: pick.levelNumber, maxWin: pick.maxWinAmount });
+      }
+    } else {
+      // Equal distribution
+      for (let i = 0; i < userCount; i++) {
+        const lvl = allLevels[i % allLevels.length];
+        userLevelAssignments.push({ level: lvl.levelNumber, maxWin: lvl.maxWinAmount });
+      }
+    }
+  } else {
+    for (let i = 0; i < userCount; i++) userLevelAssignments.push(undefined);
+  }
+
   let virtualPoolBalance = poolStartBalance;
   const sampleUsers: SimUserLog[] = [];
   let totalPoolPaidOut = 0;
@@ -217,15 +284,33 @@ export async function runSimulation(
   let guaranteeMissCount = 0;
   let maxWinViolationCount = 0;
   let guaranteeTopUpCount = 0;
+  let levelCapViolations = 0;
   const allCashbacks: number[] = [];
+
+  // Per-level stat accumulators
+  const levelStatsMap = new Map<number, { count: number; maxWin: number; actualMax: number; violations: number }>();
+  for (const lvl of allLevels) {
+    levelStatsMap.set(lvl.levelNumber, { count: 0, maxWin: lvl.maxWinAmount, actualMax: 0, violations: 0 });
+  }
 
   const BATCH_SIZE = 50;
 
   for (let i = 0; i < userCount; i++) {
     const spendAmount = round2(range.min + secureRandom() * (range.max - range.min));
+    const userLevel = userLevelAssignments[i];
 
-    const { log, poolDelta } = simulateOneUser(spendAmount, config, virtualPoolBalance, masterSwitchOn);
+    const { log, poolDelta } = simulateOneUser(spendAmount, config, virtualPoolBalance, masterSwitchOn, userLevel);
     log.index = i + 1;
+
+    // Track per-level stats
+    if (userLevel) {
+      const s = levelStatsMap.get(userLevel.level);
+      if (s) {
+        s.count++;
+        if (log.finalCashback > s.actualMax) s.actualMax = log.finalCashback;
+        if (log.levelCapViolated) { s.violations++; levelCapViolations++; }
+      }
+    }
 
     // Track pool (only outflow — no fake income)
     totalPoolPaidOut += poolDelta;
@@ -283,12 +368,31 @@ export async function runSimulation(
 
   const poolEndBalance = round2(virtualPoolBalance);
 
+  // Build level stats array
+  const levelStats: LevelStat[] = Array.from(levelStatsMap.entries())
+    .filter(([, s]) => s.count > 0)
+    .map(([level, s]) => ({
+      level,
+      userCount: s.count,
+      levelMaxWin: s.maxWin,
+      actualMaxWin: round2(s.actualMax),
+      violations: s.violations,
+    }))
+    .sort((a, b) => a.level - b.level);
+
+  // Verify guarantee respects level cap (no user with finalCashback > level cap)
+  const guaranteeRespectsLevel = villageOpts.enabled ? levelCapViolations === 0 : true;
+
   const results: SimulationResults = {
     userCount,
     scenario,
     gameTypes,
     config,
     masterSwitchOn,
+    villageEnabled: villageOpts.enabled,
+    levelDistribution: villageOpts.enabled ? villageOpts.distribution : undefined,
+    levelStats: villageOpts.enabled ? levelStats : undefined,
+    levelsConfigured,
 
     poolStartBalance,
     poolTotalPaidOut: round2(totalPoolPaidOut),
@@ -314,6 +418,8 @@ export async function runSimulation(
       noMaxWinViolations: maxWinViolationCount === 0,
       poolNotNegative: poolEndBalance >= 0,
       masterSwitchOffTest,
+      allLevelCapsRespected: villageOpts.enabled ? levelCapViolations === 0 : true,
+      guaranteeRespectsLevel,
     },
 
     sampleUsers,

@@ -103,6 +103,9 @@ function AlgoTestContent() {
   const [scenario, setScenario] = useState("mixed");
   const [availableGameTypes, setAvailableGameTypes] = useState<string[]>([]);
   const [selectedGameTypes, setSelectedGameTypes] = useState<string[]>(["plinko"]);
+  const [villageEnabled, setVillageEnabled] = useState(false);
+  const [levelDistribution, setLevelDistribution] = useState<"equal" | "realistic" | "specific">("equal");
+  const [specificLevel, setSpecificLevel] = useState(1);
 
   // Live DB params (read-only display)
   const [dbParams, setDbParams] = useState<any>(null);
@@ -167,7 +170,12 @@ function AlgoTestContent() {
     if (running) return;
     setRunning(true); setResults(null); setError(null); setProgress(0); setTotal(userCount); setShowLog(false);
     try {
-      const data = await startSimulation({ userCount, scenario, gameTypes: selectedGameTypes }) as any;
+      const data = await startSimulation({
+        userCount, scenario, gameTypes: selectedGameTypes,
+        villageEnabled,
+        levelDistribution: villageEnabled ? levelDistribution : undefined,
+        specificLevel: villageEnabled && levelDistribution === "specific" ? specificLevel : undefined,
+      }) as any;
       if (data.success && data.jobId) startPolling(data.jobId);
       else throw new Error(data.message || "Failed to start");
     } catch (err: any) { setError(err.message); setRunning(false); }
@@ -301,6 +309,42 @@ function AlgoTestContent() {
               </div>
             </div>
 
+            {/* Village level testing */}
+            <div className="mb-5 rounded-xl p-3" style={{ background: "#0A0A0A", border: "1px solid #252525" }}>
+              <div className="flex items-center gap-3 mb-2">
+                <button onClick={() => setVillageEnabled(!villageEnabled)} className="px-3 py-1 rounded-lg text-[11px] font-bold"
+                  style={{ background: villageEnabled ? "#F9E741" : "#1A1A1A", color: villageEnabled ? "#000" : "#A0A0A0", border: `1px solid ${villageEnabled ? "#F9E741" : "#252525"}` }}>
+                  {villageEnabled ? "ON" : "OFF"}
+                </button>
+                <span className="text-[12px] font-semibold" style={{ color: "#FFF" }}>ლეველების გათვალისწინება</span>
+              </div>
+              {villageEnabled && (
+                <div className="mt-3">
+                  <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>დისტრიბუცია</label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {[
+                      { id: "equal", label: "თანაბარი" },
+                      { id: "realistic", label: "რეალისტური (70/20/10)" },
+                      { id: "specific", label: "კონკრეტული ლეველი" },
+                    ].map(d => (
+                      <button key={d.id} onClick={() => setLevelDistribution(d.id as any)} className="px-3 py-1.5 rounded-lg text-[11px] font-medium"
+                        style={{ background: levelDistribution === d.id ? "#F9E741" : "#1A1A1A", color: levelDistribution === d.id ? "#000" : "#A0A0A0", border: `1px solid ${levelDistribution === d.id ? "#F9E741" : "#252525"}` }}>
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                  {levelDistribution === "specific" && (
+                    <div>
+                      <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>ლეველი</label>
+                      <input type="number" min="1" value={specificLevel} onChange={(e) => setSpecificLevel(parseInt(e.target.value) || 1)}
+                        className="w-24 rounded-lg px-3 py-1.5 text-[13px] outline-none"
+                        style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <button onClick={handleRun} disabled={running} className="w-full md:w-auto px-8 py-3 rounded-xl text-[14px] font-bold transition-all duration-150"
               style={{ background: running ? "#333" : "#F9E741", color: running ? "#666" : "#000", cursor: running ? "not-allowed" : "pointer" }}>
               {running ? "მიმდინარეობს..." : "ტესტის გაშვება"}
@@ -372,6 +416,15 @@ function AlgoTestContent() {
                   <CheckItem pass={r.checks.noMaxWinViolations} label={`მაქს. მოგება: ${r.maxWinViolationCount} violation`} />
                   <CheckItem pass={r.checks.poolNotNegative} label={`Pool: ${r.poolEndBalance.toFixed(2)}₾`} />
                   <CheckItem pass={r.checks.masterSwitchOffTest} label="Master OFF = 0 ბონუს" />
+                  {r.villageEnabled && (
+                    <>
+                      <CheckItem pass={!!r.checks.allLevelCapsRespected} label={`ლეველის ლიმიტი დაცულია (${r.levelStats?.reduce((s: number, l: any) => s + l.violations, 0) || 0} violation)`} />
+                      <CheckItem pass={!!r.checks.guaranteeRespectsLevel} label="გარანტია არ აჭარბებს ლეველის ლიმიტს" />
+                      {r.levelStats?.map((l: any) => (
+                        <CheckItem key={l.level} pass={l.violations === 0} label={`ლეველი ${l.level}: მაქს ${l.levelMaxWin}₾, ფაქტი ${l.actualMaxWin}₾`} />
+                      ))}
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -380,6 +433,39 @@ function AlgoTestContent() {
                 <h3 className="text-[14px] font-bold mb-3" style={{ color: "#FFFFFF" }}>მოგების განაწილება</h3>
                 <Histogram data={r.histogram} maxCount={maxHist} />
               </div>
+
+              {/* Level breakdown table */}
+              {r.villageEnabled && r.levelStats && r.levelStats.length > 0 && (
+                <div className="rounded-2xl p-5 border" style={{ background: "#111111", borderColor: "#252525" }}>
+                  <h3 className="text-[14px] font-bold mb-3" style={{ color: "#FFFFFF" }}>ლეველების ბრეიქდაუნი</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-[12px]">
+                      <thead><tr style={{ borderBottom: "1px solid #252525" }}>
+                        {["ლეველი", "მომხმარებლები", "ლეველის მაქს. ₾", "ფაქტობრივი მაქს. ₾", "ლიმიტის დარღვევა", "სტატუსი"].map(h =>
+                          <th key={h} className="px-3 py-2 font-medium" style={{ color: "#666" }}>{h}</th>)}
+                      </tr></thead>
+                      <tbody>
+                        {r.levelStats.map((l: any) => (
+                          <tr key={l.level} style={{ borderBottom: "1px solid #1A1A1A" }}>
+                            <td className="px-3 py-2 font-bold" style={{ color: "#F9E741" }}>L{l.level}</td>
+                            <td className="px-3 py-2" style={{ color: "#FFF" }}>{l.userCount}</td>
+                            <td className="px-3 py-2" style={{ color: "#A0A0A0" }}>{l.levelMaxWin}₾</td>
+                            <td className="px-3 py-2 font-semibold" style={{ color: l.actualMaxWin > l.levelMaxWin ? "#EF4444" : "#22C55E" }}>{l.actualMaxWin}₾</td>
+                            <td className="px-3 py-2" style={{ color: l.violations > 0 ? "#EF4444" : "#666" }}>{l.violations}</td>
+                            <td className="px-3 py-2">{l.violations === 0 ? "✅" : "❌"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {r.villageEnabled && r.levelsConfigured === false && (
+                <div className="rounded-2xl p-4 border" style={{ background: "#F59E0B15", borderColor: "#F59E0B40" }}>
+                  <p className="text-[13px]" style={{ color: "#F59E0B" }}>⚠ ლეველები არ არის კონფიგურირებული — ჯერ Village გვერდზე დაამატეთ</p>
+                </div>
+              )}
 
               {/* ── SAMPLE USER LOG (proof) ── */}
               {r.sampleUsers && r.sampleUsers.length > 0 && (
@@ -408,7 +494,13 @@ function AlgoTestContent() {
                               <span>ბუნებრივი: <b style={{ color: "#FFF" }}>{u.naturalCashback}₾</b></span>
                               <span>გარანტია: <b style={{ color: "#FFF" }}>{u.guaranteedMinimum}₾</b></span>
                               <span>Top-up: <b style={{ color: u.guaranteeTopUp > 0 ? "#F9E741" : "#FFF" }}>{u.guaranteeTopUp}₾</b></span>
-                              <span>საბოლოო: <b style={{ color: "#22C55E" }}>{u.finalCashback}₾</b></span>
+                              <span>საბოლოო: <b style={{ color: u.levelCapViolated ? "#EF4444" : "#22C55E" }}>{u.finalCashback}₾</b></span>
+                              {u.level !== undefined && (
+                                <>
+                                  <span>ლეველი: <b style={{ color: "#F9E741" }}>L{u.level}</b></span>
+                                  <span>ლეველის მაქს: <b style={{ color: u.levelCapViolated ? "#EF4444" : "#FFF" }}>{u.levelMaxWin}₾</b></span>
+                                </>
+                              )}
                               <span className="md:col-span-2" style={{ color: "#555" }}>მოსალოდნელი მინ: {expectedMin.toFixed(4)}₾</span>
                             </div>
                           </div>
