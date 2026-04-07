@@ -90,6 +90,29 @@ async function runStartupMigrations() {
       value TEXT NOT NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    // ── Big Win tables ──
+    sql`CREATE TABLE IF NOT EXISTS big_win_config (
+      id TEXT PRIMARY KEY,
+      budget_percent REAL NOT NULL DEFAULT 30,
+      trigger_chance_percent REAL NOT NULL DEFAULT 0.1,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    sql`CREATE TABLE IF NOT EXISTS big_win_prizes (
+      id TEXT PRIMARY KEY,
+      amount REAL NOT NULL,
+      quantity INTEGER NOT NULL,
+      won_count INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    sql`CREATE TABLE IF NOT EXISTS big_win_history (
+      id TEXT PRIMARY KEY,
+      prize_id TEXT NOT NULL REFERENCES big_win_prizes(id),
+      user_id TEXT NOT NULL REFERENCES users(id),
+      amount REAL NOT NULL,
+      won_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
   ];
   for (const s of statements) {
     try { await (db as any).run(s); } catch (e: any) {
@@ -145,6 +168,10 @@ async function runStartupMigrations() {
     for (const [k, v] of configDefaults) {
       try { await (db as any).run(sql`INSERT INTO village_config (key, value) VALUES (${k}, ${v})`); } catch {}
     }
+    // Default big win config (single row)
+    try {
+      await (db as any).run(sql`INSERT INTO big_win_config (id, budget_percent, trigger_chance_percent) VALUES ('main', 30, 0.1)`);
+    } catch {}
   } catch (e: any) {
     console.error("[startup seed]", e.message);
   }

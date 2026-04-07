@@ -222,6 +222,35 @@ export const systemConfig = sqliteTable("system_config", {
 });
 
 // ═══════════════════════════════════════
+// BIG WIN — admin-managed prize pool
+// ═══════════════════════════════════════
+
+export const bigWinConfig = sqliteTable("big_win_config", {
+  id: text("id").primaryKey(),
+  budgetPercent: real("budget_percent").default(30).notNull(),
+  triggerChancePercent: real("trigger_chance_percent").default(0.1).notNull(),
+  updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const bigWinPrizes = sqliteTable("big_win_prizes", {
+  id: text("id").primaryKey(),
+  amount: real("amount").notNull(),
+  quantity: integer("quantity").notNull(),
+  wonCount: integer("won_count").default(0).notNull(),
+  isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+  updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const bigWinHistory = sqliteTable("big_win_history", {
+  id: text("id").primaryKey(),
+  prizeId: text("prize_id").notNull().references(() => bigWinPrizes.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  amount: real("amount").notNull(),
+  wonAt: text("won_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+// ═══════════════════════════════════════
 // VILLAGE — gamification layer (levels, cards, attacks)
 // ═══════════════════════════════════════
 

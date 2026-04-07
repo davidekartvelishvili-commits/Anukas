@@ -220,6 +220,15 @@ export async function getUserFinance(userId: string) {
   return adminFetch(`/admin/finance/user/${userId}`);
 }
 
+// Big Win
+export const getBigWinConfig = () => adminFetch("/admin/big-win/config");
+export const updateBigWinConfig = (data: any) => adminFetch("/admin/big-win/config", { method: "PUT", body: JSON.stringify(data) });
+export const getBigWinPrizes = () => adminFetch("/admin/big-win/prizes");
+export const createBigWinPrize = (data: any) => adminFetch("/admin/big-win/prizes", { method: "POST", body: JSON.stringify(data) });
+export const updateBigWinPrize = (id: string, data: any) => adminFetch(`/admin/big-win/prizes/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export const deleteBigWinPrize = (id: string) => adminFetch(`/admin/big-win/prizes/${id}`, { method: "DELETE" });
+export const getBigWinHistory = () => adminFetch("/admin/big-win/history");
+
 // Village
 export const getVillageLevels = () => adminFetch("/admin/village/levels");
 export const createVillageLevel = (data: any) => adminFetch("/admin/village/levels", { method: "POST", body: JSON.stringify(data) });

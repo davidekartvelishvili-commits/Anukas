@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getGameConfig, updateGameConfig, getPool, fundPool, getMasterSwitch, setMasterSwitch } from "@/services/admin";
+import { getGameConfig, updateGameConfig, getPool, fundPool, getMasterSwitch, setMasterSwitch, getBigWinConfig, updateBigWinConfig, getBigWinPrizes, createBigWinPrize, deleteBigWinPrize } from "@/services/admin";
 import AdminAuthGuard from "@/components/admin/AdminAuthGuard";
 
 /* ── SVG ICONS (same as dashboard) ── */
@@ -117,7 +117,65 @@ function AlgorithmContent() {
     getMasterSwitch().then((data: any) => {
       if (data.success !== undefined) setWinningsEnabled(data.enabled);
     }).catch(() => {});
+
+    loadBigWin();
   }, []);
+
+  // BIG WIN state
+  const [bigWinData, setBigWinData] = useState<any>(null);
+  const [bigWinPrizes, setBigWinPrizes] = useState<any[]>([]);
+  const [bwBudgetPercent, setBwBudgetPercent] = useState(30);
+  const [bwTriggerChance, setBwTriggerChance] = useState(0.1);
+  const [bwEditingConfig, setBwEditingConfig] = useState(false);
+  const [showAddPrize, setShowAddPrize] = useState(false);
+  const [newPrizeAmount, setNewPrizeAmount] = useState("");
+  const [newPrizeQty, setNewPrizeQty] = useState("");
+
+  const loadBigWin = async () => {
+    try {
+      const cfg = await getBigWinConfig() as any;
+      if (cfg.success) {
+        setBigWinData(cfg);
+        setBwBudgetPercent(cfg.config.budgetPercent);
+        setBwTriggerChance(cfg.config.triggerChancePercent);
+      }
+      const pz = await getBigWinPrizes() as any;
+      if (pz.success) setBigWinPrizes(pz.prizes);
+    } catch {}
+  };
+
+  const handleSaveBigWinConfig = async () => {
+    try {
+      await updateBigWinConfig({ budgetPercent: bwBudgetPercent, triggerChancePercent: bwTriggerChance });
+      setBwEditingConfig(false);
+      loadBigWin();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const handleAddPrize = async () => {
+    const amt = parseFloat(newPrizeAmount);
+    const qty = parseInt(newPrizeQty);
+    if (!amt || !qty || amt <= 0 || qty <= 0) return;
+    const totalNew = amt * qty;
+    const free = bigWinData?.pool?.freeBigWin || 0;
+    if (totalNew > free) {
+      if (!confirm(`პრიზები ბიუჯეტს აჭარბებს (${totalNew}₾ > ${free}₾). გავაგრძელო?`)) return;
+    }
+    try {
+      await createBigWinPrize({ amount: amt, quantity: qty });
+      setShowAddPrize(false);
+      setNewPrizeAmount(""); setNewPrizeQty("");
+      loadBigWin();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const handleDelPrize = async (id: string) => {
+    if (!confirm("წავშალო ეს პრიზი?")) return;
+    try {
+      await deleteBigWinPrize(id);
+      loadBigWin();
+    } catch (e: any) { alert(e.message); }
+  };
 
   const poolMinimum = params.find((p) => p.key === "poolMinimumThreshold")?.value || 1000;
   const poolHealthPercent = Math.min(100, (poolBalance / Math.max(poolMinimum * 5, 1)) * 100);
@@ -246,6 +304,136 @@ function AlgorithmContent() {
               </button>
             </div>
           </div>
+
+          {/* ═══ BIG WIN BUDGET ═══ */}
+          {bigWinData && (() => {
+            const p = bigWinData.pool;
+            const total = p.balance || 1;
+            const thresholdPct = (p.threshold / total) * 100;
+            const bigPct = (p.bigWinBudget / total) * 100;
+            const regPct = (p.regularBudget / total) * 100;
+            const allocated = bigWinPrizes.reduce((s, pr) => s + pr.amount * Math.max(0, pr.quantity - pr.wonCount), 0);
+            const free = p.bigWinBudget - allocated;
+            return (
+              <div className="rounded-[12px] p-5 border" style={{ background: "#111111", borderColor: "#252525", opacity: winningsEnabled ? 1 : 0.55 }}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "#666666" }}>Big Win Budget / ბიგ ვინი</p>
+                  {!winningsEnabled && <span className="text-[10px] px-2 py-0.5 rounded-md" style={{ background: "#EF444420", color: "#EF4444" }}>გათიშულია (Master OFF)</span>}
+                </div>
+
+                {/* Segmented bar */}
+                <div className="w-full h-8 rounded-lg overflow-hidden flex mb-2" style={{ background: "#0A0A0A" }}>
+                  <div style={{ width: `${thresholdPct}%`, background: "#EF4444" }} className="flex items-center justify-center">
+                    {thresholdPct > 8 && <span className="text-[10px] font-bold text-white">{p.threshold.toFixed(0)}₾</span>}
+                  </div>
+                  <div style={{ width: `${bigPct}%`, background: "#F9E741" }} className="flex items-center justify-center">
+                    {bigPct > 8 && <span className="text-[10px] font-bold text-black">{p.bigWinBudget.toFixed(0)}₾</span>}
+                  </div>
+                  <div style={{ width: `${regPct}%`, background: "#22C55E" }} className="flex items-center justify-center">
+                    {regPct > 8 && <span className="text-[10px] font-bold text-black">{p.regularBudget.toFixed(0)}₾</span>}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-[11px] mb-4">
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm" style={{ background: "#EF4444" }} /><span style={{ color: "#A0A0A0" }}>მინიმუმი {p.threshold.toFixed(0)}₾</span></span>
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm" style={{ background: "#F9E741" }} /><span style={{ color: "#A0A0A0" }}>ბიგ ვინი {bigWinData.config.budgetPercent}% ({p.bigWinBudget.toFixed(2)}₾)</span></span>
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm" style={{ background: "#22C55E" }} /><span style={{ color: "#A0A0A0" }}>ჩვეულებრივი {(100 - bigWinData.config.budgetPercent)}% ({p.regularBudget.toFixed(2)}₾)</span></span>
+                </div>
+
+                {/* Config controls */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                  <div>
+                    <label className="text-[10px] block mb-1" style={{ color: "#666" }}>ბიგ ვინის ბიუჯეტი %</label>
+                    <input type="number" min="0" max="100" value={bwBudgetPercent} onChange={e => { setBwBudgetPercent(parseFloat(e.target.value) || 0); setBwEditingConfig(true); }}
+                      className="w-full rounded-lg px-2 py-1.5 text-[13px]" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] block mb-1" style={{ color: "#666" }}>ჩვეულებრივი (auto)</label>
+                    <input type="number" disabled value={(100 - bwBudgetPercent).toFixed(1)} className="w-full rounded-lg px-2 py-1.5 text-[13px]" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A", color: "#666" }} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] block mb-1" style={{ color: "#666" }}>Big Win trigger %</label>
+                    <input type="number" min="0" max="100" step="0.01" value={bwTriggerChance} onChange={e => { setBwTriggerChance(parseFloat(e.target.value) || 0); setBwEditingConfig(true); }}
+                      className="w-full rounded-lg px-2 py-1.5 text-[13px]" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
+                  </div>
+                </div>
+                {bwEditingConfig && (
+                  <button onClick={handleSaveBigWinConfig} className="mb-4 px-4 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: "#F9E741", color: "#000" }}>შენახვა</button>
+                )}
+
+                {/* Prize allocation summary */}
+                <div className="rounded-lg p-3 mb-3 text-[12px]" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
+                  <span style={{ color: "#A0A0A0" }}>ბიგ ვინ ბიუჯეტი: <b style={{ color: "#F9E741" }}>{p.bigWinBudget.toFixed(2)}₾</b></span>
+                  <span className="ml-3" style={{ color: "#A0A0A0" }}>გამოყოფილი: <b style={{ color: "#FFF" }}>{allocated.toFixed(2)}₾</b></span>
+                  <span className="ml-3" style={{ color: "#A0A0A0" }}>თავისუფალი: <b style={{ color: free >= 0 ? "#22C55E" : "#EF4444" }}>{free.toFixed(2)}₾</b></span>
+                </div>
+
+                {/* Prizes table */}
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[12px] font-bold" style={{ color: "#FFF" }}>პრიზები</p>
+                  <button onClick={() => setShowAddPrize(true)} className="px-3 py-1 rounded-lg text-[11px] font-bold" style={{ background: "#F9E741", color: "#000" }}>+ ახალი</button>
+                </div>
+                {bigWinPrizes.length === 0 ? (
+                  <p className="text-[12px] py-3" style={{ color: "#666" }}>პრიზები არ არის</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-[12px]">
+                      <thead><tr style={{ borderBottom: "1px solid #252525" }}>
+                        {["პრიზი", "რაოდენობა", "ჯამი", "მოგებული", "დარჩენილი", "სტატუსი", ""].map(h => <th key={h} className="px-2 py-2 font-medium" style={{ color: "#666" }}>{h}</th>)}
+                      </tr></thead>
+                      <tbody>
+                        {bigWinPrizes.map(pr => {
+                          const remaining = pr.quantity - pr.wonCount;
+                          const exhausted = remaining <= 0;
+                          return (
+                            <tr key={pr.id} style={{ borderBottom: "1px solid #1A1A1A" }}>
+                              <td className="px-2 py-2 font-bold" style={{ color: "#F9E741" }}>{pr.amount}₾</td>
+                              <td className="px-2 py-2" style={{ color: "#FFF" }}>{pr.quantity}</td>
+                              <td className="px-2 py-2" style={{ color: "#A0A0A0" }}>{(pr.amount * pr.quantity).toFixed(2)}₾</td>
+                              <td className="px-2 py-2" style={{ color: "#22C55E" }}>{pr.wonCount}</td>
+                              <td className="px-2 py-2" style={{ color: "#FFF" }}>{remaining}</td>
+                              <td className="px-2 py-2"><span className="px-2 py-0.5 rounded text-[10px]" style={{ background: exhausted ? "#1A1A1A" : "#22C55E20", color: exhausted ? "#666" : "#22C55E" }}>{exhausted ? "ამოწურულია" : "აქტიური"}</span></td>
+                              <td className="px-2 py-2">
+                                {pr.wonCount === 0 && <button onClick={() => handleDelPrize(pr.id)} className="text-[10px] px-2 py-0.5 rounded" style={{ background: "#1A1A1A", color: "#EF4444" }}>del</button>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        <tr>
+                          <td className="px-2 py-2 font-bold" style={{ color: "#FFF" }}>ჯამი</td>
+                          <td colSpan={5} className="px-2 py-2 font-bold" style={{ color: "#F9E741" }}>{allocated.toFixed(2)}₾</td>
+                          <td></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Add prize modal */}
+          {showAddPrize && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setShowAddPrize(false)}>
+              <div className="rounded-2xl p-5 w-full max-w-md border" style={{ background: "#111111", borderColor: "#252525" }} onClick={e => e.stopPropagation()}>
+                <h3 className="text-[16px] font-bold mb-4" style={{ color: "#FFF" }}>ახალი ბიგ ვინ პრიზი</h3>
+                <div className="mb-3">
+                  <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>პრიზის თანხა (₾)</label>
+                  <input type="number" step="0.5" value={newPrizeAmount} onChange={e => setNewPrizeAmount(e.target.value)} className="w-full rounded-lg px-3 py-2 text-[14px]" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
+                </div>
+                <div className="mb-3">
+                  <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>რაოდენობა</label>
+                  <input type="number" value={newPrizeQty} onChange={e => setNewPrizeQty(e.target.value)} className="w-full rounded-lg px-3 py-2 text-[14px]" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
+                </div>
+                {newPrizeAmount && newPrizeQty && (
+                  <p className="text-[12px] mb-4" style={{ color: "#A0A0A0" }}>ჯამი: <b style={{ color: "#F9E741" }}>{(parseFloat(newPrizeAmount) * parseInt(newPrizeQty || "0")).toFixed(2)}₾</b></p>
+                )}
+                <div className="flex gap-2">
+                  <button onClick={() => setShowAddPrize(false)} className="flex-1 px-4 py-2 rounded-xl text-[13px]" style={{ background: "#1A1A1A", color: "#A0A0A0", border: "1px solid #252525" }}>გაუქმება</button>
+                  <button onClick={handleAddPrize} className="flex-1 px-4 py-2 rounded-xl text-[13px] font-bold" style={{ background: "#F9E741", color: "#000" }}>დამატება</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ═══ SECTION 2: MASTER SWITCH ═══ */}
           <div className="rounded-[12px] p-5 border-2 transition-all" style={{ background: "#111111", borderColor: winningsEnabled ? "#22C55E" : "#EF4444" }}>

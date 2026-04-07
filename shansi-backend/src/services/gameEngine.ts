@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { nanoid } from "nanoid";
 import { eq, and, or, desc, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
-import { gameConfig, pool, users, gameHistory, transactions, systemConfig, userVillageProfile, villageLevels } from "../db/schema.js";
+import { gameConfig, pool, users, gameHistory, transactions, systemConfig, userVillageProfile, villageLevels, bigWinConfig, bigWinPrizes, bigWinHistory } from "../db/schema.js";
 
 // ═══════════════════════════════════════
 // PER-USER MUTEX — prevents parallel drops from causing race conditions
@@ -47,6 +47,9 @@ export interface GameResult {
   freeCoins?: number;
   bonusGamesLeft: number;
   transactionComplete: boolean;
+  // BIG WIN
+  bigWin?: boolean;
+  bigWinAmount?: number;
 }
 
 export interface ChickenRushResult extends GameResult {
@@ -197,6 +200,41 @@ async function _playGameInner(
     // fall back to global cap
   }
 
+  // ═══════════════════════════════════════
+  // BIG WIN CHECK — runs BEFORE regular calculateWin
+  // Awards a fixed prize from admin-managed pool. Respects village level cap.
+  // Skipped if master switch OFF or in bonus round.
+  // ═══════════════════════════════════════
+  let bigWinAmount = 0;
+  let bigWinPrizeId: string | null = null;
+  if (masterSwitchOn && !isBonusRound) {
+    try {
+      const [bwCfg] = await db.select().from(bigWinConfig).limit(1);
+      if (bwCfg && bwCfg.triggerChancePercent > 0) {
+        const chance = bwCfg.triggerChancePercent / 100;
+        if (secureRandom() < chance) {
+          // Triggered — find an eligible prize (active, has remaining, fits level cap, fits budget)
+          const available = Math.max(0, poolBefore - config.poolMinimumThreshold);
+          const bigWinBudget = available * bwCfg.budgetPercent / 100;
+          const activePrizes = await db.select().from(bigWinPrizes)
+            .where(eq(bigWinPrizes.isActive, true));
+          // Filter eligible: has remaining, fits level cap, fits budget
+          const eligible = activePrizes
+            .filter(p => p.quantity - p.wonCount > 0 && p.amount <= userMaxWin && p.amount <= bigWinBudget)
+            .sort(() => secureRandom() - 0.5); // randomize
+          if (eligible.length > 0) {
+            const prize = eligible[0];
+            bigWinAmount = prize.amount;
+            bigWinPrizeId = prize.id;
+            console.log(`[BIG WIN] userId=${userId} prize=${prize.amount}₾ (id=${prize.id})`);
+          }
+        }
+      }
+    } catch (e: any) {
+      console.error("[big win check]", e.message);
+    }
+  }
+
   let { minWin, bonusWin } = calculateWin(betInLari, {
     avgReturnPercent: config.avgReturnPercent,
     maxWinPerUser: userMaxWin, // VILLAGE-CAPPED max win for this user
@@ -212,7 +250,7 @@ async function _playGameInner(
     bonusWin = 0;
   }
 
-  let totalWin = round2(minWin + bonusWin);
+  let totalWin = round2(minWin + bonusWin + bigWinAmount);
 
   // ═══════════════════════════════════════
   // GUARANTEE CHECK — on the LAST game, force win to cover shortfall
@@ -263,15 +301,35 @@ async function _playGameInner(
     }
   }
 
-  console.log(`[PLAY] userId=${userId} game=${gameType} coins=${coinCost} betLari=${betInLari} minWin=${minWin} bonusWin=${bonusWin} totalWin=${totalWin} pool=${poolBefore} isBonusRound=${isBonusRound} isLastGame=${isLastGame}`);
+  // If level-cap truncation killed the big win, cancel it
+  if (bigWinPrizeId && totalWin < bigWinAmount) {
+    console.log(`[BIG WIN] cancelled — level cap truncated win`);
+    bigWinPrizeId = null;
+    bigWinAmount = 0;
+  }
 
-  // 6. Deduct from pool if bonus win (not from guarantee on last game)
+  console.log(`[PLAY] userId=${userId} game=${gameType} coins=${coinCost} betLari=${betInLari} minWin=${minWin} bonusWin=${bonusWin} bigWin=${bigWinAmount} totalWin=${totalWin} pool=${poolBefore} isBonusRound=${isBonusRound} isLastGame=${isLastGame}`);
+
+  // 6a. Deduct from pool if bonus win (not from guarantee on last game)
   if (bonusWin > 0 && !isBonusRound && !isLastGame) {
     await db.update(pool).set({
       balance: sql`ROUND(${pool.balance} - ${bonusWin}, 2)`,
       totalWon: sql`ROUND(${pool.totalWon} + ${bonusWin}, 2)`,
       updatedAt: new Date().toISOString(),
     } as any).where(eq(pool.id, poolRow.id));
+  }
+
+  // 6b. BIG WIN — deduct from pool, increment prize won_count, log to history
+  if (bigWinPrizeId && bigWinAmount > 0) {
+    await db.update(pool).set({
+      balance: sql`ROUND(${pool.balance} - ${bigWinAmount}, 2)`,
+      totalWon: sql`ROUND(${pool.totalWon} + ${bigWinAmount}, 2)`,
+      updatedAt: new Date().toISOString(),
+    } as any).where(eq(pool.id, poolRow.id));
+    await (db as any).run(sql`UPDATE big_win_prizes SET won_count = won_count + 1, updated_at = datetime('now') WHERE id = ${bigWinPrizeId}`);
+    await db.insert(bigWinHistory).values({
+      id: nanoid(), prizeId: bigWinPrizeId, userId, amount: bigWinAmount,
+    });
   }
 
   // 7. Update user cash balance — ATOMIC
@@ -355,6 +413,8 @@ async function _playGameInner(
     minWin,
     bonusWin,
     totalWin,
+    bigWin: bigWinAmount > 0,
+    bigWinAmount,
     newBalance: userAfter?.balance ?? newBalance,
     poolBalance: poolAfter?.balance || poolBefore,
     coinsRemaining: finalTx?.coinsRemaining ?? actualCoinsRemaining,

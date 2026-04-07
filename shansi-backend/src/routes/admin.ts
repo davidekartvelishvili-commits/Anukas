@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig } from "../db/schema.js";
+import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig, bigWinConfig, bigWinPrizes, bigWinHistory } from "../db/schema.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/errors.js";
@@ -1898,6 +1898,138 @@ admin.get("/village/stats", adminMiddleware, async (c) => {
       cardsBoughtWeek: Number(cardsWeek?.c) || 0,
     },
   });
+});
+
+// ══════════════════════════════════════
+// BIG WIN — admin endpoints
+// ══════════════════════════════════════
+
+async function ensureBigWinConfig() {
+  const db = getDb();
+  const [existing] = await db.select().from(bigWinConfig).limit(1);
+  if (!existing) {
+    await db.insert(bigWinConfig).values({
+      id: "main", budgetPercent: 30, triggerChancePercent: 0.1,
+    });
+  }
+}
+
+// GET /admin/big-win/config — returns config + computed budgets
+admin.get("/big-win/config", adminMiddleware, async (c) => {
+  await ensureBigWinConfig();
+  const db = getDb();
+  const [cfg] = await db.select().from(bigWinConfig).limit(1);
+  const [poolRow] = await db.select().from(pool).limit(1);
+  const [gc] = await db.select().from(gameConfig).limit(1);
+  const poolBalance = Number(poolRow?.balance) || 0;
+  const threshold = Number(gc?.poolMinimumThreshold) || 0;
+  const available = Math.max(0, poolBalance - threshold);
+  const budgetPercent = Number(cfg?.budgetPercent) || 30;
+  const bigWinBudget = Math.round(available * budgetPercent / 100 * 100) / 100;
+  const regularBudget = Math.round(available * (100 - budgetPercent) / 100 * 100) / 100;
+
+  // Total of active prizes (allocated)
+  const prizes = await db.select().from(bigWinPrizes).where(eq(bigWinPrizes.isActive, true));
+  const allocated = prizes.reduce((s, p) => s + (p.amount * Math.max(0, p.quantity - p.wonCount)), 0);
+
+  return c.json({
+    success: true,
+    config: {
+      budgetPercent,
+      triggerChancePercent: Number(cfg?.triggerChancePercent) || 0.1,
+    },
+    pool: {
+      balance: poolBalance,
+      threshold,
+      available,
+      bigWinBudget,
+      regularBudget,
+      allocated: Math.round(allocated * 100) / 100,
+      freeBigWin: Math.round((bigWinBudget - allocated) * 100) / 100,
+    },
+  });
+});
+
+const bigWinConfigSchema = z.object({
+  budgetPercent: z.number().min(0).max(100).optional(),
+  triggerChancePercent: z.number().min(0).max(100).optional(),
+});
+
+// PUT /admin/big-win/config
+admin.put("/big-win/config", adminMiddleware, async (c) => {
+  await ensureBigWinConfig();
+  const body = await c.req.json();
+  const parsed = bigWinConfigSchema.safeParse(body);
+  if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
+  const db = getDb();
+  const updates: any = { updatedAt: new Date().toISOString() };
+  if (parsed.data.budgetPercent !== undefined) updates.budgetPercent = parsed.data.budgetPercent;
+  if (parsed.data.triggerChancePercent !== undefined) updates.triggerChancePercent = parsed.data.triggerChancePercent;
+  await db.update(bigWinConfig).set(updates).where(eq(bigWinConfig.id, "main"));
+  const adminId = c.get("adminId") as string;
+  await logAction(adminId, "update_big_win_config", JSON.stringify(parsed.data));
+  return c.json({ success: true });
+});
+
+// GET /admin/big-win/prizes
+admin.get("/big-win/prizes", adminMiddleware, async (c) => {
+  const db = getDb();
+  const prizes = await db.select().from(bigWinPrizes).orderBy(desc(bigWinPrizes.createdAt));
+  return c.json({ success: true, prizes });
+});
+
+const prizeSchema = z.object({
+  amount: z.number().positive(),
+  quantity: z.number().int().positive(),
+});
+
+// POST /admin/big-win/prizes
+admin.post("/big-win/prizes", adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const parsed = prizeSchema.safeParse(body);
+  if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
+  const db = getDb();
+  await db.insert(bigWinPrizes).values({
+    id: nanoid(),
+    amount: parsed.data.amount,
+    quantity: parsed.data.quantity,
+  });
+  return c.json({ success: true });
+});
+
+// PUT /admin/big-win/prizes/:id
+admin.put("/big-win/prizes/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id")!;
+  const body = await c.req.json();
+  const db = getDb();
+  const updates: any = { updatedAt: new Date().toISOString() };
+  if (body.amount !== undefined) updates.amount = body.amount;
+  if (body.quantity !== undefined) updates.quantity = body.quantity;
+  if (body.isActive !== undefined) updates.isActive = body.isActive;
+  await db.update(bigWinPrizes).set(updates).where(eq(bigWinPrizes.id, id));
+  return c.json({ success: true });
+});
+
+// DELETE /admin/big-win/prizes/:id (only if not won)
+admin.delete("/big-win/prizes/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id")!;
+  const db = getDb();
+  const [p] = await db.select().from(bigWinPrizes).where(eq(bigWinPrizes.id, id)).limit(1);
+  if (!p) return c.json({ success: false, message: "Not found" }, 404);
+  if (p.wonCount > 0) return c.json({ success: false, message: "Cannot delete — prize already won" }, 400);
+  await db.delete(bigWinPrizes).where(eq(bigWinPrizes.id, id));
+  return c.json({ success: true });
+});
+
+// GET /admin/big-win/history
+admin.get("/big-win/history", adminMiddleware, async (c) => {
+  const db = getDb();
+  const list = await db.select().from(bigWinHistory).orderBy(desc(bigWinHistory.wonAt)).limit(100);
+  const enriched = await Promise.all(list.map(async (h) => {
+    const [u] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, h.userId)).limit(1);
+    return { ...h, userName: u?.name || u?.phone || h.userId };
+  }));
+  return c.json({ success: true, history: enriched });
 });
 
 export default admin;
