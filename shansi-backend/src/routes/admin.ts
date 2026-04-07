@@ -1167,6 +1167,10 @@ admin.get("/finance", adminMiddleware, async (c) => {
     };
   }));
 
+  const pendingAmount = Number(pendingCommission?.totalPending) || 0;
+  const received = Math.round((totalCommission - pendingAmount) * 100) / 100;
+  const profit = Math.round((received - totalPaidOut) * 100) / 100;
+
   return c.json({
     success: true,
     summary: {
@@ -1174,9 +1178,10 @@ admin.get("/finance", adminMiddleware, async (c) => {
       poolStatus,
       poolMinThreshold,
       totalCommission,
-      pendingCommission: Number(pendingCommission?.totalPending) || 0,
+      pendingCommission: pendingAmount,
+      received, // total commission - pending = actually received
       totalPaidOut,
-      profit: Math.round((totalCommission - totalPaidOut) * 100) / 100,
+      profit, // received - totalPaidOut (CAN be negative)
       totalPayments: Number(commissionStats?.totalPayments) || 0,
       totalVolume: Number(commissionStats?.totalVolume) || 0,
     },
@@ -1231,23 +1236,22 @@ admin.post("/finance/fund-pool", adminMiddleware, async (c) => {
 
   await logAction(adminId, "pool_fund", `Added ${amount}₾ to pool${note ? ` — ${note}` : ""}`);
 
-  // Optional: clear pending commissions and log funding (non-critical)
+  // Clear pending commissions FIFO (mark as in_pool until running total >= amount)
   let clearedCommissions = 0;
+  let actuallyConsumed = 0;
   try {
     await ensureFinanceTables();
 
-    // Mark oldest pending commissions as in_pool, up to amount
     const pendingTxs = await db.select().from(paymentTransactions)
       .where(eq(paymentTransactions.commissionStatus, "pending"))
       .orderBy(paymentTransactions.createdAt);
-    let remaining = amount;
+
+    // FIFO: consume pending in order until accumulated >= amount (not exact match)
     for (const tx of pendingTxs) {
-      if (remaining <= 0) break;
-      if (tx.commissionAmount <= remaining + 0.001) {
-        await db.update(paymentTransactions).set({ commissionStatus: "in_pool" } as any).where(eq(paymentTransactions.id, tx.id));
-        remaining -= tx.commissionAmount;
-        clearedCommissions++;
-      }
+      if (actuallyConsumed >= amount - 0.001) break;
+      await db.update(paymentTransactions).set({ commissionStatus: "in_pool" } as any).where(eq(paymentTransactions.id, tx.id));
+      actuallyConsumed += tx.commissionAmount;
+      clearedCommissions++;
     }
 
     // Log funding
@@ -1256,11 +1260,21 @@ admin.post("/finance/fund-pool", adminMiddleware, async (c) => {
     });
   } catch (err: any) {
     console.error("[fund-pool] non-critical error:", err.message);
-    // Pool was already funded; just log the failure
   }
 
+  // Return fresh summary so frontend can update everything
   const [updatedPool] = await db.select().from(pool).limit(1);
-  return c.json({ success: true, newBalance: updatedPool?.balance, clearedCommissions });
+  const [pendingNow] = await db.select({
+    totalPending: sql<number>`coalesce(sum(${paymentTransactions.commissionAmount}), 0)`,
+  }).from(paymentTransactions).where(eq(paymentTransactions.commissionStatus, "pending"));
+
+  return c.json({
+    success: true,
+    newBalance: updatedPool?.balance,
+    clearedCommissions,
+    actuallyConsumed: Math.round(actuallyConsumed * 100) / 100,
+    newPendingCommission: Number(pendingNow?.totalPending) || 0,
+  });
 });
 
 // GET /admin/finance/user/:userId — user financial breakdown

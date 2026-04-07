@@ -170,8 +170,8 @@ export default function FinancePage() {
       await fundPoolWithNote(amt, fundNote || undefined);
       setShowFundModal(false);
       setFundAmount(""); setFundNote("");
-      loadData();
-      loadPoolHistory();
+      // Reload BOTH finance data (refreshes all summary cards) and pool history
+      await Promise.all([loadData(), loadPoolHistory()]);
     } catch (e: any) { alert(e.message); }
   };
 
@@ -296,42 +296,62 @@ export default function FinancePage() {
           ) : summary && (
             <>
               {/* SUMMARY CARDS */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {/* Pool — large prominent */}
-                <div className="md:col-span-2 lg:col-span-1 row-span-2 rounded-2xl p-5 border" style={{
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* Pool — large prominent, spans 2 cols on lg */}
+                <div className="md:col-span-2 lg:col-span-2 rounded-2xl p-5 border" style={{
                   background: summary.poolStatus === "healthy" ? "#22C55E15" : summary.poolStatus === "low" ? "#F59E0B15" : "#EF444415",
                   borderColor: summary.poolStatus === "healthy" ? "#22C55E40" : summary.poolStatus === "low" ? "#F59E0B40" : "#EF444440"
                 }}>
-                  <p className="text-[11px] mb-1" style={{ color: "#A0A0A0" }}>Pool მიმდინარე ბალანსი</p>
-                  <p className="text-[32px] font-extrabold" style={{ color: summary.poolStatus === "healthy" ? "#22C55E" : summary.poolStatus === "low" ? "#F59E0B" : "#EF4444" }}>
-                    {fmt(summary.poolBalance)}<span className="text-[18px] ml-1">₾</span>
-                  </p>
-                  <p className="text-[11px] mt-2" style={{ color: "#666" }}>ზღვარი: {fmt(summary.poolMinThreshold)}₾</p>
-                  <div className="mt-3 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-semibold" style={{
-                    background: summary.poolStatus === "healthy" ? "#22C55E20" : summary.poolStatus === "low" ? "#F59E0B20" : "#EF444420",
-                    color: summary.poolStatus === "healthy" ? "#22C55E" : summary.poolStatus === "low" ? "#F59E0B" : "#EF4444",
-                  }}>
-                    {summary.poolStatus === "healthy" ? "● ჯანსაღი" : summary.poolStatus === "low" ? "● დაბალი" : "● კრიტიკული"}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] mb-1" style={{ color: "#A0A0A0" }}>Pool მიმდინარე ბალანსი</p>
+                      <p className="text-[36px] font-extrabold leading-tight" style={{ color: summary.poolStatus === "healthy" ? "#22C55E" : summary.poolStatus === "low" ? "#F59E0B" : "#EF4444" }}>
+                        {fmt(summary.poolBalance)}<span className="text-[20px] ml-1">₾</span>
+                      </p>
+                      <p className="text-[11px] mt-1" style={{ color: "#666" }}>
+                        ზღვარი: {fmt(summary.poolMinThreshold)}₾ · მოლოდინში: <span style={{ color: "#F59E0B" }}>{fmt(summary.pendingCommission)}₾</span>
+                      </p>
+                      <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-semibold" style={{
+                        background: summary.poolStatus === "healthy" ? "#22C55E20" : summary.poolStatus === "low" ? "#F59E0B20" : "#EF444420",
+                        color: summary.poolStatus === "healthy" ? "#22C55E" : summary.poolStatus === "low" ? "#F59E0B" : "#EF4444",
+                      }}>
+                        {summary.poolStatus === "healthy" ? "● ჯანსაღი" : summary.poolStatus === "low" ? "● დაბალი" : "● კრიტიკული"}
+                      </div>
+                    </div>
+                    <button onClick={() => setShowFundModal(true)} className="px-4 py-2 rounded-xl text-[12px] font-bold transition-all hover:opacity-90 shrink-0"
+                      style={{ background: "#F9E741", color: "#000" }}>+ შევსება</button>
                   </div>
-                  <button onClick={() => setShowFundModal(true)} className="mt-4 w-full px-4 py-2 rounded-xl text-[13px] font-bold transition-all hover:opacity-90"
-                    style={{ background: "#F9E741", color: "#000" }}>პულში თანხის შეტანა</button>
                 </div>
 
                 <div className="rounded-2xl p-4 border" style={{ background: "#111111", borderColor: "#252525" }}>
                   <p className="text-[11px] mb-1" style={{ color: "#A0A0A0" }}>ჯამური საკომისიო</p>
                   <p className="text-[22px] font-bold" style={{ color: "#22C55E" }}>{fmt(summary.totalCommission)}<span className="text-[14px] ml-0.5">₾</span></p>
+                  <p className="text-[10px] mt-0.5" style={{ color: "#555" }}>გამოთვლილი ყველა ტრანზაქციიდან</p>
                 </div>
                 <div className="rounded-2xl p-4 border" style={{ background: "#111111", borderColor: "#252525" }}>
                   <p className="text-[11px] mb-1" style={{ color: "#A0A0A0" }}>მოლოდინში</p>
                   <p className="text-[22px] font-bold" style={{ color: "#F59E0B" }}>{fmt(summary.pendingCommission)}<span className="text-[14px] ml-0.5">₾</span></p>
+                  <p className="text-[10px] mt-0.5" style={{ color: "#555" }}>მერჩანტებიდან მისაღები</p>
+                </div>
+                <div className="rounded-2xl p-4 border" style={{ background: "#111111", borderColor: "#252525" }}>
+                  <p className="text-[11px] mb-1" style={{ color: "#A0A0A0" }}>მიღებული</p>
+                  <p className="text-[22px] font-bold" style={{ color: "#3B82F6" }}>{fmt(summary.received)}<span className="text-[14px] ml-0.5">₾</span></p>
+                  <p className="text-[10px] mt-0.5" style={{ color: "#555" }}>რეალურად ჩამოსული თანხა</p>
                 </div>
                 <div className="rounded-2xl p-4 border" style={{ background: "#111111", borderColor: "#252525" }}>
                   <p className="text-[11px] mb-1" style={{ color: "#A0A0A0" }}>გაცემული (მოგებები)</p>
                   <p className="text-[22px] font-bold" style={{ color: "#EF4444" }}>{fmt(summary.totalPaidOut)}<span className="text-[14px] ml-0.5">₾</span></p>
+                  <p className="text-[10px] mt-0.5" style={{ color: "#555" }}>მომხმარებლების მოგებები</p>
                 </div>
-                <div className="rounded-2xl p-4 border" style={{ background: "#111111", borderColor: "#252525" }}>
+                <div className="rounded-2xl p-4 border" style={{
+                  background: summary.profit >= 0 ? "#22C55E10" : "#EF444410",
+                  borderColor: summary.profit >= 0 ? "#22C55E40" : "#EF444440"
+                }}>
                   <p className="text-[11px] mb-1" style={{ color: "#A0A0A0" }}>მოგება (წმინდა)</p>
-                  <p className="text-[22px] font-bold" style={{ color: "#F9E741" }}>{fmt(summary.profit)}<span className="text-[14px] ml-0.5">₾</span></p>
+                  <p className="text-[22px] font-bold" style={{ color: summary.profit >= 0 ? "#22C55E" : "#EF4444" }}>
+                    {summary.profit >= 0 ? "+" : ""}{fmt(summary.profit)}<span className="text-[14px] ml-0.5">₾</span>
+                  </p>
+                  <p className="text-[10px] mt-0.5" style={{ color: "#555" }}>მიღებული − გაცემული</p>
                 </div>
               </div>
 
