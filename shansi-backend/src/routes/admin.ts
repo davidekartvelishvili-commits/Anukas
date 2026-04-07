@@ -2012,6 +2012,36 @@ admin.put("/big-win/prizes/:id", adminMiddleware, async (c) => {
   const id = c.req.param("id")!;
   const body = await c.req.json();
   const db = getDb();
+
+  const [existing] = await db.select().from(bigWinPrizes).where(eq(bigWinPrizes.id, id)).limit(1);
+  if (!existing) return c.json({ success: false, message: "Not found" }, 404);
+
+  // Validate quantity >= wonCount
+  if (body.quantity !== undefined && body.quantity < existing.wonCount) {
+    throw new BadRequestError(`რაოდენობა ვერ იქნება ნაკლები მოგებულზე (${existing.wonCount})`);
+  }
+
+  // Server-side budget guard for amount/quantity changes
+  if (body.amount !== undefined || body.quantity !== undefined) {
+    await ensureBigWinConfig();
+    const [bw] = await db.select().from(bigWinConfig).limit(1);
+    const [poolRow] = await db.select().from(pool).limit(1);
+    const [gc] = await db.select().from(gameConfig).limit(1);
+    const available = Math.max(0, (Number(poolRow?.balance) || 0) - (Number(gc?.poolMinimumThreshold) || 0));
+    const budget = available * (Number(bw?.budgetPercent) || 30) / 100;
+    const others = await db.select().from(bigWinPrizes).where(eq(bigWinPrizes.isActive, true));
+    const allocatedOthers = others
+      .filter(p => p.id !== id)
+      .reduce((s, p) => s + p.amount * Math.max(0, p.quantity - p.wonCount), 0);
+    const newAmount = body.amount ?? existing.amount;
+    const newQuantity = body.quantity ?? existing.quantity;
+    const newPrizeRemaining = newAmount * Math.max(0, newQuantity - existing.wonCount);
+    const totalAfter = allocatedOthers + newPrizeRemaining;
+    if (totalAfter > budget + 0.001) {
+      throw new BadRequestError(`ცვლილება ბიუჯეტს აჭარბებს ${(totalAfter - budget).toFixed(2)}₾-ით (ბიუჯეტი: ${budget.toFixed(2)}₾)`);
+    }
+  }
+
   const updates: any = { updatedAt: new Date().toISOString() };
   if (body.amount !== undefined) updates.amount = body.amount;
   if (body.quantity !== undefined) updates.quantity = body.quantity;

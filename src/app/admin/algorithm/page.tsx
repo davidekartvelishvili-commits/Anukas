@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getGameConfig, updateGameConfig, getPool, fundPool, getMasterSwitch, setMasterSwitch, getBigWinConfig, updateBigWinConfig, getBigWinPrizes, createBigWinPrize, deleteBigWinPrize } from "@/services/admin";
+import { getGameConfig, updateGameConfig, getPool, fundPool, getMasterSwitch, setMasterSwitch, getBigWinConfig, updateBigWinConfig, getBigWinPrizes, createBigWinPrize, updateBigWinPrize, deleteBigWinPrize } from "@/services/admin";
 import AdminAuthGuard from "@/components/admin/AdminAuthGuard";
 
 /* ── SVG ICONS (same as dashboard) ── */
@@ -129,6 +129,9 @@ function AlgorithmContent() {
   const [showAddPrize, setShowAddPrize] = useState(false);
   const [newPrizeAmount, setNewPrizeAmount] = useState("");
   const [newPrizeQty, setNewPrizeQty] = useState("");
+  const [editingPrizeId, setEditingPrizeId] = useState<string | null>(null);
+  const [editPrizeAmount, setEditPrizeAmount] = useState("");
+  const [editPrizeQty, setEditPrizeQty] = useState("");
 
   const loadBigWin = async () => {
     try {
@@ -175,6 +178,39 @@ function AlgorithmContent() {
     if (!confirm("წავშალო ეს პრიზი?")) return;
     try {
       await deleteBigWinPrize(id);
+      loadBigWin();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const handleStartEditPrize = (pr: any) => {
+    setEditingPrizeId(pr.id);
+    setEditPrizeAmount(String(pr.amount));
+    setEditPrizeQty(String(pr.quantity));
+  };
+
+  const handleSaveEditPrize = async (id: string, currentWonCount: number) => {
+    const amt = parseFloat(editPrizeAmount);
+    const qty = parseInt(editPrizeQty);
+    if (!amt || !qty || amt <= 0 || qty <= 0) return;
+    if (qty < currentWonCount) {
+      alert(`რაოდენობა (${qty}) ვერ იქნება ნაკლები მოგებულზე (${currentWonCount})`);
+      return;
+    }
+    // Budget check: recompute as if this prize is being replaced
+    const allocatedExcludingThis = bigWinPrizes
+      .filter(p => p.id !== id)
+      .reduce((s, p) => s + p.amount * Math.max(0, p.quantity - p.wonCount), 0);
+    const newPrizeRemaining = amt * Math.max(0, qty - currentWonCount);
+    const totalAfter = allocatedExcludingThis + newPrizeRemaining;
+    const budget = bigWinData?.pool?.bigWinBudget || 0;
+    if (totalAfter > budget + 0.001) {
+      alert(`❌ ცვლილება ბიუჯეტს აჭარბებს ${(totalAfter - budget).toFixed(2)}₾-ით\n\nბიგ ვინ ბიუჯეტი: ${budget.toFixed(2)}₾\nახალი ჯამი: ${totalAfter.toFixed(2)}₾\n\nცვლილება არ შენახულა.`);
+      return;
+    }
+    try {
+      await updateBigWinPrize(id, { amount: amt, quantity: qty });
+      setEditingPrizeId(null);
+      setEditPrizeAmount(""); setEditPrizeQty("");
       loadBigWin();
     } catch (e: any) { alert(e.message); }
   };
@@ -382,16 +418,39 @@ function AlgorithmContent() {
                         {bigWinPrizes.map(pr => {
                           const remaining = pr.quantity - pr.wonCount;
                           const exhausted = remaining <= 0;
+                          const editing = editingPrizeId === pr.id;
                           return (
                             <tr key={pr.id} style={{ borderBottom: "1px solid #1A1A1A" }}>
-                              <td className="px-2 py-2 font-bold" style={{ color: "#F9E741" }}>{pr.amount}₾</td>
-                              <td className="px-2 py-2" style={{ color: "#FFF" }}>{pr.quantity}</td>
-                              <td className="px-2 py-2" style={{ color: "#A0A0A0" }}>{(pr.amount * pr.quantity).toFixed(2)}₾</td>
+                              <td className="px-2 py-2 font-bold" style={{ color: "#F9E741" }}>
+                                {editing ? (
+                                  <input type="number" step="0.5" value={editPrizeAmount} onChange={e => setEditPrizeAmount(e.target.value)} className="w-20 rounded px-2 py-0.5 text-[12px]" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
+                                ) : `${pr.amount}₾`}
+                              </td>
+                              <td className="px-2 py-2" style={{ color: "#FFF" }}>
+                                {editing ? (
+                                  <input type="number" value={editPrizeQty} onChange={e => setEditPrizeQty(e.target.value)} className="w-16 rounded px-2 py-0.5 text-[12px]" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
+                                ) : pr.quantity}
+                              </td>
+                              <td className="px-2 py-2" style={{ color: "#A0A0A0" }}>
+                                {editing
+                                  ? `${((parseFloat(editPrizeAmount) || 0) * (parseInt(editPrizeQty) || 0)).toFixed(2)}₾`
+                                  : `${(pr.amount * pr.quantity).toFixed(2)}₾`}
+                              </td>
                               <td className="px-2 py-2" style={{ color: "#22C55E" }}>{pr.wonCount}</td>
                               <td className="px-2 py-2" style={{ color: "#FFF" }}>{remaining}</td>
                               <td className="px-2 py-2"><span className="px-2 py-0.5 rounded text-[10px]" style={{ background: exhausted ? "#1A1A1A" : "#22C55E20", color: exhausted ? "#666" : "#22C55E" }}>{exhausted ? "ამოწურულია" : "აქტიური"}</span></td>
                               <td className="px-2 py-2">
-                                {pr.wonCount === 0 && <button onClick={() => handleDelPrize(pr.id)} className="text-[10px] px-2 py-0.5 rounded" style={{ background: "#1A1A1A", color: "#EF4444" }}>del</button>}
+                                {editing ? (
+                                  <div className="flex gap-1">
+                                    <button onClick={() => handleSaveEditPrize(pr.id, pr.wonCount)} className="text-[10px] px-2 py-0.5 rounded" style={{ background: "#22C55E20", color: "#22C55E" }}>✓</button>
+                                    <button onClick={() => setEditingPrizeId(null)} className="text-[10px] px-2 py-0.5 rounded" style={{ background: "#1A1A1A", color: "#A0A0A0" }}>×</button>
+                                  </div>
+                                ) : (
+                                  <div className="flex gap-1">
+                                    <button onClick={() => handleStartEditPrize(pr)} className="text-[10px] px-2 py-0.5 rounded" style={{ background: "#1A1A1A", color: "#F9E741", border: "1px solid #252525" }}>edit</button>
+                                    {pr.wonCount === 0 && <button onClick={() => handleDelPrize(pr.id)} className="text-[10px] px-2 py-0.5 rounded" style={{ background: "#1A1A1A", color: "#EF4444" }}>del</button>}
+                                  </div>
+                                )}
                               </td>
                             </tr>
                           );
