@@ -1908,9 +1908,7 @@ async function ensureBigWinConfig() {
   const db = getDb();
   const [existing] = await db.select().from(bigWinConfig).limit(1);
   if (!existing) {
-    await db.insert(bigWinConfig).values({
-      id: "main", budgetPercent: 30, triggerChancePercent: 0.1,
-    });
+    await db.insert(bigWinConfig).values({ id: "main", budgetPercent: 30 });
   }
 }
 
@@ -1934,10 +1932,7 @@ admin.get("/big-win/config", adminMiddleware, async (c) => {
 
   return c.json({
     success: true,
-    config: {
-      budgetPercent,
-      triggerChancePercent: Number(cfg?.triggerChancePercent) || 0.1,
-    },
+    config: { budgetPercent },
     pool: {
       balance: poolBalance,
       threshold,
@@ -1951,8 +1946,7 @@ admin.get("/big-win/config", adminMiddleware, async (c) => {
 });
 
 const bigWinConfigSchema = z.object({
-  budgetPercent: z.number().min(0).max(100).optional(),
-  triggerChancePercent: z.number().min(0).max(100).optional(),
+  budgetPercent: z.number().min(0).max(100),
 });
 
 // PUT /admin/big-win/config
@@ -1962,10 +1956,10 @@ admin.put("/big-win/config", adminMiddleware, async (c) => {
   const parsed = bigWinConfigSchema.safeParse(body);
   if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
   const db = getDb();
-  const updates: any = { updatedAt: new Date().toISOString() };
-  if (parsed.data.budgetPercent !== undefined) updates.budgetPercent = parsed.data.budgetPercent;
-  if (parsed.data.triggerChancePercent !== undefined) updates.triggerChancePercent = parsed.data.triggerChancePercent;
-  await db.update(bigWinConfig).set(updates).where(eq(bigWinConfig.id, "main"));
+  await db.update(bigWinConfig).set({
+    budgetPercent: parsed.data.budgetPercent,
+    updatedAt: new Date().toISOString(),
+  }).where(eq(bigWinConfig.id, "main"));
   const adminId = c.get("adminId") as string;
   await logAction(adminId, "update_big_win_config", JSON.stringify(parsed.data));
   return c.json({ success: true });

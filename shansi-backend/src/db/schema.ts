@@ -228,7 +228,6 @@ export const systemConfig = sqliteTable("system_config", {
 export const bigWinConfig = sqliteTable("big_win_config", {
   id: text("id").primaryKey(),
   budgetPercent: real("budget_percent").default(30).notNull(),
-  triggerChancePercent: real("trigger_chance_percent").default(0.1).notNull(),
   updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
 });
 

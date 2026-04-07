@@ -125,7 +125,6 @@ function AlgorithmContent() {
   const [bigWinData, setBigWinData] = useState<any>(null);
   const [bigWinPrizes, setBigWinPrizes] = useState<any[]>([]);
   const [bwBudgetPercent, setBwBudgetPercent] = useState(30);
-  const [bwTriggerChance, setBwTriggerChance] = useState(0.1);
   const [bwEditingConfig, setBwEditingConfig] = useState(false);
   const [showAddPrize, setShowAddPrize] = useState(false);
   const [newPrizeAmount, setNewPrizeAmount] = useState("");
@@ -137,7 +136,6 @@ function AlgorithmContent() {
       if (cfg.success) {
         setBigWinData(cfg);
         setBwBudgetPercent(cfg.config.budgetPercent);
-        setBwTriggerChance(cfg.config.triggerChancePercent);
       }
       const pz = await getBigWinPrizes() as any;
       if (pz.success) setBigWinPrizes(pz.prizes);
@@ -146,7 +144,7 @@ function AlgorithmContent() {
 
   const handleSaveBigWinConfig = async () => {
     try {
-      await updateBigWinConfig({ budgetPercent: bwBudgetPercent, triggerChancePercent: bwTriggerChance });
+      await updateBigWinConfig({ budgetPercent: bwBudgetPercent });
       setBwEditingConfig(false);
       loadBigWin();
     } catch (e: any) { alert(e.message); }
@@ -344,7 +342,7 @@ function AlgorithmContent() {
                 </div>
 
                 {/* Config controls */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
                   <div>
                     <label className="text-[10px] block mb-1" style={{ color: "#666" }}>ბიგ ვინის ბიუჯეტი %</label>
                     <input type="number" min="0" max="100" value={bwBudgetPercent} onChange={e => { setBwBudgetPercent(parseFloat(e.target.value) || 0); setBwEditingConfig(true); }}
@@ -354,12 +352,8 @@ function AlgorithmContent() {
                     <label className="text-[10px] block mb-1" style={{ color: "#666" }}>ჩვეულებრივი (auto)</label>
                     <input type="number" disabled value={(100 - bwBudgetPercent).toFixed(1)} className="w-full rounded-lg px-2 py-1.5 text-[13px]" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A", color: "#666" }} />
                   </div>
-                  <div>
-                    <label className="text-[10px] block mb-1" style={{ color: "#666" }}>Big Win trigger %</label>
-                    <input type="number" min="0" max="100" step="0.01" value={bwTriggerChance} onChange={e => { setBwTriggerChance(parseFloat(e.target.value) || 0); setBwEditingConfig(true); }}
-                      className="w-full rounded-lg px-2 py-1.5 text-[13px]" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
-                  </div>
                 </div>
+                <p className="text-[10px] mb-4" style={{ color: "#555" }}>ბიგ ვინების სიხშირე ავტომატურია — დამოკიდებულია პრიზების რაოდენობაზე და ბიუჯეტზე</p>
                 {bwEditingConfig && (
                   <button onClick={handleSaveBigWinConfig} className="mb-4 px-4 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: "#F9E741", color: "#000" }}>შენახვა</button>
                 )}

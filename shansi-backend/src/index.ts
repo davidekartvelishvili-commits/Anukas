@@ -170,7 +170,7 @@ async function runStartupMigrations() {
     }
     // Default big win config (single row)
     try {
-      await (db as any).run(sql`INSERT INTO big_win_config (id, budget_percent, trigger_chance_percent) VALUES ('main', 30, 0.1)`);
+      await (db as any).run(sql`INSERT INTO big_win_config (id, budget_percent) VALUES ('main', 30)`);
     } catch {}
   } catch (e: any) {
     console.error("[startup seed]", e.message);
