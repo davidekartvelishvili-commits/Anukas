@@ -268,14 +268,15 @@ user.post("/confirm-payment", async (c) => {
   const guaranteedMinimum = Math.round(amount * minReturnPercent / 100 * 100) / 100;
 
   // Create payment transaction
+  const paymentTxId = nanoid();
   await db.insert(paymentTransactions).values({
-    id: nanoid(), userId, merchantId: m.id,
+    id: paymentTxId, userId, merchantId: m.id,
     amount, commissionAmount, merchantAmount, coinsAwarded,
   });
 
-  // Create coin transaction for user
+  // Create coin transaction for user — LINKED to payment for finance tracking
   await db.insert(transactions).values({
-    id: nanoid(), userId, paymentAmount: amount,
+    id: nanoid(), userId, paymentTransactionId: paymentTxId, paymentAmount: amount,
     coinsReceived: coinsAwarded, coinsRemaining: coinsAwarded,
     totalCashWon: 0, guaranteedMinimum, status: "active",
   });

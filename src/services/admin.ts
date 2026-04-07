@@ -207,6 +207,9 @@ export async function getFinanceData(from?: string, to?: string, page = 1, q?: s
 export async function getPoolFundingHistory() {
   return adminFetch("/admin/finance/pool-history");
 }
+export async function resetLegacyCommissions() {
+  return adminFetch("/admin/finance/reset-legacy-commissions", { method: "POST" });
+}
 export async function fundPoolWithNote(amount: number, note?: string) {
   return adminFetch("/admin/finance/fund-pool", {
     method: "POST",

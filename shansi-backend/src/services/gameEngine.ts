@@ -296,6 +296,8 @@ async function _playGameInner(
     winAmount: totalWin,
     poolBalanceBefore: poolBefore,
     poolBalanceAfter: poolAfter?.balance || poolBefore,
+    // Link this game to the source payment for accurate finance reporting
+    paymentTransactionId: (activeTx as any).paymentTransactionId || null,
   });
 
   // Re-read for accurate return values

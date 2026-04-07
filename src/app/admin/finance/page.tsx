@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getFinanceData, getPoolFundingHistory, fundPoolWithNote, getUserFinance } from "@/services/admin";
+import { getFinanceData, getPoolFundingHistory, fundPoolWithNote, getUserFinance, resetLegacyCommissions } from "@/services/admin";
 
 /* ── ICONS ── */
 function NavIcon({ id, active }: { id: string; active: boolean }) {
@@ -240,6 +240,19 @@ export default function FinancePage() {
             <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#A0A0A0" strokeWidth="1.5" strokeLinecap="round"><line x1="4" y1="7" x2="18" y2="7" /><line x1="4" y1="11" x2="18" y2="11" /><line x1="4" y1="15" x2="18" y2="15" /></svg>
           </button>
           <h1 className="text-[16px] font-semibold flex-1" style={{ color: "#FFFFFF" }}>ფინანსები</h1>
+          <button
+            onClick={async () => {
+              if (!confirm("Legacy pending კომისიების გასწორება (ერთჯერადი)?\n\nესვმარკავს ძველ pending რიგებს როგორც in_pool — pool-ის totalFunded-ის მიხედვით.")) return;
+              try {
+                const r = await resetLegacyCommissions() as any;
+                alert(`გასწორდა ${r.cleared} ჩანაწერი (${r.consumed}₾ / ${r.totalFunded}₾)`);
+                loadData();
+              } catch (e: any) { alert(e.message); }
+            }}
+            className="px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all hover:opacity-80 mr-2"
+            style={{ background: "#1A1A1A", color: "#F59E0B", border: "1px solid #252525" }}
+            title="ერთჯერადი fix legacy pending commissions"
+          >Legacy Fix</button>
           <button onClick={exportCSV} className="px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all hover:opacity-80" style={{ background: "#1A1A1A", color: "#A0A0A0", border: "1px solid #252525" }}>ექსპორტი</button>
         </header>
 

@@ -1058,7 +1058,7 @@ admin.patch("/withdrawals/:id", adminMiddleware, async (c) => {
 // FINANCE
 // ══════════════════════════════════════
 
-// Auto-create pool_fundings table & ensure commission_status column exists
+// Auto-create pool_fundings table & ensure all finance-related columns exist
 async function ensureFinanceTables() {
   const db = getDb();
   try {
@@ -1072,6 +1072,12 @@ async function ensureFinanceTables() {
   } catch {}
   try {
     await (db as any).run(sql`ALTER TABLE payment_transactions ADD COLUMN commission_status TEXT NOT NULL DEFAULT 'pending'`);
+  } catch {} // already exists
+  try {
+    await (db as any).run(sql`ALTER TABLE game_history ADD COLUMN payment_transaction_id TEXT`);
+  } catch {} // already exists
+  try {
+    await (db as any).run(sql`ALTER TABLE transactions ADD COLUMN payment_transaction_id TEXT`);
   } catch {} // already exists
 }
 
@@ -1199,13 +1205,26 @@ admin.get("/finance", adminMiddleware, async (c) => {
   const enriched = await Promise.all(txList.map(async (tx) => {
     const [user] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, tx.userId)).limit(1);
     const [merch] = await db.select({ businessName: merchants.businessName, commissionPercent: merchants.commissionPercent }).from(merchants).where(eq(merchants.id, tx.merchantId)).limit(1);
-    // Sum user's winnings from coins of this transaction's session
-    // Approximation: sum gameHistory.winAmount for this user between tx time and tx+24h
-    const txDate = new Date(tx.createdAt);
-    const after = new Date(txDate.getTime() + 24 * 3600 * 1000).toISOString();
+    // Sum winnings via FK link (accurate, replaces 24h approximation)
+    // Falls back to 24h window for legacy rows where paymentTransactionId is null
     const [winRow] = await db.select({ s: sql<number>`coalesce(sum(${gameHistory.winAmount}), 0)` })
       .from(gameHistory)
-      .where(and(eq(gameHistory.userId, tx.userId), sql`${gameHistory.createdAt} >= ${tx.createdAt}`, sql`${gameHistory.createdAt} <= ${after}`));
+      .where(eq(gameHistory.paymentTransactionId, tx.id));
+    let userWinnings = Number(winRow?.s) || 0;
+    if (userWinnings === 0) {
+      // Legacy fallback: pre-FK rows
+      const txDate = new Date(tx.createdAt);
+      const after = new Date(txDate.getTime() + 24 * 3600 * 1000).toISOString();
+      const [legacyRow] = await db.select({ s: sql<number>`coalesce(sum(${gameHistory.winAmount}), 0)` })
+        .from(gameHistory)
+        .where(and(
+          eq(gameHistory.userId, tx.userId),
+          sql`${gameHistory.paymentTransactionId} IS NULL`,
+          sql`${gameHistory.createdAt} >= ${tx.createdAt}`,
+          sql`${gameHistory.createdAt} <= ${after}`,
+        ));
+      userWinnings = Number(legacyRow?.s) || 0;
+    }
     return {
       id: tx.id,
       merchantName: merch?.businessName || "—",
@@ -1216,7 +1235,7 @@ admin.get("/finance", adminMiddleware, async (c) => {
       amount: tx.amount,
       commissionAmount: tx.commissionAmount,
       coinsAwarded: tx.coinsAwarded,
-      userWinnings: Number(winRow?.s) || 0,
+      userWinnings,
       commissionStatus: tx.commissionStatus,
       createdAt: tx.createdAt,
     };
@@ -1251,6 +1270,37 @@ admin.get("/finance", adminMiddleware, async (c) => {
       totalPages: Math.ceil((Number(totalTxResult?.count) || 0) / limit),
     },
   });
+});
+
+// POST /admin/finance/reset-legacy-commissions — one-time fix for pre-tracking pending rows
+// Marks all paymentTransactions older than the most recent pool_funding as "in_pool"
+// since they were funded via the old endpoint that didn't track commission_status
+admin.post("/finance/reset-legacy-commissions", adminMiddleware, async (c) => {
+  await ensureFinanceTables();
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  // Get total funded from pool table — assume that's what was already covered
+  const [poolRow] = await db.select().from(pool).limit(1);
+  const totalFunded = Number(poolRow?.totalFunded) || 0;
+
+  // Mark oldest pending commissions as in_pool, FIFO until accumulated >= totalFunded
+  const pendingTxs = await db.select().from(paymentTransactions)
+    .where(eq(paymentTransactions.commissionStatus, "pending"))
+    .orderBy(paymentTransactions.createdAt);
+
+  let consumed = 0;
+  let cleared = 0;
+  for (const tx of pendingTxs) {
+    if (consumed >= totalFunded - 0.001) break;
+    await db.update(paymentTransactions).set({ commissionStatus: "in_pool" } as any).where(eq(paymentTransactions.id, tx.id));
+    consumed += tx.commissionAmount;
+    cleared++;
+  }
+
+  await logAction(adminId, "reset_legacy_commissions", `Cleared ${cleared} legacy pending commissions (${consumed.toFixed(2)}₾) against ${totalFunded.toFixed(2)}₾ total funded`);
+
+  return c.json({ success: true, cleared, consumed: Math.round(consumed * 100) / 100, totalFunded });
 });
 
 // GET /admin/finance/pool-history — funding history

@@ -71,12 +71,16 @@ export const gameHistory = sqliteTable("game_history", {
   winAmount: real("win_amount").notNull(),
   poolBalanceBefore: real("pool_balance_before"),
   poolBalanceAfter: real("pool_balance_after"),
+  // FK link to source payment that created the coins for this game
+  paymentTransactionId: text("payment_transaction_id"),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
 });
 
 export const transactions = sqliteTable("transactions", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
+  // FK to the payment that created these coins (for finance tracking)
+  paymentTransactionId: text("payment_transaction_id"),
   paymentAmount: real("payment_amount").notNull(),
   coinsReceived: integer("coins_received").notNull(),
   coinsRemaining: integer("coins_remaining").notNull(),
