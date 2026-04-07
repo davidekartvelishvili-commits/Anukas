@@ -157,9 +157,13 @@ function AlgorithmContent() {
     const qty = parseInt(newPrizeQty);
     if (!amt || !qty || amt <= 0 || qty <= 0) return;
     const totalNew = amt * qty;
-    const free = bigWinData?.pool?.freeBigWin || 0;
-    if (totalNew > free) {
-      if (!confirm(`პრიზები ბიუჯეტს აჭარბებს (${totalNew}₾ > ${free}₾). გავაგრძელო?`)) return;
+    const allocatedNow = bigWinPrizes.reduce((s, pr) => s + pr.amount * Math.max(0, pr.quantity - pr.wonCount), 0);
+    const budget = bigWinData?.pool?.bigWinBudget || 0;
+    const free = budget - allocatedNow;
+    if (totalNew > free + 0.001) {
+      const over = (totalNew - free).toFixed(2);
+      alert(`❌ პრიზი ბიუჯეტს აჭარბებს ${over}₾-ით\n\nბიგ ვინ ბიუჯეტი: ${budget.toFixed(2)}₾\nუკვე გამოყოფილი: ${allocatedNow.toFixed(2)}₾\nთავისუფალი: ${free.toFixed(2)}₾\nახალი პრიზის ჯამი: ${totalNew.toFixed(2)}₾\n\nპრიზი არ დაემატა.`);
+      return;
     }
     try {
       await createBigWinPrize({ amount: amt, quantity: qty });
@@ -424,9 +428,29 @@ function AlgorithmContent() {
                   <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>რაოდენობა</label>
                   <input type="number" value={newPrizeQty} onChange={e => setNewPrizeQty(e.target.value)} className="w-full rounded-lg px-3 py-2 text-[14px]" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
                 </div>
-                {newPrizeAmount && newPrizeQty && (
-                  <p className="text-[12px] mb-4" style={{ color: "#A0A0A0" }}>ჯამი: <b style={{ color: "#F9E741" }}>{(parseFloat(newPrizeAmount) * parseInt(newPrizeQty || "0")).toFixed(2)}₾</b></p>
-                )}
+                {(() => {
+                  const amt = parseFloat(newPrizeAmount) || 0;
+                  const qty = parseInt(newPrizeQty || "0") || 0;
+                  const totalNew = amt * qty;
+                  const allocatedNow = bigWinPrizes.reduce((s, pr) => s + pr.amount * Math.max(0, pr.quantity - pr.wonCount), 0);
+                  const budget = bigWinData?.pool?.bigWinBudget || 0;
+                  const free = budget - allocatedNow;
+                  const over = totalNew > free + 0.001;
+                  if (totalNew === 0) return null;
+                  return (
+                    <div className="rounded-lg p-3 mb-4 text-[11px] space-y-1" style={{ background: over ? "#EF444415" : "#0A0A0A", border: `1px solid ${over ? "#EF444440" : "#1A1A1A"}` }}>
+                      <div className="flex justify-between"><span style={{ color: "#A0A0A0" }}>ბიგ ვინ ბიუჯეტი:</span> <b style={{ color: "#F9E741" }}>{budget.toFixed(2)}₾</b></div>
+                      <div className="flex justify-between"><span style={{ color: "#A0A0A0" }}>უკვე გამოყოფილი:</span> <b style={{ color: "#FFF" }}>{allocatedNow.toFixed(2)}₾</b></div>
+                      <div className="flex justify-between"><span style={{ color: "#A0A0A0" }}>თავისუფალი:</span> <b style={{ color: free > 0 ? "#22C55E" : "#EF4444" }}>{free.toFixed(2)}₾</b></div>
+                      <div className="flex justify-between border-t pt-1 mt-1" style={{ borderColor: "#1A1A1A" }}><span style={{ color: "#A0A0A0" }}>ახალი პრიზის ჯამი:</span> <b style={{ color: over ? "#EF4444" : "#FFF" }}>{totalNew.toFixed(2)}₾</b></div>
+                      {over && (
+                        <div className="text-center pt-1 font-bold" style={{ color: "#EF4444" }}>
+                          ⚠ აჭარბებს ბიუჯეტს {(totalNew - free).toFixed(2)}₾-ით
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div className="flex gap-2">
                   <button onClick={() => setShowAddPrize(false)} className="flex-1 px-4 py-2 rounded-xl text-[13px]" style={{ background: "#1A1A1A", color: "#A0A0A0", border: "1px solid #252525" }}>გაუქმება</button>
                   <button onClick={handleAddPrize} className="flex-1 px-4 py-2 rounded-xl text-[13px] font-bold" style={{ background: "#F9E741", color: "#000" }}>დამატება</button>

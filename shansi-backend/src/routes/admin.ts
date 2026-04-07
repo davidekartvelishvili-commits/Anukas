@@ -1989,6 +1989,22 @@ admin.post("/big-win/prizes", adminMiddleware, async (c) => {
   const parsed = prizeSchema.safeParse(body);
   if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
   const db = getDb();
+
+  // Server-side budget guard
+  await ensureBigWinConfig();
+  const [bw] = await db.select().from(bigWinConfig).limit(1);
+  const [poolRow] = await db.select().from(pool).limit(1);
+  const [gc] = await db.select().from(gameConfig).limit(1);
+  const available = Math.max(0, (Number(poolRow?.balance) || 0) - (Number(gc?.poolMinimumThreshold) || 0));
+  const budget = available * (Number(bw?.budgetPercent) || 30) / 100;
+  const existing = await db.select().from(bigWinPrizes).where(eq(bigWinPrizes.isActive, true));
+  const allocated = existing.reduce((s, p) => s + p.amount * Math.max(0, p.quantity - p.wonCount), 0);
+  const free = budget - allocated;
+  const totalNew = parsed.data.amount * parsed.data.quantity;
+  if (totalNew > free + 0.001) {
+    throw new BadRequestError(`პრიზი ბიუჯეტს აჭარბებს ${(totalNew - free).toFixed(2)}₾-ით (ბიუჯეტი: ${budget.toFixed(2)}₾, თავისუფალი: ${free.toFixed(2)}₾)`);
+  }
+
   await db.insert(bigWinPrizes).values({
     id: nanoid(),
     amount: parsed.data.amount,
