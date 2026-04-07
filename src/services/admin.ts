@@ -220,6 +220,20 @@ export async function getUserFinance(userId: string) {
   return adminFetch(`/admin/finance/user/${userId}`);
 }
 
+// Village
+export const getVillageLevels = () => adminFetch("/admin/village/levels");
+export const createVillageLevel = (data: any) => adminFetch("/admin/village/levels", { method: "POST", body: JSON.stringify(data) });
+export const updateVillageLevel = (id: string, data: any) => adminFetch(`/admin/village/levels/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export const deleteVillageLevel = (id: string) => adminFetch(`/admin/village/levels/${id}`, { method: "DELETE" });
+export const getVillageCards = () => adminFetch("/admin/village/cards");
+export const createVillageCard = (data: any) => adminFetch("/admin/village/cards", { method: "POST", body: JSON.stringify(data) });
+export const updateVillageCard = (id: string, data: any) => adminFetch(`/admin/village/cards/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export const deleteVillageCard = (id: string) => adminFetch(`/admin/village/cards/${id}`, { method: "DELETE" });
+export const getVillageConfig = () => adminFetch("/admin/village/config");
+export const updateVillageConfig = (data: any) => adminFetch("/admin/village/config", { method: "PUT", body: JSON.stringify(data) });
+export const getVillageAttacks = (page = 1) => adminFetch(`/admin/village/attacks?page=${page}`);
+export const getVillageStats = () => adminFetch("/admin/village/stats");
+
 // Algorithm simulation
 export async function startSimulation(params: {
   userCount: number;

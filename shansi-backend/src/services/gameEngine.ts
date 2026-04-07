@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { nanoid } from "nanoid";
 import { eq, and, or, desc, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
-import { gameConfig, pool, users, gameHistory, transactions, systemConfig } from "../db/schema.js";
+import { gameConfig, pool, users, gameHistory, transactions, systemConfig, userVillageProfile, villageLevels } from "../db/schema.js";
 
 // ═══════════════════════════════════════
 // PER-USER MUTEX — prevents parallel drops from causing race conditions
@@ -173,9 +173,33 @@ async function _playGameInner(
     plannedBonusWin = plan[played] || 0;
   }
 
+  // ═══════════════════════════════════════
+  // VILLAGE LEVEL CAP — user's level overrides global maxWin
+  // ═══════════════════════════════════════
+  let userMaxWin = config.maxWinPerUser;
+  try {
+    let [profile] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);
+    if (!profile) {
+      // Auto-create at Level 1 with 0 stars
+      await db.insert(userVillageProfile).values({
+        id: nanoid(), userId, currentLevel: 1, totalStars: 0,
+      });
+      [profile] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);
+    }
+    if (profile) {
+      const [lvl] = await db.select().from(villageLevels).where(eq(villageLevels.levelNumber, profile.currentLevel)).limit(1);
+      if (lvl) {
+        userMaxWin = Math.min(config.maxWinPerUser, lvl.maxWinAmount);
+      }
+    }
+  } catch (e: any) {
+    console.error("[village level cap]", e.message);
+    // fall back to global cap
+  }
+
   let { minWin, bonusWin } = calculateWin(betInLari, {
     avgReturnPercent: config.avgReturnPercent,
-    maxWinPerUser: config.maxWinPerUser,
+    maxWinPerUser: userMaxWin, // VILLAGE-CAPPED max win for this user
     poolMinimumThreshold: config.poolMinimumThreshold,
     fullReturnThreshold: config.fullReturnThreshold,
     minReturnPercent: config.minReturnPercent,

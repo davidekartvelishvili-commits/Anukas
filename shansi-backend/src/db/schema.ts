@@ -221,6 +221,64 @@ export const systemConfig = sqliteTable("system_config", {
   updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
 });
 
+// ═══════════════════════════════════════
+// VILLAGE — gamification layer (levels, cards, attacks)
+// ═══════════════════════════════════════
+
+export const villageLevels = sqliteTable("village_levels", {
+  id: text("id").primaryKey(),
+  levelNumber: integer("level_number").notNull().unique(),
+  starsRequired: integer("stars_required").notNull(),
+  maxWinAmount: real("max_win_amount").notNull(),
+  description: text("description"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+  updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const villageCards = sqliteTable("village_cards", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  rarity: text("rarity").notNull(), // common | rare | epic | legendary
+  imageUrl: text("image_url"),
+  starValue: integer("star_value").notNull(),
+  coinCost: integer("coin_cost").notNull(),
+  isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const userVillageProfile = sqliteTable("user_village_profile", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id).unique(),
+  currentLevel: integer("current_level").default(1).notNull(),
+  totalStars: integer("total_stars").default(0).notNull(),
+  shieldActiveUntil: text("shield_active_until"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+  updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const userCards = sqliteTable("user_cards", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  cardId: text("card_id").notNull().references(() => villageCards.id),
+  obtainedAt: text("obtained_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const villageAttacks = sqliteTable("village_attacks", {
+  id: text("id").primaryKey(),
+  attackerId: text("attacker_id").notNull().references(() => users.id),
+  victimId: text("victim_id").notNull().references(() => users.id),
+  attackResult: text("attack_result").notNull(), // success | failed | blocked
+  starsAwarded: integer("stars_awarded").default(0).notNull(),
+  attackerLevel: integer("attacker_level").notNull(),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const villageConfig = sqliteTable("village_config", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
+});
+
 export const simulationRuns = sqliteTable("simulation_runs", {
   id: text("id").primaryKey(),
   adminId: text("admin_id").notNull(),

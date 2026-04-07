@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings } from "../db/schema.js";
+import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig } from "../db/schema.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/errors.js";
@@ -1698,6 +1698,197 @@ admin.get("/algorithm/simulate-history", adminMiddleware, async (c) => {
       completedAt: r.completedAt,
       results: r.results ? JSON.parse(r.results) : null,
     })),
+  });
+});
+
+// ══════════════════════════════════════
+// VILLAGE — admin endpoints
+// ══════════════════════════════════════
+
+// GET /admin/village/levels
+admin.get("/village/levels", adminMiddleware, async (c) => {
+  const db = getDb();
+  const levels = await db.select().from(villageLevels).orderBy(villageLevels.levelNumber);
+  return c.json({ success: true, levels });
+});
+
+const levelSchema = z.object({
+  levelNumber: z.number().int().min(1),
+  starsRequired: z.number().int().min(0),
+  maxWinAmount: z.number().min(0),
+  description: z.string().optional(),
+});
+
+// POST /admin/village/levels — create new level
+admin.post("/village/levels", adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const parsed = levelSchema.safeParse(body);
+  if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
+  const db = getDb();
+  const id = "lvl_" + parsed.data.levelNumber;
+  await db.insert(villageLevels).values({
+    id, levelNumber: parsed.data.levelNumber, starsRequired: parsed.data.starsRequired,
+    maxWinAmount: parsed.data.maxWinAmount, description: parsed.data.description || null,
+  });
+  return c.json({ success: true });
+});
+
+// PUT /admin/village/levels/:id
+admin.put("/village/levels/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id")!;
+  const body = await c.req.json();
+  const db = getDb();
+  const updates: any = { updatedAt: new Date().toISOString() };
+  if (body.starsRequired !== undefined) updates.starsRequired = body.starsRequired;
+  if (body.maxWinAmount !== undefined) updates.maxWinAmount = body.maxWinAmount;
+  if (body.description !== undefined) updates.description = body.description;
+  await db.update(villageLevels).set(updates).where(eq(villageLevels.id, id));
+  return c.json({ success: true });
+});
+
+// DELETE /admin/village/levels/:id
+admin.delete("/village/levels/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id")!;
+  const db = getDb();
+  await db.delete(villageLevels).where(eq(villageLevels.id, id));
+  return c.json({ success: true });
+});
+
+// GET /admin/village/cards
+admin.get("/village/cards", adminMiddleware, async (c) => {
+  const db = getDb();
+  const cards = await db.select().from(villageCards).orderBy(villageCards.coinCost);
+  return c.json({ success: true, cards });
+});
+
+const cardSchema = z.object({
+  name: z.string().min(1),
+  rarity: z.enum(["common", "rare", "epic", "legendary"]),
+  imageUrl: z.string().optional(),
+  starValue: z.number().int().min(1),
+  coinCost: z.number().int().min(1),
+});
+
+// POST /admin/village/cards
+admin.post("/village/cards", adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const parsed = cardSchema.safeParse(body);
+  if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
+  const db = getDb();
+  await db.insert(villageCards).values({
+    id: nanoid(),
+    name: parsed.data.name,
+    rarity: parsed.data.rarity,
+    imageUrl: parsed.data.imageUrl || null,
+    starValue: parsed.data.starValue,
+    coinCost: parsed.data.coinCost,
+  });
+  return c.json({ success: true });
+});
+
+// PUT /admin/village/cards/:id
+admin.put("/village/cards/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id")!;
+  const body = await c.req.json();
+  const db = getDb();
+  const updates: any = {};
+  if (body.name !== undefined) updates.name = body.name;
+  if (body.rarity !== undefined) updates.rarity = body.rarity;
+  if (body.imageUrl !== undefined) updates.imageUrl = body.imageUrl;
+  if (body.starValue !== undefined) updates.starValue = body.starValue;
+  if (body.coinCost !== undefined) updates.coinCost = body.coinCost;
+  if (body.isActive !== undefined) updates.isActive = body.isActive;
+  await db.update(villageCards).set(updates).where(eq(villageCards.id, id));
+  return c.json({ success: true });
+});
+
+// DELETE /admin/village/cards/:id
+admin.delete("/village/cards/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id")!;
+  const db = getDb();
+  await db.delete(villageCards).where(eq(villageCards.id, id));
+  return c.json({ success: true });
+});
+
+// GET /admin/village/config
+admin.get("/village/config", adminMiddleware, async (c) => {
+  const db = getDb();
+  const rows = await db.select().from(villageConfig);
+  const config: Record<string, string> = {};
+  for (const r of rows) config[r.key] = r.value;
+  return c.json({ success: true, config });
+});
+
+// PUT /admin/village/config
+admin.put("/village/config", adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const db = getDb();
+  for (const [k, v] of Object.entries(body)) {
+    const value = String(v);
+    const [existing] = await db.select().from(villageConfig).where(eq(villageConfig.key, k)).limit(1);
+    if (existing) {
+      await db.update(villageConfig).set({ value, updatedAt: new Date().toISOString() }).where(eq(villageConfig.key, k));
+    } else {
+      await db.insert(villageConfig).values({ key: k, value });
+    }
+  }
+  return c.json({ success: true });
+});
+
+// GET /admin/village/attacks — paginated history
+admin.get("/village/attacks", adminMiddleware, async (c) => {
+  const db = getDb();
+  const page = parseInt(c.req.query("page") || "1");
+  const limit = 30;
+  const offset = (page - 1) * limit;
+  const list = await db.select().from(villageAttacks).orderBy(desc(villageAttacks.createdAt)).limit(limit).offset(offset);
+  const enriched = await Promise.all(list.map(async (a) => {
+    const [att] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, a.attackerId)).limit(1);
+    const [vic] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, a.victimId)).limit(1);
+    return { ...a, attackerName: att?.name || att?.phone || a.attackerId, victimName: vic?.name || vic?.phone || a.victimId };
+  }));
+  const [total] = await db.select({ c: sql<number>`count(*)` }).from(villageAttacks);
+  return c.json({ success: true, attacks: enriched, total: Number(total?.c) || 0 });
+});
+
+// GET /admin/village/stats
+admin.get("/village/stats", adminMiddleware, async (c) => {
+  const db = getDb();
+
+  // Users per level
+  const distRows = await db.select({
+    level: userVillageProfile.currentLevel,
+    c: sql<number>`count(*)`,
+  }).from(userVillageProfile).groupBy(userVillageProfile.currentLevel);
+
+  // Top cards
+  const topRows = await db.select({
+    cardId: userCards.cardId,
+    c: sql<number>`count(*)`,
+  }).from(userCards).groupBy(userCards.cardId).orderBy(sql`count(*) desc`).limit(10);
+  const topCards = await Promise.all(topRows.map(async (r) => {
+    const [card] = await db.select().from(villageCards).where(eq(villageCards.id, r.cardId)).limit(1);
+    return { name: card?.name || "—", rarity: card?.rarity || "—", count: Number(r.c) || 0 };
+  }));
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+
+  const [attacksToday] = await db.select({ c: sql<number>`count(*)` }).from(villageAttacks).where(sql`${villageAttacks.createdAt} >= ${todayStr}`);
+  const [attacksWeek] = await db.select({ c: sql<number>`count(*)` }).from(villageAttacks).where(sql`${villageAttacks.createdAt} >= ${weekAgo}`);
+  const [cardsToday] = await db.select({ c: sql<number>`count(*)` }).from(userCards).where(sql`${userCards.obtainedAt} >= ${todayStr}`);
+  const [cardsWeek] = await db.select({ c: sql<number>`count(*)` }).from(userCards).where(sql`${userCards.obtainedAt} >= ${weekAgo}`);
+
+  return c.json({
+    success: true,
+    stats: {
+      usersPerLevel: distRows.map(r => ({ level: r.level, count: Number(r.c) || 0 })),
+      topCards,
+      attacksToday: Number(attacksToday?.c) || 0,
+      attacksWeek: Number(attacksWeek?.c) || 0,
+      cardsBoughtToday: Number(cardsToday?.c) || 0,
+      cardsBoughtWeek: Number(cardsWeek?.c) || 0,
+    },
   });
 });
 
