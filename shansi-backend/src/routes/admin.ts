@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns } from "../db/schema.js";
+import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings } from "../db/schema.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/errors.js";
@@ -1022,37 +1022,259 @@ admin.patch("/withdrawals/:id", adminMiddleware, async (c) => {
 // FINANCE
 // ══════════════════════════════════════
 
-// GET /admin/finance
-admin.get("/finance", adminMiddleware, async (c) => {
+// Auto-create pool_fundings table & ensure commission_status column exists
+async function ensureFinanceTables() {
   const db = getDb();
+  try {
+    await (db as any).run(sql`CREATE TABLE IF NOT EXISTS pool_fundings (
+      id TEXT PRIMARY KEY,
+      amount REAL NOT NULL,
+      admin_id TEXT NOT NULL,
+      note TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+  } catch {}
+  try {
+    await (db as any).run(sql`ALTER TABLE payment_transactions ADD COLUMN commission_status TEXT NOT NULL DEFAULT 'pending'`);
+  } catch {} // already exists
+}
+
+// GET /admin/finance — full finance dashboard with date filter
+admin.get("/finance", adminMiddleware, async (c) => {
+  await ensureFinanceTables();
+  const db = getDb();
+
+  const from = c.req.query("from"); // YYYY-MM-DD
+  const to = c.req.query("to");
+  const page = parseInt(c.req.query("page") || "1");
+  const limit = parseInt(c.req.query("limit") || "20");
+  const offset = (page - 1) * limit;
+
+  const dateConds: any[] = [];
+  if (from) dateConds.push(sql`${paymentTransactions.createdAt} >= ${from}`);
+  if (to) dateConds.push(sql`${paymentTransactions.createdAt} <= ${to + "T23:59:59"}`);
+  const dateWhere = dateConds.length > 0 ? and(...dateConds) : undefined;
+
+  // Pool current state (real-time, not date-filtered)
+  const [poolRow] = await db.select().from(pool).limit(1);
+  const poolBalance = Number(poolRow?.balance) || 0;
+  const poolMinThreshold = 1000;
+  let poolStatus: "healthy" | "low" | "critical" = "critical";
+  if (poolBalance >= poolMinThreshold) poolStatus = "healthy";
+  else if (poolBalance > poolMinThreshold * 0.3) poolStatus = "low";
+
+  // Commission stats — date filtered
   const [commissionStats] = await db.select({
     totalCommission: sql<number>`coalesce(sum(${paymentTransactions.commissionAmount}), 0)`,
     totalPayments: sql<number>`count(*)`,
     totalVolume: sql<number>`coalesce(sum(${paymentTransactions.amount}), 0)`,
-  }).from(paymentTransactions);
+  }).from(paymentTransactions).where(dateWhere);
 
-  const [withdrawalStats] = await db.select({
-    totalPaidOut: sql<number>`coalesce(sum(${withdrawals.amount}), 0)`,
-  }).from(withdrawals).where(eq(withdrawals.status, "completed"));
+  // Pending commission (not yet in pool) — across all time
+  const [pendingCommission] = await db.select({
+    totalPending: sql<number>`coalesce(sum(${paymentTransactions.commissionAmount}), 0)`,
+  }).from(paymentTransactions).where(eq(paymentTransactions.commissionStatus, "pending"));
 
-  const [pendingWithdrawals] = await db.select({
-    totalPending: sql<number>`coalesce(sum(${withdrawals.amount}), 0)`,
-    count: sql<number>`count(*)`,
-  }).from(withdrawals).where(eq(withdrawals.status, "pending"));
+  // Total paid out as cash winnings — date filtered (using gameHistory winAmount)
+  const gameDateConds: any[] = [];
+  if (from) gameDateConds.push(sql`${gameHistory.createdAt} >= ${from}`);
+  if (to) gameDateConds.push(sql`${gameHistory.createdAt} <= ${to + "T23:59:59"}`);
+  const [winStats] = await db.select({
+    totalPaidOut: sql<number>`coalesce(sum(${gameHistory.winAmount}), 0)`,
+  }).from(gameHistory).where(gameDateConds.length > 0 ? and(...gameDateConds) : undefined);
 
   const totalCommission = Number(commissionStats?.totalCommission) || 0;
-  const totalPaidOut = Number(withdrawalStats?.totalPaidOut) || 0;
+  const totalPaidOut = Number(winStats?.totalPaidOut) || 0;
+
+  // Charts — last 30 days regardless of filter (for trend visibility)
+  const dailyStats: { date: string; commission: number; paidOut: number }[] = [];
+  for (let d = 29; d >= 0; d--) {
+    const date = new Date();
+    date.setDate(date.getDate() - d);
+    const dStr = date.toISOString().slice(0, 10);
+    const dStart = `${dStr}T00:00:00`;
+    const dEnd = `${dStr}T23:59:59`;
+    const [c1] = await db.select({ s: sql<number>`coalesce(sum(${paymentTransactions.commissionAmount}), 0)` })
+      .from(paymentTransactions)
+      .where(and(sql`${paymentTransactions.createdAt} >= ${dStart}`, sql`${paymentTransactions.createdAt} <= ${dEnd}`));
+    const [g1] = await db.select({ s: sql<number>`coalesce(sum(${gameHistory.winAmount}), 0)` })
+      .from(gameHistory)
+      .where(and(sql`${gameHistory.createdAt} >= ${dStart}`, sql`${gameHistory.createdAt} <= ${dEnd}`));
+    dailyStats.push({ date: dStr, commission: Number(c1?.s) || 0, paidOut: Number(g1?.s) || 0 });
+  }
+
+  // Pie chart — commission by merchant (date filtered)
+  const merchantBreakdown = await db.select({
+    merchantId: paymentTransactions.merchantId,
+    total: sql<number>`coalesce(sum(${paymentTransactions.commissionAmount}), 0)`,
+    count: sql<number>`count(*)`,
+  }).from(paymentTransactions).where(dateWhere).groupBy(paymentTransactions.merchantId);
+
+  const merchantsBreakdown = await Promise.all(merchantBreakdown.map(async (m) => {
+    const [merch] = await db.select({ businessName: merchants.businessName }).from(merchants).where(eq(merchants.id, m.merchantId)).limit(1);
+    return { name: merch?.businessName || "—", total: Number(m.total) || 0, count: Number(m.count) || 0 };
+  }));
+  merchantsBreakdown.sort((a, b) => b.total - a.total);
+
+  // Transactions table — date filtered + paginated
+  const txList = await db.select().from(paymentTransactions)
+    .where(dateWhere)
+    .orderBy(desc(paymentTransactions.createdAt))
+    .limit(limit).offset(offset);
+
+  const [totalTxResult] = await db.select({ count: sql<number>`count(*)` }).from(paymentTransactions).where(dateWhere);
+
+  const enriched = await Promise.all(txList.map(async (tx) => {
+    const [user] = await db.select({ phone: users.phone, name: users.name }).from(users).where(eq(users.id, tx.userId)).limit(1);
+    const [merch] = await db.select({ businessName: merchants.businessName, commissionPercent: merchants.commissionPercent }).from(merchants).where(eq(merchants.id, tx.merchantId)).limit(1);
+    // Sum user's winnings from coins of this transaction's session
+    // Approximation: sum gameHistory.winAmount for this user between tx time and tx+24h
+    const txDate = new Date(tx.createdAt);
+    const after = new Date(txDate.getTime() + 24 * 3600 * 1000).toISOString();
+    const [winRow] = await db.select({ s: sql<number>`coalesce(sum(${gameHistory.winAmount}), 0)` })
+      .from(gameHistory)
+      .where(and(eq(gameHistory.userId, tx.userId), sql`${gameHistory.createdAt} >= ${tx.createdAt}`, sql`${gameHistory.createdAt} <= ${after}`));
+    return {
+      id: tx.id,
+      merchantName: merch?.businessName || "—",
+      commissionPercent: Number(merch?.commissionPercent) || 0,
+      userId: tx.userId,
+      userPhone: user?.phone || "",
+      userName: user?.name || "",
+      amount: tx.amount,
+      commissionAmount: tx.commissionAmount,
+      coinsAwarded: tx.coinsAwarded,
+      userWinnings: Number(winRow?.s) || 0,
+      commissionStatus: tx.commissionStatus,
+      createdAt: tx.createdAt,
+    };
+  }));
 
   return c.json({
     success: true,
-    finance: {
+    summary: {
+      poolBalance,
+      poolStatus,
+      poolMinThreshold,
       totalCommission,
+      pendingCommission: Number(pendingCommission?.totalPending) || 0,
+      totalPaidOut,
+      profit: Math.round((totalCommission - totalPaidOut) * 100) / 100,
       totalPayments: Number(commissionStats?.totalPayments) || 0,
       totalVolume: Number(commissionStats?.totalVolume) || 0,
-      totalPaidOut,
-      pendingWithdrawals: Number(pendingWithdrawals?.totalPending) || 0,
-      pendingCount: Number(pendingWithdrawals?.count) || 0,
-      profit: Math.round((totalCommission - totalPaidOut) * 100) / 100,
+    },
+    charts: {
+      daily: dailyStats,
+      merchantBreakdown: merchantsBreakdown,
+    },
+    transactions: enriched,
+    pagination: {
+      page, limit,
+      total: Number(totalTxResult?.count) || 0,
+      totalPages: Math.ceil((Number(totalTxResult?.count) || 0) / limit),
+    },
+  });
+});
+
+// GET /admin/finance/pool-history — funding history
+admin.get("/finance/pool-history", adminMiddleware, async (c) => {
+  await ensureFinanceTables();
+  const db = getDb();
+  const fundings = await db.select().from(poolFundings).orderBy(desc(poolFundings.createdAt)).limit(50);
+  const enriched = await Promise.all(fundings.map(async (f) => {
+    const [adm] = await db.select({ name: admins.name, email: admins.email }).from(admins).where(eq(admins.id, f.adminId)).limit(1);
+    return { ...f, adminName: adm?.name || adm?.email || f.adminId };
+  }));
+  return c.json({ success: true, fundings: enriched });
+});
+
+// POST /admin/finance/fund-pool — add funds and clear pending
+const fundPoolSchema = z.object({
+  amount: z.number().positive(),
+  note: z.string().optional(),
+});
+admin.post("/finance/fund-pool", adminMiddleware, async (c) => {
+  await ensureFinanceTables();
+  const body = await c.req.json();
+  const parsed = fundPoolSchema.safeParse(body);
+  if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
+
+  const adminId = c.get("adminId") as string;
+  const db = getDb();
+  const { amount, note } = parsed.data;
+
+  // Get current pool
+  const [poolRow] = await db.select().from(pool).limit(1);
+  if (!poolRow) throw new BadRequestError("Pool not initialized");
+
+  // Update pool
+  await db.update(pool).set({
+    balance: sql`ROUND(${pool.balance} + ${amount}, 2)`,
+    totalFunded: sql`ROUND(${pool.totalFunded} + ${amount}, 2)`,
+    updatedAt: new Date().toISOString(),
+  } as any).where(eq(pool.id, poolRow.id));
+
+  // Mark oldest pending commissions as in_pool, up to amount
+  const pendingTxs = await db.select().from(paymentTransactions)
+    .where(eq(paymentTransactions.commissionStatus, "pending"))
+    .orderBy(paymentTransactions.createdAt);
+  let remaining = amount;
+  const consumed: string[] = [];
+  for (const tx of pendingTxs) {
+    if (remaining <= 0) break;
+    if (tx.commissionAmount <= remaining + 0.001) {
+      consumed.push(tx.id);
+      remaining -= tx.commissionAmount;
+    }
+  }
+  if (consumed.length > 0) {
+    for (const id of consumed) {
+      await db.update(paymentTransactions).set({ commissionStatus: "in_pool" } as any).where(eq(paymentTransactions.id, id));
+    }
+  }
+
+  // Log funding
+  await db.insert(poolFundings).values({
+    id: nanoid(), amount, adminId, note: note || null,
+  });
+
+  await logAction(adminId, "fund_pool", `Added ${amount}₾ to pool. Cleared ${consumed.length} pending commissions.`);
+
+  const [updatedPool] = await db.select().from(pool).limit(1);
+  return c.json({ success: true, newBalance: updatedPool?.balance, clearedCommissions: consumed.length });
+});
+
+// GET /admin/finance/user/:userId — user financial breakdown
+admin.get("/finance/user/:userId", adminMiddleware, async (c) => {
+  const userId = c.req.param("userId")!;
+  const db = getDb();
+
+  const [spendRow] = await db.select({
+    totalSpend: sql<number>`coalesce(sum(${paymentTransactions.amount}), 0)`,
+    txCount: sql<number>`count(*)`,
+  }).from(paymentTransactions).where(eq(paymentTransactions.userId, userId));
+
+  const [winRow] = await db.select({
+    totalWon: sql<number>`coalesce(sum(${gameHistory.winAmount}), 0)`,
+    gamesPlayed: sql<number>`count(*)`,
+  }).from(gameHistory).where(eq(gameHistory.userId, userId));
+
+  const [bonusRow] = await db.select({
+    bonusRounds: sql<number>`count(*)`,
+  }).from(transactions).where(and(eq(transactions.userId, userId), eq(transactions.status, "bonus_round")));
+
+  const totalSpend = Number(spendRow?.totalSpend) || 0;
+  const totalWon = Number(winRow?.totalWon) || 0;
+
+  return c.json({
+    success: true,
+    user: {
+      totalSpend,
+      totalWon,
+      winPercent: totalSpend > 0 ? Math.round((totalWon / totalSpend) * 10000) / 100 : 0,
+      gamesPlayed: Number(winRow?.gamesPlayed) || 0,
+      bonusRounds: Number(bonusRow?.bonusRounds) || 0,
+      txCount: Number(spendRow?.txCount) || 0,
     },
   });
 });

@@ -182,7 +182,17 @@ export const paymentTransactions = sqliteTable("payment_transactions", {
   merchantAmount: real("merchant_amount").notNull(),
   coinsAwarded: integer("coins_awarded").notNull(),
   status: text("status").default("completed").notNull(),
+  // Commission lifecycle: pending → transferred → in_pool
+  commissionStatus: text("commission_status").default("pending").notNull(),
   paymentReference: text("payment_reference"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const poolFundings = sqliteTable("pool_fundings", {
+  id: text("id").primaryKey(),
+  amount: real("amount").notNull(),
+  adminId: text("admin_id").notNull(),
+  note: text("note"),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
 });
 

@@ -196,6 +196,26 @@ export function isAdminAuthenticated(): boolean {
   return !!localStorage.getItem("adminToken");
 }
 
+// Finance
+export async function getFinanceData(from?: string, to?: string, page = 1) {
+  const params = new URLSearchParams({ page: String(page) });
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  return adminFetch(`/admin/finance?${params}`);
+}
+export async function getPoolFundingHistory() {
+  return adminFetch("/admin/finance/pool-history");
+}
+export async function fundPoolWithNote(amount: number, note?: string) {
+  return adminFetch("/admin/finance/fund-pool", {
+    method: "POST",
+    body: JSON.stringify({ amount, note }),
+  });
+}
+export async function getUserFinance(userId: string) {
+  return adminFetch(`/admin/finance/user/${userId}`);
+}
+
 // Algorithm simulation
 export async function startSimulation(params: {
   userCount: number;

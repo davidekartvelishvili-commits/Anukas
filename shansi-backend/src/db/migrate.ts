@@ -97,6 +97,14 @@ async function migrate() {
       details TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS pool_fundings (
+      id TEXT PRIMARY KEY,
+      amount REAL NOT NULL,
+      admin_id TEXT NOT NULL,
+      note TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `ALTER TABLE payment_transactions ADD COLUMN commission_status TEXT NOT NULL DEFAULT 'pending'`,
     `CREATE TABLE IF NOT EXISTS simulation_runs (
       id TEXT PRIMARY KEY,
       admin_id TEXT NOT NULL,
