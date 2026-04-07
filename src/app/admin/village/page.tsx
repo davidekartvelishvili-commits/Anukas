@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
+  getVillagesList, getVillageDetail, createVillage, updateVillage, deleteVillage, updateVillageBuilding,
   getVillageLevels, createVillageLevel, updateVillageLevel, deleteVillageLevel,
-  getVillageCards, createVillageCard, updateVillageCard, deleteVillageCard,
   getVillageConfig, updateVillageConfig,
   getVillageAttacks, getVillageStats,
 } from "@/services/admin";
@@ -47,110 +47,129 @@ const NAV_ITEMS = [
 ];
 const CURRENT = "village";
 
-const RARITY_COLORS: Record<string, string> = {
-  common: "#9CA3AF", rare: "#3B82F6", epic: "#A855F7", legendary: "#F59E0B",
-};
+// Image upload helper — converts file to base64, resized to max 500x500
+async function fileToCompressedBase64(file: File, maxDim = 500, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const ratio = Math.min(maxDim / width, maxDim / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/webp", quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 function VillageContent() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [tab, setTab] = useState<"levels" | "cards" | "settings" | "stats" | "attacks">("levels");
+  const [tab, setTab] = useState<"villages" | "levels" | "settings" | "stats" | "attacks">("villages");
 
-  // Levels
+  // Villages
+  const [villagesList, setVillagesList] = useState<any[]>([]);
+  const [selectedVillageId, setSelectedVillageId] = useState<string | null>(null);
+  const [selectedVillage, setSelectedVillage] = useState<any>(null);
+  const [showAddVillage, setShowAddVillage] = useState(false);
+  const [newVillageName, setNewVillageName] = useState("");
+  const [newVillageTheme, setNewVillageTheme] = useState("");
+
+  // Levels (existing system)
   const [levels, setLevels] = useState<any[]>([]);
   const [editLvl, setEditLvl] = useState<string | null>(null);
   const [editLvlData, setEditLvlData] = useState<any>(null);
-  const [showAddLvl, setShowAddLvl] = useState(false);
-  const [newLvl, setNewLvl] = useState({ levelNumber: "", starsRequired: "", maxWinAmount: "", description: "" });
-
-  // Cards
-  const [cards, setCards] = useState<any[]>([]);
-  const [showAddCard, setShowAddCard] = useState(false);
-  const [newCard, setNewCard] = useState({ name: "", rarity: "common", imageUrl: "", starValue: "", coinCost: "" });
 
   // Config
-  const [config, setConfig] = useState<Record<string, string>>({});
   const [configDirty, setConfigDirty] = useState<Record<string, string>>({});
 
-  // Stats
+  // Stats / attacks
   const [stats, setStats] = useState<any>(null);
-
-  // Attacks
   const [attacks, setAttacks] = useState<any[]>([]);
-  const [attacksPage, setAttacksPage] = useState(1);
 
-  const loadAll = useCallback(async () => {
+  const loadVillages = useCallback(async () => {
     try {
-      const [l, ca, co, s, a] = await Promise.all([
-        getVillageLevels(), getVillageCards(), getVillageConfig(),
-        getVillageStats(), getVillageAttacks(1),
+      const r = await getVillagesList() as any;
+      if (r.success) {
+        setVillagesList(r.villages);
+        if (!selectedVillageId && r.villages[0]) {
+          setSelectedVillageId(r.villages[0].id);
+          setSelectedVillage(r.villages[0]);
+        } else if (selectedVillageId) {
+          const v = r.villages.find((x: any) => x.id === selectedVillageId);
+          if (v) setSelectedVillage(v);
+        }
+      }
+    } catch (e) { console.error(e); }
+  }, [selectedVillageId]);
+
+  const loadOther = useCallback(async () => {
+    try {
+      const [l, co, s, a] = await Promise.all([
+        getVillageLevels(), getVillageConfig(), getVillageStats(), getVillageAttacks(1),
       ]) as any[];
       if (l.success) setLevels(l.levels);
-      if (ca.success) setCards(ca.cards);
-      if (co.success) { setConfig(co.config); setConfigDirty(co.config); }
+      if (co.success) setConfigDirty(co.config);
       if (s.success) setStats(s.stats);
       if (a.success) setAttacks(a.attacks);
-    } catch (e) { console.error(e); }
+    } catch {}
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => { loadVillages(); }, [loadVillages]);
+  useEffect(() => { loadOther(); }, [loadOther]);
 
-  // Levels handlers
-  const handleSaveLvl = async (id: string) => {
-    if (!editLvlData) return;
-    await updateVillageLevel(id, editLvlData);
-    setEditLvl(null);
-    setEditLvlData(null);
-    loadAll();
-  };
-  const handleAddLvl = async () => {
-    await createVillageLevel({
-      levelNumber: parseInt(newLvl.levelNumber),
-      starsRequired: parseInt(newLvl.starsRequired),
-      maxWinAmount: parseFloat(newLvl.maxWinAmount),
-      description: newLvl.description,
-    });
-    setShowAddLvl(false);
-    setNewLvl({ levelNumber: "", starsRequired: "", maxWinAmount: "", description: "" });
-    loadAll();
-  };
-  const handleDelLvl = async (id: string) => {
-    if (!confirm("წაშალო ეს ლეველი?")) return;
-    await deleteVillageLevel(id);
-    loadAll();
+  const handleAddVillage = async () => {
+    if (!newVillageName.trim()) return;
+    try {
+      await createVillage({ name: newVillageName, theme: newVillageTheme || undefined });
+      setShowAddVillage(false);
+      setNewVillageName("");
+      setNewVillageTheme("");
+      loadVillages();
+    } catch (e: any) { alert(e.message); }
   };
 
-  // Cards handlers
-  const handleAddCard = async () => {
-    await createVillageCard({
-      name: newCard.name, rarity: newCard.rarity, imageUrl: newCard.imageUrl || undefined,
-      starValue: parseInt(newCard.starValue), coinCost: parseInt(newCard.coinCost),
-    });
-    setShowAddCard(false);
-    setNewCard({ name: "", rarity: "common", imageUrl: "", starValue: "", coinCost: "" });
-    loadAll();
-  };
-  const handleToggleCard = async (id: string, isActive: boolean) => {
-    await updateVillageCard(id, { isActive: !isActive });
-    loadAll();
-  };
-  const handleDelCard = async (id: string) => {
-    if (!confirm("წაშალო ეს ბარათი?")) return;
-    await deleteVillageCard(id);
-    loadAll();
+  const handleDeleteVillage = async (id: string) => {
+    if (!confirm("წავშალო ეს ვილიჯი?")) return;
+    try {
+      await deleteVillage(id);
+      setSelectedVillageId(null);
+      setSelectedVillage(null);
+      loadVillages();
+    } catch (e: any) { alert(e.message); }
   };
 
-  // Config handlers
-  const handleSaveConfig = async () => {
-    await updateVillageConfig(configDirty);
-    setConfig(configDirty);
-    alert("შენახულია");
+  // Building edit handlers
+  const handleSaveBuildingField = async (buildingId: string, field: string, value: any) => {
+    if (!selectedVillage) return;
+    try {
+      await updateVillageBuilding(selectedVillage.id, buildingId, { [field]: value });
+      // Optimistic update
+      setSelectedVillage((v: any) => ({
+        ...v,
+        buildings: v.buildings.map((b: any) => b.id === buildingId ? { ...b, [field]: value } : b),
+      }));
+    } catch (e: any) { alert(e.message); }
   };
 
-  const loadAttacksPage = async (p: number) => {
-    setAttacksPage(p);
-    const a = await getVillageAttacks(p) as any;
-    if (a.success) setAttacks(a.attacks);
+  const handleImageUpload = async (buildingId: string, starField: string, file: File) => {
+    try {
+      const base64 = await fileToCompressedBase64(file);
+      await handleSaveBuildingField(buildingId, starField, base64);
+    } catch (e: any) { alert("სურათის დატვირთვა ვერ მოხერხდა: " + e.message); }
   };
 
   return (
@@ -187,8 +206,8 @@ function VillageContent() {
           {/* TABS */}
           <div className="flex flex-wrap gap-2 mb-5">
             {[
+              { id: "villages", label: "ვილიჯები" },
               { id: "levels", label: "ლეველები" },
-              { id: "cards", label: "ბარათები" },
               { id: "settings", label: "პარამეტრები" },
               { id: "stats", label: "სტატისტიკა" },
               { id: "attacks", label: "შეტევები" },
@@ -200,13 +219,73 @@ function VillageContent() {
             ))}
           </div>
 
-          {/* LEVELS TAB */}
+          {/* VILLAGES TAB */}
+          {tab === "villages" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[14px] font-bold" style={{ color: "#FFF" }}>ვილიჯების სია</h3>
+                <button onClick={() => setShowAddVillage(true)} className="px-3 py-1.5 rounded-lg text-[12px] font-semibold" style={{ background: "#F9E741", color: "#000" }}>+ ახალი ვილიჯი</button>
+              </div>
+
+              {/* Village picker tabs */}
+              <div className="flex flex-wrap gap-2">
+                {villagesList.map(v => (
+                  <button key={v.id} onClick={() => { setSelectedVillageId(v.id); setSelectedVillage(v); }}
+                    className="px-4 py-2 rounded-xl text-[12px] font-medium"
+                    style={{
+                      background: selectedVillageId === v.id ? "#F9E741" : "#1A1A1A",
+                      color: selectedVillageId === v.id ? "#000" : "#A0A0A0",
+                      border: `1px solid ${selectedVillageId === v.id ? "#F9E741" : "#252525"}`
+                    }}>
+                    L{v.position} · {v.name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Selected village editor */}
+              {selectedVillage && (
+                <div className="rounded-2xl border p-5" style={{ background: "#111111", borderColor: "#252525" }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <input
+                        defaultValue={selectedVillage.name}
+                        onBlur={async (e) => {
+                          if (e.target.value !== selectedVillage.name) {
+                            await updateVillage(selectedVillage.id, { name: e.target.value });
+                            loadVillages();
+                          }
+                        }}
+                        className="text-[18px] font-bold bg-transparent outline-none border-b"
+                        style={{ color: "#F9E741", borderColor: "#252525" }}
+                      />
+                      <p className="text-[11px] mt-1" style={{ color: "#666" }}>
+                        Position L{selectedVillage.position} · Theme: {selectedVillage.theme || "—"}
+                      </p>
+                    </div>
+                    <button onClick={() => handleDeleteVillage(selectedVillage.id)} className="px-3 py-1.5 rounded-lg text-[11px]" style={{ background: "#1A1A1A", color: "#EF4444", border: "1px solid #252525" }}>
+                      წაშლა
+                    </button>
+                  </div>
+
+                  {/* 5 buildings, each row = 4 stars */}
+                  <div className="space-y-5">
+                    {selectedVillage.buildings?.map((b: any) => (
+                      <BuildingEditor key={b.id} building={b}
+                        onFieldSave={(field, value) => handleSaveBuildingField(b.id, field, value)}
+                        onImageUpload={(starField, file) => handleImageUpload(b.id, starField, file)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* LEVELS TAB (existing) */}
           {tab === "levels" && (
             <div className="rounded-2xl border p-5" style={{ background: "#111111", borderColor: "#252525" }}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[14px] font-bold" style={{ color: "#FFF" }}>ლეველების კონფიგურაცია</h3>
-                <button onClick={() => setShowAddLvl(true)} className="px-3 py-1.5 rounded-lg text-[12px] font-semibold" style={{ background: "#F9E741", color: "#000" }}>+ ახალი ლეველი</button>
-              </div>
+              <h3 className="text-[14px] font-bold mb-4" style={{ color: "#FFF" }}>მაქს. მოგების ლიმიტი ლეველის მიხედვით</h3>
+              <p className="text-[11px] mb-4" style={{ color: "#666" }}>ეს ცხრილი განსაზღვრავს თითოეული ლეველის (= ვილიჯის) მაქსიმუმ მოგებას ალგორითმში</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-[12px]">
                   <thead><tr style={{ borderBottom: "1px solid #252525" }}>
@@ -230,14 +309,11 @@ function VillageContent() {
                           <td className="px-3 py-2">
                             {editing ? (
                               <div className="flex gap-1">
-                                <button onClick={() => handleSaveLvl(l.id)} className="px-2 py-0.5 rounded text-[11px]" style={{ background: "#22C55E20", color: "#22C55E" }}>✓</button>
+                                <button onClick={async () => { await updateVillageLevel(l.id, editLvlData); setEditLvl(null); setEditLvlData(null); loadOther(); }} className="px-2 py-0.5 rounded text-[11px]" style={{ background: "#22C55E20", color: "#22C55E" }}>✓</button>
                                 <button onClick={() => { setEditLvl(null); setEditLvlData(null); }} className="px-2 py-0.5 rounded text-[11px]" style={{ background: "#1A1A1A", color: "#A0A0A0" }}>×</button>
                               </div>
                             ) : (
-                              <div className="flex gap-1">
-                                <button onClick={() => { setEditLvl(l.id); setEditLvlData(l); }} className="px-2 py-0.5 rounded text-[11px]" style={{ background: "#1A1A1A", color: "#F9E741", border: "1px solid #252525" }}>edit</button>
-                                <button onClick={() => handleDelLvl(l.id)} className="px-2 py-0.5 rounded text-[11px]" style={{ background: "#1A1A1A", color: "#EF4444", border: "1px solid #252525" }}>del</button>
-                              </div>
+                              <button onClick={() => { setEditLvl(l.id); setEditLvlData(l); }} className="px-2 py-0.5 rounded text-[11px]" style={{ background: "#1A1A1A", color: "#F9E741", border: "1px solid #252525" }}>edit</button>
                             )}
                           </td>
                         </tr>
@@ -245,35 +321,6 @@ function VillageContent() {
                     })}
                   </tbody>
                 </table>
-              </div>
-            </div>
-          )}
-
-          {/* CARDS TAB */}
-          {tab === "cards" && (
-            <div className="rounded-2xl border p-5" style={{ background: "#111111", borderColor: "#252525" }}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[14px] font-bold" style={{ color: "#FFF" }}>ბარათების კატალოგი</h3>
-                <button onClick={() => setShowAddCard(true)} className="px-3 py-1.5 rounded-lg text-[12px] font-semibold" style={{ background: "#F9E741", color: "#000" }}>+ ახალი ბარათი</button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                {cards.map(c => (
-                  <div key={c.id} className="rounded-xl p-3 border" style={{ background: "#0A0A0A", borderColor: RARITY_COLORS[c.rarity] + "40" }}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] px-2 py-0.5 rounded uppercase font-bold" style={{ background: RARITY_COLORS[c.rarity] + "20", color: RARITY_COLORS[c.rarity] }}>{c.rarity}</span>
-                      <button onClick={() => handleToggleCard(c.id, c.isActive)} className="text-[10px] px-2 py-0.5 rounded" style={{ background: c.isActive ? "#22C55E20" : "#1A1A1A", color: c.isActive ? "#22C55E" : "#666" }}>
-                        {c.isActive ? "active" : "inactive"}
-                      </button>
-                    </div>
-                    {c.imageUrl && <img src={c.imageUrl} alt={c.name} className="w-full h-24 object-cover rounded mb-2" />}
-                    <p className="text-[14px] font-bold" style={{ color: "#FFF" }}>{c.name}</p>
-                    <div className="flex justify-between mt-2 text-[12px]">
-                      <span style={{ color: "#A0A0A0" }}>⭐ {c.starValue}</span>
-                      <span style={{ color: "#F9E741" }}>{c.coinCost} ქოინი</span>
-                    </div>
-                    <button onClick={() => handleDelCard(c.id)} className="mt-2 w-full text-[10px] py-1 rounded" style={{ background: "#1A1A1A", color: "#EF4444", border: "1px solid #252525" }}>წაშლა</button>
-                  </div>
-                ))}
               </div>
             </div>
           )}
@@ -297,7 +344,7 @@ function VillageContent() {
                   </div>
                 ))}
               </div>
-              <button onClick={handleSaveConfig} className="mt-4 px-6 py-2 rounded-xl text-[13px] font-bold" style={{ background: "#F9E741", color: "#000" }}>შენახვა</button>
+              <button onClick={async () => { await updateVillageConfig(configDirty); alert("შენახულია"); }} className="mt-4 px-6 py-2 rounded-xl text-[13px] font-bold" style={{ background: "#F9E741", color: "#000" }}>შენახვა</button>
             </div>
           )}
 
@@ -305,60 +352,17 @@ function VillageContent() {
           {tab === "stats" && stats && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="rounded-2xl border p-4" style={{ background: "#111111", borderColor: "#252525" }}>
-                  <p className="text-[11px]" style={{ color: "#666" }}>შეტევები დღეს</p>
-                  <p className="text-[22px] font-bold" style={{ color: "#EF4444" }}>{stats.attacksToday}</p>
-                </div>
-                <div className="rounded-2xl border p-4" style={{ background: "#111111", borderColor: "#252525" }}>
-                  <p className="text-[11px]" style={{ color: "#666" }}>შეტევები კვირაში</p>
-                  <p className="text-[22px] font-bold" style={{ color: "#EF4444" }}>{stats.attacksWeek}</p>
-                </div>
-                <div className="rounded-2xl border p-4" style={{ background: "#111111", borderColor: "#252525" }}>
-                  <p className="text-[11px]" style={{ color: "#666" }}>ბარათები დღეს</p>
-                  <p className="text-[22px] font-bold" style={{ color: "#22C55E" }}>{stats.cardsBoughtToday}</p>
-                </div>
-                <div className="rounded-2xl border p-4" style={{ background: "#111111", borderColor: "#252525" }}>
-                  <p className="text-[11px]" style={{ color: "#666" }}>ბარათები კვირაში</p>
-                  <p className="text-[22px] font-bold" style={{ color: "#22C55E" }}>{stats.cardsBoughtWeek}</p>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border p-5" style={{ background: "#111111", borderColor: "#252525" }}>
-                <h3 className="text-[13px] font-bold mb-3" style={{ color: "#FFF" }}>მომხმარებლები ლეველების მიხედვით</h3>
-                {stats.usersPerLevel?.length === 0 ? <p className="text-[12px]" style={{ color: "#666" }}>მონაცემები არ არის</p> : (
-                  <div className="space-y-1.5">
-                    {stats.usersPerLevel.map((u: any) => {
-                      const max = Math.max(...stats.usersPerLevel.map((x: any) => x.count));
-                      return (
-                        <div key={u.level} className="flex items-center gap-2">
-                          <span className="w-12 text-[11px]" style={{ color: "#A0A0A0" }}>L{u.level}</span>
-                          <div className="flex-1 h-5 rounded" style={{ background: "#0A0A0A" }}>
-                            <div className="h-full rounded" style={{ background: "#F9E741", width: `${(u.count / max) * 100}%` }} />
-                          </div>
-                          <span className="w-12 text-right text-[11px]" style={{ color: "#FFF" }}>{u.count}</span>
-                        </div>
-                      );
-                    })}
+                {[
+                  { label: "შეტევები დღეს", val: stats.attacksToday, color: "#EF4444" },
+                  { label: "შეტევები კვირაში", val: stats.attacksWeek, color: "#EF4444" },
+                  { label: "ბარათები დღეს", val: stats.cardsBoughtToday, color: "#22C55E" },
+                  { label: "ბარათები კვირაში", val: stats.cardsBoughtWeek, color: "#22C55E" },
+                ].map(s => (
+                  <div key={s.label} className="rounded-2xl border p-4" style={{ background: "#111111", borderColor: "#252525" }}>
+                    <p className="text-[11px]" style={{ color: "#666" }}>{s.label}</p>
+                    <p className="text-[22px] font-bold" style={{ color: s.color }}>{s.val}</p>
                   </div>
-                )}
-              </div>
-
-              <div className="rounded-2xl border p-5" style={{ background: "#111111", borderColor: "#252525" }}>
-                <h3 className="text-[13px] font-bold mb-3" style={{ color: "#FFF" }}>ყველაზე პოპულარული ბარათები</h3>
-                {stats.topCards?.length === 0 ? <p className="text-[12px]" style={{ color: "#666" }}>მონაცემები არ არის</p> : (
-                  <table className="w-full text-[12px]">
-                    <tbody>
-                      {stats.topCards.map((c: any, i: number) => (
-                        <tr key={i} style={{ borderBottom: "1px solid #1A1A1A" }}>
-                          <td className="py-2" style={{ color: "#666" }}>#{i + 1}</td>
-                          <td className="py-2" style={{ color: "#FFF" }}>{c.name}</td>
-                          <td className="py-2" style={{ color: RARITY_COLORS[c.rarity] || "#666" }}>{c.rarity}</td>
-                          <td className="py-2 text-right" style={{ color: "#F9E741" }}>{c.count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                ))}
               </div>
             </div>
           )}
@@ -370,22 +374,18 @@ function VillageContent() {
               {attacks.length === 0 ? <p className="text-[12px]" style={{ color: "#666" }}>შეტევები არ არის</p> : (
                 <table className="w-full text-left text-[12px]">
                   <thead><tr style={{ borderBottom: "1px solid #252525" }}>
-                    {["თარიღი", "თავდამსხმელი", "მსხვერპლი", "ლეველი", "შედეგი", "⭐"].map(h => <th key={h} className="px-3 py-2 font-medium" style={{ color: "#666" }}>{h}</th>)}
+                    {["თარიღი", "თავდამსხმელი", "მსხვერპლი", "ლეველი", "შედეგი"].map(h => <th key={h} className="px-3 py-2 font-medium" style={{ color: "#666" }}>{h}</th>)}
                   </tr></thead>
                   <tbody>
-                    {attacks.map(a => {
-                      const color = a.attackResult === "success" ? "#22C55E" : a.attackResult === "blocked" ? "#3B82F6" : "#EF4444";
-                      return (
-                        <tr key={a.id} style={{ borderBottom: "1px solid #1A1A1A" }}>
-                          <td className="px-3 py-2" style={{ color: "#A0A0A0" }}>{new Date(a.createdAt).toLocaleString("ka-GE", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
-                          <td className="px-3 py-2" style={{ color: "#FFF" }}>{a.attackerName}</td>
-                          <td className="px-3 py-2" style={{ color: "#FFF" }}>{a.victimName}</td>
-                          <td className="px-3 py-2" style={{ color: "#F9E741" }}>L{a.attackerLevel}</td>
-                          <td className="px-3 py-2"><span className="px-2 py-0.5 rounded text-[10px] font-medium" style={{ background: color + "20", color }}>{a.attackResult}</span></td>
-                          <td className="px-3 py-2 text-right" style={{ color: "#F9E741" }}>{a.starsAwarded}</td>
-                        </tr>
-                      );
-                    })}
+                    {attacks.map(a => (
+                      <tr key={a.id} style={{ borderBottom: "1px solid #1A1A1A" }}>
+                        <td className="px-3 py-2" style={{ color: "#A0A0A0" }}>{new Date(a.createdAt).toLocaleString("ka-GE", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
+                        <td className="px-3 py-2" style={{ color: "#FFF" }}>{a.attackerName}</td>
+                        <td className="px-3 py-2" style={{ color: "#FFF" }}>{a.victimName}</td>
+                        <td className="px-3 py-2" style={{ color: "#F9E741" }}>L{a.attackerLevel}</td>
+                        <td className="px-3 py-2">{a.attackResult}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               )}
@@ -393,72 +393,122 @@ function VillageContent() {
           )}
         </div>
 
-        {/* ADD LEVEL MODAL */}
-        {showAddLvl && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setShowAddLvl(false)}>
+        {/* ADD VILLAGE MODAL */}
+        {showAddVillage && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setShowAddVillage(false)}>
             <div className="rounded-2xl p-5 w-full max-w-md border" style={{ background: "#111111", borderColor: "#252525" }} onClick={e => e.stopPropagation()}>
-              <h3 className="text-[16px] font-bold mb-3" style={{ color: "#FFF" }}>ახალი ლეველი</h3>
-              {[
-                { k: "levelNumber", l: "ლეველი", t: "number" },
-                { k: "starsRequired", l: "⭐ საჭირო", t: "number" },
-                { k: "maxWinAmount", l: "მაქს. მოგება ₾", t: "number" },
-                { k: "description", l: "აღწერა", t: "text" },
-              ].map(f => (
-                <div key={f.k} className="mb-3">
-                  <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>{f.l}</label>
-                  <input type={f.t} value={(newLvl as any)[f.k]} onChange={(e) => setNewLvl({ ...newLvl, [f.k]: e.target.value })}
-                    className="w-full rounded-lg px-3 py-2 text-[14px] outline-none"
-                    style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
-                </div>
-              ))}
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => setShowAddLvl(false)} className="flex-1 px-4 py-2 rounded-xl text-[13px]" style={{ background: "#1A1A1A", color: "#A0A0A0", border: "1px solid #252525" }}>გაუქმება</button>
-                <button onClick={handleAddLvl} className="flex-1 px-4 py-2 rounded-xl text-[13px] font-bold" style={{ background: "#F9E741", color: "#000" }}>დამატება</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ADD CARD MODAL */}
-        {showAddCard && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setShowAddCard(false)}>
-            <div className="rounded-2xl p-5 w-full max-w-md border" style={{ background: "#111111", borderColor: "#252525" }} onClick={e => e.stopPropagation()}>
-              <h3 className="text-[16px] font-bold mb-3" style={{ color: "#FFF" }}>ახალი ბარათი</h3>
+              <h3 className="text-[16px] font-bold mb-3" style={{ color: "#FFF" }}>ახალი ვილიჯი</h3>
+              <p className="text-[10px] mb-3" style={{ color: "#666" }}>5 ბილდინგი ავტომატურად შეიქმნება. შემდეგ შეცვალე სახელები და დატვირთე სურათები.</p>
               <div className="mb-3">
                 <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>სახელი</label>
-                <input value={newCard.name} onChange={e => setNewCard({ ...newCard, name: e.target.value })} className="w-full rounded-lg px-3 py-2 text-[14px] outline-none" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
+                <input value={newVillageName} onChange={e => setNewVillageName(e.target.value)} className="w-full rounded-lg px-3 py-2 text-[14px]" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
               </div>
-              <div className="mb-3">
-                <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>იშვიათობა</label>
-                <select value={newCard.rarity} onChange={e => setNewCard({ ...newCard, rarity: e.target.value })} className="w-full rounded-lg px-3 py-2 text-[14px] outline-none" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }}>
-                  <option value="common">Common</option>
-                  <option value="rare">Rare</option>
-                  <option value="epic">Epic</option>
-                  <option value="legendary">Legendary</option>
-                </select>
+              <div className="mb-4">
+                <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>თემა (georgian, egyptian, ...)</label>
+                <input value={newVillageTheme} onChange={e => setNewVillageTheme(e.target.value)} className="w-full rounded-lg px-3 py-2 text-[14px]" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
               </div>
-              <div className="mb-3">
-                <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>სურათის URL (არასავალდებულო)</label>
-                <input value={newCard.imageUrl} onChange={e => setNewCard({ ...newCard, imageUrl: e.target.value })} className="w-full rounded-lg px-3 py-2 text-[14px] outline-none" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
-              </div>
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>⭐ ვარსკვლავი</label>
-                  <input type="number" value={newCard.starValue} onChange={e => setNewCard({ ...newCard, starValue: e.target.value })} className="w-full rounded-lg px-3 py-2 text-[14px] outline-none" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
-                </div>
-                <div>
-                  <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>ქოინი</label>
-                  <input type="number" value={newCard.coinCost} onChange={e => setNewCard({ ...newCard, coinCost: e.target.value })} className="w-full rounded-lg px-3 py-2 text-[14px] outline-none" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
-                </div>
-              </div>
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => setShowAddCard(false)} className="flex-1 px-4 py-2 rounded-xl text-[13px]" style={{ background: "#1A1A1A", color: "#A0A0A0", border: "1px solid #252525" }}>გაუქმება</button>
-                <button onClick={handleAddCard} className="flex-1 px-4 py-2 rounded-xl text-[13px] font-bold" style={{ background: "#F9E741", color: "#000" }}>დამატება</button>
+              <div className="flex gap-2">
+                <button onClick={() => setShowAddVillage(false)} className="flex-1 px-4 py-2 rounded-xl text-[13px]" style={{ background: "#1A1A1A", color: "#A0A0A0", border: "1px solid #252525" }}>გაუქმება</button>
+                <button onClick={handleAddVillage} className="flex-1 px-4 py-2 rounded-xl text-[13px] font-bold" style={{ background: "#F9E741", color: "#000" }}>დამატება</button>
               </div>
             </div>
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+// ── Building editor: 4 stars in a row, each with image upload + name + cost ──
+function BuildingEditor({ building, onFieldSave, onImageUpload }: {
+  building: any;
+  onFieldSave: (field: string, value: any) => void;
+  onImageUpload: (starField: string, file: File) => void;
+}) {
+  const [name, setName] = useState(building.name);
+  const stars = [1, 2, 3, 4];
+
+  return (
+    <div className="rounded-xl p-4" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
+      <div className="mb-3">
+        <label className="text-[10px]" style={{ color: "#666" }}>ბილდინგის სახელი</label>
+        <input
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onBlur={() => name !== building.name && onFieldSave("name", name)}
+          className="block w-full md:w-64 rounded-lg px-3 py-1.5 text-[14px] font-bold mt-1"
+          style={{ background: "#111", border: "1px solid #252525", color: "#F9E741" }}
+        />
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {stars.map(star => (
+          <StarSlot key={star} building={building} star={star}
+            onFieldSave={onFieldSave}
+            onImageUpload={onImageUpload}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StarSlot({ building, star, onFieldSave, onImageUpload }: {
+  building: any; star: number;
+  onFieldSave: (field: string, value: any) => void;
+  onImageUpload: (starField: string, file: File) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const nameKey = `star${star}Name` as const;
+  const costKey = `star${star}Cost` as const;
+  const imgKey = `star${star}Image` as const;
+  const [name, setName] = useState(building[nameKey] || "");
+  const [cost, setCost] = useState(building[costKey] || 0);
+  const image = building[imgKey];
+
+  return (
+    <div className="rounded-lg p-2" style={{ background: "#111", border: "1px solid #252525" }}>
+      <div className="text-[10px] mb-1.5 font-bold" style={{ color: "#F9E741" }}>{"⭐".repeat(star)}</div>
+      <div
+        onClick={() => fileRef.current?.click()}
+        className="aspect-square rounded-md mb-2 flex items-center justify-center cursor-pointer overflow-hidden"
+        style={{ background: "#0A0A0A", border: "1px dashed #333" }}
+      >
+        {image ? (
+          <img src={image} alt={name} className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-[10px]" style={{ color: "#555" }}>+ სურათი</span>
+        )}
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onImageUpload(imgKey, f); }} />
+      <input
+        value={name}
+        onChange={e => setName(e.target.value)}
+        onBlur={() => name !== building[nameKey] && onFieldSave(nameKey, name)}
+        placeholder="სახელი"
+        className="w-full rounded px-2 py-1 text-[10px] mb-1"
+        style={{ background: "#0A0A0A", border: "1px solid #252525", color: "#FFF" }}
+      />
+      <div className="flex items-center gap-1">
+        <input
+          type="number"
+          value={cost}
+          onChange={e => setCost(parseInt(e.target.value) || 0)}
+          onBlur={() => cost !== building[costKey] && onFieldSave(costKey, cost)}
+          className="flex-1 rounded px-2 py-1 text-[10px]"
+          style={{ background: "#0A0A0A", border: "1px solid #252525", color: "#FFF" }}
+        />
+        <span className="text-[9px]" style={{ color: "#666" }}>ქოინი</span>
+      </div>
+      {image && (
+        <button
+          onClick={() => onFieldSave(imgKey, null)}
+          className="w-full mt-1 text-[9px] py-0.5 rounded"
+          style={{ background: "#0A0A0A", color: "#EF4444", border: "1px solid #252525" }}
+        >
+          წაშლა
+        </button>
+      )}
     </div>
   );
 }

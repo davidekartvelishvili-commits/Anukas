@@ -229,7 +229,16 @@ export const updateBigWinPrize = (id: string, data: any) => adminFetch(`/admin/b
 export const deleteBigWinPrize = (id: string) => adminFetch(`/admin/big-win/prizes/${id}`, { method: "DELETE" });
 export const getBigWinHistory = () => adminFetch("/admin/big-win/history");
 
-// Village
+// Villages (NEW system)
+export const getVillagesList = () => adminFetch("/admin/villages");
+export const getVillageDetail = (id: string) => adminFetch(`/admin/villages/${id}`);
+export const createVillage = (data: any) => adminFetch("/admin/villages", { method: "POST", body: JSON.stringify(data) });
+export const updateVillage = (id: string, data: any) => adminFetch(`/admin/villages/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export const deleteVillage = (id: string) => adminFetch(`/admin/villages/${id}`, { method: "DELETE" });
+export const updateVillageBuilding = (vid: string, bid: string, data: any) =>
+  adminFetch(`/admin/villages/${vid}/buildings/${bid}`, { method: "PUT", body: JSON.stringify(data) });
+
+// Village (legacy/levels/config — still used)
 export const getVillageLevels = () => adminFetch("/admin/village/levels");
 export const createVillageLevel = (data: any) => adminFetch("/admin/village/levels", { method: "POST", body: JSON.stringify(data) });
 export const updateVillageLevel = (id: string, data: any) => adminFetch(`/admin/village/levels/${id}`, { method: "PUT", body: JSON.stringify(data) });

@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig, bigWinConfig, bigWinPrizes, bigWinHistory } from "../db/schema.js";
+import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig, bigWinConfig, bigWinPrizes, bigWinHistory, villages, villageBuildings, userVillageProgress } from "../db/schema.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/errors.js";
@@ -1762,59 +1762,110 @@ admin.delete("/village/levels/:id", adminMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
-// GET /admin/village/cards
-admin.get("/village/cards", adminMiddleware, async (c) => {
+// ── NEW VILLAGES SYSTEM (themed villages with 5 buildings each) ──
+
+// GET /admin/villages — all villages with their buildings
+admin.get("/villages", adminMiddleware, async (c) => {
   const db = getDb();
-  const cards = await db.select().from(villageCards).orderBy(villageCards.coinCost);
-  return c.json({ success: true, cards });
+  const allVillages = await db.select().from(villages).orderBy(villages.position);
+  const enriched = await Promise.all(allVillages.map(async (v) => {
+    const buildings = await db.select().from(villageBuildings).where(eq(villageBuildings.villageId, v.id)).orderBy(villageBuildings.position);
+    return { ...v, buildings };
+  }));
+  return c.json({ success: true, villages: enriched });
 });
 
-const cardSchema = z.object({
+// GET /admin/villages/:id — single village with buildings
+admin.get("/villages/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id")!;
+  const db = getDb();
+  const [v] = await db.select().from(villages).where(eq(villages.id, id)).limit(1);
+  if (!v) return c.json({ success: false, message: "Not found" }, 404);
+  const buildings = await db.select().from(villageBuildings).where(eq(villageBuildings.villageId, id)).orderBy(villageBuildings.position);
+  return c.json({ success: true, village: { ...v, buildings } });
+});
+
+// POST /admin/villages — create new village (with 5 default buildings)
+const newVillageSchema = z.object({
   name: z.string().min(1),
-  rarity: z.enum(["common", "rare", "epic", "legendary"]),
-  imageUrl: z.string().optional(),
-  starValue: z.number().int().min(1),
-  coinCost: z.number().int().min(1),
+  theme: z.string().optional(),
+  position: z.number().int().min(1).optional(),
 });
-
-// POST /admin/village/cards
-admin.post("/village/cards", adminMiddleware, async (c) => {
+admin.post("/villages", adminMiddleware, async (c) => {
   const body = await c.req.json();
-  const parsed = cardSchema.safeParse(body);
+  const parsed = newVillageSchema.safeParse(body);
   if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
   const db = getDb();
-  await db.insert(villageCards).values({
-    id: nanoid(),
-    name: parsed.data.name,
-    rarity: parsed.data.rarity,
-    imageUrl: parsed.data.imageUrl || null,
-    starValue: parsed.data.starValue,
-    coinCost: parsed.data.coinCost,
+  // Auto-position: max + 1
+  let position = parsed.data.position;
+  if (position === undefined) {
+    const all = await db.select().from(villages);
+    position = (all.reduce((m, v) => Math.max(m, v.position), 0) || 0) + 1;
+  }
+  const id = nanoid();
+  await db.insert(villages).values({
+    id, position, name: parsed.data.name, theme: parsed.data.theme || null,
   });
-  return c.json({ success: true });
+  // Seed 5 placeholder buildings
+  const base = 50 * position;
+  for (let i = 1; i <= 5; i++) {
+    await db.insert(villageBuildings).values({
+      id: nanoid(), villageId: id, position: i, name: `Building ${i}`,
+      star1Name: `B${i} ⭐`, star1Cost: base,
+      star2Name: `B${i} ⭐⭐`, star2Cost: base * 2,
+      star3Name: `B${i} ⭐⭐⭐`, star3Cost: base * 4,
+      star4Name: `B${i} ⭐⭐⭐⭐`, star4Cost: base * 8,
+    });
+  }
+  return c.json({ success: true, id });
 });
 
-// PUT /admin/village/cards/:id
-admin.put("/village/cards/:id", adminMiddleware, async (c) => {
+// PUT /admin/villages/:id — update village name/theme
+admin.put("/villages/:id", adminMiddleware, async (c) => {
   const id = c.req.param("id")!;
   const body = await c.req.json();
   const db = getDb();
   const updates: any = {};
   if (body.name !== undefined) updates.name = body.name;
-  if (body.rarity !== undefined) updates.rarity = body.rarity;
-  if (body.imageUrl !== undefined) updates.imageUrl = body.imageUrl;
-  if (body.starValue !== undefined) updates.starValue = body.starValue;
-  if (body.coinCost !== undefined) updates.coinCost = body.coinCost;
+  if (body.theme !== undefined) updates.theme = body.theme;
   if (body.isActive !== undefined) updates.isActive = body.isActive;
-  await db.update(villageCards).set(updates).where(eq(villageCards.id, id));
+  await db.update(villages).set(updates).where(eq(villages.id, id));
   return c.json({ success: true });
 });
 
-// DELETE /admin/village/cards/:id
-admin.delete("/village/cards/:id", adminMiddleware, async (c) => {
+// DELETE /admin/villages/:id
+admin.delete("/villages/:id", adminMiddleware, async (c) => {
   const id = c.req.param("id")!;
   const db = getDb();
-  await db.delete(villageCards).where(eq(villageCards.id, id));
+  await db.delete(villageBuildings).where(eq(villageBuildings.villageId, id));
+  await db.delete(villages).where(eq(villages.id, id));
+  return c.json({ success: true });
+});
+
+// PUT /admin/villages/:vid/buildings/:bid — update building name, costs, and images
+// Body can include: name, star1Name/Cost/Image, star2..., star3..., star4...
+admin.put("/villages/:vid/buildings/:bid", adminMiddleware, async (c) => {
+  const bid = c.req.param("bid")!;
+  const body = await c.req.json();
+  const db = getDb();
+  const updates: any = {};
+  const fields = [
+    "name",
+    "star1Name", "star1Cost", "star1Image",
+    "star2Name", "star2Cost", "star2Image",
+    "star3Name", "star3Cost", "star3Image",
+    "star4Name", "star4Cost", "star4Image",
+  ];
+  for (const f of fields) {
+    if (body[f] !== undefined) updates[f] = body[f];
+  }
+  // Server-side image size guard (base64 — limit ~600KB)
+  for (const k of ["star1Image", "star2Image", "star3Image", "star4Image"]) {
+    if (typeof updates[k] === "string" && updates[k].length > 800000) {
+      throw new BadRequestError(`სურათი დიდია (${k}) — მაქს. 600KB`);
+    }
+  }
+  await db.update(villageBuildings).set(updates).where(eq(villageBuildings.id, bid));
   return c.json({ success: true });
 });
 

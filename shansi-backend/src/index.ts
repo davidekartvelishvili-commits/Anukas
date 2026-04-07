@@ -113,6 +113,47 @@ async function runStartupMigrations() {
       amount REAL NOT NULL,
       won_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    // ── New Village system (themed villages with buildings) ──
+    sql`CREATE TABLE IF NOT EXISTS villages (
+      id TEXT PRIMARY KEY,
+      position INTEGER NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      theme TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    sql`CREATE TABLE IF NOT EXISTS village_buildings (
+      id TEXT PRIMARY KEY,
+      village_id TEXT NOT NULL REFERENCES villages(id),
+      position INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      star1_name TEXT NOT NULL,
+      star1_cost INTEGER NOT NULL,
+      star1_image TEXT,
+      star2_name TEXT NOT NULL,
+      star2_cost INTEGER NOT NULL,
+      star2_image TEXT,
+      star3_name TEXT NOT NULL,
+      star3_cost INTEGER NOT NULL,
+      star3_image TEXT,
+      star4_name TEXT NOT NULL,
+      star4_cost INTEGER NOT NULL,
+      star4_image TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    sql`CREATE TABLE IF NOT EXISTS user_village_progress (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      village_id TEXT NOT NULL REFERENCES villages(id),
+      b1_stars INTEGER NOT NULL DEFAULT 0,
+      b2_stars INTEGER NOT NULL DEFAULT 0,
+      b3_stars INTEGER NOT NULL DEFAULT 0,
+      b4_stars INTEGER NOT NULL DEFAULT 0,
+      b5_stars INTEGER NOT NULL DEFAULT 0,
+      completed INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      completed_at TEXT
+    )`,
   ];
   for (const s of statements) {
     try { await (db as any).run(s); } catch (e: any) {
@@ -172,6 +213,42 @@ async function runStartupMigrations() {
     try {
       await (db as any).run(sql`INSERT INTO big_win_config (id, budget_percent) VALUES ('main', 30)`);
     } catch {}
+
+    // Seed 5 default villages with their 5 buildings each
+    const vCount = await (db as any).all(sql`SELECT COUNT(*) as c FROM villages`);
+    const vc = vCount?.rows?.[0]?.c ?? vCount?.[0]?.c ?? 0;
+    if (vc === 0) {
+      const villages = [
+        { pos: 1, name: "ქართული სოფელი", theme: "georgian", buildings: ["სახლი", "ეკლესია", "ძეგლი", "ბაღი", "ფერმა"] },
+        { pos: 2, name: "ეგვიპტე", theme: "egyptian", buildings: ["პირამიდა", "სფინქსი", "ტაძარი", "ობელისკი", "ოაზისი"] },
+        { pos: 3, name: "იაპონია", theme: "japanese", buildings: ["პაგოდა", "ციხე", "ტორი", "ბაღი", "სახლი"] },
+        { pos: 4, name: "შუა საუკუნეები", theme: "medieval", buildings: ["ციხე", "ტავერნა", "ეკლესია", "ბაზარი", "კოშკი"] },
+        { pos: 5, name: "მომავალი", theme: "futuristic", buildings: ["ცათამბჯენი", "სადგური", "ლაბორატორია", "გუმბათი", "ფაბრიკა"] },
+      ];
+      // Star costs scale per village level: village 1 starts at 50, village 2 at 100, etc.
+      for (const v of villages) {
+        const vid = `village_${v.pos}`;
+        await (db as any).run(sql`INSERT INTO villages (id, position, name, theme) VALUES (${vid}, ${v.pos}, ${v.name}, ${v.theme})`);
+        for (let i = 0; i < 5; i++) {
+          const bname = v.buildings[i];
+          const base = 50 * v.pos; // village multiplier
+          await (db as any).run(sql`INSERT INTO village_buildings (
+            id, village_id, position, name,
+            star1_name, star1_cost,
+            star2_name, star2_cost,
+            star3_name, star3_cost,
+            star4_name, star4_cost
+          ) VALUES (
+            ${`b_${v.pos}_${i + 1}`}, ${vid}, ${i + 1}, ${bname},
+            ${bname + " ⭐"}, ${base},
+            ${bname + " ⭐⭐"}, ${base * 2},
+            ${bname + " ⭐⭐⭐"}, ${base * 4},
+            ${bname + " ⭐⭐⭐⭐"}, ${base * 8}
+          )`);
+        }
+      }
+      console.log("[startup] seeded 5 default villages with 25 buildings");
+    }
   } catch (e: any) {
     console.error("[startup seed]", e.message);
   }

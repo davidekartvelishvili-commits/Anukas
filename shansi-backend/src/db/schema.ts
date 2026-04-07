@@ -263,15 +263,60 @@ export const villageLevels = sqliteTable("village_levels", {
   updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
 });
 
+// LEGACY (kept for migration compat — no longer used by new system)
 export const villageCards = sqliteTable("village_cards", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  rarity: text("rarity").notNull(), // common | rare | epic | legendary
+  rarity: text("rarity").notNull(),
   imageUrl: text("image_url"),
   starValue: integer("star_value").notNull(),
   coinCost: integer("coin_cost").notNull(),
   isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+// NEW: themed villages with 5 buildings, each upgradable through 4 star levels
+export const villages = sqliteTable("villages", {
+  id: text("id").primaryKey(),
+  position: integer("position").notNull().unique(),
+  name: text("name").notNull(),
+  theme: text("theme"),
+  isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const villageBuildings = sqliteTable("village_buildings", {
+  id: text("id").primaryKey(),
+  villageId: text("village_id").notNull().references(() => villages.id),
+  position: integer("position").notNull(), // 1-5
+  name: text("name").notNull(),
+  star1Name: text("star1_name").notNull(),
+  star1Cost: integer("star1_cost").notNull(),
+  star1Image: text("star1_image"),
+  star2Name: text("star2_name").notNull(),
+  star2Cost: integer("star2_cost").notNull(),
+  star2Image: text("star2_image"),
+  star3Name: text("star3_name").notNull(),
+  star3Cost: integer("star3_cost").notNull(),
+  star3Image: text("star3_image"),
+  star4Name: text("star4_name").notNull(),
+  star4Cost: integer("star4_cost").notNull(),
+  star4Image: text("star4_image"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const userVillageProgress = sqliteTable("user_village_progress", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  villageId: text("village_id").notNull().references(() => villages.id),
+  building1Stars: integer("b1_stars").default(0).notNull(),
+  building2Stars: integer("b2_stars").default(0).notNull(),
+  building3Stars: integer("b3_stars").default(0).notNull(),
+  building4Stars: integer("b4_stars").default(0).notNull(),
+  building5Stars: integer("b5_stars").default(0).notNull(),
+  completed: integer("completed", { mode: "boolean" }).default(false).notNull(),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+  completedAt: text("completed_at"),
 });
 
 export const userVillageProfile = sqliteTable("user_village_profile", {
