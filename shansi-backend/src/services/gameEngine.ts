@@ -201,11 +201,13 @@ async function _playGameInner(
   }
 
   // ═══════════════════════════════════════
-  // BIG WIN CHECK — distributes admin-created prizes across expected game plays
-  // No fixed trigger %; rarity is controlled by quantity of prizes vs expected plays
-  // chance_per_game = remainingBigWins / expectedPlaysRemaining
-  //   where expectedPlaysRemaining = bigWinBudget / avgBet
-  // Naturally adapts: fewer prizes = rarer; more prizes = more frequent.
+  // BIG WIN CHECK — payment-based eligibility, random distribution
+  // User must pass ALL filters:
+  //   1. payment_amount >= prize.amount  (paid enough to be eligible)
+  //   2. userMaxWin >= prize.amount      (village level cap)
+  //   3. prize.amount <= bigWinBudget    (fits budget)
+  //   4. prize has remaining quantity
+  // Among eligible: pick the LARGEST prize, then roll chance.
   // Skipped if master switch OFF or in bonus round.
   // ═══════════════════════════════════════
   let bigWinAmount = 0;
@@ -213,35 +215,33 @@ async function _playGameInner(
   if (masterSwitchOn && !isBonusRound) {
     try {
       const [bwCfg] = await db.select().from(bigWinConfig).limit(1);
-      if (bwCfg) {
+      const paymentAmount = activeTx.paymentAmount || 0;
+      if (bwCfg && paymentAmount > 0) {
         const available = Math.max(0, poolBefore - config.poolMinimumThreshold);
         const bigWinBudget = available * bwCfg.budgetPercent / 100;
 
         if (bigWinBudget > 0 && betInLari > 0) {
           const activePrizes = await db.select().from(bigWinPrizes)
             .where(eq(bigWinPrizes.isActive, true));
-          // Eligible = has remaining + fits level cap + fits budget
+
+          // Filter: has remaining + payment eligible + level eligible + budget fit
           const eligible = activePrizes
-            .filter(p => p.quantity - p.wonCount > 0 && p.amount <= userMaxWin && p.amount <= bigWinBudget);
+            .filter(p => p.quantity - p.wonCount > 0)
+            .filter(p => p.amount <= paymentAmount)
+            .filter(p => p.amount <= userMaxWin)
+            .filter(p => p.amount <= bigWinBudget)
+            .sort((a, b) => b.amount - a.amount); // largest first
 
           if (eligible.length > 0) {
             const remainingBigWins = eligible.reduce((s, p) => s + (p.quantity - p.wonCount), 0);
-            // Expected games the budget covers (1 bet per game)
             const expectedPlays = bigWinBudget / betInLari;
             const chance = expectedPlays > 0 ? Math.min(1, remainingBigWins / expectedPlays) : 0;
 
             if (secureRandom() < chance) {
-              // Pick a random eligible prize, weighted by remaining quantity
-              const totalRemaining = remainingBigWins;
-              let pick = secureRandom() * totalRemaining;
-              let chosen = eligible[0];
-              for (const p of eligible) {
-                pick -= (p.quantity - p.wonCount);
-                if (pick <= 0) { chosen = p; break; }
-              }
+              const chosen = eligible[0]; // largest eligible
               bigWinAmount = chosen.amount;
               bigWinPrizeId = chosen.id;
-              console.log(`[BIG WIN] userId=${userId} prize=${chosen.amount}₾ chance=${(chance * 100).toFixed(3)}% remaining=${remainingBigWins} expected=${expectedPlays.toFixed(0)}`);
+              console.log(`[BIG WIN] userId=${userId} prize=${chosen.amount}₾ payment=${paymentAmount}₾ levelCap=${userMaxWin}₾ chance=${(chance * 100).toFixed(3)}%`);
             }
           }
         }

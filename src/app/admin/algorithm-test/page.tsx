@@ -416,6 +416,12 @@ function AlgoTestContent() {
                   <CheckItem pass={r.checks.noMaxWinViolations} label={`მაქს. მოგება: ${r.maxWinViolationCount} violation`} />
                   <CheckItem pass={r.checks.poolNotNegative} label={`Pool: ${r.poolEndBalance.toFixed(2)}₾`} />
                   <CheckItem pass={r.checks.masterSwitchOffTest} label="Master OFF = 0 ბონუს" />
+                  {r.bigWinsAwarded !== undefined && r.bigWinsAwarded > 0 && (
+                    <>
+                      <CheckItem pass={!!r.checks.bigWinPaymentEligibility} label={`ბიგ ვინი payment-ის ფარგლებში (${r.bigWinsAwarded} პრიზი)`} />
+                      <CheckItem pass={!!r.checks.bigWinLevelEligibility} label="ბიგ ვინი ლეველის ფარგლებში" />
+                    </>
+                  )}
                   {r.villageEnabled && (
                     <>
                       <CheckItem pass={!!r.checks.allLevelCapsRespected} label={`ლეველის ლიმიტი დაცულია (${r.levelStats?.reduce((s: number, l: any) => s + l.violations, 0) || 0} violation)`} />
@@ -464,6 +470,41 @@ function AlgoTestContent() {
               {r.villageEnabled && r.levelsConfigured === false && (
                 <div className="rounded-2xl p-4 border" style={{ background: "#F59E0B15", borderColor: "#F59E0B40" }}>
                   <p className="text-[13px]" style={{ color: "#F59E0B" }}>⚠ ლეველები არ არის კონფიგურირებული — ჯერ Village გვერდზე დაამატეთ</p>
+                </div>
+              )}
+
+              {/* Big Win winners */}
+              {r.bigWinsAwarded !== undefined && r.bigWinsAwarded > 0 && (
+                <div className="rounded-2xl p-5 border" style={{ background: "#111111", borderColor: "#F9E74140" }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-[14px] font-bold" style={{ color: "#F9E741" }}>🏆 ბიგ ვინ მოგებები</h3>
+                    <span className="text-[12px]" style={{ color: "#A0A0A0" }}>{r.bigWinsAwarded} პრიზი · {r.bigWinsTotalAmount}₾</span>
+                  </div>
+                  <table className="w-full text-left text-[12px]">
+                    <thead><tr style={{ borderBottom: "1px solid #252525" }}>
+                      {["#", "User", "ხარჯი", "ლეველი", "პრიზი"].map(h => <th key={h} className="px-2 py-1.5 font-medium" style={{ color: "#666" }}>{h}</th>)}
+                    </tr></thead>
+                    <tbody>
+                      {r.bigWinWinners?.map((w: any, i: number) => {
+                        const paymentOk = w.spend >= w.prize - 0.001;
+                        const levelOk = !w.level || (r.levelStats?.find((l: any) => l.level === w.level)?.levelMaxWin || Infinity) >= w.prize - 0.001;
+                        return (
+                          <tr key={i} style={{ borderBottom: "1px solid #1A1A1A" }}>
+                            <td className="px-2 py-1.5" style={{ color: "#666" }}>{i + 1}</td>
+                            <td className="px-2 py-1.5" style={{ color: "#FFF" }}>U{w.userIndex}</td>
+                            <td className="px-2 py-1.5" style={{ color: paymentOk ? "#22C55E" : "#EF4444" }}>{w.spend}₾</td>
+                            <td className="px-2 py-1.5" style={{ color: levelOk ? "#A0A0A0" : "#EF4444" }}>{w.level ? `L${w.level}` : "—"}</td>
+                            <td className="px-2 py-1.5 font-bold" style={{ color: "#F9E741" }}>{w.prize}₾</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {r.bigWinsAwarded !== undefined && r.bigWinsAwarded === 0 && (
+                <div className="rounded-2xl p-4 border" style={{ background: "#0A0A0A", borderColor: "#252525" }}>
+                  <p className="text-[12px]" style={{ color: "#666" }}>ბიგ ვინი არ გაცემულა (არ არის აქტიური პრიზები ან ბიუჯეტი 0-ია)</p>
                 </div>
               )}
 

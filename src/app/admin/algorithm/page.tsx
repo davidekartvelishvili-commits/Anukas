@@ -412,7 +412,7 @@ function AlgorithmContent() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-[12px]">
                       <thead><tr style={{ borderBottom: "1px solid #252525" }}>
-                        {["პრიზი", "რაოდენობა", "ჯამი", "მოგებული", "დარჩენილი", "სტატუსი", ""].map(h => <th key={h} className="px-2 py-2 font-medium" style={{ color: "#666" }}>{h}</th>)}
+                        {["პრიზი", "მინ. გადახდა", "რაოდენობა", "ჯამი", "მოგებული", "დარჩენილი", "სტატუსი", ""].map(h => <th key={h} className="px-2 py-2 font-medium" style={{ color: "#666" }}>{h}</th>)}
                       </tr></thead>
                       <tbody>
                         {bigWinPrizes.map(pr => {
@@ -426,6 +426,7 @@ function AlgorithmContent() {
                                   <input type="number" step="0.5" value={editPrizeAmount} onChange={e => setEditPrizeAmount(e.target.value)} className="w-20 rounded px-2 py-0.5 text-[12px]" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
                                 ) : `${pr.amount}₾`}
                               </td>
+                              <td className="px-2 py-2" style={{ color: "#3B82F6" }}>≥ {editing ? (parseFloat(editPrizeAmount) || 0) : pr.amount}₾</td>
                               <td className="px-2 py-2" style={{ color: "#FFF" }}>
                                 {editing ? (
                                   <input type="number" value={editPrizeQty} onChange={e => setEditPrizeQty(e.target.value)} className="w-16 rounded px-2 py-0.5 text-[12px]" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
@@ -457,7 +458,7 @@ function AlgorithmContent() {
                         })}
                         <tr>
                           <td className="px-2 py-2 font-bold" style={{ color: "#FFF" }}>ჯამი</td>
-                          <td colSpan={5} className="px-2 py-2 font-bold" style={{ color: "#F9E741" }}>{allocated.toFixed(2)}₾</td>
+                          <td colSpan={6} className="px-2 py-2 font-bold" style={{ color: "#F9E741" }}>{allocated.toFixed(2)}₾</td>
                           <td></td>
                         </tr>
                       </tbody>
@@ -472,9 +473,10 @@ function AlgorithmContent() {
           {showAddPrize && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setShowAddPrize(false)}>
               <div className="rounded-2xl p-5 w-full max-w-md border" style={{ background: "#111111", borderColor: "#252525" }} onClick={e => e.stopPropagation()}>
-                <h3 className="text-[16px] font-bold mb-4" style={{ color: "#FFF" }}>ახალი ბიგ ვინ პრიზი</h3>
+                <h3 className="text-[16px] font-bold mb-2" style={{ color: "#FFF" }}>ახალი ბიგ ვინ პრიზი</h3>
+                <p className="text-[10px] mb-4" style={{ color: "#666" }}>ამ პრიზის მოსაგებად მომხმარებელმა მინიმუმ ამ თანხის გადახდა უნდა მოახდინოს და ლეველის ლიმიტიც უნდა იყოს საკმარისი</p>
                 <div className="mb-3">
-                  <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>პრიზის თანხა (₾)</label>
+                  <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>პრიზის თანხა (₾) — ასევე მინიმალური გადახდა</label>
                   <input type="number" step="0.5" value={newPrizeAmount} onChange={e => setNewPrizeAmount(e.target.value)} className="w-full rounded-lg px-3 py-2 text-[14px]" style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
                 </div>
                 <div className="mb-3">

@@ -1,6 +1,6 @@
 import { eq, asc } from "drizzle-orm";
 import { getDb } from "../db/client.js";
-import { gameConfig, pool, simulationRuns, systemConfig, villageLevels } from "../db/schema.js";
+import { gameConfig, pool, simulationRuns, systemConfig, villageLevels, bigWinConfig, bigWinPrizes } from "../db/schema.js";
 
 // REAL ALGORITHM IMPORTS — same functions production uses
 import {
@@ -30,6 +30,16 @@ interface SimUserLog {
   level?: number;
   levelMaxWin?: number;
   levelCapViolated?: boolean;
+  // Big win info
+  bigWinAmount?: number;
+  bigWinPrizeAmount?: number;
+}
+
+interface SimPrizeState {
+  id: string;
+  amount: number;
+  quantity: number;
+  wonCount: number;
 }
 
 interface LevelStat {
@@ -81,7 +91,14 @@ export interface SimulationResults {
     masterSwitchOffTest: boolean;
     allLevelCapsRespected?: boolean;
     guaranteeRespectsLevel?: boolean;
+    bigWinPaymentEligibility?: boolean;
+    bigWinLevelEligibility?: boolean;
   };
+
+  // Big win results
+  bigWinsAwarded?: number;
+  bigWinsTotalAmount?: number;
+  bigWinWinners?: { userIndex: number; spend: number; level?: number; prize: number }[];
 
   // Proof — first 10 users detailed log
   sampleUsers: SimUserLog[];
@@ -98,8 +115,10 @@ function simulateOneUser(
   config: Config,
   virtualPoolBalance: number,
   masterSwitchOn: boolean,
-  userLevel?: { level: number; maxWin: number }
-): { log: SimUserLog; poolDelta: number } {
+  userLevel?: { level: number; maxWin: number },
+  prizeState?: SimPrizeState[],
+  bigWinBudget = 0
+): { log: SimUserLog; poolDelta: number; bigWinAwarded?: { prizeId: string; amount: number } } {
   const coinCost = 10;
   const coinsReceived = Math.round(spendAmount * 100);
   const totalGames = Math.floor(coinsReceived / coinCost);
@@ -119,10 +138,33 @@ function simulateOneUser(
   let gamesWon = 0;
   let poolDelta = 0;
   let maxSingleWin = 0;
+  let bigWinAwarded: { prizeId: string; amount: number } | undefined;
+  let bigWinAmount = 0;
 
   for (let i = 0; i < totalGames; i++) {
     const isLastGame = i === totalGames - 1;
     const currentPoolBalance = virtualPoolBalance - poolDelta;
+
+    // ═══ BIG WIN CHECK (same logic as production) ═══
+    if (masterSwitchOn && !bigWinAwarded && prizeState && bigWinBudget > 0 && betInLari > 0) {
+      const eligible = prizeState
+        .filter(p => p.quantity - p.wonCount > 0)
+        .filter(p => p.amount <= spendAmount)        // payment eligibility
+        .filter(p => p.amount <= effectiveMaxWin)    // level eligibility
+        .filter(p => p.amount <= bigWinBudget)
+        .sort((a, b) => b.amount - a.amount);
+      if (eligible.length > 0) {
+        const remainingBigWins = eligible.reduce((s, p) => s + (p.quantity - p.wonCount), 0);
+        const expectedPlays = bigWinBudget / betInLari;
+        const chance = expectedPlays > 0 ? Math.min(1, remainingBigWins / expectedPlays) : 0;
+        if (secureRandom() < chance) {
+          const chosen = eligible[0];
+          chosen.wonCount++; // mutate prize state
+          bigWinAwarded = { prizeId: chosen.id, amount: chosen.amount };
+          bigWinAmount = chosen.amount;
+        }
+      }
+    }
 
     // ═══ REAL ALGORITHM CALL — same as production, with level-capped maxWin ═══
     let { minWin, bonusWin } = calculateWin(
@@ -131,7 +173,8 @@ function simulateOneUser(
 
     if (!masterSwitchOn) { minWin = 0; bonusWin = 0; }
 
-    let totalWin = round2(minWin + bonusWin);
+    let totalWin = round2(minWin + bonusWin + bigWinAmount);
+    bigWinAmount = 0; // consume — only adds to one game
 
     // Last-game guarantee + level cap (mirrors production)
     if (isLastGame && guaranteedTetri > 0) {
@@ -186,8 +229,11 @@ function simulateOneUser(
       level: userLevel?.level,
       levelMaxWin: userLevel?.maxWin,
       levelCapViolated,
+      bigWinAmount: bigWinAwarded?.amount,
+      bigWinPrizeAmount: bigWinAwarded?.amount,
     },
     poolDelta: round2(poolDelta),
+    bigWinAwarded,
   };
 }
 
@@ -242,6 +288,16 @@ export async function runSimulation(
   const [poolRow] = await db.select().from(pool).limit(1);
   const poolStartBalance = poolRow?.balance || 0;
 
+  // ═══ BIG WIN — load active prizes and budget ═══
+  const [bwCfg] = await db.select().from(bigWinConfig).limit(1);
+  const activePrizes = await db.select().from(bigWinPrizes).where(eq(bigWinPrizes.isActive, true));
+  const prizeState: SimPrizeState[] = activePrizes.map(p => ({
+    id: p.id, amount: p.amount, quantity: p.quantity, wonCount: 0, // sim resets won count
+  }));
+  const bwBudgetPercent = Number(bwCfg?.budgetPercent) || 30;
+  const availableForBW = Math.max(0, poolStartBalance - config.poolMinimumThreshold);
+  const bigWinBudget = availableForBW * bwBudgetPercent / 100;
+
   // ═══ VILLAGE LEVELS ═══
   const allLevels = await db.select().from(villageLevels).orderBy(asc(villageLevels.levelNumber));
   const levelsConfigured = allLevels.length > 0;
@@ -293,14 +349,28 @@ export async function runSimulation(
     levelStatsMap.set(lvl.levelNumber, { count: 0, maxWin: lvl.maxWinAmount, actualMax: 0, violations: 0 });
   }
 
+  // Big win tracking
+  const bigWinWinners: { userIndex: number; spend: number; level?: number; prize: number }[] = [];
+  let bigWinPaymentViolation = false;
+  let bigWinLevelViolation = false;
+
   const BATCH_SIZE = 50;
 
   for (let i = 0; i < userCount; i++) {
     const spendAmount = round2(range.min + secureRandom() * (range.max - range.min));
     const userLevel = userLevelAssignments[i];
 
-    const { log, poolDelta } = simulateOneUser(spendAmount, config, virtualPoolBalance, masterSwitchOn, userLevel);
+    const { log, poolDelta, bigWinAwarded } = simulateOneUser(
+      spendAmount, config, virtualPoolBalance, masterSwitchOn, userLevel,
+      prizeState, bigWinBudget,
+    );
     log.index = i + 1;
+
+    if (bigWinAwarded) {
+      bigWinWinners.push({ userIndex: i + 1, spend: spendAmount, level: userLevel?.level, prize: bigWinAwarded.amount });
+      if (spendAmount < bigWinAwarded.amount - 0.001) bigWinPaymentViolation = true;
+      if (userLevel && userLevel.maxWin < bigWinAwarded.amount - 0.001) bigWinLevelViolation = true;
+    }
 
     // Track per-level stats
     if (userLevel) {
@@ -420,7 +490,12 @@ export async function runSimulation(
       masterSwitchOffTest,
       allLevelCapsRespected: villageOpts.enabled ? levelCapViolations === 0 : true,
       guaranteeRespectsLevel,
+      bigWinPaymentEligibility: !bigWinPaymentViolation,
+      bigWinLevelEligibility: !bigWinLevelViolation,
     },
+    bigWinsAwarded: bigWinWinners.length,
+    bigWinsTotalAmount: round2(bigWinWinners.reduce((s, w) => s + w.prize, 0)),
+    bigWinWinners: bigWinWinners.slice(0, 20),
 
     sampleUsers,
     durationMs: Date.now() - startTime,
