@@ -40,9 +40,6 @@ const NAV_ITEMS = [
   { label: "Referrals", id: "referrals", href: "/admin/referrals" },
   { label: "Withdrawals", id: "withdrawals", href: "/admin/withdrawals" },
   { label: "Finance", id: "finance", href: "/admin/finance" },
-  { label: "Village", id: "village", href: "/admin" },
-  { label: "Notifications", id: "notifications", href: "/admin" },
-  { label: "Analytics", id: "analytics", href: "/admin" },
   { label: "System", id: "system", href: "/admin" },
 ];
 
@@ -243,8 +240,8 @@ function AlgorithmContent() {
                 <p className="text-[12px]" style={{ color: "#A0A0A0" }}>მინიმუმის ზღვარი: <span className="text-white font-semibold">{poolMinimum}₾</span></p>
                 <p className="text-[12px]" style={{ color: "#A0A0A0" }}>სტატუსი: <span style={{ color: winningsEnabled ? "#22C55E" : "#EF4444" }}>{winningsEnabled ? "აქტიური" : "შეჩერებული"}</span></p>
               </div>
-              <button onClick={() => setShowAddModal(true)} className="px-4 py-2 rounded-[8px] text-[13px] font-bold transition-all active:scale-[0.97]" style={{ background: "#F9E741", color: "#000000" }}>
-                თანხის დამატება
+              <button onClick={() => router.push("/admin/finance")} className="px-4 py-2 rounded-[8px] text-[13px] font-bold transition-all active:scale-[0.97]" style={{ background: "#F9E741", color: "#000000" }}>
+                Finance-ზე გადასვლა
               </button>
             </div>
           </div>

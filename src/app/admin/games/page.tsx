@@ -37,9 +37,6 @@ const NAV_ITEMS = [
   { label: "Referrals", id: "referrals", href: "/admin/referrals" },
   { label: "Withdrawals", id: "withdrawals", href: "/admin/withdrawals" },
   { label: "Finance", id: "finance", href: "/admin/finance" },
-  { label: "Village", id: "village", href: "/admin" },
-  { label: "Notifications", id: "notifications", href: "/admin" },
-  { label: "Analytics", id: "analytics", href: "/admin" },
   { label: "System", id: "system", href: "/admin" },
 ];
 
@@ -144,10 +141,11 @@ export default function GamesPage() {
             nameKa: meta.nameKa,
             icon: meta.icon,
             enabled: c.isActive,
-            playsToday: 0,
-            playsTotal: 0,
-            totalWon: 0,
-            avgWin: 0,
+            // REAL stats from backend
+            playsToday: c.stats?.playsToday ?? 0,
+            playsTotal: c.stats?.playsTotal ?? 0,
+            totalWon: c.stats?.totalWon ?? 0,
+            avgWin: c.stats?.avgWin ?? 0,
             xpPerPlay: 10,
           };
         }));

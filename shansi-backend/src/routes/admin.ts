@@ -197,11 +197,47 @@ admin.get("/dashboard", adminMiddleware, async (c) => {
   });
 });
 
-// GET /admin/game-config
+// GET /admin/logs — admin action history (real, from adminLogs table)
+admin.get("/logs", adminMiddleware, async (c) => {
+  const db = getDb();
+  const limit = parseInt(c.req.query("limit") || "100");
+  const logs = await db.select().from(adminLogs).orderBy(desc(adminLogs.createdAt)).limit(limit);
+  const enriched = await Promise.all(logs.map(async (l) => {
+    const [adm] = await db.select({ name: admins.name, email: admins.email }).from(admins).where(eq(admins.id, l.adminId)).limit(1);
+    return { ...l, adminName: adm?.name || adm?.email || l.adminId };
+  }));
+  return c.json({ success: true, logs: enriched });
+});
+
+// GET /admin/game-config — includes real-time stats per game type
 admin.get("/game-config", adminMiddleware, async (c) => {
   const db = getDb();
   const configs = await db.select().from(gameConfig);
-  return c.json({ success: true, configs });
+
+  // Real stats from gameHistory
+  const today = new Date().toISOString().slice(0, 10);
+  const enriched = await Promise.all(configs.map(async (cfg) => {
+    const [todayRow] = await db.select({ c: sql<number>`count(*)` })
+      .from(gameHistory)
+      .where(and(eq(gameHistory.gameType, cfg.gameType), sql`${gameHistory.createdAt} >= ${today}`));
+    const [totalRow] = await db.select({
+      c: sql<number>`count(*)`,
+      won: sql<number>`coalesce(sum(${gameHistory.winAmount}), 0)`,
+    }).from(gameHistory).where(eq(gameHistory.gameType, cfg.gameType));
+    const playsTotal = Number(totalRow?.c) || 0;
+    const totalWon = Number(totalRow?.won) || 0;
+    return {
+      ...cfg,
+      stats: {
+        playsToday: Number(todayRow?.c) || 0,
+        playsTotal,
+        totalWon: Math.round(totalWon * 100) / 100,
+        avgWin: playsTotal > 0 ? Math.round((totalWon / playsTotal) * 10000) / 10000 : 0,
+      },
+    };
+  }));
+
+  return c.json({ success: true, configs: enriched });
 });
 
 // PATCH /admin/game-config/:gameType
@@ -1075,7 +1111,9 @@ admin.get("/finance", adminMiddleware, async (c) => {
   // Pool current state (real-time, not date-filtered)
   const [poolRow] = await db.select().from(pool).limit(1);
   const poolBalance = Number(poolRow?.balance) || 0;
-  const poolMinThreshold = 1000;
+  // Read threshold from gameConfig (matches Algorithm settings page exactly)
+  const [primaryCfg] = await db.select().from(gameConfig).limit(1);
+  const poolMinThreshold = Number(primaryCfg?.poolMinimumThreshold) || 1000;
   let poolStatus: "healthy" | "low" | "critical" = "critical";
   if (poolBalance >= poolMinThreshold) poolStatus = "healthy";
   else if (poolBalance > poolMinThreshold * 0.3) poolStatus = "low";
@@ -1103,21 +1141,38 @@ admin.get("/finance", adminMiddleware, async (c) => {
   const totalCommission = Number(commissionStats?.totalCommission) || 0;
   const totalPaidOut = Number(winStats?.totalPaidOut) || 0;
 
-  // Charts — last 30 days regardless of filter (for trend visibility)
+  // Charts — last 30 days, ONE query each (was 60 queries — fixed perf bug)
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+  const since = thirtyDaysAgo.toISOString().slice(0, 10);
+
+  const commissionByDay = await db.select({
+    day: sql<string>`substr(${paymentTransactions.createdAt}, 1, 10)`,
+    s: sql<number>`coalesce(sum(${paymentTransactions.commissionAmount}), 0)`,
+  }).from(paymentTransactions)
+    .where(sql`${paymentTransactions.createdAt} >= ${since}`)
+    .groupBy(sql`substr(${paymentTransactions.createdAt}, 1, 10)`);
+
+  const winsByDay = await db.select({
+    day: sql<string>`substr(${gameHistory.createdAt}, 1, 10)`,
+    s: sql<number>`coalesce(sum(${gameHistory.winAmount}), 0)`,
+  }).from(gameHistory)
+    .where(sql`${gameHistory.createdAt} >= ${since}`)
+    .groupBy(sql`substr(${gameHistory.createdAt}, 1, 10)`);
+
+  const commissionMap = new Map(commissionByDay.map(r => [r.day, Number(r.s) || 0]));
+  const winsMap = new Map(winsByDay.map(r => [r.day, Number(r.s) || 0]));
+
   const dailyStats: { date: string; commission: number; paidOut: number }[] = [];
   for (let d = 29; d >= 0; d--) {
     const date = new Date();
     date.setDate(date.getDate() - d);
     const dStr = date.toISOString().slice(0, 10);
-    const dStart = `${dStr}T00:00:00`;
-    const dEnd = `${dStr}T23:59:59`;
-    const [c1] = await db.select({ s: sql<number>`coalesce(sum(${paymentTransactions.commissionAmount}), 0)` })
-      .from(paymentTransactions)
-      .where(and(sql`${paymentTransactions.createdAt} >= ${dStart}`, sql`${paymentTransactions.createdAt} <= ${dEnd}`));
-    const [g1] = await db.select({ s: sql<number>`coalesce(sum(${gameHistory.winAmount}), 0)` })
-      .from(gameHistory)
-      .where(and(sql`${gameHistory.createdAt} >= ${dStart}`, sql`${gameHistory.createdAt} <= ${dEnd}`));
-    dailyStats.push({ date: dStr, commission: Number(c1?.s) || 0, paidOut: Number(g1?.s) || 0 });
+    dailyStats.push({
+      date: dStr,
+      commission: commissionMap.get(dStr) || 0,
+      paidOut: winsMap.get(dStr) || 0,
+    });
   }
 
   // Pie chart — commission by merchant (date filtered)

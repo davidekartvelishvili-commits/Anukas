@@ -38,9 +38,6 @@ const NAV_ITEMS = [
   { label: "Referrals", id: "referrals", href: "/admin/referrals" },
   { label: "Withdrawals", id: "withdrawals", href: "/admin/withdrawals" },
   { label: "Finance", id: "finance", href: "/admin/finance" },
-  { label: "Village", id: "village", href: "/admin/village" },
-  { label: "Notifications", id: "notifications", href: "/admin/notifications" },
-  { label: "Analytics", id: "analytics", href: "/admin/analytics" },
   { label: "System", id: "system", href: "/admin/system" },
 ];
 
@@ -104,30 +101,10 @@ interface LogEntry {
 
 const ACTION_TYPES = ["ყველა", "ავტორიზაცია", "მომხმარებლები", "მერჩანტები", "ალგორითმი", "სისტემა", "ექსპორტი"];
 
-const MOCK_LOGS: LogEntry[] = [
-  { id: 1, date: "2026-03-29", time: "14:22", adminName: "Giorgi Kapanadze", action: "სისტემაში შესვლა", actionType: "ავტორიზაცია" },
-  { id: 2, date: "2026-03-29", time: "14:18", adminName: "Nino Lomidze", action: "ახალი მომხმარებლის დამატება - Ana M.", actionType: "მომხმარებლები" },
-  { id: 3, date: "2026-03-29", time: "13:55", adminName: "Giorgi Kapanadze", action: "ალგორითმის პარამეტრების შეცვლა - win_probability: 0.12", actionType: "ალგორითმი" },
-  { id: 4, date: "2026-03-29", time: "13:40", adminName: "Luka Beridze", action: "სისტემაში შესვლა", actionType: "ავტორიზაცია" },
-  { id: 5, date: "2026-03-29", time: "12:30", adminName: "Davit Tsereteli", action: "მერჩანტის სტატუსის შეცვლა - Stamba Cafe: აქტიური", actionType: "მერჩანტები" },
-  { id: 6, date: "2026-03-29", time: "11:20", adminName: "Nino Lomidze", action: "მომხმარებლების CSV ექსპორტი", actionType: "ექსპორტი" },
-  { id: 7, date: "2026-03-29", time: "11:05", adminName: "Nino Lomidze", action: "სისტემაში შესვლა", actionType: "ავტორიზაცია" },
-  { id: 8, date: "2026-03-28", time: "22:15", adminName: "Giorgi Kapanadze", action: "სისტემის ტექნიკური რეჟიმის გამორთვა", actionType: "სისტემა" },
-  { id: 9, date: "2026-03-28", time: "21:00", adminName: "Giorgi Kapanadze", action: "სისტემის ტექნიკური რეჟიმის ჩართვა", actionType: "სისტემა" },
-  { id: 10, date: "2026-03-28", time: "18:30", adminName: "Davit Tsereteli", action: "სისტემაში შესვლა", actionType: "ავტორიზაცია" },
-  { id: 11, date: "2026-03-28", time: "17:45", adminName: "Nino Lomidze", action: "მერჩანტის დამატება - Coffee Lab", actionType: "მერჩანტები" },
-  { id: 12, date: "2026-03-28", time: "16:30", adminName: "Giorgi Kapanadze", action: "ალგორითმის პარამეტრების შეცვლა - max_cashback: 50", actionType: "ალგორითმი" },
-  { id: 13, date: "2026-03-28", time: "15:10", adminName: "Davit Tsereteli", action: "მომხმარებლის დაბლოკვა - ID #4521", actionType: "მომხმარებლები" },
-  { id: 14, date: "2026-03-28", time: "14:00", adminName: "Luka Beridze", action: "ტრანზაქციების CSV ექსპორტი", actionType: "ექსპორტი" },
-  { id: 15, date: "2026-03-27", time: "19:30", adminName: "Giorgi Kapanadze", action: "ადმინის როლის შეცვლა - Mariam: viewer", actionType: "სისტემა" },
-  { id: 16, date: "2026-03-27", time: "16:20", adminName: "Nino Lomidze", action: "მერჩანტის კომისიის შეცვლა - Dunkin': 2.5%", actionType: "მერჩანტები" },
-  { id: 17, date: "2026-03-27", time: "14:55", adminName: "Davit Tsereteli", action: "მომხმარებლის განბლოკვა - ID #3892", actionType: "მომხმარებლები" },
-  { id: 18, date: "2026-03-27", time: "12:10", adminName: "Giorgi Kapanadze", action: "Force update ჩართვა - v2.3.1", actionType: "სისტემა" },
-  { id: 19, date: "2026-03-27", time: "09:15", adminName: "Mariam Javakhishvili", action: "სისტემაში შესვლა", actionType: "ავტორიზაცია" },
-  { id: 20, date: "2026-03-26", time: "20:45", adminName: "Giorgi Kapanadze", action: "მერჩანტების CSV ექსპორტი", actionType: "ექსპორტი" },
-];
+// Real admin logs are now fetched from /admin/logs
+const MOCK_LOGS: LogEntry[] = [];
 
-const ADMIN_NAMES_FILTER = ["ყველა", ...Array.from(new Set(MOCK_LOGS.map((l) => l.adminName)))];
+const ADMIN_NAMES_FILTER = ["ყველა"];
 
 /* ── PAGE ── */
 function SystemContent() {
@@ -202,6 +179,24 @@ function SystemContent() {
   const [logFilterType, setLogFilterType] = useState("ყველა");
   const [logFilterDate, setLogFilterDate] = useState("");
   const LOGS_PER_PAGE = 8;
+  const [realLogs, setRealLogs] = useState<LogEntry[]>([]);
+  useEffect(() => {
+    adminFetch("/admin/logs?limit=200").then((data: any) => {
+      if (data.success && data.logs) {
+        setRealLogs(data.logs.map((l: any, i: number) => {
+          const d = new Date(l.createdAt);
+          return {
+            id: i + 1,
+            date: d.toISOString().slice(0, 10),
+            time: d.toTimeString().slice(0, 5),
+            adminName: l.adminName || "—",
+            action: l.action + (l.details ? ` — ${l.details}` : ""),
+            actionType: l.action.split("_")[0] || "სისტემა",
+          };
+        }));
+      }
+    }).catch(() => {});
+  }, []);
 
   // Data Export state
   const [exportDateFrom, setExportDateFrom] = useState("2026-03-01");
@@ -214,8 +209,8 @@ function SystemContent() {
   const [showMaintenanceConfirm, setShowMaintenanceConfirm] = useState(false);
   const [showForceUpdateConfirm, setShowForceUpdateConfirm] = useState(false);
 
-  // Filtered logs
-  const filteredLogs = MOCK_LOGS.filter((log) => {
+  // Filtered logs (real)
+  const filteredLogs = realLogs.filter((log) => {
     if (logFilterAdmin !== "ყველა" && log.adminName !== logFilterAdmin) return false;
     if (logFilterType !== "ყველა" && log.actionType !== logFilterType) return false;
     if (logFilterDate && log.date !== logFilterDate) return false;
