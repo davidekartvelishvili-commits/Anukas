@@ -3,31 +3,121 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
+import { apiFetch } from "@/services/api";
+import { getCoinBalance } from "@/services/balance";
+
+interface Building {
+  id: string;
+  position: number;
+  name: string;
+  currentStars: number;
+  currentImage: string;
+  nextStar: number | null;
+  nextName: string | null;
+  nextCost: number | null;
+  complete: boolean;
+}
+
+interface VillageData {
+  id: string;
+  name: string;
+  theme: string;
+  position: number;
+  buildings: Building[];
+  totalStars: number;
+  totalRequired: number;
+  complete: boolean;
+}
+
+function StarRow({ current, total }: { current: number; total: number }) {
+  return (
+    <div className="flex justify-center gap-0.5 pt-1.5">
+      {Array.from({ length: total }).map((_, i) => (
+        <div
+          key={i}
+          style={{
+            width: 12,
+            height: 12,
+            clipPath: "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)",
+            background: i < current ? "#FFD700" : "#8a7a5a",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function VillagePage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [showHand, setShowHand] = useState(true);
+  const [village, setVillage] = useState<VillageData | null>(null);
+  const [coinBalance, setCoinBalanceState] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [upgrading, setUpgrading] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [showHand, setShowHand] = useState(true);
+  const [profile, setProfile] = useState<{ totalStars: number; shieldActive: boolean; currentLevel: number } | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
     return () => clearTimeout(t);
   }, []);
 
-  // Hand blink every 3 seconds
+  // Fetch village data
+  useEffect(() => {
+    setCoinBalanceState(getCoinBalance());
+    Promise.all([
+      apiFetch("/village/current").catch(() => null),
+      apiFetch("/village/profile").catch(() => null),
+    ]).then(([vData, pData]: any[]) => {
+      if (vData?.success) setVillage(vData.village);
+      if (pData?.success) setProfile(pData.profile);
+      setLoading(false);
+    });
+  }, []);
+
+  // Hand blink
   useEffect(() => {
     if (!showWelcome) return;
-    const iv = setInterval(() => {
-      setShowHand((h) => !h);
-    }, 3000);
+    const iv = setInterval(() => setShowHand((h) => !h), 3000);
     return () => clearInterval(iv);
   }, [showWelcome]);
 
-  const handleCardClick = () => {
+  const handleUpgrade = async (building: Building) => {
+    if (building.complete || !building.nextCost || upgrading) return;
     setShowWelcome(false);
     setShowHand(false);
+
+    if (coinBalance < building.nextCost) return;
+
+    setUpgrading(building.id);
+    try {
+      const res: any = await apiFetch("/village/upgrade", {
+        method: "POST",
+        body: JSON.stringify({ buildingId: building.id }),
+      });
+      if (res.success) {
+        // Refresh data
+        const [vData, pData]: any[] = await Promise.all([
+          apiFetch("/village/current").catch(() => null),
+          apiFetch("/village/profile").catch(() => null),
+        ]);
+        if (vData?.success) setVillage(vData.village);
+        if (pData?.success) setProfile(pData.profile);
+        setCoinBalanceState(getCoinBalance());
+      }
+    } catch {
+      // error handling
+    }
+    setUpgrading(null);
   };
+
+  const formatCoins = (n: number) => {
+    if (n >= 1000) return `${Math.floor(n / 1000)}K`;
+    return String(n);
+  };
+
+  const buildings = village?.buildings || [];
 
   return (
     <AuthGuard>
@@ -73,54 +163,35 @@ export default function VillagePage() {
           </div>
         ))}
 
-        {/* Fence - wooden stakes around village */}
+        {/* Fence */}
         <div className="absolute" style={{ left: "20%", top: "30%", width: "60%", height: "35%", zIndex: 3 }}>
-          {/* Left fence */}
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={`fl-${i}`} className="absolute" style={{
-              left: `${-2 + i * 2}%`, top: `${10 + i * 10}%`,
-              width: 6, height: 22, background: "#8B6914", borderRadius: "2px 2px 0 0",
-              transform: `rotate(${-15 + i * 2}deg)`, boxShadow: "1px 0 0 #6b4a0a",
-            }} />
+            <div key={`fl-${i}`} className="absolute" style={{ left: `${-2 + i * 2}%`, top: `${10 + i * 10}%`, width: 6, height: 22, background: "#8B6914", borderRadius: "2px 2px 0 0", transform: `rotate(${-15 + i * 2}deg)`, boxShadow: "1px 0 0 #6b4a0a" }} />
           ))}
-          {/* Right fence */}
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={`fr-${i}`} className="absolute" style={{
-              right: `${-2 + i * 2}%`, top: `${10 + i * 10}%`,
-              width: 6, height: 22, background: "#8B6914", borderRadius: "2px 2px 0 0",
-              transform: `rotate(${15 - i * 2}deg)`, boxShadow: "-1px 0 0 #6b4a0a",
-            }} />
+            <div key={`fr-${i}`} className="absolute" style={{ right: `${-2 + i * 2}%`, top: `${10 + i * 10}%`, width: 6, height: 22, background: "#8B6914", borderRadius: "2px 2px 0 0", transform: `rotate(${15 - i * 2}deg)`, boxShadow: "-1px 0 0 #6b4a0a" }} />
           ))}
         </div>
 
-        {/* Village clearing - lighter green area */}
+        {/* Village clearing */}
         <div className="absolute rounded-[50%]" style={{ left: "15%", top: "32%", width: "70%", height: "30%", background: "radial-gradient(ellipse, #7ec850 0%, #6ab04c 50%, #5a9e3e 100%)", zIndex: 1 }} />
 
-        {/* Small flowers scattered */}
-        {[
-          { x: 30, y: 45 }, { x: 50, y: 50 }, { x: 65, y: 42 }, { x: 40, y: 55 },
-          { x: 55, y: 48 }, { x: 35, y: 52 }, { x: 60, y: 55 }, { x: 45, y: 42 },
-        ].map((f, i) => (
-          <div key={`fl-${i}`} className="absolute w-[6px] h-[6px] rounded-full" style={{
-            left: `${f.x}%`, top: `${f.y}%`, background: "#fff",
-            animation: `sparkle-flower ${2 + i * 0.3}s ease-in-out ${i * 0.4}s infinite`, zIndex: 4,
-          }} />
+        {/* Flowers */}
+        {[{ x: 30, y: 45 }, { x: 50, y: 50 }, { x: 65, y: 42 }, { x: 40, y: 55 }, { x: 55, y: 48 }, { x: 35, y: 52 }, { x: 60, y: 55 }, { x: 45, y: 42 }].map((f, i) => (
+          <div key={`fl-${i}`} className="absolute w-[6px] h-[6px] rounded-full" style={{ left: `${f.x}%`, top: `${f.y}%`, background: "#fff", animation: `sparkle-flower ${2 + i * 0.3}s ease-in-out ${i * 0.4}s infinite`, zIndex: 4 }} />
         ))}
 
         {/* Lake */}
         <div className="absolute" style={{ left: "5%", top: "68%", width: "90%", height: "18%", background: "linear-gradient(180deg, #2d8bc9 0%, #1e7ab8 50%, #1565a0 100%)", borderRadius: "40% 60% 50% 50%", zIndex: 5 }}>
-          {/* Lake shore */}
           <div className="absolute -top-[6px] left-[5%] right-[5%] h-[12px] rounded-[50%]" style={{ background: "#8B6914" }} />
-          {/* Water shimmer */}
           <div className="absolute top-[30%] left-[20%] w-[60%] h-[3px] rounded-full opacity-30" style={{ background: "rgba(255,255,255,0.4)" }} />
           <div className="absolute top-[50%] left-[30%] w-[40%] h-[2px] rounded-full opacity-20" style={{ background: "rgba(255,255,255,0.3)" }} />
         </div>
 
-        {/* Wooden dock */}
+        {/* Dock */}
         <div className="absolute" style={{ left: "52%", top: "72%", zIndex: 6 }}>
           <div className="w-[50px] h-[8px] rounded-[2px]" style={{ background: "#8B6914", transform: "perspective(100px) rotateX(15deg)" }} />
           <div className="w-[50px] h-[8px] rounded-[2px] mt-[3px]" style={{ background: "#7a5a10" }} />
-          {/* Dock posts */}
           <div className="absolute -left-[3px] top-[2px] w-[5px] h-[20px] rounded-b-sm" style={{ background: "#6b4a0a" }} />
           <div className="absolute -right-[3px] top-[2px] w-[5px] h-[20px] rounded-b-sm" style={{ background: "#6b4a0a" }} />
         </div>
@@ -130,47 +201,49 @@ export default function VillagePage() {
           <div className="flex items-center justify-between px-3">
             {/* Coins */}
             <div className="flex items-center gap-1.5">
-              <img src="/images/lari-icon.png" alt="₾" width={32} height={32} style={{ objectFit: "contain" }} />
+              <img src="/images/coin-icon.png" alt="coin" width={32} height={32} style={{ objectFit: "contain" }} />
               <div className="flex items-center gap-1 px-3 py-1 rounded-full" style={{ background: "rgba(180,140,80,0.7)" }}>
-                <span className="text-white text-[15px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>75,000</span>
+                <span className="text-white text-[15px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
+                  {coinBalance.toLocaleString()}
+                </span>
                 <span className="text-[#4CAF50] text-[14px] font-bold">+</span>
               </div>
             </div>
 
-            {/* Star - Level */}
+            {/* Stars */}
             <div className="flex items-center gap-1">
-              <span className="text-[28px]">⭐</span>
-              <span className="text-white text-[15px] font-bold" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>0</span>
+              <div style={{ width: 28, height: 28, clipPath: "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)", background: "#FFD700" }} />
+              <span className="text-white text-[15px] font-bold" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>
+                {profile?.totalStars ?? 0}
+              </span>
             </div>
 
             {/* Shields */}
             <div className="flex items-center gap-1 px-3 py-1 rounded-full" style={{ background: "rgba(150,200,240,0.5)" }}>
-              <span className="text-[20px]">🛡️</span>
-              <span className="text-white text-[13px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>0</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              <span className="text-white text-[13px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
+                {profile?.shieldActive ? "1" : "0"}
+              </span>
             </div>
           </div>
         </div>
 
         {/* ── WELCOME BANNER ── */}
-        {showWelcome && (
+        {showWelcome && !loading && (
           <div className="absolute left-0 right-0 z-20 flex flex-col items-center" style={{ top: "30%", animation: "banner-pop 0.5s ease-out" }}>
-            {/* Red banner */}
             <div className="relative px-8 py-3 mb-4" style={{ background: "linear-gradient(180deg, #e53935, #c62828)", borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.3)" }}>
-              {/* Banner folds */}
               <div className="absolute -left-3 top-0 w-3 h-full" style={{ background: "#b71c1c", borderRadius: "4px 0 0 4px" }} />
               <div className="absolute -right-3 top-0 w-3 h-full" style={{ background: "#b71c1c", borderRadius: "0 4px 4px 0" }} />
               <span className="text-white text-[22px] font-black uppercase tracking-wider" style={{ fontFamily: "var(--font-outfit)", textShadow: "2px 2px 0 rgba(0,0,0,0.3)" }}>
-                Your First Village
+                {village?.name || "Your Village"}
               </span>
             </div>
-
-            {/* Welcome text */}
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px]">✨</span>
               <span className="text-white text-[22px] font-black italic" style={{ fontFamily: "var(--font-outfit)", textShadow: "2px 2px 0 rgba(0,0,0,0.4)" }}>
                 Welcome Friend!
               </span>
-              <span className="text-[10px]">✨</span>
             </div>
             <span className="text-white text-[17px] font-bold" style={{ fontFamily: "var(--font-outfit)", textShadow: "1px 1px 0 rgba(0,0,0,0.4)" }}>
               Click on the Build button to start
@@ -180,47 +253,67 @@ export default function VillagePage() {
 
         {/* ── BOTTOM CARDS ── */}
         <div className="absolute bottom-0 left-0 right-0 z-20" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 70px)" }}>
-          <div className="flex gap-2 px-2 overflow-x-auto scrollbar-hide">
-            {[
-              { price: "60K", stars: 4 },
-              { price: "80K", stars: 4 },
-              { price: "100K", stars: 4 },
-              { price: "120K", stars: 4 },
-              { price: "160K", stars: 4 },
-            ].map((card, i) => (
-              <div
-                key={i}
-                onClick={handleCardClick}
-                className="relative shrink-0 w-[85px] rounded-[12px] overflow-hidden cursor-pointer active:scale-[0.95] transition-transform"
-                style={{ background: "linear-gradient(180deg, #f5e6c8, #e8d4a8)", border: "2px solid #c4a46a", boxShadow: "0 3px 8px rgba(0,0,0,0.2)" }}
-              >
-                {/* Stars */}
-                <div className="flex justify-center gap-0.5 pt-1.5">
-                  {Array.from({ length: card.stars }).map((_, s) => (
-                    <span key={s} className="text-[10px]">⭐</span>
-                  ))}
-                </div>
+          {loading ? (
+            <div className="flex justify-center py-4">
+              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="flex gap-2 px-2 overflow-x-auto scrollbar-hide">
+              {buildings.map((b, i) => (
+                <div
+                  key={b.id}
+                  onClick={() => handleUpgrade(b)}
+                  className="relative shrink-0 w-[85px] rounded-[12px] overflow-hidden cursor-pointer active:scale-[0.95] transition-transform"
+                  style={{
+                    background: "linear-gradient(180deg, #f5e6c8, #e8d4a8)",
+                    border: b.complete ? "2px solid #FFD700" : "2px solid #c4a46a",
+                    boxShadow: "0 3px 8px rgba(0,0,0,0.2)",
+                    opacity: upgrading === b.id ? 0.6 : 1,
+                  }}
+                >
+                  {/* Stars — colored only for earned stars */}
+                  <StarRow current={b.currentStars} total={4} />
 
-                {/* Empty card content area */}
-                <div className="h-[60px] flex items-center justify-center">
-                  <div className="w-[50px] h-[50px] rounded-[8px]" style={{ background: "rgba(180,150,100,0.2)" }} />
-                </div>
-
-                {/* Price */}
-                <div className="flex items-center justify-center gap-1 pb-1.5 pt-1">
-                  <img src="/images/lari-icon.png" alt="₾" width={14} height={14} style={{ objectFit: "contain" }} />
-                  <span className="text-[12px] font-bold" style={{ color: "#5a4a2a", fontFamily: "var(--font-outfit)" }}>{card.price}</span>
-                </div>
-
-                {/* Hand pointer on first card */}
-                {i === 0 && showHand && showWelcome && (
-                  <div className="absolute -bottom-2 -left-2 text-[36px] z-30" style={{ animation: "hand-bounce 1s ease-in-out infinite" }}>
-                    👆
+                  {/* Card image or empty plot */}
+                  <div className="h-[60px] flex items-center justify-center">
+                    {b.currentImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={b.currentImage}
+                        alt={b.name}
+                        className="w-[50px] h-[50px] rounded-[8px] object-cover"
+                      />
+                    ) : (
+                      <div className="w-[50px] h-[50px] rounded-[8px]" style={{ background: "rgba(180,150,100,0.2)" }} />
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
+
+                  {/* Price or complete */}
+                  <div className="flex items-center justify-center gap-1 pb-1.5 pt-1">
+                    {b.complete ? (
+                      <span className="text-[11px] font-bold" style={{ color: "#2d7a28", fontFamily: "var(--font-outfit)" }}>MAX</span>
+                    ) : (
+                      <>
+                        <img src="/images/coin-icon.png" alt="coin" width={14} height={14} style={{ objectFit: "contain" }} />
+                        <span className="text-[12px] font-bold" style={{ color: "#5a4a2a", fontFamily: "var(--font-outfit)" }}>
+                          {formatCoins(b.nextCost || 0)}
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Hand pointer on first card */}
+                  {i === 0 && showHand && showWelcome && (
+                    <div className="absolute -bottom-2 -left-2 text-[36px] z-30" style={{ animation: "hand-bounce 1s ease-in-out infinite" }}>
+                      <svg width="36" height="36" viewBox="0 0 24 24" fill="#FFD700" stroke="#5a4a2a" strokeWidth="1">
+                        <path d="M12 2l-1 9H7l5 11 1-9h4L12 2z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── BOTTOM NAV ── */}
