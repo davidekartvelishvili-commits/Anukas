@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { verifyOtp, sendOtp } from "@/services/auth";
+import { verifyOtp, sendOtp, setupPin } from "@/services/auth";
 
 function VerifyContent() {
   const router = useRouter();
@@ -25,6 +25,13 @@ function VerifyContent() {
   const [referralCode, setReferralCode] = useState("");
   const [referralToast, setReferralToast] = useState("");
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // PIN creation state
+  const [pinStep, setPinStep] = useState<"none" | "create" | "confirm">("none");
+  const [pin, setPin] = useState<string[]>(["", "", "", "", "", ""]);
+  const [firstPin, setFirstPin] = useState("");
+  const [pinError, setPinError] = useState("");
+  const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Focus first input on mount
   useEffect(() => {
@@ -79,17 +86,97 @@ function VerifyContent() {
         setReferralToast(`\u10DB\u10D8\u10D8\u10E6\u10D4 ${data.referralReward.coinsEarned} \u10E5\u10DD\u10D8\u10DC\u10D8 \u10E0\u10D4\u10E4\u10D4\u10E0\u10D0\u10DA \u10D1\u10DD\u10DC\u10E3\u10E1\u10D8! \uD83C\uDF89`);
         await new Promise(r => setTimeout(r, 2000));
       }
-      if (!data.isNewUser && !isLoginMode) {
-        router.push("/home");
+      if (data.isNewUser) {
+        // New user — show PIN creation
+        setVerifying(false);
+        setPinStep("create");
+        setPin(["", "", "", "", "", ""]);
+        setTimeout(() => pinRefs.current[0]?.focus(), 300);
         return;
       }
-      // All users go to home after verification
       router.push("/home");
     } catch (err: any) {
       setVerifyError(err.message || "Invalid code");
       setVerifying(false);
       setOtp(["", "", "", "", "", ""]);
       inputRefs.current[0]?.focus();
+    }
+  };
+
+  // PIN input handlers
+  const handlePinChange = (index: number, value: string) => {
+    if (!/^\d?$/.test(value)) return;
+    const next = [...pin];
+    next[index] = value;
+    setPin(next);
+
+    if (value && index < 5) {
+      pinRefs.current[index + 1]?.focus();
+    }
+
+    if (value && index === 5 && next.every((d) => d !== "")) {
+      handlePinSubmit(next.join(""));
+    }
+  };
+
+  const handlePinKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !pin[index] && index > 0) {
+      pinRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handlePinPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (pasted.length === 0) return;
+    const next = [...pin];
+    for (let i = 0; i < pasted.length; i++) {
+      next[i] = pasted[i];
+    }
+    setPin(next);
+    const focusIdx = Math.min(pasted.length, 5);
+    pinRefs.current[focusIdx]?.focus();
+    if (pasted.length === 6) {
+      handlePinSubmit(pasted);
+    }
+  };
+
+  const handlePinSubmit = async (code: string) => {
+    if (pinStep === "create") {
+      setFirstPin(code);
+      setPinStep("confirm");
+      setPin(["", "", "", "", "", ""]);
+      setPinError("");
+      setTimeout(() => pinRefs.current[0]?.focus(), 200);
+      return;
+    }
+
+    if (pinStep === "confirm") {
+      if (code !== firstPin) {
+        setPinError("\u10DE\u10D8\u10DC\u10D4\u10D1\u10D8 \u10D0\u10E0 \u10D4\u10E0\u10D7\u10DB\u10D0\u10DC\u10D4\u10D7\u10D8. \u10E1\u10EA\u10D0\u10D3\u10D4\u10D7 \u10D7\u10D0\u10D5\u10D8\u10D3\u10D0\u10DC.");
+        setPin(["", "", "", "", "", ""]);
+        setTimeout(() => pinRefs.current[0]?.focus(), 200);
+        return;
+      }
+
+      setVerifying(true);
+      setPinError("");
+      try {
+        await setupPin(code);
+        // Update stored user to reflect PIN
+        const stored = localStorage.getItem("shansi_user");
+        if (stored) {
+          const user = JSON.parse(stored);
+          user.hasPin = true;
+          localStorage.setItem("shansi_user", JSON.stringify(user));
+        }
+        router.push("/home");
+      } catch (err: any) {
+        setPinError(err.message || "PIN setup failed");
+        setVerifying(false);
+        setPin(["", "", "", "", "", ""]);
+        setTimeout(() => pinRefs.current[0]?.focus(), 200);
+      }
     }
   };
 
@@ -102,6 +189,142 @@ function VerifyContent() {
     } catch {}
   };
 
+  // ── PIN creation screen ──
+  if (pinStep !== "none") {
+    return (
+      <>
+        <style>{`html, body { background: #000000 !important; }`}</style>
+        <meta name="theme-color" content="#000000" />
+
+        <main
+          className="flex flex-col"
+          style={{ background: "#000000", minHeight: "100dvh", height: "100dvh" }}
+        >
+          {/* ── Header ── */}
+          <div
+            className="flex items-center px-4 pt-3 shrink-0"
+            style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
+          >
+            <button
+              onClick={() => {
+                if (pinStep === "confirm") {
+                  setPinStep("create");
+                  setPin(["", "", "", "", "", ""]);
+                  setPinError("");
+                  setTimeout(() => pinRefs.current[0]?.focus(), 200);
+                }
+              }}
+              className="w-[32px] h-[32px] flex items-center justify-center active:opacity-50 transition-opacity"
+              style={{ visibility: pinStep === "confirm" ? "visible" : "hidden" }}
+            >
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 5L8 11l6 6" />
+              </svg>
+            </button>
+            <span
+              className="flex-1 text-center text-[16px] font-semibold text-white pr-8"
+              style={{ fontFamily: "var(--font-outfit), system-ui, sans-serif" }}
+            >
+              {"\u10DE\u10D8\u10DC \u10D9\u10DD\u10D3\u10D8"}
+            </span>
+          </div>
+
+          {/* ── Content ── */}
+          <div className="flex flex-col items-center px-6 pt-12 shrink-0">
+            {/* Lock icon */}
+            <div
+              className="w-[72px] h-[72px] rounded-full flex items-center justify-center mb-6"
+              style={{ background: "#1C1C1E" }}
+            >
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFE500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0110 0v4" />
+              </svg>
+            </div>
+
+            <h1
+              className="text-[28px] sm:text-[32px] font-bold text-white text-center leading-[1.15]"
+              style={{ fontFamily: "var(--font-outfit), system-ui, sans-serif" }}
+            >
+              {pinStep === "create"
+                ? "\u10E8\u10D4\u10E5\u10DB\u10D4\u10DC\u10D8 \u10DE\u10D8\u10DC \u10D9\u10DD\u10D3\u10D8"
+                : "\u10D2\u10D0\u10D8\u10DB\u10D4\u10DD\u10E0\u10D4\u10D7 \u10DE\u10D8\u10DC \u10D9\u10DD\u10D3\u10D8"}
+            </h1>
+
+            <p
+              className="text-[15px] text-[#9CA3AF] mt-3 text-center leading-[1.4]"
+              style={{ fontFamily: "var(--font-dm-sans), system-ui, sans-serif" }}
+            >
+              {pinStep === "create"
+                ? "\u10E8\u10D4\u10D8\u10E7\u10D5\u10D0\u10DC\u10D4\u10D7 6-\u10DC\u10D8\u10E8\u10DC\u10D0 \u10DE\u10D8\u10DC \u10D9\u10DD\u10D3\u10D8"
+                : "\u10E8\u10D4\u10D8\u10E7\u10D5\u10D0\u10DC\u10D4\u10D7 \u10DE\u10D8\u10DC \u10D9\u10DD\u10D3\u10D8 \u10D7\u10D0\u10D5\u10D8\u10D3\u10D0\u10DC"}
+            </p>
+
+            {/* PIN inputs */}
+            <div className="flex justify-center gap-3 mt-8" onPaste={handlePinPaste}>
+              {pin.map((digit, i) => (
+                <input
+                  key={i}
+                  ref={(el) => { pinRefs.current[i] = el; }}
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handlePinChange(i, e.target.value)}
+                  onKeyDown={(e) => handlePinKeyDown(i, e)}
+                  className="w-[48px] h-[56px] rounded-[16px] text-center text-[22px] font-bold text-white outline-none transition-all duration-200 caret-white"
+                  style={{
+                    fontFamily: "var(--font-outfit), system-ui, sans-serif",
+                    background: digit ? "#2A2A2E" : "#1C1C1E",
+                    border: "none",
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* PIN dots indicator */}
+            <div className="flex gap-2 mt-6">
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ background: pinStep === "create" ? "#FFE500" : "#333" }}
+              />
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ background: pinStep === "confirm" ? "#FFE500" : "#333" }}
+              />
+            </div>
+          </div>
+
+          {/* ── Spacer ── */}
+          <div className="flex-1" />
+
+          {/* Error */}
+          {pinError && (
+            <p
+              className="text-[#EF4444] text-[14px] text-center font-medium mb-4 px-6"
+              style={{ fontFamily: "var(--font-dm-sans)" }}
+            >
+              {pinError}
+            </p>
+          )}
+
+          <div className="h-8 shrink-0" />
+
+          {/* Loading overlay */}
+          {verifying && (
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-50">
+              <svg className="animate-spin h-8 w-8" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="#FFE500" strokeWidth="3" />
+                <path className="opacity-75" fill="#FFE500" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            </div>
+          )}
+        </main>
+      </>
+    );
+  }
+
+  // ── OTP verification screen ──
   return (
     <>
       <style>{`html, body { background: #000000 !important; }`}</style>
