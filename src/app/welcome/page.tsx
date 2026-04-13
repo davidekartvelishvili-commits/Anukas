@@ -69,6 +69,7 @@ export default function WelcomePage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [gyroGranted, setGyroGranted] = useState(false);
+  const userTapped = useRef(false);
 
   const rawTilt = useRef({ x: 0, y: 0 });
   const smoothTilt = useRef({ x: 0, y: 0 });
@@ -334,7 +335,7 @@ export default function WelcomePage() {
 
               if (dvDotN < 0) {
                 const speed = Math.abs(dvDotN);
-                if (speed > 1.5 && typeof navigator !== "undefined" && navigator.vibrate) {
+                if (speed > 1.5 && userTapped.current && navigator.vibrate) {
                   navigator.vibrate(Math.min(30, Math.round(speed * 4)));
                 }
                 const impulse = -(1 + BOUNCE) * dvDotN * COLLISION_RESPONSE;
@@ -384,7 +385,7 @@ export default function WelcomePage() {
           const actualBottom = actualTop + item.width;
 
           const wallVibrate = (v: number) => {
-            if (Math.abs(v) > 2 && typeof navigator !== "undefined" && navigator.vibrate) {
+            if (Math.abs(v) > 2 && userTapped.current && navigator.vibrate) {
               navigator.vibrate(Math.min(20, Math.round(Math.abs(v) * 3)));
             }
           };
@@ -478,6 +479,7 @@ export default function WelcomePage() {
 
   // ── Drag handlers ──
   const startDrag = (idx: number, cx: number, cy: number) => {
+    userTapped.current = true;
     if (animPhase.current !== "settled") return;
     draggingIdx.current = idx;
     dragPrev.current = { x: cx, y: cy };
@@ -522,7 +524,7 @@ export default function WelcomePage() {
       <main
         className="relative flex flex-col overflow-hidden"
         style={{ background: "#FFE500", height: "100dvh", minHeight: "100vh" }}
-        onClick={requestGyro}
+        onClick={() => { userTapped.current = true; requestGyro(); }}
       >
         {/* ── Top bar ── */}
         <div className="flex justify-end px-5 pt-3 relative z-50" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" }}>
