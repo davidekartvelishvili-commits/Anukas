@@ -31,10 +31,10 @@ const ITEMS: FloatingItem[] = [
 
 /* ───────── ENTRANCE ANIMATION ───────── */
 
-const CAROUSEL_DURATION = 2000;       // 2s carousel phase
+const CAROUSEL_DURATION = 4000;       // 4s carousel phase (more rotations)
 const STAGGER_DELAY = 100;            // 100ms between each item falling
 const CAROUSEL_RADIUS = 160;          // circle radius in px
-const CAROUSEL_SPEED = 0.0008;        // radians per ms
+const CAROUSEL_SPEED = 0.0018;        // radians per ms (faster spin)
 
 /* ───────── LOGO ───────── */
 
@@ -233,11 +233,13 @@ export default function WelcomePage() {
             b.vx = -Math.abs(b.vx) * WALL_BOUNCE_FALL;
           }
 
-          // Gentle homing spring toward rest position — kicks in after initial bounce
+          // Homing spring toward rest position — kicks in after initial bounce
           const t = fallElapsed - itemDelay;
-          if (t > 800) {
-            const homeStrength = 0.008;
-            const homeDamp = 0.06;
+          if (t > 600) {
+            // Ramp up strength over time so items settle decisively
+            const ramp = Math.min(1, (t - 600) / 1500);
+            const homeStrength = 0.012 + ramp * 0.025;
+            const homeDamp = 0.08 + ramp * 0.12;
             b.vx += -homeStrength * b.x - homeDamp * b.vx;
             b.vy += -homeStrength * b.y - homeDamp * b.vy;
           }
@@ -252,7 +254,7 @@ export default function WelcomePage() {
           // Check settled
           const dist = Math.sqrt(b.x * b.x + b.y * b.y);
           const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-          if (dist > 1 || speed > 0.2) {
+          if (dist > 2 || speed > 0.5) {
             allSettled = false;
           } else {
             b.x = 0;
