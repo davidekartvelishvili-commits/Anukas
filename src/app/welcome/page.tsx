@@ -29,6 +29,13 @@ const ITEMS: FloatingItem[] = [
   { src: "/images/onboarding/cards.png",   x: 42,  y: 25,  width: 120, rotation: -8,  depth: 1.1, zIndex: 3 },
 ];
 
+/* ───────── ENTRANCE ANIMATION ───────── */
+
+const CAROUSEL_DURATION = 2000;       // 2s carousel phase
+const STAGGER_DELAY = 100;            // 100ms between each item falling
+const CAROUSEL_RADIUS = 160;          // circle radius in px
+const CAROUSEL_SPEED = 0.0008;        // radians per ms
+
 /* ───────── LOGO ───────── */
 
 function CovrdLogo() {
@@ -68,6 +75,14 @@ export default function WelcomePage() {
   // Physics bodies — one per item
   const bodies = useRef<PhysicsBody[]>(ITEMS.map(() => ({ x: 0, y: 0, vx: 0, vy: 0 })));
 
+  // Entrance animation state
+  const animPhase = useRef<"carousel" | "falling" | "settled">("carousel");
+  const animStartTime = useRef<number>(0);
+  // Per-item fall spring state
+  const fallProgress = useRef<number[]>(ITEMS.map(() => 0));
+  const fallVelocity = useRef<number[]>(ITEMS.map(() => 0));
+  const itemScale = useRef<number[]>(ITEMS.map(() => 1));
+
   // Drag state
   const draggingIdx = useRef<number | null>(null);
   const dragPrev = useRef({ x: 0, y: 0 });
@@ -81,6 +96,7 @@ export default function WelcomePage() {
 
   useEffect(() => {
     setMounted(true);
+    animStartTime.current = performance.now();
 
     // Get the center of an item in screen coordinates
     const getCenter = (idx: number): { x: number; y: number } => {
@@ -97,8 +113,29 @@ export default function WelcomePage() {
       };
     };
 
+    // Compute the carousel offset for an item (offset from its base position to its circle slot)
+    const getCarouselOffset = (idx: number, elapsed: number) => {
+      const sw = window.innerWidth;
+      const sh = window.innerHeight;
+      const item = ITEMS[idx];
+      // Circle center: horizontally centered, vertically ~30% from top (near the title)
+      const cx = sw / 2;
+      const cy = sh * 0.38;
+      // Item base position (matches CSS)
+      const baseX = (item.x / 100) * sw;
+      const baseY = ((45 + item.y * 0.55) / 100) * sh;
+      // Angle for this item in the circle, rotating clockwise over time
+      const angle = (idx / ITEMS.length) * Math.PI * 2 + elapsed * CAROUSEL_SPEED;
+      const targetX = cx + CAROUSEL_RADIUS * Math.cos(angle) - item.width / 2;
+      const targetY = cy + CAROUSEL_RADIUS * Math.sin(angle) - item.width / 2;
+      return { x: targetX - baseX, y: targetY - baseY };
+    };
+
     // ── Main physics loop at 60fps ──
     const loop = () => {
+      const now = performance.now();
+      const elapsed = now - animStartTime.current;
+
       // Lerp gyro
       smoothTilt.current.x += (rawTilt.current.x - smoothTilt.current.x) * 0.1;
       smoothTilt.current.y += (rawTilt.current.y - smoothTilt.current.y) * 0.1;
@@ -107,129 +144,201 @@ export default function WelcomePage() {
 
       const n = ITEMS.length;
 
-      // ── Apply velocity + friction to non-dragged items ──
-      for (let i = 0; i < n; i++) {
-        const b = bodies.current[i];
-        if (draggingIdx.current === i) continue;
-        b.x += b.vx;
-        b.y += b.vy;
-        b.vx *= FRICTION;
-        b.vy *= FRICTION;
-        // Kill tiny velocities
-        if (Math.abs(b.vx) < 0.05) b.vx = 0;
-        if (Math.abs(b.vy) < 0.05) b.vy = 0;
+      // ── PHASE: Carousel (first 2 seconds) ──
+      if (animPhase.current === "carousel") {
+        if (elapsed >= CAROUSEL_DURATION) {
+          // Transition to falling — snapshot each item's current carousel offset as body position
+          for (let i = 0; i < n; i++) {
+            const off = getCarouselOffset(i, elapsed);
+            bodies.current[i].x = off.x;
+            bodies.current[i].y = off.y;
+            bodies.current[i].vx = 0;
+            bodies.current[i].vy = 0;
+            fallProgress.current[i] = 0;
+            fallVelocity.current[i] = 0;
+            itemScale.current[i] = 1;
+          }
+          animPhase.current = "falling";
+        } else {
+          // Position all items on the rotating circle
+          for (let i = 0; i < n; i++) {
+            const off = getCarouselOffset(i, elapsed);
+            bodies.current[i].x = off.x;
+            bodies.current[i].y = off.y;
+          }
+        }
       }
 
-      // ── Collision detection + momentum transfer ──
-      for (let i = 0; i < n; i++) {
-        for (let j = i + 1; j < n; j++) {
-          const ci = getCenter(i);
-          const cj = getCenter(j);
-          const dx = cj.x - ci.x;
-          const dy = cj.y - ci.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const ri = ITEMS[i].width * 0.35;
-          const rj = ITEMS[j].width * 0.35;
-          const minDist = ri + rj;
+      // ── PHASE: Falling (spring to rest position) ──
+      if (animPhase.current === "falling") {
+        const fallElapsed = elapsed - CAROUSEL_DURATION;
+        let allSettled = true;
 
-          if (dist < minDist && dist > 0.5) {
-            const nx = dx / dist;
-            const ny = dy / dist;
-            const overlap = minDist - dist;
+        for (let i = 0; i < n; i++) {
+          const itemDelay = i * STAGGER_DELAY;
+          if (fallElapsed < itemDelay) {
+            allSettled = false;
+            continue;
+          }
 
-            const bi = bodies.current[i];
-            const bj = bodies.current[j];
+          const b = bodies.current[i];
+          // Spring toward (0, 0) — the item's natural rest position
+          // Using a damped spring: F = -stiffness * x - damping * v
+          const stiffness = 0.015;
+          const damping = 0.12;
 
-            // Relative velocity along collision normal
-            const dvx = bj.vx - bi.vx;
-            const dvy = bj.vy - bi.vy;
-            const dvDotN = dvx * nx + dvy * ny;
+          const fx = -stiffness * b.x - damping * b.vx;
+          const fy = -stiffness * b.y - damping * b.vy;
+          b.vx += fx;
+          b.vy += fy;
+          b.x += b.vx;
+          b.y += b.vy;
 
-            // Only resolve if moving toward each other
-            if (dvDotN < 0) {
-              // Haptic feedback — vibrate on collision
-              const speed = Math.abs(dvDotN);
-              if (speed > 1.5 && typeof navigator !== "undefined" && navigator.vibrate) {
-                navigator.vibrate(Math.min(30, Math.round(speed * 4)));
+          // Bounce scale: overshoot then settle
+          const t = fallElapsed - itemDelay;
+          if (t < 600) {
+            // Spring-based scale: peaks at 1.2 then settles to 1.0
+            const st = t / 600;
+            const springScale = 1 + 0.2 * Math.sin(st * Math.PI) * Math.exp(-st * 2.5);
+            itemScale.current[i] = springScale;
+          } else {
+            itemScale.current[i] = 1;
+          }
+
+          // Check if settled
+          const dist = Math.sqrt(b.x * b.x + b.y * b.y);
+          const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+          if (dist > 0.5 || speed > 0.1) {
+            allSettled = false;
+          } else {
+            b.x = 0;
+            b.y = 0;
+            b.vx = 0;
+            b.vy = 0;
+            itemScale.current[i] = 1;
+          }
+        }
+
+        if (allSettled) {
+          animPhase.current = "settled";
+        }
+      }
+
+      // ── PHASE: Settled (normal physics) ──
+      if (animPhase.current === "settled") {
+        // ── Apply velocity + friction to non-dragged items ──
+        for (let i = 0; i < n; i++) {
+          const b = bodies.current[i];
+          if (draggingIdx.current === i) continue;
+          b.x += b.vx;
+          b.y += b.vy;
+          b.vx *= FRICTION;
+          b.vy *= FRICTION;
+          if (Math.abs(b.vx) < 0.05) b.vx = 0;
+          if (Math.abs(b.vy) < 0.05) b.vy = 0;
+        }
+
+        // ── Collision detection + momentum transfer ──
+        for (let i = 0; i < n; i++) {
+          for (let j = i + 1; j < n; j++) {
+            const ci = getCenter(i);
+            const cj = getCenter(j);
+            const dx = cj.x - ci.x;
+            const dy = cj.y - ci.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const ri = ITEMS[i].width * 0.35;
+            const rj = ITEMS[j].width * 0.35;
+            const minDist = ri + rj;
+
+            if (dist < minDist && dist > 0.5) {
+              const nx = dx / dist;
+              const ny = dy / dist;
+              const overlap = minDist - dist;
+
+              const bi = bodies.current[i];
+              const bj = bodies.current[j];
+
+              const dvx = bj.vx - bi.vx;
+              const dvy = bj.vy - bi.vy;
+              const dvDotN = dvx * nx + dvy * ny;
+
+              if (dvDotN < 0) {
+                const speed = Math.abs(dvDotN);
+                if (speed > 1.5 && typeof navigator !== "undefined" && navigator.vibrate) {
+                  navigator.vibrate(Math.min(30, Math.round(speed * 4)));
+                }
+                const impulse = -(1 + BOUNCE) * dvDotN * COLLISION_RESPONSE;
+
+                if (draggingIdx.current === i) {
+                  bj.vx += nx * impulse * 2;
+                  bj.vy += ny * impulse * 2;
+                } else if (draggingIdx.current === j) {
+                  bi.vx -= nx * impulse * 2;
+                  bi.vy -= ny * impulse * 2;
+                } else {
+                  bi.vx -= nx * impulse;
+                  bi.vy -= ny * impulse;
+                  bj.vx += nx * impulse;
+                  bj.vy += ny * impulse;
+                }
               }
-              const impulse = -(1 + BOUNCE) * dvDotN * COLLISION_RESPONSE;
 
+              const sep = overlap * 0.5;
               if (draggingIdx.current === i) {
-                // Dragged item is immovable, all impulse goes to j
-                bj.vx += nx * impulse * 2;
-                bj.vy += ny * impulse * 2;
+                bj.x += nx * overlap;
+                bj.y += ny * overlap;
               } else if (draggingIdx.current === j) {
-                bi.vx -= nx * impulse * 2;
-                bi.vy -= ny * impulse * 2;
+                bi.x -= nx * overlap;
+                bi.y -= ny * overlap;
               } else {
-                bi.vx -= nx * impulse;
-                bi.vy -= ny * impulse;
-                bj.vx += nx * impulse;
-                bj.vy += ny * impulse;
+                bi.x -= nx * sep;
+                bi.y -= ny * sep;
+                bj.x += nx * sep;
+                bj.y += ny * sep;
               }
             }
+          }
+        }
 
-            // Separate overlapping items
-            const sep = overlap * 0.5;
-            if (draggingIdx.current === i) {
-              bj.x += nx * overlap;
-              bj.y += ny * overlap;
-            } else if (draggingIdx.current === j) {
-              bi.x -= nx * overlap;
-              bi.y -= ny * overlap;
-            } else {
-              bi.x -= nx * sep;
-              bi.y -= ny * sep;
-              bj.x += nx * sep;
-              bj.y += ny * sep;
+        // ── Wall bouncing ──
+        const screenW = window.innerWidth;
+        const screenH = window.innerHeight;
+        for (let i = 0; i < n; i++) {
+          const item = ITEMS[i];
+          const b = bodies.current[i];
+          const baseX = (item.x / 100) * screenW;
+          const baseY = ((45 + item.y * 0.55) / 100) * screenH;
+          const actualLeft = baseX + b.x;
+          const actualRight = actualLeft + item.width;
+          const actualTop = baseY + b.y;
+          const actualBottom = actualTop + item.width;
+
+          const wallVibrate = (v: number) => {
+            if (Math.abs(v) > 2 && typeof navigator !== "undefined" && navigator.vibrate) {
+              navigator.vibrate(Math.min(20, Math.round(Math.abs(v) * 3)));
             }
+          };
+
+          if (actualLeft < -10) {
+            b.x = -10 - baseX;
+            wallVibrate(b.vx);
+            b.vx = Math.abs(b.vx) * BOUNCE;
           }
-        }
-      }
-
-      // ── Wall bouncing — keep items on screen ──
-      const screenW = window.innerWidth;
-      const screenH = window.innerHeight;
-      for (let i = 0; i < n; i++) {
-        const item = ITEMS[i];
-        const b = bodies.current[i];
-        // Get item's actual screen position (base + offset)
-        const baseX = (item.x / 100) * screenW;
-        const baseY = ((45 + item.y * 0.55) / 100) * screenH;
-        const actualLeft = baseX + b.x;
-        const actualRight = actualLeft + item.width;
-        const actualTop = baseY + b.y;
-        const actualBottom = actualTop + item.width;
-
-        const wallVibrate = (v: number) => {
-          if (Math.abs(v) > 2 && typeof navigator !== "undefined" && navigator.vibrate) {
-            navigator.vibrate(Math.min(20, Math.round(Math.abs(v) * 3)));
+          if (actualRight > screenW + 10) {
+            b.x = screenW + 10 - item.width - baseX;
+            wallVibrate(b.vx);
+            b.vx = -Math.abs(b.vx) * BOUNCE;
           }
-        };
-
-        // Left wall
-        if (actualLeft < -10) {
-          b.x = -10 - baseX;
-          wallVibrate(b.vx);
-          b.vx = Math.abs(b.vx) * BOUNCE;
-        }
-        // Right wall
-        if (actualRight > screenW + 10) {
-          b.x = screenW + 10 - item.width - baseX;
-          wallVibrate(b.vx);
-          b.vx = -Math.abs(b.vx) * BOUNCE;
-        }
-        // Top wall
-        if (actualTop < -10) {
-          b.y = -10 - baseY;
-          wallVibrate(b.vy);
-          b.vy = Math.abs(b.vy) * BOUNCE;
-        }
-        // Bottom wall
-        if (actualBottom > screenH + 10) {
-          b.y = screenH + 10 - item.width - baseY;
-          wallVibrate(b.vy);
-          b.vy = -Math.abs(b.vy) * BOUNCE;
+          if (actualTop < -10) {
+            b.y = -10 - baseY;
+            wallVibrate(b.vy);
+            b.vy = Math.abs(b.vy) * BOUNCE;
+          }
+          if (actualBottom > screenH + 10) {
+            b.y = screenH + 10 - item.width - baseY;
+            wallVibrate(b.vy);
+            b.vy = -Math.abs(b.vy) * BOUNCE;
+          }
         }
       }
 
@@ -238,12 +347,15 @@ export default function WelcomePage() {
         const el = itemRefs.current[idx];
         if (!el) return;
         const b = bodies.current[idx];
-        const gyroX = Math.max(-MAX_GYRO, Math.min(MAX_GYRO, sx * item.depth * 30 * SENSITIVITY));
-        const gyroY = Math.max(-MAX_GYRO, Math.min(MAX_GYRO, sy * item.depth * 18 * SENSITIVITY));
-        const dr = sx * item.depth * 3;
+        const scale = itemScale.current[idx];
+        // Only apply gyro/parallax after settling
+        const useGyro = animPhase.current === "settled";
+        const gyroX = useGyro ? Math.max(-MAX_GYRO, Math.min(MAX_GYRO, sx * item.depth * 30 * SENSITIVITY)) : 0;
+        const gyroY = useGyro ? Math.max(-MAX_GYRO, Math.min(MAX_GYRO, sy * item.depth * 18 * SENSITIVITY)) : 0;
+        const dr = useGyro ? sx * item.depth * 3 : 0;
         const totalX = gyroX + b.x;
         const totalY = gyroY + b.y;
-        el.style.transform = `translate3d(${totalX}px, ${totalY}px, 0) rotate(${item.rotation + dr}deg)`;
+        el.style.transform = `translate3d(${totalX}px, ${totalY}px, 0) rotate(${item.rotation + dr}deg) scale(${scale})`;
       });
 
       rafRef.current = requestAnimationFrame(loop);
@@ -296,6 +408,7 @@ export default function WelcomePage() {
 
   // ── Drag handlers ──
   const startDrag = (idx: number, cx: number, cy: number) => {
+    if (animPhase.current !== "settled") return;
     draggingIdx.current = idx;
     dragPrev.current = { x: cx, y: cy };
     dragVel.current = { x: 0, y: 0 };
@@ -381,7 +494,7 @@ export default function WelcomePage() {
               fontSize: "clamp(30px, 9.5vw, 52px)",
             }}
           >
-            Welcome to Covrd!
+            Welcome to Shansi!
           </h1>
         </div>
 
