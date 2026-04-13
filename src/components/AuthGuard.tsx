@@ -11,7 +11,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const token = getStoredToken();
     if (!token) {
-      router.replace("/welcome");
+      router.replace("/");
       return;
     }
     setAuthorized(true);
