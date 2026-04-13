@@ -6,6 +6,7 @@ import BackHeader from "@/components/BackHeader";
 import BottomNav from "@/components/BottomNav";
 import { getMe, getStoredToken } from "@/services/auth";
 import { requestWithdrawal, getWithdrawals } from "@/services/wallet";
+import AuthGuard from "@/components/AuthGuard";
 
 /* ── BANKS ── */
 const BANKS = [
@@ -132,6 +133,7 @@ export default function WalletPage() {
   };
 
   return (
+    <AuthGuard>
     <div className="min-h-[100dvh] flex flex-col" style={{ background: "#000000" }}>
       <BackHeader title="საფულე" />
 
@@ -263,5 +265,6 @@ export default function WalletPage() {
 
       <BottomNav />
     </div>
+    </AuthGuard>
   );
 }

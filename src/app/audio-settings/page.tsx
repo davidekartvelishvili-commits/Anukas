@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import AuthGuard from "@/components/AuthGuard";
 
 const BEHAVIOR_OPTIONS = ["Default", "Always on", "Always off"];
 const BEHAVIOR_DESCRIPTIONS: Record<string, string> = {
@@ -29,7 +30,7 @@ export default function AudioSettingsPage() {
   });
 
   return (
-    <>
+    <AuthGuard>
       <style>{`html, body { background: #000000 !important; }`}</style>
       <meta name="theme-color" content="#000000" />
 
@@ -216,6 +217,6 @@ export default function AudioSettingsPage() {
           </div>
         </nav>
       </main>
-    </>
+    </AuthGuard>
   );
 }

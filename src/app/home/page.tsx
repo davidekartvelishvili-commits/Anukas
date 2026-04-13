@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getCoinBalance, getCashBalance, exchange as doExchange, seedTestUser } from "@/services/balance";
 import { getMe, getStoredToken } from "@/services/auth";
 import { apiFetch } from "@/services/api";
+import AuthGuard from "@/components/AuthGuard";
 
 /* ───────── ICONS ───────── */
 
@@ -156,7 +157,7 @@ export default function HomePage() {
   });
 
   return (
-    <>
+    <AuthGuard>
       <style>{`html, body { background: #000000 !important; }`}</style>
       <meta name="theme-color" content="#000000" />
 
@@ -605,6 +606,6 @@ export default function HomePage() {
           to { opacity: 1; transform: scale(1); }
         }
       `}</style>
-    </>
+    </AuthGuard>
   );
 }

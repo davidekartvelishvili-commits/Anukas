@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import AuthGuard from "@/components/AuthGuard";
 
 export default function VillagePage() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export default function VillagePage() {
   };
 
   return (
-    <>
+    <AuthGuard>
       <style>{`
         html, body { background: #87CEEB !important; }
         @keyframes float-cloud { 0% { transform: translateX(0); } 100% { transform: translateX(30px); } }
@@ -291,6 +292,6 @@ export default function VillagePage() {
           </div>
         </nav>
       </main>
-    </>
+    </AuthGuard>
   );
 }

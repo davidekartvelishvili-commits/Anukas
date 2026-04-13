@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getMe, getStoredUser } from "@/services/auth";
 import { apiFetch } from "@/services/api";
+import AuthGuard from "@/components/AuthGuard";
 
 export default function ReferralCodePage() {
   const router = useRouter();
@@ -71,7 +72,7 @@ export default function ReferralCodePage() {
   };
 
   return (
-    <>
+    <AuthGuard>
       <style>{`html, body { background: #000000 !important; }`}</style>
       <meta name="theme-color" content="#000000" />
 
@@ -171,6 +172,6 @@ export default function ReferralCodePage() {
           </div>
         </nav>
       </main>
-    </>
+    </AuthGuard>
   );
 }

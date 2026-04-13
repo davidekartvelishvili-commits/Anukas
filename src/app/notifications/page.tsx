@@ -6,6 +6,7 @@ import BackHeader from "@/components/BackHeader";
 import BottomNav from "@/components/BottomNav";
 import Icon from "@/components/Icon";
 import { apiFetch } from "@/services/api";
+import AuthGuard from "@/components/AuthGuard";
 
 /* ───────── TYPES ───────── */
 
@@ -111,6 +112,7 @@ export default function NotificationsPage() {
   });
 
   return (
+    <AuthGuard>
     <main className="min-h-[100dvh] bg-[#0A0F1C] pb-[110px]">
       <div className="max-w-[430px] mx-auto px-5" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)" }}>
 
@@ -223,5 +225,6 @@ export default function NotificationsPage() {
 
       <BottomNav />
     </main>
+    </AuthGuard>
   );
 }

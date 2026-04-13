@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredUser, setupPin } from "@/services/auth";
+import AuthGuard from "@/components/AuthGuard";
 
 export default function SecurityPage() {
   const router = useRouter();
@@ -103,7 +104,7 @@ export default function SecurityPage() {
   };
 
   return (
-    <>
+    <AuthGuard>
       <style>{`html, body { background: #000000 !important; }`}</style>
       <meta name="theme-color" content="#000000" />
 
@@ -355,6 +356,6 @@ export default function SecurityPage() {
           </div>
         </nav>
       </main>
-    </>
+    </AuthGuard>
   );
 }

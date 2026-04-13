@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { logout } from "@/services/auth";
+import AuthGuard from "@/components/AuthGuard";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -62,7 +63,7 @@ export default function SettingsPage() {
   });
 
   return (
-    <>
+    <AuthGuard>
       <style>{`html, body { background: #000000 !important; }`}</style>
       <meta name="theme-color" content="#000000" />
 
@@ -429,6 +430,6 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
-    </>
+    </AuthGuard>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import AuthGuard from "@/components/AuthGuard";
 
 /* ───────── FACE DATA ───────── */
 
@@ -184,7 +185,7 @@ export default function MysteryBoxPage() {
   };
 
   return (
-    <>
+    <AuthGuard>
       <style>{`html, body { background: #1A1510 !important; }`}</style>
       <meta name="theme-color" content="#1A1510" />
 
@@ -385,6 +386,6 @@ export default function MysteryBoxPage() {
           50% { opacity: 1; transform: scale(1); }
         }
       `}</style>
-    </>
+    </AuthGuard>
   );
 }

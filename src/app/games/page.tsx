@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getCoinBalance, getCashBalance } from "@/services/balance";
 import { apiFetch } from "@/services/api";
 import { getStoredToken } from "@/services/auth";
+import AuthGuard from "@/components/AuthGuard";
 
 /* ───────── GAMES DATA ───────── */
 
@@ -203,7 +204,7 @@ export default function GamesPage() {
   const favoriteGames = playedGames.map((id) => getGame(id)).filter((g): g is NonNullable<typeof g> => !!g && (!g.gameType || activeGameTypes.includes(g.gameType)));
 
   return (
-    <>
+    <AuthGuard>
       <style>{`html, body { background: #000000 !important; }`}</style>
       <meta name="theme-color" content="#000000" />
 
@@ -402,6 +403,6 @@ export default function GamesPage() {
           to { opacity: 1; transform: scale(1); }
         }
       `}</style>
-    </>
+    </AuthGuard>
   );
 }

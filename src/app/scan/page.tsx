@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import jsQR from "jsqr";
 import { apiFetch } from "@/services/api";
+import AuthGuard from "@/components/AuthGuard";
 
 export default function ScanPage() {
   const router = useRouter();
@@ -182,7 +183,7 @@ export default function ScanPage() {
   };
 
   return (
-    <>
+    <AuthGuard>
       <style>{`html, body { background: #000000 !important; }`}</style>
       <meta name="theme-color" content="#000000" />
 
@@ -327,6 +328,6 @@ export default function ScanPage() {
           </div>
         </div>
       </main>
-    </>
+    </AuthGuard>
   );
 }

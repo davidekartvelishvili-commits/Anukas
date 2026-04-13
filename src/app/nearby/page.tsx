@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import BottomNav from "@/components/BottomNav";
+import AuthGuard from "@/components/AuthGuard";
 
 /* ───────── SVG ICONS ───────── */
 
@@ -285,6 +286,7 @@ export default function NearbyPage() {
   );
 
   return (
+    <AuthGuard>
     <main className="min-h-[100dvh] bg-[#0A0F1C]">
       <div className="max-w-[430px] mx-auto px-5 pb-8" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)" }}>
 
@@ -510,5 +512,6 @@ export default function NearbyPage() {
 
       <BottomNav />
     </main>
+    </AuthGuard>
   );
 }

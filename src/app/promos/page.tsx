@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import AuthGuard from "@/components/AuthGuard";
 
 /* ───────── COUNTDOWN HOOK ───────── */
 function useCountdown(totalSeconds: number) {
@@ -201,7 +202,7 @@ export default function PromosPage() {
     : partnerPromos.filter((p) => p.category === activeCategory);
 
   return (
-    <>
+    <AuthGuard>
       <style>{`
         html, body { background: #000000 !important; }
         @keyframes pulse-dot { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
@@ -582,6 +583,6 @@ export default function PromosPage() {
           </div>
         </nav>
       </main>
-    </>
+    </AuthGuard>
   );
 }

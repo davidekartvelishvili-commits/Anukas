@@ -6,6 +6,7 @@ import Icon from "@/components/Icon";
 import BackHeader from "@/components/BackHeader";
 import BottomNav from "@/components/BottomNav";
 import { getGameHistory } from "@/services/games";
+import AuthGuard from "@/components/AuthGuard";
 
 /* ───────── SVG ICONS ───────── */
 
@@ -175,6 +176,7 @@ export default function HistoryPage() {
   };
 
   return (
+    <AuthGuard>
     <main className="min-h-[100dvh] bg-[#0A0F1C]">
       <div className="max-w-[430px] mx-auto px-5 pb-8" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)" }}>
 
@@ -405,5 +407,6 @@ export default function HistoryPage() {
 
       <BottomNav />
     </main>
+    </AuthGuard>
   );
 }

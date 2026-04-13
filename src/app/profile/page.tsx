@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getMe, getStoredUser, getUserActivity } from "@/services/auth";
+import AuthGuard from "@/components/AuthGuard";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -72,7 +73,7 @@ export default function ProfilePage() {
   });
 
   return (
-    <>
+    <AuthGuard>
       <style>{`html, body { background: #000000 !important; }`}</style>
       <meta name="theme-color" content="#000000" />
 
@@ -836,6 +837,6 @@ export default function ProfilePage() {
           to { opacity: 1; transform: scale(1); }
         }
       `}</style>
-    </>
+    </AuthGuard>
   );
 }
