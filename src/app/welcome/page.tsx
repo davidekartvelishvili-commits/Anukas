@@ -194,16 +194,13 @@ export default function WelcomePage() {
 
           const b = bodies.current[i];
           const item = ITEMS[i];
-          const t = fallElapsed - itemDelay;
 
-          // Gravity fades out as homing takes over
-          const homingRamp = t > 600 ? Math.min(1, (t - 600) / 1000) : 0;
-          b.vy += GRAVITY * (1 - homingRamp);
+          // Pure gravity
+          b.vy += GRAVITY;
 
-          // Friction increases as homing ramps
-          const friction = 0.995 - homingRamp * 0.09;
-          b.vx *= friction;
-          b.vy *= friction;
+          // Air friction
+          b.vx *= 0.995;
+          b.vy *= 0.995;
 
           b.x += b.vx;
           b.y += b.vy;
@@ -215,34 +212,28 @@ export default function WelcomePage() {
           const absRight = absLeft + item.width;
           const absBottom = baseY + b.y + item.width;
 
-          // Floor bounce (only while gravity is active)
-          if (homingRamp < 0.8 && absBottom > screenH - 20) {
+          // Floor bounce — items land and stay where they fall
+          if (absBottom > screenH - 20) {
             b.y = screenH - 20 - item.width - baseY;
             b.vy = -Math.abs(b.vy) * FLOOR_BOUNCE;
             if (!hasBouncedFloor.current[i]) {
               hasBouncedFloor.current[i] = true;
               itemScale.current[i] = 1.2;
             }
-          }
-
-          // Side walls (only while gravity is active)
-          if (homingRamp < 0.8) {
-            if (absLeft < -10) {
-              b.x = -10 - baseX;
-              b.vx = Math.abs(b.vx) * WALL_BOUNCE_FALL;
-            }
-            if (absRight > screenW + 10) {
-              b.x = screenW + 10 - item.width - baseX;
-              b.vx = -Math.abs(b.vx) * WALL_BOUNCE_FALL;
+            // Kill tiny bounces so items come to rest on floor
+            if (Math.abs(b.vy) < 1.5) {
+              b.vy = 0;
             }
           }
 
-          // Homing spring toward rest position
-          if (homingRamp > 0) {
-            const homeStrength = 0.02 * homingRamp;
-            const homeDamp = 0.15 * homingRamp;
-            b.vx += -homeStrength * b.x - homeDamp * b.vx;
-            b.vy += -homeStrength * b.y - homeDamp * b.vy;
+          // Side walls
+          if (absLeft < -10) {
+            b.x = -10 - baseX;
+            b.vx = Math.abs(b.vx) * WALL_BOUNCE_FALL;
+          }
+          if (absRight > screenW + 10) {
+            b.x = screenW + 10 - item.width - baseX;
+            b.vx = -Math.abs(b.vx) * WALL_BOUNCE_FALL;
           }
 
           // Scale settle: 1.2 → 1.0
@@ -252,16 +243,9 @@ export default function WelcomePage() {
             itemScale.current[i] = 1;
           }
 
-          // Check settled (or force-settle after 4s per item)
-          const dist = Math.sqrt(b.x * b.x + b.y * b.y);
+          // Check if item has stopped moving
           const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-          if ((dist < 3 && speed < 0.5) || t > 4000) {
-            b.x = 0;
-            b.y = 0;
-            b.vx = 0;
-            b.vy = 0;
-            itemScale.current[i] = 1;
-          } else {
+          if (speed > 0.3) {
             allSettled = false;
           }
         }
