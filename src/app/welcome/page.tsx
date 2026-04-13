@@ -38,14 +38,17 @@ const CAROUSEL_SPEED = 0.0008;        // radians per ms
 
 /* ───────── LOGO ───────── */
 
-function CovrdLogo() {
+function ShansiLogo() {
   return (
-    <span
-      className="text-[44px] font-black text-[#1A1A1A] select-none leading-none"
-      style={{ fontFamily: "var(--font-outfit), system-ui, sans-serif" }}
-    >
-      ₾
-    </span>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/images/shansi-logo.png"
+      alt="Shansi"
+      width={52}
+      height={52}
+      className="select-none"
+      draggable={false}
+    />
   );
 }
 
@@ -78,10 +81,9 @@ export default function WelcomePage() {
   // Entrance animation state
   const animPhase = useRef<"carousel" | "falling" | "settled">("carousel");
   const animStartTime = useRef<number>(0);
-  // Per-item fall spring state
-  const fallProgress = useRef<number[]>(ITEMS.map(() => 0));
-  const fallVelocity = useRef<number[]>(ITEMS.map(() => 0));
   const itemScale = useRef<number[]>(ITEMS.map(() => 1));
+  const hasBouncedFloor = useRef<boolean[]>(ITEMS.map(() => false));
+  const itemReleased = useRef<boolean[]>(ITEMS.map(() => false));
 
   // Drag state
   const draggingIdx = useRef<number | null>(null);
@@ -154,9 +156,9 @@ export default function WelcomePage() {
             bodies.current[i].y = off.y;
             bodies.current[i].vx = 0;
             bodies.current[i].vy = 0;
-            fallProgress.current[i] = 0;
-            fallVelocity.current[i] = 0;
             itemScale.current[i] = 1;
+            hasBouncedFloor.current[i] = false;
+            itemReleased.current[i] = false;
           }
           animPhase.current = "falling";
         } else {
@@ -169,10 +171,16 @@ export default function WelcomePage() {
         }
       }
 
-      // ── PHASE: Falling (spring to rest position) ──
+      // ── PHASE: Falling (real gravity) ──
       if (animPhase.current === "falling") {
         const fallElapsed = elapsed - CAROUSEL_DURATION;
+        const GRAVITY = 0.45;
+        const FLOOR_BOUNCE = 0.45;
+        const WALL_BOUNCE_FALL = 0.4;
         let allSettled = true;
+
+        const screenW = window.innerWidth;
+        const screenH = window.innerHeight;
 
         for (let i = 0; i < n; i++) {
           const itemDelay = i * STAGGER_DELAY;
@@ -180,35 +188,71 @@ export default function WelcomePage() {
             allSettled = false;
             continue;
           }
+          if (!itemReleased.current[i]) {
+            itemReleased.current[i] = true;
+          }
 
           const b = bodies.current[i];
-          // Spring toward (0, 0) — the item's natural rest position
-          // Using a damped spring: F = -stiffness * x - damping * v
-          const stiffness = 0.015;
-          const damping = 0.12;
+          const item = ITEMS[i];
 
-          const fx = -stiffness * b.x - damping * b.vx;
-          const fy = -stiffness * b.y - damping * b.vy;
-          b.vx += fx;
-          b.vy += fy;
+          // Gravity
+          b.vy += GRAVITY;
+
+          // Light air friction
+          b.vx *= 0.995;
+          b.vy *= 0.995;
+
           b.x += b.vx;
           b.y += b.vy;
 
-          // Bounce scale: overshoot then settle
+          // Absolute position for wall checks
+          const baseX = (item.x / 100) * screenW;
+          const baseY = ((45 + item.y * 0.55) / 100) * screenH;
+          const absLeft = baseX + b.x;
+          const absRight = absLeft + item.width;
+          const absBottom = baseY + b.y + item.width;
+
+          // Floor bounce
+          if (absBottom > screenH - 20) {
+            b.y = screenH - 20 - item.width - baseY;
+            b.vy = -Math.abs(b.vy) * FLOOR_BOUNCE;
+            // Scale bounce on first floor hit
+            if (!hasBouncedFloor.current[i]) {
+              hasBouncedFloor.current[i] = true;
+              itemScale.current[i] = 1.2;
+            }
+          }
+
+          // Side walls
+          if (absLeft < -10) {
+            b.x = -10 - baseX;
+            b.vx = Math.abs(b.vx) * WALL_BOUNCE_FALL;
+          }
+          if (absRight > screenW + 10) {
+            b.x = screenW + 10 - item.width - baseX;
+            b.vx = -Math.abs(b.vx) * WALL_BOUNCE_FALL;
+          }
+
+          // Gentle homing spring toward rest position — kicks in after initial bounce
           const t = fallElapsed - itemDelay;
-          if (t < 600) {
-            // Spring-based scale: peaks at 1.2 then settles to 1.0
-            const st = t / 600;
-            const springScale = 1 + 0.2 * Math.sin(st * Math.PI) * Math.exp(-st * 2.5);
-            itemScale.current[i] = springScale;
+          if (t > 800) {
+            const homeStrength = 0.008;
+            const homeDamp = 0.06;
+            b.vx += -homeStrength * b.x - homeDamp * b.vx;
+            b.vy += -homeStrength * b.y - homeDamp * b.vy;
+          }
+
+          // Scale settle: 1.2 → 1.0
+          if (itemScale.current[i] > 1.001) {
+            itemScale.current[i] += (1.0 - itemScale.current[i]) * 0.15;
           } else {
             itemScale.current[i] = 1;
           }
 
-          // Check if settled
+          // Check settled
           const dist = Math.sqrt(b.x * b.x + b.y * b.y);
           const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-          if (dist > 0.5 || speed > 0.1) {
+          if (dist > 1 || speed > 0.2) {
             allSettled = false;
           } else {
             b.x = 0;
@@ -216,6 +260,39 @@ export default function WelcomePage() {
             b.vx = 0;
             b.vy = 0;
             itemScale.current[i] = 1;
+          }
+        }
+
+        // Collision between falling items
+        for (let i = 0; i < n; i++) {
+          if (!itemReleased.current[i]) continue;
+          for (let j = i + 1; j < n; j++) {
+            if (!itemReleased.current[j]) continue;
+            const ci = getCenter(i);
+            const cj = getCenter(j);
+            const dx = cj.x - ci.x;
+            const dy = cj.y - ci.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const minDist = ITEMS[i].width * 0.35 + ITEMS[j].width * 0.35;
+            if (dist < minDist && dist > 0.5) {
+              const nx = dx / dist;
+              const ny = dy / dist;
+              const bi = bodies.current[i];
+              const bj = bodies.current[j];
+              const dvDotN = (bj.vx - bi.vx) * nx + (bj.vy - bi.vy) * ny;
+              if (dvDotN < 0) {
+                const impulse = -dvDotN * 0.4;
+                bi.vx -= nx * impulse;
+                bi.vy -= ny * impulse;
+                bj.vx += nx * impulse;
+                bj.vy += ny * impulse;
+              }
+              const overlap = (minDist - dist) * 0.5;
+              bi.x -= nx * overlap;
+              bi.y -= ny * overlap;
+              bj.x += nx * overlap;
+              bj.y += ny * overlap;
+            }
           }
         }
 
@@ -474,7 +551,7 @@ export default function WelcomePage() {
             transition: "all 0.5s ease-out 0.1s",
           }}
         >
-          <CovrdLogo />
+          <ShansiLogo />
         </div>
 
         {/* ── Title — centered, one line, edge to edge ── */}
