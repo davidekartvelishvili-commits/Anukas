@@ -49,20 +49,18 @@ function AuthContent() {
     setSendError("");
     setInfoMsg("");
     try {
-      if (isLogin) {
-        // Check if user exists and has PIN
-        const check = await checkPhone(digits);
-        if (check.exists && check.hasPin) {
-          // Show PIN screen instead of OTP
-          setSending(false);
-          setShowPinLogin(true);
-          return;
-        }
-        if (!check.exists) {
-          setSendError("Account not found. Please sign up first.");
-          setSending(false);
-          return;
-        }
+      // Always check if user exists and has PIN
+      const check = await checkPhone(digits);
+      if (check.exists && check.hasPin) {
+        // User has PIN — go straight to PIN login, no OTP needed
+        setSending(false);
+        setShowPinLogin(true);
+        return;
+      }
+      if (isLogin && !check.exists) {
+        setSendError("Account not found. Please sign up first.");
+        setSending(false);
+        return;
       }
       await sendOtp(digits);
       router.push(`/auth/verify?phone=${digits}${isLogin ? "&mode=login" : ""}`);
