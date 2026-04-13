@@ -84,6 +84,7 @@ export default function WelcomePage() {
   const itemScale = useRef<number[]>(ITEMS.map(() => 1));
   const hasBouncedFloor = useRef<boolean[]>(ITEMS.map(() => false));
   const itemReleased = useRef<boolean[]>(ITEMS.map(() => false));
+  const itemFrozen = useRef<boolean[]>(ITEMS.map(() => false));
 
   // Drag state
   const draggingIdx = useRef<number | null>(null);
@@ -195,12 +196,17 @@ export default function WelcomePage() {
           const b = bodies.current[i];
           const item = ITEMS[i];
 
+          // Skip frozen items — they've already landed
+          if (itemFrozen.current[i]) {
+            continue;
+          }
+
           // Pure gravity
           b.vy += GRAVITY;
 
           // Air friction
-          b.vx *= 0.995;
-          b.vy *= 0.995;
+          b.vx *= 0.99;
+          b.vy *= 0.99;
 
           b.x += b.vx;
           b.y += b.vy;
@@ -220,9 +226,13 @@ export default function WelcomePage() {
               hasBouncedFloor.current[i] = true;
               itemScale.current[i] = 1.2;
             }
-            // Kill tiny bounces so items come to rest on floor
-            if (Math.abs(b.vy) < 1.5) {
+            // Freeze item if bounce is tiny — it's resting on floor
+            if (Math.abs(b.vy) < 2) {
+              b.vx = 0;
               b.vy = 0;
+              itemFrozen.current[i] = true;
+              itemScale.current[i] = 1;
+              continue;
             }
           }
 
@@ -243,11 +253,7 @@ export default function WelcomePage() {
             itemScale.current[i] = 1;
           }
 
-          // Check if item has stopped moving
-          const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-          if (speed > 0.3) {
-            allSettled = false;
-          }
+          allSettled = false;
         }
 
         // Collision between falling items
