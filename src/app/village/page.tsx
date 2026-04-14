@@ -15,6 +15,8 @@ interface Building {
   nextStar: number | null;
   nextName: string | null;
   nextCost: number | null;
+  nextImage: string | null;
+  previewImage: string;
   complete: boolean;
 }
 
@@ -274,14 +276,18 @@ export default function VillagePage() {
                   {/* Stars — colored only for earned stars */}
                   <StarRow current={b.currentStars} total={4} />
 
-                  {/* Card image or empty plot */}
+                  {/* Card image — always show preview, dim if not yet purchased */}
                   <div className="h-[60px] flex items-center justify-center">
-                    {b.currentImage ? (
+                    {b.previewImage ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={b.currentImage}
+                        src={b.previewImage}
                         alt={b.name}
                         className="w-[50px] h-[50px] rounded-[8px] object-cover"
+                        style={{
+                          opacity: b.currentStars > 0 ? 1 : 0.5,
+                          filter: b.currentStars > 0 ? "none" : "grayscale(40%)",
+                        }}
                       />
                     ) : (
                       <div className="w-[50px] h-[50px] rounded-[8px]" style={{ background: "rgba(180,150,100,0.2)" }} />

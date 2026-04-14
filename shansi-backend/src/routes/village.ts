@@ -316,22 +316,26 @@ village.get("/current", async (c) => {
   const enrichedBuildings = buildings.map(b => {
     const currentStars = stars[b.position] || 0;
     const nextStar = currentStars + 1;
-    let nextName = "", nextCost = 0, currentImage = "";
+    let nextName = "", nextCost = 0, currentImage = "", nextImage = "";
     if (currentStars === 0) currentImage = ""; // empty plot
     else if (currentStars === 1) currentImage = b.star1Image || "";
     else if (currentStars === 2) currentImage = b.star2Image || "";
     else if (currentStars === 3) currentImage = b.star3Image || "";
     else if (currentStars >= 4) currentImage = b.star4Image || "";
-    if (nextStar === 1) { nextName = b.star1Name; nextCost = b.star1Cost; }
-    else if (nextStar === 2) { nextName = b.star2Name; nextCost = b.star2Cost; }
-    else if (nextStar === 3) { nextName = b.star3Name; nextCost = b.star3Cost; }
-    else if (nextStar === 4) { nextName = b.star4Name; nextCost = b.star4Cost; }
+    if (nextStar === 1) { nextName = b.star1Name; nextCost = b.star1Cost; nextImage = b.star1Image || ""; }
+    else if (nextStar === 2) { nextName = b.star2Name; nextCost = b.star2Cost; nextImage = b.star2Image || ""; }
+    else if (nextStar === 3) { nextName = b.star3Name; nextCost = b.star3Cost; nextImage = b.star3Image || ""; }
+    else if (nextStar === 4) { nextName = b.star4Name; nextCost = b.star4Cost; nextImage = b.star4Image || ""; }
+    // Preview image: show currentImage if owned, else nextImage as preview
+    const previewImage = currentImage || nextImage || b.star1Image || "";
     return {
       id: b.id, position: b.position, name: b.name,
       currentStars, currentImage,
       nextStar: currentStars >= 4 ? null : nextStar,
       nextName: currentStars >= 4 ? null : nextName,
       nextCost: currentStars >= 4 ? null : nextCost,
+      nextImage: currentStars >= 4 ? null : nextImage,
+      previewImage,
       complete: currentStars >= 4,
     };
   });
