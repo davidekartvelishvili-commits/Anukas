@@ -72,11 +72,23 @@ export default function VillagePage() {
       apiFetch("/village/current").catch(() => null),
       apiFetch("/village/profile").catch(() => null),
     ]).then(([vData, pData]: any[]) => {
-      if (vData?.success) setVillage(vData.village);
+      if (vData?.success) {
+        setVillage(vData.village);
+        // If user has already built anything → hide welcome banner immediately
+        const hasBuilt = vData.village?.buildings?.some((b: Building) => b.currentStars > 0);
+        if (hasBuilt) setShowWelcome(false);
+      }
       if (pData?.success) setProfile(pData.profile);
       setLoading(false);
     });
   }, []);
+
+  // Auto-hide welcome banner after 5 seconds
+  useEffect(() => {
+    if (!showWelcome) return;
+    const t = setTimeout(() => setShowWelcome(false), 5000);
+    return () => clearTimeout(t);
+  }, [showWelcome]);
 
   // Hand blink
   useEffect(() => {
@@ -133,6 +145,7 @@ export default function VillagePage() {
         @keyframes sparkle-flower { 0%,100% { opacity: 0.4; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.1); } }
         @keyframes hand-bounce { 0%,100% { transform: translateY(0) rotate(-15deg); } 50% { transform: translateY(-8px) rotate(-15deg); } }
         @keyframes banner-pop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes banner-fade { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0.9); } }
         @keyframes water-ripple-1 { 0% { transform: translateX(-100%); opacity: 0; } 30% { opacity: 0.7; } 100% { transform: translateX(100%); opacity: 0; } }
         @keyframes water-ripple-2 { 0% { transform: translateX(-80%); opacity: 0; } 30% { opacity: 0.5; } 100% { transform: translateX(120%); opacity: 0; } }
         @keyframes water-shine { 0%,100% { opacity: 0.2; } 50% { opacity: 0.6; } }
@@ -305,14 +318,14 @@ export default function VillagePage() {
           </div>
         ))}
 
-        {/* ── VILLAGE CLEARING (grass) ── */}
+        {/* ── VILLAGE CLEARING (grass) — larger circle ── */}
         <div
           className="absolute rounded-[50%]"
           style={{
-            left: "12%",
-            top: "33%",
-            width: "76%",
-            height: "32%",
+            left: "4%",
+            top: "30%",
+            width: "92%",
+            height: "42%",
             background: "radial-gradient(ellipse at 50% 40%, #8fd460 0%, #7ec850 30%, #6ab04c 65%, #5a9e3e 100%)",
             boxShadow: "inset 0 -10px 20px rgba(0,0,0,0.1)",
             zIndex: 2,
@@ -342,28 +355,29 @@ export default function VillagePage() {
           />
         ))}
 
-        {/* ── CIRCULAR WOODEN FENCE — around the village clearing ── */}
+        {/* ── CIRCULAR WOODEN FENCE — opens toward the lake (bottom) ── */}
         <div
           className="absolute pointer-events-none"
           style={{
-            left: "12%",
-            top: "33%",
-            width: "76%",
-            height: "32%",
+            left: "4%",
+            top: "30%",
+            width: "92%",
+            height: "42%",
             zIndex: 4,
           }}
         >
-          {/* 24 fence posts distributed around the ellipse */}
-          {Array.from({ length: 24 }).map((_, i) => {
-            const angle = (i / 24) * Math.PI * 2;
-            // Ellipse positioning — only show fence on sides and bottom (hide top for visibility)
-            const isTop = angle > Math.PI * 1.2 && angle < Math.PI * 1.8;
-            if (isTop) return null;
+          {/* 28 fence posts distributed around the ellipse, bottom arc hidden (opening toward lake) */}
+          {Array.from({ length: 28 }).map((_, i) => {
+            const angle = (i / 28) * Math.PI * 2;
+            // Hide BOTTOM arc so fence opens toward the lake
+            // In screen coords, bottom corresponds to angle around π/2 (sin > 0)
+            const isBottom = angle > Math.PI * 0.25 && angle < Math.PI * 0.75;
+            if (isBottom) return null;
             const cx = 50 + Math.cos(angle) * 48;
-            const cy = 50 + Math.sin(angle) * 45;
-            // Tilt post based on position on circle
-            const tilt = Math.cos(angle) * 8 + (Math.sin(i * 1.7) * 3);
-            const height = 26 + Math.sin(i) * 3;
+            const cy = 50 + Math.sin(angle) * 47;
+            // Tilt post outward slightly based on position on circle
+            const tilt = Math.cos(angle) * 6 + (Math.sin(i * 1.7) * 3);
+            const height = 28 + Math.sin(i) * 3;
             return (
               <div
                 key={`fence-${i}`}
@@ -400,7 +414,7 @@ export default function VillagePage() {
               </div>
             );
           })}
-          {/* Horizontal fence rails connecting posts (only bottom arc) */}
+          {/* Horizontal fence rails — only on the top arc (where fence exists) */}
           <svg
             className="absolute inset-0 w-full h-full pointer-events-none"
             viewBox="0 0 100 100"
@@ -412,17 +426,16 @@ export default function VillagePage() {
                 <stop offset="100%" stopColor="#5a3a10" />
               </linearGradient>
             </defs>
-            {/* Top rail */}
+            {/* Top arc rails — connecting posts around the top half */}
             <path
-              d="M 2,55 A 48,42 0 0,0 98,55"
+              d="M 2,50 A 48,42 0 0,1 98,50"
               fill="none"
               stroke="url(#railGrad)"
               strokeWidth="1.2"
               opacity="0.85"
             />
-            {/* Bottom rail */}
             <path
-              d="M 2,62 A 48,42 0 0,0 98,62"
+              d="M 2,57 A 48,42 0 0,1 98,57"
               fill="none"
               stroke="url(#railGrad)"
               strokeWidth="1.2"
@@ -433,10 +446,11 @@ export default function VillagePage() {
 
         {/* ── FLOWERS inside clearing ── */}
         {[
-          { x: 25, y: 42, color: "#ff6b6b" }, { x: 32, y: 54, color: "#ffd93d" },
-          { x: 45, y: 46, color: "#fff" }, { x: 52, y: 52, color: "#ff6b9d" },
-          { x: 60, y: 44, color: "#fff" }, { x: 68, y: 50, color: "#ffd93d" },
-          { x: 38, y: 48, color: "#ff6b6b" }, { x: 72, y: 45, color: "#ff6b9d" },
+          { x: 18, y: 40, color: "#ff6b6b" }, { x: 28, y: 54, color: "#ffd93d" },
+          { x: 40, y: 44, color: "#fff" }, { x: 50, y: 52, color: "#ff6b9d" },
+          { x: 62, y: 42, color: "#fff" }, { x: 72, y: 50, color: "#ffd93d" },
+          { x: 35, y: 58, color: "#ff6b6b" }, { x: 78, y: 44, color: "#ff6b9d" },
+          { x: 22, y: 58, color: "#fff" }, { x: 82, y: 58, color: "#ffd93d" },
         ].map((f, i) => (
           <div
             key={`flower-${i}`}
@@ -587,24 +601,32 @@ export default function VillagePage() {
           </div>
         </div>
 
-        {/* ── WELCOME BANNER ── */}
-        {showWelcome && !loading && (
-          <div className="absolute left-0 right-0 z-20 flex flex-col items-center" style={{ top: "30%", animation: "banner-pop 0.5s ease-out" }}>
-            <div className="relative px-8 py-3 mb-4" style={{ background: "linear-gradient(180deg, #e53935, #c62828)", borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.3)" }}>
+        {/* ── WELCOME BANNER — village name only, auto-fades in 5s ── */}
+        {showWelcome && !loading && village?.name && (
+          <div
+            className="absolute left-0 right-0 z-20 flex flex-col items-center"
+            style={{
+              top: "28%",
+              animation: "banner-pop 0.5s ease-out, banner-fade 1s ease-in 4s forwards",
+            }}
+          >
+            <div
+              className="relative px-8 py-3"
+              style={{
+                background: "linear-gradient(180deg, #e53935, #c62828)",
+                borderRadius: 8,
+                boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+              }}
+            >
               <div className="absolute -left-3 top-0 w-3 h-full" style={{ background: "#b71c1c", borderRadius: "4px 0 0 4px" }} />
               <div className="absolute -right-3 top-0 w-3 h-full" style={{ background: "#b71c1c", borderRadius: "0 4px 4px 0" }} />
-              <span className="text-white text-[22px] font-black uppercase tracking-wider" style={{ fontFamily: "var(--font-outfit)", textShadow: "2px 2px 0 rgba(0,0,0,0.3)" }}>
-                {village?.name || "Your Village"}
+              <span
+                className="text-white text-[22px] font-black uppercase tracking-wider"
+                style={{ fontFamily: "var(--font-outfit)", textShadow: "2px 2px 0 rgba(0,0,0,0.3)" }}
+              >
+                {village.name}
               </span>
             </div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-white text-[22px] font-black italic" style={{ fontFamily: "var(--font-outfit)", textShadow: "2px 2px 0 rgba(0,0,0,0.4)" }}>
-                Welcome Friend!
-              </span>
-            </div>
-            <span className="text-white text-[17px] font-bold" style={{ fontFamily: "var(--font-outfit)", textShadow: "1px 1px 0 rgba(0,0,0,0.4)" }}>
-              Click on the Build button to start
-            </span>
           </div>
         )}
 
@@ -663,14 +685,6 @@ export default function VillagePage() {
                     )}
                   </div>
 
-                  {/* Hand pointer on first card */}
-                  {i === 0 && showHand && showWelcome && (
-                    <div className="absolute -bottom-2 -left-2 text-[36px] z-30" style={{ animation: "hand-bounce 1s ease-in-out infinite" }}>
-                      <svg width="36" height="36" viewBox="0 0 24 24" fill="#FFD700" stroke="#5a4a2a" strokeWidth="1">
-                        <path d="M12 2l-1 9H7l5 11 1-9h4L12 2z" />
-                      </svg>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
