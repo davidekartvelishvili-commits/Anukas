@@ -224,6 +224,81 @@ export default function VillagePage() {
         </div>
 
 
+        {/* ── DISTANT BACKGROUND TREES — below mountains, small forest line ── */}
+        {(() => {
+          const seed = (n: number) => {
+            const x = Math.sin(n * 43.1337) * 91733.919;
+            return x - Math.floor(x);
+          };
+          type BgKind = "pine" | "broadleaf" | "tall";
+          const kinds: BgKind[] = ["pine", "broadleaf", "tall"];
+          const bgTrees: Array<{ left: number; top: number; scale: number; kind: BgKind; hueShift: number; delay: number }> = [];
+          // 18 trees spread across the full width, at y just below mountains
+          const N = 18;
+          for (let i = 0; i < N; i++) {
+            const baseX = (i / (N - 1)) * 100;
+            const xJitter = (seed(i) - 0.5) * 4;
+            const yJitter = (seed(i + 50) - 0.5) * 2;
+            const left = baseX + xJitter;
+            // top: 25-28% — below mountain bases (mountains end around 27% on mobile)
+            const top = 26.5 + yJitter;
+            // Very small — distant horizon
+            const scale = 0.28 + seed(i + 100) * 0.18;
+            const kind = kinds[Math.floor(seed(i + 200) * kinds.length)];
+            // Slight blue-green tint for atmospheric perspective
+            const hueShift = -10 + seed(i + 300) * 15;
+            bgTrees.push({ left, top, scale, kind, hueShift, delay: -(i * 0.13) });
+          }
+          return bgTrees;
+        })().map((t, i) => {
+          const leafDark = `hsl(${130 + t.hueShift}, 30%, 28%)`;
+          const leafMid = `hsl(${125 + t.hueShift}, 35%, 38%)`;
+          const trunkColor = `hsl(25, 35%, 25%)`;
+          return (
+            <div
+              key={`bgt-${i}`}
+              className="absolute pointer-events-none"
+              style={{
+                left: `${t.left}%`,
+                top: `${t.top}%`,
+                transform: `translateX(-50%) scale(${t.scale})`,
+                animation: `tree-sway ${5 + (i % 3)}s ease-in-out infinite`,
+                animationDelay: `${t.delay}s`,
+                transformOrigin: "bottom center",
+                zIndex: 1,
+                opacity: 0.85,
+                filter: "blur(0.3px)",
+              }}
+            >
+              {t.kind === "pine" && (
+                <svg width="40" height="80" viewBox="0 0 40 80">
+                  <rect x="17" y="58" width="6" height="18" fill={trunkColor} rx="1" />
+                  <path d="M20,8 L8,34 L32,34 Z" fill={leafDark} />
+                  <path d="M20,26 L5,54 L35,54 Z" fill={leafDark} />
+                  <path d="M20,44 L3,68 L37,68 Z" fill={leafMid} />
+                </svg>
+              )}
+              {t.kind === "tall" && (
+                <svg width="28" height="82" viewBox="0 0 28 82">
+                  <rect x="11" y="64" width="5" height="16" fill={trunkColor} rx="1" />
+                  <path d="M14,6 L6,28 L22,28 Z" fill={leafDark} />
+                  <path d="M14,22 L5,46 L23,46 Z" fill={leafDark} />
+                  <path d="M14,40 L4,66 L24,66 Z" fill={leafMid} />
+                </svg>
+              )}
+              {t.kind === "broadleaf" && (
+                <svg width="42" height="72" viewBox="0 0 42 72">
+                  <rect x="18" y="50" width="5" height="20" fill={trunkColor} rx="1" />
+                  <ellipse cx="21" cy="48" rx="18" ry="12" fill={leafDark} />
+                  <ellipse cx="14" cy="36" rx="10" ry="9" fill={leafDark} />
+                  <ellipse cx="28" cy="36" rx="10" ry="9" fill={leafDark} />
+                  <ellipse cx="21" cy="28" rx="11" ry="10" fill={leafMid} />
+                </svg>
+              )}
+            </div>
+          );
+        })}
+
         {/* ── GRASS TEXTURE BLADES ── */}
         {[
           { x: 20, y: 42 }, { x: 25, y: 58 }, { x: 35, y: 60 }, { x: 45, y: 42 },
