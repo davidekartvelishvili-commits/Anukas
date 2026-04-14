@@ -125,69 +125,424 @@ export default function VillagePage() {
     <AuthGuard>
       <style>{`
         html, body { background: #87CEEB !important; }
-        @keyframes float-cloud { 0% { transform: translateX(0); } 100% { transform: translateX(30px); } }
-        @keyframes sway { 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
-        @keyframes sparkle-flower { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+        @keyframes drift-slow { 0% { transform: translateX(-20px); } 100% { transform: translateX(20px); } }
+        @keyframes drift-med { 0% { transform: translateX(-15px); } 100% { transform: translateX(25px); } }
+        @keyframes drift-fast { 0% { transform: translateX(-30px); } 100% { transform: translateX(10px); } }
+        @keyframes tree-sway { 0%,100% { transform: rotate(-1.2deg) translateY(0); } 50% { transform: rotate(1.2deg) translateY(-1px); } }
+        @keyframes leaf-sway { 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+        @keyframes sparkle-flower { 0%,100% { opacity: 0.4; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.1); } }
         @keyframes hand-bounce { 0%,100% { transform: translateY(0) rotate(-15deg); } 50% { transform: translateY(-8px) rotate(-15deg); } }
         @keyframes banner-pop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes water-ripple-1 { 0% { transform: translateX(-100%); opacity: 0; } 30% { opacity: 0.7; } 100% { transform: translateX(100%); opacity: 0; } }
+        @keyframes water-ripple-2 { 0% { transform: translateX(-80%); opacity: 0; } 30% { opacity: 0.5; } 100% { transform: translateX(120%); opacity: 0; } }
+        @keyframes water-shine { 0%,100% { opacity: 0.2; } 50% { opacity: 0.6; } }
+        @keyframes fence-sway { 0%,100% { transform: translateY(0) rotate(var(--r, 0deg)); } 50% { transform: translateY(-0.5px) rotate(calc(var(--r, 0deg) + 0.5deg)); } }
       `}</style>
 
-      <main className="relative w-full h-[100dvh] overflow-hidden" style={{ background: "linear-gradient(180deg, #e8f4f8 0%, #c5e8f0 8%, #87CEEB 15%, #87CEEB 20%, #6ab04c 28%, #5a9e3e 35%, #4a8e30 60%, #3d7a28 70%, #2d8bc9 78%, #1e90c9 85%, #2d8bc9 100%)" }}>
+      <main className="relative w-full h-[100dvh] overflow-hidden" style={{ background: "linear-gradient(180deg, #d4ecf5 0%, #b3dcec 10%, #87CEEB 18%, #7cc4e1 22%, #6ab04c 30%, #5a9e3e 38%, #4a8e30 58%, #3d7a28 68%, #2d8bc9 76%, #1e90c9 84%, #1975a8 100%)" }}>
 
-        {/* Clouds */}
-        <div className="absolute top-[3%] right-[10%] w-[120px] h-[50px] rounded-[40px] opacity-80" style={{ background: "rgba(255,255,255,0.7)", animation: "float-cloud 8s ease-in-out infinite alternate" }} />
-        <div className="absolute top-[6%] right-[25%] w-[80px] h-[35px] rounded-[30px] opacity-60" style={{ background: "rgba(255,255,255,0.6)", animation: "float-cloud 10s ease-in-out infinite alternate-reverse" }} />
-        <div className="absolute top-[2%] left-[5%] w-[60px] h-[28px] rounded-[20px] opacity-50" style={{ background: "rgba(255,255,255,0.5)", animation: "float-cloud 12s ease-in-out infinite alternate" }} />
-
-        {/* Forest trees - back row */}
-        {[8, 18, 30, 42, 55, 68, 80, 90].map((left, i) => (
-          <div key={`bt-${i}`} className="absolute" style={{ left: `${left}%`, top: "15%", transform: "translateX(-50%)" }}>
-            <div style={{ width: 0, height: 0, borderLeft: `${18 + i % 3 * 5}px solid transparent`, borderRight: `${18 + i % 3 * 5}px solid transparent`, borderBottom: `${50 + i % 3 * 10}px solid #1a5c3a` }} />
-            <div style={{ width: 0, height: 0, borderLeft: `${22 + i % 3 * 5}px solid transparent`, borderRight: `${22 + i % 3 * 5}px solid transparent`, borderBottom: `${45 + i % 3 * 8}px solid #1a6b3a`, marginTop: -20, marginLeft: -4 }} />
-            <div className="w-[8px] h-[15px] mx-auto rounded-b-sm" style={{ background: "#5c3a1a" }} />
+        {/* ── REALISTIC CLOUDS — multi-layered puff ── */}
+        {[
+          { top: 3, left: 65, scale: 1.2, speed: 22, delay: 0, opacity: 0.95 },
+          { top: 7, left: 30, scale: 0.8, speed: 28, delay: -8, opacity: 0.8 },
+          { top: 2, left: 8, scale: 0.9, speed: 32, delay: -3, opacity: 0.85 },
+          { top: 10, left: 85, scale: 0.6, speed: 26, delay: -12, opacity: 0.7 },
+        ].map((c, i) => (
+          <div
+            key={`cloud-${i}`}
+            className="absolute"
+            style={{
+              top: `${c.top}%`,
+              left: `${c.left}%`,
+              transform: `scale(${c.scale})`,
+              animation: `${i % 3 === 0 ? "drift-slow" : i % 3 === 1 ? "drift-med" : "drift-fast"} ${c.speed}s ease-in-out infinite alternate`,
+              animationDelay: `${c.delay}s`,
+              opacity: c.opacity,
+              zIndex: 1,
+            }}
+          >
+            <svg width="140" height="60" viewBox="0 0 140 60" style={{ filter: "drop-shadow(0 4px 8px rgba(100,130,160,0.15))" }}>
+              <defs>
+                <radialGradient id={`cloudGrad${i}`} cx="50%" cy="40%">
+                  <stop offset="0%" stopColor="#ffffff" />
+                  <stop offset="60%" stopColor="#f5f9fc" />
+                  <stop offset="100%" stopColor="#d8e4ec" />
+                </radialGradient>
+              </defs>
+              <ellipse cx="30" cy="40" rx="22" ry="18" fill={`url(#cloudGrad${i})`} />
+              <ellipse cx="55" cy="32" rx="26" ry="22" fill={`url(#cloudGrad${i})`} />
+              <ellipse cx="85" cy="35" rx="24" ry="20" fill={`url(#cloudGrad${i})`} />
+              <ellipse cx="110" cy="42" rx="20" ry="16" fill={`url(#cloudGrad${i})`} />
+              <ellipse cx="70" cy="45" rx="30" ry="12" fill={`url(#cloudGrad${i})`} opacity="0.9" />
+              {/* Cloud shadow highlight */}
+              <ellipse cx="55" cy="28" rx="20" ry="10" fill="rgba(255,255,255,0.6)" />
+            </svg>
           </div>
         ))}
 
-        {/* Forest trees - front row */}
-        {[5, 15, 25, 72, 82, 92].map((left, i) => (
-          <div key={`ft-${i}`} className="absolute" style={{ left: `${left}%`, top: "22%", transform: "translateX(-50%)", zIndex: 2 }}>
-            <div style={{ width: 0, height: 0, borderLeft: `${20 + i % 2 * 8}px solid transparent`, borderRight: `${20 + i % 2 * 8}px solid transparent`, borderBottom: `${55 + i % 2 * 12}px solid #2d7a28` }} />
-            <div style={{ width: 0, height: 0, borderLeft: `${24 + i % 2 * 8}px solid transparent`, borderRight: `${24 + i % 2 * 8}px solid transparent`, borderBottom: `${50 + i % 2 * 10}px solid #3a8e30`, marginTop: -22, marginLeft: -4 }} />
-            <div className="w-[9px] h-[18px] mx-auto rounded-b-sm" style={{ background: "#6b4a2a" }} />
-          </div>
-        ))}
-
-        {/* Bushes */}
-        {[3, 20, 75, 95].map((left, i) => (
-          <div key={`bush-${i}`} className="absolute rounded-full" style={{ left: `${left}%`, top: `${30 + i * 2}%`, width: 30 + i * 5, height: 20 + i * 3, background: "#3d8a28", zIndex: 2 }}>
-            <div className="absolute w-[5px] h-[5px] rounded-full bg-red-500 top-[2px] left-[8px]" />
-            <div className="absolute w-[4px] h-[4px] rounded-full bg-red-500 top-[5px] right-[10px]" />
-          </div>
-        ))}
-
-        {/* Fence */}
-        <div className="absolute" style={{ left: "20%", top: "30%", width: "60%", height: "35%", zIndex: 3 }}>
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={`fl-${i}`} className="absolute" style={{ left: `${-2 + i * 2}%`, top: `${10 + i * 10}%`, width: 6, height: 22, background: "#8B6914", borderRadius: "2px 2px 0 0", transform: `rotate(${-15 + i * 2}deg)`, boxShadow: "1px 0 0 #6b4a0a" }} />
-          ))}
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={`fr-${i}`} className="absolute" style={{ right: `${-2 + i * 2}%`, top: `${10 + i * 10}%`, width: 6, height: 22, background: "#8B6914", borderRadius: "2px 2px 0 0", transform: `rotate(${15 - i * 2}deg)`, boxShadow: "-1px 0 0 #6b4a0a" }} />
-          ))}
+        {/* ── DISTANT MOUNTAINS ── */}
+        <div className="absolute left-0 right-0" style={{ top: "17%", zIndex: 1 }}>
+          <svg width="100%" height="80" viewBox="0 0 400 80" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="mountainGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#8ba8c9" />
+                <stop offset="100%" stopColor="#6a8ca8" />
+              </linearGradient>
+            </defs>
+            <path d="M0,80 L40,30 L80,55 L120,20 L160,45 L200,15 L240,40 L280,25 L320,50 L360,30 L400,55 L400,80 Z" fill="url(#mountainGrad)" opacity="0.7" />
+            {/* Snow caps */}
+            <path d="M115,25 L120,20 L125,25 L122,30 Z" fill="#fff" opacity="0.8" />
+            <path d="M195,20 L200,15 L205,20 L202,25 Z" fill="#fff" opacity="0.8" />
+            <path d="M275,30 L280,25 L285,30 L282,33 Z" fill="#fff" opacity="0.8" />
+          </svg>
         </div>
 
-        {/* Village clearing */}
-        <div className="absolute rounded-[50%]" style={{ left: "15%", top: "32%", width: "70%", height: "30%", background: "radial-gradient(ellipse, #7ec850 0%, #6ab04c 50%, #5a9e3e 100%)", zIndex: 1 }} />
-
-        {/* Flowers */}
-        {[{ x: 30, y: 45 }, { x: 50, y: 50 }, { x: 65, y: 42 }, { x: 40, y: 55 }, { x: 55, y: 48 }, { x: 35, y: 52 }, { x: 60, y: 55 }, { x: 45, y: 42 }].map((f, i) => (
-          <div key={`fl-${i}`} className="absolute w-[6px] h-[6px] rounded-full" style={{ left: `${f.x}%`, top: `${f.y}%`, background: "#fff", animation: `sparkle-flower ${2 + i * 0.3}s ease-in-out ${i * 0.4}s infinite`, zIndex: 4 }} />
+        {/* ── REALISTIC TREES — back row (distant forest) ── */}
+        {[
+          { left: 5, top: 20, scale: 0.7, delay: 0 },
+          { left: 14, top: 19, scale: 0.65, delay: -1 },
+          { left: 22, top: 21, scale: 0.75, delay: -0.5 },
+          { left: 31, top: 20, scale: 0.7, delay: -1.5 },
+          { left: 40, top: 22, scale: 0.6, delay: -0.8 },
+          { left: 60, top: 21, scale: 0.7, delay: -1.2 },
+          { left: 69, top: 20, scale: 0.65, delay: -0.3 },
+          { left: 77, top: 22, scale: 0.75, delay: -1.8 },
+          { left: 86, top: 19, scale: 0.7, delay: -0.7 },
+          { left: 94, top: 21, scale: 0.65, delay: -1.1 },
+        ].map((t, i) => (
+          <div
+            key={`bt-${i}`}
+            className="absolute"
+            style={{
+              left: `${t.left}%`,
+              top: `${t.top}%`,
+              transform: `translateX(-50%) scale(${t.scale})`,
+              animation: `tree-sway ${4 + (i % 3)}s ease-in-out infinite`,
+              animationDelay: `${t.delay}s`,
+              transformOrigin: "bottom center",
+              zIndex: 2,
+            }}
+          >
+            <svg width="50" height="90" viewBox="0 0 50 90">
+              <defs>
+                <linearGradient id={`trunkBack${i}`} x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#4a2f18" />
+                  <stop offset="50%" stopColor="#6b4422" />
+                  <stop offset="100%" stopColor="#3a2510" />
+                </linearGradient>
+                <linearGradient id={`leafBack${i}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3a7a3a" />
+                  <stop offset="100%" stopColor="#1a5c2a" />
+                </linearGradient>
+              </defs>
+              {/* Trunk */}
+              <rect x="22" y="60" width="6" height="28" fill={`url(#trunkBack${i})`} rx="1" />
+              {/* Foliage — 3 layered clusters */}
+              <ellipse cx="25" cy="60" rx="20" ry="14" fill={`url(#leafBack${i})`} />
+              <ellipse cx="18" cy="48" rx="14" ry="12" fill={`url(#leafBack${i})`} />
+              <ellipse cx="32" cy="48" rx="14" ry="12" fill={`url(#leafBack${i})`} />
+              <ellipse cx="25" cy="38" rx="12" ry="11" fill={`url(#leafBack${i})`} />
+              {/* Highlights */}
+              <ellipse cx="22" cy="42" rx="5" ry="3" fill="#5a9a4a" opacity="0.6" />
+              <ellipse cx="30" cy="52" rx="4" ry="2.5" fill="#5a9a4a" opacity="0.5" />
+            </svg>
+          </div>
         ))}
 
-        {/* Lake */}
-        <div className="absolute" style={{ left: "5%", top: "68%", width: "90%", height: "18%", background: "linear-gradient(180deg, #2d8bc9 0%, #1e7ab8 50%, #1565a0 100%)", borderRadius: "40% 60% 50% 50%", zIndex: 5 }}>
-          <div className="absolute -top-[6px] left-[5%] right-[5%] h-[12px] rounded-[50%]" style={{ background: "#8B6914" }} />
-          <div className="absolute top-[30%] left-[20%] w-[60%] h-[3px] rounded-full opacity-30" style={{ background: "rgba(255,255,255,0.4)" }} />
-          <div className="absolute top-[50%] left-[30%] w-[40%] h-[2px] rounded-full opacity-20" style={{ background: "rgba(255,255,255,0.3)" }} />
+        {/* ── REALISTIC TREES — front row (closer, bigger) ── */}
+        {[
+          { left: 3, top: 27, scale: 1.1, delay: 0 },
+          { left: 12, top: 29, scale: 0.95, delay: -1.3 },
+          { left: 22, top: 28, scale: 1.05, delay: -0.6 },
+          { left: 78, top: 28, scale: 1.05, delay: -1.7 },
+          { left: 88, top: 29, scale: 1.0, delay: -0.9 },
+          { left: 97, top: 27, scale: 1.1, delay: -2.1 },
+        ].map((t, i) => (
+          <div
+            key={`ft-${i}`}
+            className="absolute"
+            style={{
+              left: `${t.left}%`,
+              top: `${t.top}%`,
+              transform: `translateX(-50%) scale(${t.scale})`,
+              animation: `tree-sway ${3.5 + (i % 2) * 0.8}s ease-in-out infinite`,
+              animationDelay: `${t.delay}s`,
+              transformOrigin: "bottom center",
+              zIndex: 3,
+            }}
+          >
+            <svg width="60" height="110" viewBox="0 0 60 110">
+              <defs>
+                <linearGradient id={`trunkFront${i}`} x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#5a3820" />
+                  <stop offset="40%" stopColor="#7a5230" />
+                  <stop offset="70%" stopColor="#5a3820" />
+                  <stop offset="100%" stopColor="#3a2210" />
+                </linearGradient>
+                <radialGradient id={`leafFront${i}`} cx="40%" cy="40%">
+                  <stop offset="0%" stopColor="#5aa348" />
+                  <stop offset="60%" stopColor="#388a30" />
+                  <stop offset="100%" stopColor="#1c6622" />
+                </radialGradient>
+              </defs>
+              {/* Trunk with texture lines */}
+              <path d="M26,75 L26,105 L34,105 L34,75 Z" fill={`url(#trunkFront${i})`} />
+              <line x1="28" y1="82" x2="28" y2="100" stroke="#3a2210" strokeWidth="0.8" opacity="0.5" />
+              <line x1="31" y1="85" x2="31" y2="103" stroke="#3a2210" strokeWidth="0.6" opacity="0.4" />
+              {/* Foliage — multiple overlapping clusters for depth */}
+              <ellipse cx="30" cy="75" rx="26" ry="16" fill={`url(#leafFront${i})`} />
+              <ellipse cx="18" cy="60" rx="16" ry="14" fill={`url(#leafFront${i})`} />
+              <ellipse cx="42" cy="60" rx="16" ry="14" fill={`url(#leafFront${i})`} />
+              <ellipse cx="30" cy="48" rx="16" ry="14" fill={`url(#leafFront${i})`} />
+              <ellipse cx="22" cy="38" rx="12" ry="11" fill={`url(#leafFront${i})`} />
+              <ellipse cx="38" cy="38" rx="12" ry="11" fill={`url(#leafFront${i})`} />
+              <ellipse cx="30" cy="28" rx="11" ry="10" fill={`url(#leafFront${i})`} />
+              {/* Highlights — sun catching leaves */}
+              <ellipse cx="24" cy="35" rx="5" ry="4" fill="#7bc26a" opacity="0.7" />
+              <ellipse cx="36" cy="50" rx="5" ry="3.5" fill="#7bc26a" opacity="0.6" />
+              <ellipse cx="20" cy="55" rx="4" ry="3" fill="#7bc26a" opacity="0.5" />
+            </svg>
+          </div>
+        ))}
+
+        {/* ── VILLAGE CLEARING (grass) ── */}
+        <div
+          className="absolute rounded-[50%]"
+          style={{
+            left: "12%",
+            top: "33%",
+            width: "76%",
+            height: "32%",
+            background: "radial-gradient(ellipse at 50% 40%, #8fd460 0%, #7ec850 30%, #6ab04c 65%, #5a9e3e 100%)",
+            boxShadow: "inset 0 -10px 20px rgba(0,0,0,0.1)",
+            zIndex: 2,
+          }}
+        />
+
+        {/* ── GRASS TEXTURE BLADES ── */}
+        {[
+          { x: 20, y: 42 }, { x: 25, y: 58 }, { x: 35, y: 60 }, { x: 45, y: 42 },
+          { x: 55, y: 58 }, { x: 65, y: 44 }, { x: 72, y: 56 }, { x: 80, y: 45 },
+          { x: 30, y: 50 }, { x: 60, y: 50 }, { x: 70, y: 42 }, { x: 40, y: 56 },
+        ].map((g, i) => (
+          <div
+            key={`grass-${i}`}
+            className="absolute"
+            style={{
+              left: `${g.x}%`,
+              top: `${g.y}%`,
+              width: 2,
+              height: 6,
+              background: "linear-gradient(to top, #3a7a28, #5a9e3e)",
+              borderRadius: "50% 50% 0 0",
+              animation: `leaf-sway ${2 + (i % 3) * 0.5}s ease-in-out ${i * 0.2}s infinite`,
+              transformOrigin: "bottom center",
+              zIndex: 3,
+            }}
+          />
+        ))}
+
+        {/* ── CIRCULAR WOODEN FENCE — around the village clearing ── */}
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            left: "12%",
+            top: "33%",
+            width: "76%",
+            height: "32%",
+            zIndex: 4,
+          }}
+        >
+          {/* 24 fence posts distributed around the ellipse */}
+          {Array.from({ length: 24 }).map((_, i) => {
+            const angle = (i / 24) * Math.PI * 2;
+            // Ellipse positioning — only show fence on sides and bottom (hide top for visibility)
+            const isTop = angle > Math.PI * 1.2 && angle < Math.PI * 1.8;
+            if (isTop) return null;
+            const cx = 50 + Math.cos(angle) * 48;
+            const cy = 50 + Math.sin(angle) * 45;
+            // Tilt post based on position on circle
+            const tilt = Math.cos(angle) * 8 + (Math.sin(i * 1.7) * 3);
+            const height = 26 + Math.sin(i) * 3;
+            return (
+              <div
+                key={`fence-${i}`}
+                className="absolute"
+                style={{
+                  left: `${cx}%`,
+                  top: `${cy}%`,
+                  transform: `translate(-50%, -100%)`,
+                  animation: "fence-sway 4s ease-in-out infinite",
+                  animationDelay: `${i * 0.15}s`,
+                  ["--r" as any]: `${tilt}deg`,
+                }}
+              >
+                <svg width="10" height={height} viewBox={`0 0 10 ${height}`}>
+                  <defs>
+                    <linearGradient id={`postGrad${i}`} x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#5a3a18" />
+                      <stop offset="30%" stopColor="#8B6914" />
+                      <stop offset="70%" stopColor="#6b4a0a" />
+                      <stop offset="100%" stopColor="#3a2208" />
+                    </linearGradient>
+                  </defs>
+                  {/* Post body */}
+                  <path
+                    d={`M1,${height} L1,6 L5,0 L9,6 L9,${height} Z`}
+                    fill={`url(#postGrad${i})`}
+                  />
+                  {/* Wood grain lines */}
+                  <line x1="3" y1="8" x2="3" y2={height - 2} stroke="#3a2208" strokeWidth="0.4" opacity="0.5" />
+                  <line x1="6" y1="10" x2="6" y2={height - 3} stroke="#3a2208" strokeWidth="0.3" opacity="0.4" />
+                  {/* Top highlight */}
+                  <path d={`M1,6 L5,0 L9,6 L5,4 Z`} fill="#a88044" opacity="0.7" />
+                </svg>
+              </div>
+            );
+          })}
+          {/* Horizontal fence rails connecting posts (only bottom arc) */}
+          <svg
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+          >
+            <defs>
+              <linearGradient id="railGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#8B6914" />
+                <stop offset="100%" stopColor="#5a3a10" />
+              </linearGradient>
+            </defs>
+            {/* Top rail */}
+            <path
+              d="M 2,55 A 48,42 0 0,0 98,55"
+              fill="none"
+              stroke="url(#railGrad)"
+              strokeWidth="1.2"
+              opacity="0.85"
+            />
+            {/* Bottom rail */}
+            <path
+              d="M 2,62 A 48,42 0 0,0 98,62"
+              fill="none"
+              stroke="url(#railGrad)"
+              strokeWidth="1.2"
+              opacity="0.85"
+            />
+          </svg>
+        </div>
+
+        {/* ── FLOWERS inside clearing ── */}
+        {[
+          { x: 25, y: 42, color: "#ff6b6b" }, { x: 32, y: 54, color: "#ffd93d" },
+          { x: 45, y: 46, color: "#fff" }, { x: 52, y: 52, color: "#ff6b9d" },
+          { x: 60, y: 44, color: "#fff" }, { x: 68, y: 50, color: "#ffd93d" },
+          { x: 38, y: 48, color: "#ff6b6b" }, { x: 72, y: 45, color: "#ff6b9d" },
+        ].map((f, i) => (
+          <div
+            key={`flower-${i}`}
+            className="absolute"
+            style={{
+              left: `${f.x}%`,
+              top: `${f.y}%`,
+              zIndex: 5,
+              animation: `sparkle-flower ${2 + i * 0.3}s ease-in-out ${i * 0.4}s infinite`,
+            }}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10">
+              <circle cx="5" cy="2.5" r="1.5" fill={f.color} />
+              <circle cx="7.5" cy="5" r="1.5" fill={f.color} />
+              <circle cx="5" cy="7.5" r="1.5" fill={f.color} />
+              <circle cx="2.5" cy="5" r="1.5" fill={f.color} />
+              <circle cx="5" cy="5" r="1.2" fill="#ffd93d" />
+            </svg>
+          </div>
+        ))}
+
+        {/* ── REALISTIC LAKE with animated water ── */}
+        <div
+          className="absolute overflow-hidden"
+          style={{
+            left: "3%",
+            top: "68%",
+            width: "94%",
+            height: "20%",
+            borderRadius: "48% 52% 46% 54% / 40% 60% 50% 50%",
+            background: "linear-gradient(180deg, #4ba3d4 0%, #2d8bc9 30%, #1e7ab8 60%, #1565a0 100%)",
+            boxShadow: "inset 0 4px 12px rgba(0,0,0,0.2), inset 0 -4px 8px rgba(20,80,140,0.3)",
+            zIndex: 5,
+          }}
+        >
+          {/* Sandy shore along top edge */}
+          <div
+            className="absolute left-0 right-0 -top-1 h-[14px]"
+            style={{
+              background: "linear-gradient(180deg, #c4a46a 0%, #a88044 60%, transparent 100%)",
+              borderRadius: "50% 50% 0 0 / 100% 100% 0 0",
+            }}
+          />
+          {/* Small rocks on shore */}
+          {[12, 28, 42, 58, 72, 88].map((x, i) => (
+            <div
+              key={`rock-${i}`}
+              className="absolute"
+              style={{
+                left: `${x}%`,
+                top: i % 2 === 0 ? "1px" : "3px",
+                width: 4 + (i % 3),
+                height: 3 + (i % 2),
+                background: "radial-gradient(ellipse at 30% 30%, #a8a098, #6a6258)",
+                borderRadius: "50%",
+                boxShadow: "0 1px 0 rgba(0,0,0,0.3)",
+              }}
+            />
+          ))}
+          {/* Lake reflections / shimmer lines — horizontally sweeping */}
+          <div
+            className="absolute left-0 right-0 h-[2px]"
+            style={{
+              top: "25%",
+              background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)",
+              animation: "water-ripple-1 6s ease-in-out infinite",
+            }}
+          />
+          <div
+            className="absolute left-0 right-0 h-[1.5px]"
+            style={{
+              top: "45%",
+              background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)",
+              animation: "water-ripple-2 8s ease-in-out 1.5s infinite",
+            }}
+          />
+          <div
+            className="absolute left-0 right-0 h-[1px]"
+            style={{
+              top: "65%",
+              background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)",
+              animation: "water-ripple-1 10s ease-in-out 3s infinite",
+            }}
+          />
+          {/* Static shine spots */}
+          <div
+            className="absolute top-[20%] left-[15%] w-[20%] h-[2px] rounded-full"
+            style={{ background: "rgba(255,255,255,0.4)", animation: "water-shine 3s ease-in-out infinite" }}
+          />
+          <div
+            className="absolute top-[55%] left-[55%] w-[15%] h-[2px] rounded-full"
+            style={{ background: "rgba(255,255,255,0.3)", animation: "water-shine 4s ease-in-out 1s infinite" }}
+          />
+          {/* Lily pad */}
+          <div className="absolute top-[35%] left-[20%]" style={{ zIndex: 6 }}>
+            <svg width="18" height="12" viewBox="0 0 18 12">
+              <ellipse cx="9" cy="6" rx="8" ry="4" fill="#2d7a28" opacity="0.85" />
+              <path d="M 9,6 L 1,6" stroke="#1a5c2a" strokeWidth="0.8" />
+              <circle cx="4" cy="5" r="1.2" fill="#ff6b9d" opacity="0.8" />
+            </svg>
+          </div>
+          <div className="absolute top-[50%] left-[75%]" style={{ zIndex: 6 }}>
+            <svg width="14" height="10" viewBox="0 0 14 10">
+              <ellipse cx="7" cy="5" rx="6" ry="3" fill="#2d7a28" opacity="0.8" />
+            </svg>
+          </div>
         </div>
 
         {/* Dock */}
