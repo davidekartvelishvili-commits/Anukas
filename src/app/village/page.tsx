@@ -210,18 +210,16 @@ export default function VillagePage() {
           </svg>
         </div>
 
-        {/* ── REALISTIC TREES — back row (distant forest) ── */}
+        {/* ── REALISTIC TREES — back row (distant forest, outside fence) ── */}
         {[
-          { left: 5, top: 20, scale: 0.7, delay: 0 },
-          { left: 14, top: 19, scale: 0.65, delay: -1 },
-          { left: 22, top: 21, scale: 0.75, delay: -0.5 },
-          { left: 31, top: 20, scale: 0.7, delay: -1.5 },
-          { left: 40, top: 22, scale: 0.6, delay: -0.8 },
-          { left: 60, top: 21, scale: 0.7, delay: -1.2 },
-          { left: 69, top: 20, scale: 0.65, delay: -0.3 },
-          { left: 77, top: 22, scale: 0.75, delay: -1.8 },
-          { left: 86, top: 19, scale: 0.7, delay: -0.7 },
-          { left: 94, top: 21, scale: 0.65, delay: -1.1 },
+          { left: 2, top: 20, scale: 0.7, delay: 0 },
+          { left: 6, top: 19, scale: 0.65, delay: -1 },
+          { left: 10, top: 21, scale: 0.75, delay: -0.5 },
+          { left: 13, top: 24, scale: 0.6, delay: -1.5 },
+          { left: 87, top: 24, scale: 0.7, delay: -1.2 },
+          { left: 90, top: 21, scale: 0.75, delay: -0.3 },
+          { left: 94, top: 19, scale: 0.65, delay: -1.8 },
+          { left: 98, top: 20, scale: 0.7, delay: -0.7 },
         ].map((t, i) => (
           <div
             key={`bt-${i}`}
@@ -262,13 +260,13 @@ export default function VillagePage() {
           </div>
         ))}
 
-        {/* ── REALISTIC TREES — front row (closer, bigger) ── */}
+        {/* ── REALISTIC TREES — front row (closer, bigger, outside fence) ── */}
         {[
           { left: 3, top: 27, scale: 1.1, delay: 0 },
-          { left: 12, top: 29, scale: 0.95, delay: -1.3 },
-          { left: 22, top: 28, scale: 1.05, delay: -0.6 },
-          { left: 78, top: 28, scale: 1.05, delay: -1.7 },
-          { left: 88, top: 29, scale: 1.0, delay: -0.9 },
+          { left: 8, top: 32, scale: 0.95, delay: -1.3 },
+          { left: 12, top: 38, scale: 1.05, delay: -0.6 },
+          { left: 88, top: 38, scale: 1.05, delay: -1.7 },
+          { left: 92, top: 32, scale: 0.95, delay: -0.9 },
           { left: 97, top: 27, scale: 1.1, delay: -2.1 },
         ].map((t, i) => (
           <div
