@@ -210,16 +210,39 @@ export default function VillagePage() {
           </svg>
         </div>
 
-        {/* ── TREES — circular forest ring curving around fence ── */}
-        {[
-          // Top arc — smallest (distant, deepest in scene), curves up at center
-          { left: 30, top: 22, scale: 0.5, delay: -0.8 },
-          { left: 38, top: 19, scale: 0.45, delay: -1.2 },
-          { left: 46, top: 17, scale: 0.4, delay: -0.3 },  // top-most, smallest
-          { left: 54, top: 17, scale: 0.4, delay: -1.8 },
-          { left: 62, top: 19, scale: 0.45, delay: -0.7 },
-          { left: 70, top: 22, scale: 0.5, delay: -1.1 },
-        ].map((t, i) => (
+        {/* ── TREES — perfect circle ring around the clearing ── */}
+        {(() => {
+          // Generate positions along a visual circle centered at (50%, 44%)
+          // with radius ~140px (approx 35% viewport width, 17.5% viewport height)
+          // Skip the bottom arc (lake side)
+          const trees: Array<{ left: number; top: number; scale: number; delay: number }> = [];
+          // Angles in screen convention (0°=right, 90°=down, 180°=left, 270°=up)
+          // Sweep from 165° (lower-left) ccw through 270° (top) back down to 15° (lower-right)
+          const N = 16;
+          for (let i = 0; i < N; i++) {
+            // Parametrize arc from 165° ccw through 270° to 15° (total 210°)
+            const t = i / (N - 1);
+            const angleDeg = 165 + t * 210;
+            const rad = (angleDeg * Math.PI) / 180;
+            // Visual circle: rX = 35% viewport width, rY = 17.5% viewport height
+            // Center: (50%, 44%)
+            const baseX = 50 + Math.cos(rad) * 35;
+            const baseY = 44 + Math.sin(rad) * 17.5;
+            // Tree size — smaller toward top (depth perspective), bigger at sides
+            const fromTop = Math.abs(angleDeg - 270) / 105; // 0 at top, 1 at sides
+            const scale = 0.55 + fromTop * 0.35;
+            // Tree top = base - (scaled SVG height in vh)
+            const svgHeight = 90 * scale; // back-row SVG height
+            const treeTopVh = baseY - (svgHeight / 8); // 1vh ≈ 8px on 800px viewport
+            trees.push({
+              left: baseX,
+              top: treeTopVh,
+              scale,
+              delay: -(i * 0.2),
+            });
+          }
+          return trees;
+        })().map((t, i) => (
           <div
             key={`bt-${i}`}
             className="absolute"
@@ -259,22 +282,8 @@ export default function VillagePage() {
           </div>
         ))}
 
-        {/* ── TREES — front row: curves around LEFT and RIGHT sides of fence ── */}
-        {[
-          // LEFT curve — wraps around fence left arc (fence x=22-78)
-          // Trees follow arc: upper-left small, mid-left medium, lower-left big
-          { left: 14, top: 24, scale: 0.55, delay: 0 },    // upper-left of arc, small
-          { left: 10, top: 30, scale: 0.75, delay: -1.3 }, // upper-left side
-          { left: 6, top: 38, scale: 0.85, delay: -0.6 },  // mid-left
-          { left: 4, top: 48, scale: 0.95, delay: -1.8 },  // lower-left
-          { left: 8, top: 58, scale: 1.05, delay: -0.9 },  // bottom-left (biggest, foreground)
-          // RIGHT curve — mirror, following fence right arc
-          { left: 86, top: 24, scale: 0.55, delay: -2.1 }, // upper-right of arc, small
-          { left: 90, top: 30, scale: 0.75, delay: -1.0 }, // upper-right side
-          { left: 94, top: 38, scale: 0.85, delay: -0.9 }, // mid-right
-          { left: 96, top: 48, scale: 0.95, delay: -1.7 }, // lower-right
-          { left: 92, top: 58, scale: 1.05, delay: -0.4 }, // bottom-right (biggest, foreground)
-        ].map((t, i) => (
+        {/* ── (Second tree array removed — single perfect-circle ring is used now) ── */}
+        {([] as Array<{ left: number; top: number; scale: number; delay: number }>).map((t, i) => (
           <div
             key={`ft-${i}`}
             className="absolute"
@@ -359,66 +368,6 @@ export default function VillagePage() {
           />
         ))}
 
-        {/* ── CIRCULAR WOODEN FENCE — perfect circle, opens toward the lake ── */}
-        <div
-          className="absolute pointer-events-none"
-          style={{
-            left: "22%",
-            top: "30%",
-            width: "56%",
-            aspectRatio: "1 / 1",
-            zIndex: 4,
-          }}
-        >
-          {/* 28 fence posts distributed around the ellipse, bottom arc hidden (opening toward lake) */}
-          {Array.from({ length: 28 }).map((_, i) => {
-            const angle = (i / 28) * Math.PI * 2;
-            // Hide BOTTOM arc so fence opens toward the lake
-            // In screen coords, bottom corresponds to angle around π/2 (sin > 0)
-            const isBottom = angle > Math.PI * 0.25 && angle < Math.PI * 0.75;
-            if (isBottom) return null;
-            const cx = 50 + Math.cos(angle) * 48;
-            const cy = 50 + Math.sin(angle) * 47;
-            // Tilt post outward slightly based on position on circle
-            const tilt = Math.cos(angle) * 6 + (Math.sin(i * 1.7) * 3);
-            const height = 28 + Math.sin(i) * 3;
-            return (
-              <div
-                key={`fence-${i}`}
-                className="absolute"
-                style={{
-                  left: `${cx}%`,
-                  top: `${cy}%`,
-                  transform: `translate(-50%, -100%)`,
-                  animation: "fence-sway 4s ease-in-out infinite",
-                  animationDelay: `${i * 0.15}s`,
-                  ["--r" as any]: `${tilt}deg`,
-                }}
-              >
-                <svg width="10" height={height} viewBox={`0 0 10 ${height}`}>
-                  <defs>
-                    <linearGradient id={`postGrad${i}`} x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#5a3a18" />
-                      <stop offset="30%" stopColor="#8B6914" />
-                      <stop offset="70%" stopColor="#6b4a0a" />
-                      <stop offset="100%" stopColor="#3a2208" />
-                    </linearGradient>
-                  </defs>
-                  {/* Post body */}
-                  <path
-                    d={`M1,${height} L1,6 L5,0 L9,6 L9,${height} Z`}
-                    fill={`url(#postGrad${i})`}
-                  />
-                  {/* Wood grain lines */}
-                  <line x1="3" y1="8" x2="3" y2={height - 2} stroke="#3a2208" strokeWidth="0.4" opacity="0.5" />
-                  <line x1="6" y1="10" x2="6" y2={height - 3} stroke="#3a2208" strokeWidth="0.3" opacity="0.4" />
-                  {/* Top highlight */}
-                  <path d={`M1,6 L5,0 L9,6 L5,4 Z`} fill="#a88044" opacity="0.7" />
-                </svg>
-              </div>
-            );
-          })}
-        </div>
 
         {/* ── FLOWERS inside clearing ── */}
         {[
