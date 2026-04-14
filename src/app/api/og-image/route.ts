@@ -9,15 +9,17 @@ function decodeDataUrl(dataUrl: string): { buf: Buffer; mime: string } | null {
   return { mime: m[1], buf: Buffer.from(m[2], "base64") };
 }
 
-function redirectToDefault(req: Request): NextResponse {
-  const u = new URL(req.url);
-  const defaultUrl = `${u.origin}/og-welcome.png`;
-  return NextResponse.redirect(defaultUrl, 302);
+async function fetchDefault(origin: string): Promise<{ buf: Buffer; mime: string }> {
+  const res = await fetch(`${origin}/og-welcome.png`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  return { buf, mime: res.headers.get("Content-Type") || "image/png" };
 }
 
 export async function GET(req: Request) {
+  const origin = new URL(req.url).origin;
+
+  // Try fetching admin-configured image
   try {
-    // Fetch current referral config from backend
     const res = await fetch(`${API_BASE}/user/referral-config`, { cache: "no-store" });
     if (res.ok) {
       const data: any = await res.json();
@@ -29,6 +31,7 @@ export async function GET(req: Request) {
             return new NextResponse(new Uint8Array(decoded.buf) as any, {
               headers: {
                 "Content-Type": decoded.mime,
+                "Content-Length": String(decoded.buf.length),
                 "Cache-Control": "public, max-age=300, s-maxage=300",
               },
             });
@@ -40,6 +43,7 @@ export async function GET(req: Request) {
             return new NextResponse(new Uint8Array(buf) as any, {
               headers: {
                 "Content-Type": imgRes.headers.get("Content-Type") || "image/png",
+                "Content-Length": String(buf.length),
                 "Cache-Control": "public, max-age=300, s-maxage=300",
               },
             });
@@ -48,9 +52,20 @@ export async function GET(req: Request) {
       }
     }
   } catch {
-    // fall through to default redirect
+    // fall through to default
   }
 
-  // Fallback: redirect to static default image
-  return redirectToDefault(req);
+  // Default fallback: serve the static image bytes (no redirect — scrapers don't always follow)
+  try {
+    const { buf, mime } = await fetchDefault(origin);
+    return new NextResponse(new Uint8Array(buf) as any, {
+      headers: {
+        "Content-Type": mime,
+        "Content-Length": String(buf.length),
+        "Cache-Control": "public, max-age=300, s-maxage=300",
+      },
+    });
+  } catch {
+    return new NextResponse("Not found", { status: 404 });
+  }
 }

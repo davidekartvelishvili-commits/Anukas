@@ -14,45 +14,75 @@ const dmSans = DM_Sans({
   weight: ["400", "500", "600"],
 });
 
-// Absolute site URL for OG/Twitter metadata — must be reachable by scrapers (WhatsApp, Telegram, iMessage, etc.)
+// Absolute site URL for OG/Twitter metadata — must be reachable by scrapers (WhatsApp, Telegram, iMessage, Messenger)
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://backapp-liart.vercel.app");
 
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: "Shansi — Smart Cashback",
-  description: "Get cashback on every purchase. Join me on Shansi!",
-  openGraph: {
-    title: "Welcome to Shansi!",
-    description: "Smart cashback on every purchase. Join now and get bonus cash.",
-    url: SITE_URL,
-    siteName: "Shansi",
-    images: [
-      {
-        url: `${SITE_URL}/api/og-image`,
-        width: 1200,
-        height: 1200,
-        alt: "Welcome to Shansi!",
-        type: "image/png",
-      },
-    ],
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Welcome to Shansi!",
-    description: "Smart cashback on every purchase. Join now and get bonus cash.",
-    images: [`${SITE_URL}/api/og-image`],
-  },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-    viewportFit: "cover",
-  },
-};
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+// Build the OG description from the admin's share-message template
+function buildDescription(template: string | null | undefined, lari: number): string {
+  const tpl = (template || "Join me on Shansi! Use my referral code: {code} to get _ ₾").trim();
+  return tpl
+    .replace(/\{code\}/gi, "your code")
+    .replace(/_/g, String(lari));
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  let imageUrl = `${SITE_URL}/og-welcome.png`;
+  let description = "Smart cashback on every purchase. Join now and earn bonus coins.";
+
+  try {
+    const res = await fetch(`${API_BASE}/user/referral-config`, { next: { revalidate: 60 } });
+    if (res.ok) {
+      const data: any = await res.json();
+      const cfg = data?.config;
+      // If admin uploaded a custom image, use the /api/og-image route (serves bytes inline)
+      if (cfg?.shareImageUrl) {
+        imageUrl = `${SITE_URL}/api/og-image`;
+      }
+      description = buildDescription(cfg?.shareMessageTemplate, cfg?.signupRewardLari ?? 10);
+    }
+  } catch {
+    // fall back to defaults
+  }
+
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: "Shansi — Smart Cashback",
+    description,
+    openGraph: {
+      title: "Welcome to Shansi!",
+      description,
+      url: SITE_URL,
+      siteName: "Shansi",
+      images: [
+        {
+          url: imageUrl,
+          width: 1200,
+          height: 1200,
+          alt: "Welcome to Shansi!",
+          type: "image/png",
+        },
+      ],
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Welcome to Shansi!",
+      description,
+      images: [imageUrl],
+    },
+    viewport: {
+      width: "device-width",
+      initialScale: 1,
+      maximumScale: 1,
+      userScalable: false,
+      viewportFit: "cover",
+    },
+  };
+}
 
 export default function RootLayout({
   children,
