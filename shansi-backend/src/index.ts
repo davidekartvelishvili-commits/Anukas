@@ -11,6 +11,7 @@ import games from "./routes/games.js";
 import merchant from "./routes/merchant.js";
 import village from "./routes/village.js";
 import { offersRoute } from "./routes/offers.js";
+import { publicRoute } from "./routes/public.js";
 import { AppError } from "./utils/errors.js";
 import { getEnv } from "./utils/env.js";
 import { getDb } from "./db/client.js";
@@ -319,6 +320,7 @@ app.route("/games", games);
 app.route("/merchant", merchant);
 app.route("/village", village);
 app.route("/offers", offersRoute);
+app.route("/public", publicRoute);
 
 // ── Health check ──
 app.get("/health", (c) => {

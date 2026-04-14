@@ -34,7 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
   let description = "Smart cashback on every purchase. Join now and earn bonus coins.";
 
   try {
-    const res = await fetch(`${API_BASE}/user/referral-config`, { next: { revalidate: 60 } });
+    const res = await fetch(`${API_BASE}/public/referral-config`, { next: { revalidate: 60 } });
     if (res.ok) {
       const data: any = await res.json();
       const cfg = data?.config;

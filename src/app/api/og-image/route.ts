@@ -20,7 +20,7 @@ export async function GET(req: Request) {
 
   // Try fetching admin-configured image
   try {
-    const res = await fetch(`${API_BASE}/user/referral-config`, { cache: "no-store" });
+    const res = await fetch(`${API_BASE}/public/referral-config`, { cache: "no-store" });
     if (res.ok) {
       const data: any = await res.json();
       const url: string | null = data?.config?.shareImageUrl;

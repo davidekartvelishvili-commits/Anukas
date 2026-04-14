@@ -39,7 +39,7 @@ export async function getMyReferral() {
 // Get current public referral config (coins per referral + bonus rules)
 export async function getReferralConfigPublic() {
   return apiFetch<{ success: boolean; config: PublicReferralConfig }>(
-    "/user/referral-config"
+    "/public/referral-config"
   );
 }
 
