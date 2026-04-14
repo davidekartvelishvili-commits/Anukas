@@ -14,10 +14,10 @@ const dmSans = DM_Sans({
   weight: ["400", "500", "600"],
 });
 
-// Absolute site URL for OG/Twitter metadata — must be reachable by scrapers (WhatsApp, Telegram, iMessage, Messenger)
+// Absolute site URL for OG/Twitter metadata — always production URL so crawlers (WhatsApp, FB, iMessage) get a stable domain
+// VERCEL_URL changes per deployment (preview URLs), which breaks OG caching and confuses scrapers — always hardcode production.
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://backapp-liart.vercel.app");
+  process.env.NEXT_PUBLIC_SITE_URL || "https://backapp-liart.vercel.app";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
