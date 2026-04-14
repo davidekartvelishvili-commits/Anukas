@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import { apiFetch } from "@/services/api";
-import { getCoinBalance } from "@/services/balance";
+import { getCoinBalance, setCoinBalance } from "@/services/balance";
+import { getMe } from "@/services/auth";
 
 interface Building {
   id: string;
@@ -105,23 +106,35 @@ export default function VillagePage() {
     if (coinBalance < building.nextCost) return;
 
     setUpgrading(building.id);
+    // Optimistic local coin deduction for snappy UI
+    const cost = building.nextCost;
+    const optimisticBalance = getCoinBalance() - cost;
+    setCoinBalance(optimisticBalance);
+    setCoinBalanceState(optimisticBalance);
     try {
       const res: any = await apiFetch("/village/upgrade", {
         method: "POST",
         body: JSON.stringify({ buildingId: building.id }),
       });
       if (res.success) {
-        // Refresh data
-        const [vData, pData]: any[] = await Promise.all([
+        // Refresh village, profile, and user data (syncs real coin balance)
+        const [vData, pData] = await Promise.all([
           apiFetch("/village/current").catch(() => null),
           apiFetch("/village/profile").catch(() => null),
-        ]);
+          getMe().catch(() => null),
+        ]) as any[];
         if (vData?.success) setVillage(vData.village);
         if (pData?.success) setProfile(pData.profile);
         setCoinBalanceState(getCoinBalance());
+      } else {
+        // Rollback optimistic deduction
+        setCoinBalance(optimisticBalance + cost);
+        setCoinBalanceState(optimisticBalance + cost);
       }
     } catch {
-      // error handling
+      // Rollback optimistic deduction on error
+      setCoinBalance(optimisticBalance + cost);
+      setCoinBalanceState(optimisticBalance + cost);
     }
     setUpgrading(null);
   };
@@ -361,22 +374,31 @@ export default function VillagePage() {
         {/* ── TOP UI ── */}
         <div className="absolute top-0 left-0 right-0 z-30" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
           <div className="flex items-center justify-between px-3">
-            {/* Coins */}
-            <div className="flex items-center gap-1.5">
-              <img src="/images/coin-icon.png" alt="coin" width={32} height={32} style={{ objectFit: "contain" }} />
-              <div className="flex items-center gap-1 px-3 py-1 rounded-full" style={{ background: "rgba(180,140,80,0.7)" }}>
-                <span className="text-white text-[15px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
-                  {coinBalance.toLocaleString()}
-                </span>
-                <span className="text-[#4CAF50] text-[14px] font-bold">+</span>
-              </div>
+            {/* Coins — icon inside pill */}
+            <div
+              className="flex items-center gap-2 pl-1 pr-4 py-1 rounded-full"
+              style={{ background: "rgba(180,140,80,0.7)" }}
+            >
+              <img
+                src="/images/coin-icon.png"
+                alt="coin"
+                width={28}
+                height={28}
+                style={{ objectFit: "contain" }}
+              />
+              <span
+                className="text-white text-[15px] font-bold"
+                style={{ fontFamily: "var(--font-outfit)" }}
+              >
+                {coinBalance.toLocaleString()}
+              </span>
             </div>
 
-            {/* Stars */}
+            {/* Stars — reflects live village star count after each upgrade */}
             <div className="flex items-center gap-1">
               <div style={{ width: 28, height: 28, clipPath: "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)", background: "#FFD700" }} />
               <span className="text-white text-[15px] font-bold" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>
-                {profile?.totalStars ?? 0}
+                {village?.totalStars ?? 0}
               </span>
             </div>
 
