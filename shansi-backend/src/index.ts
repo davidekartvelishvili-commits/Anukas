@@ -42,6 +42,7 @@ async function runStartupMigrations() {
     sql`ALTER TABLE game_history ADD COLUMN payment_transaction_id TEXT`,
     sql`ALTER TABLE transactions ADD COLUMN payment_transaction_id TEXT`,
     sql`ALTER TABLE merchants ADD COLUMN commission_enabled INTEGER NOT NULL DEFAULT 1`,
+    sql`ALTER TABLE merchants ADD COLUMN logo_url TEXT`,
     // ── Village system tables ──
     sql`CREATE TABLE IF NOT EXISTS village_levels (
       id TEXT PRIMARY KEY,

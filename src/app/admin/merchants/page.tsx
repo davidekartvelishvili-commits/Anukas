@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getMerchants, getMerchant, updateMerchant, simulatePayment, createMerchant } from "@/services/admin";
 
@@ -77,6 +77,34 @@ function Toast({ message, type, onClose }: { message: string; type?: "success" |
   );
 }
 
+// Image upload helper — converts file to base64, resized to max 400x400
+async function fileToCompressedBase64(file: File, maxDim = 400, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const ratio = Math.min(maxDim / width, maxDim / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/webp", quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 /* ── MAIN ── */
 export default function MerchantsPage() {
   const router = useRouter();
@@ -116,6 +144,9 @@ export default function MerchantsPage() {
     contact_person: "",
     commission_percent: "3",
   });
+  const [cLogo, setCLogo] = useState<string>("");
+  const [cLogoLoading, setCLogoLoading] = useState(false);
+  const cLogoInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = (msg: string, type: "success" | "error" = "success") => setToast({ msg, type });
 
@@ -281,7 +312,19 @@ export default function MerchantsPage() {
                       <>
                         <tr key={m.id} onClick={() => toggleDetail(m.id)} className="cursor-pointer transition-all hover:bg-white/5" style={{ borderBottom: "1px solid #1A1A1A" }}>
                           <td className="px-3 py-3 text-[12px] font-mono font-bold" style={{ color: "#F9E741" }}>{m.merchantCode || "—"}</td>
-                          <td className="px-3 py-3 text-[13px]" style={{ color: "#FFF" }}>{m.businessName || m.name}</td>
+                          <td className="px-3 py-3 text-[13px]" style={{ color: "#FFF" }}>
+                            <div className="flex items-center gap-2">
+                              {m.logoUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={m.logoUrl} alt="" className="w-7 h-7 rounded-[6px] object-cover shrink-0" />
+                              ) : (
+                                <div className="w-7 h-7 rounded-[6px] flex items-center justify-center shrink-0" style={{ background: "#252525" }}>
+                                  <span className="text-[10px]" style={{ color: "#666" }}>{(m.businessName || m.name || "?").slice(0, 1).toUpperCase()}</span>
+                                </div>
+                              )}
+                              <span>{m.businessName || m.name}</span>
+                            </div>
+                          </td>
                           <td className="px-3 py-3 text-[12px]" style={{ color: "#A0A0A0" }}>{m.category || "—"}</td>
                           <td className="px-3 py-3 text-[12px]">
                             {m.commissionEnabled === false ? (
@@ -478,6 +521,69 @@ export default function MerchantsPage() {
               </button>
             </div>
             <div className="space-y-3">
+              {/* Logo upload */}
+              <div>
+                <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>ლოგო</label>
+                <div
+                  onClick={() => cLogoInputRef.current?.click()}
+                  className="flex items-center gap-3 p-2 rounded-[8px] cursor-pointer transition-all hover:brightness-110"
+                  style={{ background: "#111", border: "1px dashed #333" }}
+                >
+                  <div
+                    className="w-[64px] h-[64px] rounded-[8px] flex items-center justify-center shrink-0 overflow-hidden"
+                    style={{ background: "#1C1C1E" }}
+                  >
+                    {cLogo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={cLogo} alt="logo" className="w-full h-full object-cover" />
+                    ) : cLogoLoading ? (
+                      <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#F9E741", borderTopColor: "transparent" }} />
+                    ) : (
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <circle cx="9" cy="9" r="2" />
+                        <path d="M21 15l-5-5L5 21" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium" style={{ color: cLogo ? "#22C55E" : "#A0A0A0" }}>
+                      {cLogo ? "ლოგო ატვირთულია" : "აირჩიეთ ლოგო"}
+                    </p>
+                    <p className="text-[11px]" style={{ color: "#666" }}>PNG, JPG, ან WebP (max 400×400)</p>
+                  </div>
+                  {cLogo && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setCLogo(""); }}
+                      className="px-2 py-1 rounded-[6px] text-[11px] font-medium"
+                      style={{ background: "#EF444420", color: "#EF4444" }}
+                    >
+                      წაშლა
+                    </button>
+                  )}
+                </div>
+                <input
+                  ref={cLogoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setCLogoLoading(true);
+                    try {
+                      const b64 = await fileToCompressedBase64(f);
+                      setCLogo(b64);
+                    } catch {
+                      showToast("სურათის ატვირთვა ვერ მოხერხდა", "error");
+                    } finally {
+                      setCLogoLoading(false);
+                      if (cLogoInputRef.current) cLogoInputRef.current.value = "";
+                    }
+                  }}
+                />
+              </div>
+
               <div>
                 <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>ბიზნესის სახელი *</label>
                 <input value={cForm.business_name} onChange={(e) => setCForm((p) => ({ ...p, business_name: e.target.value }))} placeholder="Business name" style={inputStyle} />
@@ -547,6 +653,7 @@ export default function MerchantsPage() {
                       address: cForm.address.trim() || undefined,
                       contact_person: cForm.contact_person.trim() || undefined,
                       commission_percent: parseFloat(cForm.commission_percent) || 3,
+                      logo_url: cLogo || undefined,
                     });
                     showToast("მერჩანტი დაემატა");
                     setCreateOpen(false);
@@ -555,6 +662,7 @@ export default function MerchantsPage() {
                       phone: "+995", email: "", address: "", contact_person: "",
                       commission_percent: "3",
                     });
+                    setCLogo("");
                     fetchMerchants();
                   } catch (e: any) {
                     showToast(e.message || "შეცდომა", "error");

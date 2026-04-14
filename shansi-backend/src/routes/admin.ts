@@ -895,6 +895,7 @@ admin.post("/merchants", adminMiddleware, async (c) => {
     address: body.address || null,
     contactPerson: body.contact_person || null,
     commissionPercent: body.commission_percent ?? 3.0,
+    logoUrl: body.logo_url || null,
     isActive: true,
     isVerified: true,
     approvedAt: new Date().toISOString(),
@@ -994,6 +995,7 @@ admin.patch("/merchants/:id", adminMiddleware, async (c) => {
   if (body.is_verified !== undefined) updates.isVerified = body.is_verified;
   if (body.commission_percent !== undefined) updates.commissionPercent = body.commission_percent;
   if (body.commission_enabled !== undefined) updates.commissionEnabled = body.commission_enabled;
+  if (body.logo_url !== undefined) updates.logoUrl = body.logo_url;
 
   if (Object.keys(updates).length > 0) {
     await db.update(merchants).set(updates).where(eq(merchants.id, id));

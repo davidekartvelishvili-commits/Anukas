@@ -245,6 +245,7 @@ export async function createMerchant(data: {
   address?: string;
   contact_person?: string;
   commission_percent?: number;
+  logo_url?: string;
 }) {
   return adminFetch("/admin/merchants", {
     method: "POST",
