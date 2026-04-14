@@ -170,6 +170,22 @@ export const merchants = sqliteTable("merchants", {
   approvedBy: text("approved_by"),
 });
 
+export const offers = sqliteTable("offers", {
+  id: text("id").primaryKey(),
+  merchantId: text("merchant_id").notNull().references(() => merchants.id),
+  offerType: text("offer_type").notNull(), // 'featured' | 'flash' | 'partner'
+  boostedRate: real("boosted_rate").notNull(),
+  normalRate: real("normal_rate").default(0).notNull(),
+  title: text("title"),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  startsAt: text("starts_at").notNull(),
+  endsAt: text("ends_at").notNull(),
+  isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  createdBy: text("created_by"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
 export const pendingPayments = sqliteTable("pending_payments", {
   id: text("id").primaryKey(),
   merchantId: text("merchant_id").notNull().references(() => merchants.id),

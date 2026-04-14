@@ -62,6 +62,38 @@ export async function adjustBalance(userId: string, type: "coin" | "cash", actio
   });
 }
 
+// ── Offers ──
+export async function getOffers(params: { type?: string; active?: boolean } = {}) {
+  const qs = new URLSearchParams();
+  if (params.type) qs.set("type", params.type);
+  if (params.active !== undefined) qs.set("active", String(params.active));
+  const q = qs.toString();
+  return adminFetch(`/admin/offers${q ? `?${q}` : ""}`);
+}
+
+export async function createOffer(data: {
+  merchant_id: string;
+  offer_type: "featured" | "flash" | "partner";
+  boosted_rate: number;
+  normal_rate?: number;
+  title?: string;
+  description?: string;
+  sort_order?: number;
+  starts_at: string;
+  ends_at: string;
+  is_active?: boolean;
+}) {
+  return adminFetch("/admin/offers", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updateOffer(id: string, data: Record<string, any>) {
+  return adminFetch(`/admin/offers/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function deleteOffer(id: string) {
+  return adminFetch(`/admin/offers/${id}`, { method: "DELETE" });
+}
+
 export async function resetUserVillage(userId: string) {
   return adminFetch(`/admin/users/${userId}/reset-village`, {
     method: "POST",

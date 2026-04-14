@@ -3,6 +3,71 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
+import { apiFetch } from "@/services/api";
+
+interface ApiOffer {
+  id: string;
+  merchantId: string;
+  offerType: "featured" | "flash" | "partner";
+  boostedRate: number;
+  normalRate: number;
+  title: string | null;
+  description: string | null;
+  sortOrder: number;
+  startsAt: string;
+  endsAt: string;
+  isActive: boolean;
+  merchant?: {
+    id: string;
+    merchantCode: string | null;
+    businessName: string;
+    businessNameKa: string | null;
+    category: string;
+    logoUrl: string | null;
+  } | null;
+}
+
+interface ApiWin {
+  id: string;
+  name: string;
+  pct: number;
+  place: string;
+  logoUrl: string | null;
+  createdAt: string;
+}
+
+// Assign a stable bg color per merchant category for hero cards
+function bgForCategory(cat?: string): { bgColor: string; textColor: string } {
+  switch ((cat || "").toLowerCase()) {
+    case "cafe": return { bgColor: "#F5D547", textColor: "#1A1A1A" };
+    case "restaurant": return { bgColor: "#9B59B6", textColor: "#FFFFFF" };
+    case "food":
+    case "fast food": return { bgColor: "#E8002A", textColor: "#FFFFFF" };
+    case "grocery": return { bgColor: "#2980B9", textColor: "#FFFFFF" };
+    case "pharmacy": return { bgColor: "#16A085", textColor: "#FFFFFF" };
+    case "entertainment": return { bgColor: "#E67E22", textColor: "#FFFFFF" };
+    default: return { bgColor: "#FF6B2B", textColor: "#FFFFFF" };
+  }
+}
+
+function secondsUntil(iso: string): number {
+  const ms = new Date(iso).getTime() - Date.now();
+  return Math.max(0, Math.floor(ms / 1000));
+}
+
+function timeHHMM(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function timeAgo(iso: string): string {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} hr ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
 
 /* ───────── COUNTDOWN HOOK ───────── */
 function useCountdown(totalSeconds: number) {
@@ -22,32 +87,73 @@ function CountdownText({ seconds, className, style }: { seconds: number; classNa
   return <span className={className} style={style}>{display}</span>;
 }
 
-/* ───────── DATA ───────── */
-const allDeals = [
-  { id: 0, merchant: "Stamba Cafe", category: "Cafe", rate: 40, endsIn: 19800, color: "#1a5c3a", image: "/images/stamba-cafe.png", description: "2x cashback on coffee today only", bgColor: "#F5D547", exclusive: true, textColor: "#1A1A1A" },
-  { id: 1, merchant: "Dunkin'", category: "Cafe", rate: 35, endsIn: 6300, color: "#5c4a1a", image: "/images/dunkin-logo.jpg", description: "Extra cashback on donuts & coffee", bgColor: "#FF6B2B", exclusive: false, textColor: "#FFFFFF" },
-  { id: 2, merchant: "Wendy's", category: "Fast Food", rate: 25, endsIn: 3600, color: "#5c1a1a", image: "/images/wendys-logo.png", description: "Boosted cashback on all meals", bgColor: "#E8002A", exclusive: false, textColor: "#FFFFFF" },
-  { id: 3, merchant: "Luca Polare", category: "Restaurant", rate: 30, endsIn: 9000, color: "#5c1a3a", image: "", description: "Special gelato cashback deal", bgColor: "#9B59B6", exclusive: false, textColor: "#FFFFFF" },
-  { id: 4, merchant: "GPC", category: "Store", rate: 20, endsIn: 14400, color: "#1a3a5c", image: "", description: "Extra cashback on groceries", bgColor: "#2980B9", exclusive: false, textColor: "#FFFFFF" },
-];
-
-const partnerPromos = [
-  { id: 1, merchant: "Stamba Cafe", category: "Cafe", distance: "120m", normalRate: 10, boostedRate: 25, endsAt: "23:59", color: "#1a5c3a", image: "/images/stamba-cafe.png" },
-  { id: 2, merchant: "Dunkin'", category: "Cafe", distance: "250m", normalRate: 8, boostedRate: 20, endsAt: "23:59", color: "#5c4a1a", image: "/images/dunkin-logo.jpg" },
-  { id: 3, merchant: "Wendy's", category: "Fast Food", distance: "350m", normalRate: 5, boostedRate: 15, endsAt: "18:00", color: "#5c1a1a", image: "/images/wendys-logo.png" },
-  { id: 4, merchant: "Luca Polare", category: "Restaurant", distance: "500m", normalRate: 8, boostedRate: 20, endsAt: "23:59", color: "#5c1a3a", image: "" },
-  { id: 5, merchant: "Bread House", category: "Bakery", distance: "800m", normalRate: 5, boostedRate: 15, endsAt: "18:00", color: "#1a3a5c", image: "" },
-  { id: 6, merchant: "Coffee Lab", category: "Cafe", distance: "1km", normalRate: 12, boostedRate: 30, endsAt: "20:00", color: "#3a5c1a", image: "" },
-  { id: 7, merchant: "Pasanauri", category: "Restaurant", distance: "1.2km", normalRate: 6, boostedRate: 18, endsAt: "23:59", color: "#5c3a1a", image: "" },
-];
-
-const recentWins = [
-  { id: 1, name: "Ana M.", pct: 45, place: "Stamba Cafe", time: "12 min ago" },
-  { id: 2, name: "David K.", pct: 30, place: "Dunkin'", time: "28 min ago" },
-  { id: 3, name: "Nino J.", pct: 100, place: "Luca Polare", time: "1 hr ago" },
-];
-
 const categories = ["All", "Cafe", "Restaurant", "Store", "Entertainment"];
+
+/* Deal shape used by existing render code */
+interface Deal {
+  id: string;
+  merchant: string;
+  category: string;
+  rate: number;
+  endsIn: number;
+  color: string;
+  image: string;
+  description: string;
+  bgColor: string;
+  exclusive: boolean;
+  textColor: string;
+}
+
+interface Partner {
+  id: string;
+  merchant: string;
+  category: string;
+  distance: string;
+  normalRate: number;
+  boostedRate: number;
+  endsAt: string;
+  color: string;
+  image: string;
+}
+
+interface Win {
+  id: string;
+  name: string;
+  pct: number;
+  place: string;
+  time: string;
+}
+
+function offerToDeal(o: ApiOffer): Deal {
+  const bg = bgForCategory(o.merchant?.category);
+  return {
+    id: o.id,
+    merchant: o.merchant?.businessName || "Merchant",
+    category: o.merchant?.category || "Store",
+    rate: o.boostedRate,
+    endsIn: secondsUntil(o.endsAt),
+    color: "#1a5c3a",
+    image: o.merchant?.logoUrl || "",
+    description: o.description || o.title || "",
+    bgColor: bg.bgColor,
+    exclusive: o.offerType === "featured",
+    textColor: bg.textColor,
+  };
+}
+
+function offerToPartner(o: ApiOffer): Partner {
+  return {
+    id: o.id,
+    merchant: o.merchant?.businessName || "Merchant",
+    category: o.merchant?.category || "Store",
+    distance: "—",
+    normalRate: o.normalRate || 0,
+    boostedRate: o.boostedRate,
+    endsAt: timeHHMM(o.endsAt),
+    color: "#1a5c3a",
+    image: o.merchant?.logoUrl || "",
+  };
+}
 
 /* ───────── MAIN ───────── */
 export default function PromosPage() {
@@ -64,16 +170,50 @@ export default function PromosPage() {
   const containerWidth = useRef(0);
   const spinRef = useRef<NodeJS.Timeout | null>(null);
 
+  // API-loaded offers
+  const [featuredDeals, setFeaturedDeals] = useState<Deal[]>([]);
+  const [flashDealsAll, setFlashDealsAll] = useState<Deal[]>([]);
+  const [partnerPromos, setPartnerPromos] = useState<Partner[]>([]);
+  const [recentWins, setRecentWins] = useState<Win[]>([]);
+
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
     return () => clearTimeout(t);
   }, []);
 
-  const featured = allDeals[featuredIdx];
-  const flashDeals = allDeals.filter((_, i) => i !== featuredIdx);
+  // Fetch real offers + recent wins
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [featRes, flashRes, partRes, winsRes] = await Promise.all([
+          apiFetch<{ offers: ApiOffer[] }>(`/offers?type=featured&active=true`).catch(() => ({ offers: [] })),
+          apiFetch<{ offers: ApiOffer[] }>(`/offers?type=flash&active=true`).catch(() => ({ offers: [] })),
+          apiFetch<{ offers: ApiOffer[] }>(`/offers?type=partner&active=true`).catch(() => ({ offers: [] })),
+          apiFetch<{ wins: ApiWin[] }>(`/offers/recent-wins?limit=10`).catch(() => ({ wins: [] })),
+        ]);
+        if (!alive) return;
+        setFeaturedDeals((featRes.offers || []).map(offerToDeal));
+        setFlashDealsAll((flashRes.offers || []).map(offerToDeal));
+        setPartnerPromos((partRes.offers || []).map(offerToPartner));
+        setRecentWins((winsRes.wins || []).map((w) => ({
+          id: w.id, name: w.name, pct: w.pct, place: w.place, time: timeAgo(w.createdAt),
+        })));
+      } catch {
+        // swallow
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
-  const nextIdx = (featuredIdx + 1) % allDeals.length;
-  const prevIdx = (featuredIdx - 1 + allDeals.length) % allDeals.length;
+  // Featured carousel pulls from featured offers (fallback to flash if no featured)
+  const allDeals = featuredDeals.length > 0 ? featuredDeals : flashDealsAll;
+  const featured = allDeals[featuredIdx] as Deal | undefined;
+  // Flash strip = all flash offers (exclude the one currently featured to avoid dup)
+  const flashDeals = flashDealsAll.filter((d) => !featured || d.id !== featured.id);
+
+  const nextIdx = allDeals.length > 0 ? (featuredIdx + 1) % allDeals.length : 0;
+  const prevIdx = allDeals.length > 0 ? (featuredIdx - 1 + allDeals.length) % allDeals.length : 0;
   const nextDeal = allDeals[nextIdx];
   const prevDeal = allDeals[prevIdx];
 
@@ -97,7 +237,7 @@ export default function PromosPage() {
       setIsSnapping(true);
       setDragX(direction * containerWidth.current * 1.05);
       setTimeout(() => {
-        setFeaturedIdx((prev) => (prev + direction + allDeals.length) % allDeals.length);
+        setFeaturedIdx((prev) => allDeals.length > 0 ? (prev + direction + allDeals.length) % allDeals.length : 0);
         setDragX(0);
         setIsSnapping(false);
       }, 250);
@@ -131,7 +271,7 @@ export default function PromosPage() {
         setDragX(w * 1.05);
 
         setTimeout(() => {
-          setFeaturedIdx((prev) => (prev + 1) % allDeals.length);
+          setFeaturedIdx((prev) => allDeals.length > 0 ? (prev + 1) % allDeals.length : 0);
           setDragX(0);
           setIsSnapping(false);
 
@@ -154,7 +294,7 @@ export default function PromosPage() {
     return () => { if (spinRef.current) clearTimeout(spinRef.current); };
   }, []);
 
-  const renderCardContent = (deal: typeof allDeals[0], blur = false) => (
+  const renderCardContent = (deal: Deal, blur = false) => (
     <div className="flex flex-col h-full min-h-[180px]" style={{ filter: blur ? "blur(12px)" : "none", transition: "filter 0.5s ease-out" }}>
       {/* Top: logo + name below */}
       <div className="mb-auto">
@@ -262,6 +402,7 @@ export default function PromosPage() {
           </div>
 
           {/* ── 3. Featured promo hero (swipeable 3D) ── */}
+          {featured && prevDeal && nextDeal && (
           <div
             className="relative mb-2 overflow-hidden"
             style={{ ...stagger(2) }}
@@ -303,8 +444,10 @@ export default function PromosPage() {
               {renderCardContent(featured, !hasSpun)}
             </div>
           </div>
+          )}
 
           {/* Swipe dots */}
+          {allDeals.length > 0 && (
           <div className="flex justify-center gap-1.5 mb-4" style={stagger(2)}>
             {allDeals.map((_, i) => (
               <div
@@ -314,8 +457,10 @@ export default function PromosPage() {
               />
             ))}
           </div>
+          )}
 
           {/* Spin button */}
+          {featured && (
           <div className="flex justify-center mb-6" style={stagger(2)}>
             <button
               onClick={handleSpin}
@@ -338,6 +483,7 @@ export default function PromosPage() {
               </span>
             </button>
           </div>
+          )}
 
           {/* ── 4. Flash Deals ── */}
           <div style={stagger(3)}>
@@ -405,7 +551,7 @@ export default function PromosPage() {
                   <div className="flex items-center gap-3 py-4 cursor-pointer active:opacity-70 transition-opacity">
                   <div
                     className="w-[70px] h-[70px] rounded-[24px] shrink-0 overflow-hidden flex items-center justify-center"
-                    style={{ background: promo.image ? (promo.merchant === "Wendy's" ? "#E8002A" : "#FFFFFF") : promo.color }}
+                    style={{ background: promo.image ? "#FFFFFF" : promo.color }}
                   >
                     {promo.image && (
                       <img src={promo.image} alt={promo.merchant} className="w-[80%] h-[80%] object-contain m-auto" />

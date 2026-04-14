@@ -10,6 +10,7 @@ import admin from "./routes/admin.js";
 import games from "./routes/games.js";
 import merchant from "./routes/merchant.js";
 import village from "./routes/village.js";
+import { offersRoute } from "./routes/offers.js";
 import { AppError } from "./utils/errors.js";
 import { getEnv } from "./utils/env.js";
 import { getDb } from "./db/client.js";
@@ -43,6 +44,21 @@ async function runStartupMigrations() {
     sql`ALTER TABLE transactions ADD COLUMN payment_transaction_id TEXT`,
     sql`ALTER TABLE merchants ADD COLUMN commission_enabled INTEGER NOT NULL DEFAULT 1`,
     sql`ALTER TABLE merchants ADD COLUMN logo_url TEXT`,
+    sql`CREATE TABLE IF NOT EXISTS offers (
+      id TEXT PRIMARY KEY,
+      merchant_id TEXT NOT NULL REFERENCES merchants(id),
+      offer_type TEXT NOT NULL,
+      boosted_rate REAL NOT NULL,
+      normal_rate REAL NOT NULL DEFAULT 0,
+      title TEXT,
+      description TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      starts_at TEXT NOT NULL,
+      ends_at TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     // ── Village system tables ──
     sql`CREATE TABLE IF NOT EXISTS village_levels (
       id TEXT PRIMARY KEY,
@@ -297,6 +313,7 @@ app.route("/admin", admin);
 app.route("/games", games);
 app.route("/merchant", merchant);
 app.route("/village", village);
+app.route("/offers", offersRoute);
 
 // ── Health check ──
 app.get("/health", (c) => {

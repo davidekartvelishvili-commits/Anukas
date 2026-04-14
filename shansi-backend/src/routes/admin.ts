@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig, bigWinConfig, bigWinPrizes, bigWinHistory, villages, villageBuildings, userVillageProgress } from "../db/schema.js";
+import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig, bigWinConfig, bigWinPrizes, bigWinHistory, villages, villageBuildings, userVillageProgress, offers } from "../db/schema.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/errors.js";
@@ -2202,6 +2202,122 @@ admin.get("/big-win/history", adminMiddleware, async (c) => {
     return { ...h, userName: u?.name || u?.phone || h.userId };
   }));
   return c.json({ success: true, history: enriched });
+});
+
+// ══════════════════════════════════════
+// OFFERS (cashback promos shown on /promos page)
+// ══════════════════════════════════════
+
+// GET /admin/offers
+admin.get("/offers", adminMiddleware, async (c) => {
+  const db = getDb();
+  const type = c.req.query("type");
+  const activeParam = c.req.query("active");
+
+  const conds: any[] = [];
+  if (type) conds.push(eq(offers.offerType, type));
+  if (activeParam === "true") conds.push(eq(offers.isActive, true));
+  if (activeParam === "false") conds.push(eq(offers.isActive, false));
+
+  const rows = conds.length > 0
+    ? await db.select().from(offers).where(and(...conds)).orderBy(offers.sortOrder, desc(offers.createdAt))
+    : await db.select().from(offers).orderBy(offers.sortOrder, desc(offers.createdAt));
+
+  const enriched = await Promise.all(rows.map(async (o) => {
+    const [m] = await db.select({
+      id: merchants.id,
+      merchantCode: merchants.merchantCode,
+      businessName: merchants.businessName,
+      businessNameKa: merchants.businessNameKa,
+      category: merchants.category,
+      logoUrl: merchants.logoUrl,
+    }).from(merchants).where(eq(merchants.id, o.merchantId)).limit(1);
+    return { ...o, merchant: m || null };
+  }));
+  return c.json({ success: true, offers: enriched });
+});
+
+// POST /admin/offers
+admin.post("/offers", adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const adminId = c.get("adminId") as string;
+  const db = getDb();
+
+  if (!body.merchant_id) throw new BadRequestError("merchant_id required");
+  if (!body.offer_type) throw new BadRequestError("offer_type required");
+  if (!["featured", "flash", "partner"].includes(body.offer_type)) {
+    throw new BadRequestError("offer_type must be featured, flash, or partner");
+  }
+  if (body.boosted_rate == null) throw new BadRequestError("boosted_rate required");
+  if (!body.starts_at || !body.ends_at) throw new BadRequestError("starts_at and ends_at required");
+
+  const [m] = await db.select().from(merchants).where(eq(merchants.id, body.merchant_id)).limit(1);
+  if (!m) throw new BadRequestError("Merchant not found");
+
+  const id = nanoid();
+  await db.insert(offers).values({
+    id,
+    merchantId: body.merchant_id,
+    offerType: body.offer_type,
+    boostedRate: Number(body.boosted_rate),
+    normalRate: Number(body.normal_rate ?? 0),
+    title: body.title || null,
+    description: body.description || null,
+    sortOrder: Number(body.sort_order ?? 0),
+    startsAt: body.starts_at,
+    endsAt: body.ends_at,
+    isActive: body.is_active !== false,
+    createdBy: adminId,
+  });
+
+  await logAction(adminId, "create_offer", JSON.stringify({ id, merchantId: body.merchant_id, offerType: body.offer_type }));
+  const [created] = await db.select().from(offers).where(eq(offers.id, id)).limit(1);
+  return c.json({ success: true, offer: created });
+});
+
+// PATCH /admin/offers/:id
+admin.patch("/offers/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id") as string;
+  const body = await c.req.json();
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  const [existing] = await db.select().from(offers).where(eq(offers.id, id)).limit(1);
+  if (!existing) return c.json({ success: false, message: "Not found" }, 404);
+
+  const updates: Record<string, any> = {};
+  if (body.merchant_id !== undefined) updates.merchantId = body.merchant_id;
+  if (body.offer_type !== undefined) {
+    if (!["featured", "flash", "partner"].includes(body.offer_type)) {
+      throw new BadRequestError("offer_type must be featured, flash, or partner");
+    }
+    updates.offerType = body.offer_type;
+  }
+  if (body.boosted_rate !== undefined) updates.boostedRate = Number(body.boosted_rate);
+  if (body.normal_rate !== undefined) updates.normalRate = Number(body.normal_rate);
+  if (body.title !== undefined) updates.title = body.title;
+  if (body.description !== undefined) updates.description = body.description;
+  if (body.sort_order !== undefined) updates.sortOrder = Number(body.sort_order);
+  if (body.starts_at !== undefined) updates.startsAt = body.starts_at;
+  if (body.ends_at !== undefined) updates.endsAt = body.ends_at;
+  if (body.is_active !== undefined) updates.isActive = body.is_active;
+
+  if (Object.keys(updates).length > 0) {
+    await db.update(offers).set(updates).where(eq(offers.id, id));
+  }
+  await logAction(adminId, "update_offer", JSON.stringify({ id, updates }));
+  const [updated] = await db.select().from(offers).where(eq(offers.id, id)).limit(1);
+  return c.json({ success: true, offer: updated });
+});
+
+// DELETE /admin/offers/:id
+admin.delete("/offers/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id") as string;
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+  await db.delete(offers).where(eq(offers.id, id));
+  await logAction(adminId, "delete_offer", JSON.stringify({ id }));
+  return c.json({ success: true });
 });
 
 export default admin;
