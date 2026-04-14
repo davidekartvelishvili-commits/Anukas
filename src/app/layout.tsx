@@ -30,7 +30,9 @@ function buildDescription(template: string | null | undefined, lari: number): st
 }
 
 export async function generateMetadata(): Promise<Metadata> {
-  let imageUrl = `${SITE_URL}/og-image.png`;
+  // Always point to /api/og-image — it handles admin-uploaded image + falls back to static JPEG
+  // Using a single stable endpoint with explicit image/jpeg + 1200×630 is WhatsApp-friendly
+  let imageUrl = `${SITE_URL}/api/og-image`;
   let description = "გამოიყენე რეფერალი და მიიღე 10 ₾ სარეგისტრაციო ბონუსი! 🎰";
   let imageVersion = "1";
 
@@ -39,11 +41,9 @@ export async function generateMetadata(): Promise<Metadata> {
     if (res.ok) {
       const data: any = await res.json();
       const cfg = data?.config;
-      // If admin uploaded a custom image, use the /api/og-image route (serves bytes inline)
+      // Use a short hash of the image so the URL changes when admin re-uploads,
+      // forcing WhatsApp/FB/etc to re-scrape
       if (cfg?.shareImageUrl) {
-        imageUrl = `${SITE_URL}/api/og-image`;
-        // Use a short hash of the image so the URL changes when admin re-uploads,
-        // forcing WhatsApp/FB/etc to re-scrape
         try {
           const h = Buffer.from(String(cfg.shareImageUrl)).toString("base64").slice(-12);
           imageVersion = h;
@@ -72,10 +72,11 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: imageUrl,
+          secureUrl: imageUrl,
           width: 1200,
           height: 630,
           alt: "შანსი — გეიმიფიცირებული Cashback",
-          type: "image/png",
+          type: "image/jpeg",
         },
       ],
       type: "website",

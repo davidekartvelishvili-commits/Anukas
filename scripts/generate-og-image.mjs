@@ -74,9 +74,19 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
     fill="#888888">backapp-liart.vercel.app</text>
 </svg>`;
 
-const outPath = path.join(process.cwd(), "public", "og-image.png");
+// PNG
+const pngPath = path.join(process.cwd(), "public", "og-image.png");
 const png = await sharp(Buffer.from(svg))
   .png()
   .toBuffer();
-await writeFile(outPath, png);
-console.log(`Wrote ${outPath} (${png.length} bytes, ${W}×${H})`);
+await writeFile(pngPath, png);
+console.log(`Wrote ${pngPath} (${png.length} bytes, ${W}×${H})`);
+
+// JPEG — WhatsApp/iMessage prefer JPEG for OG previews
+const jpgPath = path.join(process.cwd(), "public", "og-image.jpg");
+const jpg = await sharp(Buffer.from(svg))
+  .flatten({ background: { r: 0, g: 0, b: 0 } }) // JPEG has no alpha — flatten on black so it matches
+  .jpeg({ quality: 90, mozjpeg: true })
+  .toBuffer();
+await writeFile(jpgPath, jpg);
+console.log(`Wrote ${jpgPath} (${jpg.length} bytes, ${W}×${H})`);
