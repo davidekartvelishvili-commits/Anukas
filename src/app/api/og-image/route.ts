@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { readFile } from "fs/promises";
-import path from "path";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -11,14 +9,13 @@ function decodeDataUrl(dataUrl: string): { buf: Buffer; mime: string } | null {
   return { mime: m[1], buf: Buffer.from(m[2], "base64") };
 }
 
-async function defaultImage(): Promise<{ body: Buffer; mime: string }> {
-  // Fallback to static /public/og-welcome.png
-  const p = path.join(process.cwd(), "public", "og-welcome.png");
-  const body = await readFile(p);
-  return { body, mime: "image/png" };
+function redirectToDefault(req: Request): NextResponse {
+  const u = new URL(req.url);
+  const defaultUrl = `${u.origin}/og-welcome.png`;
+  return NextResponse.redirect(defaultUrl, 302);
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     // Fetch current referral config from backend
     const res = await fetch(`${API_BASE}/user/referral-config`, { cache: "no-store" });
@@ -51,14 +48,9 @@ export async function GET() {
       }
     }
   } catch {
-    // fall through to default
+    // fall through to default redirect
   }
 
-  const { body, mime } = await defaultImage();
-  return new NextResponse(new Uint8Array(body) as any, {
-    headers: {
-      "Content-Type": mime,
-      "Cache-Control": "public, max-age=300, s-maxage=300",
-    },
-  });
+  // Fallback: redirect to static default image
+  return redirectToDefault(req);
 }

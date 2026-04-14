@@ -14,18 +14,27 @@ const dmSans = DM_Sans({
   weight: ["400", "500", "600"],
 });
 
+// Absolute site URL for OG/Twitter metadata — must be reachable by scrapers (WhatsApp, Telegram, iMessage, etc.)
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://backapp-liart.vercel.app");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Shansi — Smart Cashback",
   description: "Get cashback on every purchase. Join me on Shansi!",
   openGraph: {
     title: "Welcome to Shansi!",
     description: "Smart cashback on every purchase. Join now and get bonus cash.",
+    url: SITE_URL,
+    siteName: "Shansi",
     images: [
       {
-        url: "/api/og-image",
+        url: `${SITE_URL}/api/og-image`,
         width: 1200,
         height: 1200,
         alt: "Welcome to Shansi!",
+        type: "image/png",
       },
     ],
     type: "website",
@@ -34,7 +43,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Welcome to Shansi!",
     description: "Smart cashback on every purchase. Join now and get bonus cash.",
-    images: ["/api/og-image"],
+    images: [`${SITE_URL}/api/og-image`],
   },
   viewport: {
     width: "device-width",
