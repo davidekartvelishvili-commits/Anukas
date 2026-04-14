@@ -30,8 +30,8 @@ function buildDescription(template: string | null | undefined, lari: number): st
 }
 
 export async function generateMetadata(): Promise<Metadata> {
-  let imageUrl = `${SITE_URL}/og-welcome.png`;
-  let description = "Smart cashback on every purchase. Join now and earn bonus coins.";
+  let imageUrl = `${SITE_URL}/og-image.png`;
+  let description = "გამოიყენე რეფერალი და მიიღე 10 ₾ სარეგისტრაციო ბონუსი! 🎰";
   let imageVersion = "1";
 
   try {
@@ -62,19 +62,19 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     metadataBase: new URL(SITE_URL),
-    title: "Shansi — Smart Cashback",
+    title: "შანსი — გეიმიფიცირებული Cashback",
     description,
     openGraph: {
-      title: "Welcome to Shansi!",
+      title: "შანსი — გეიმიფიცირებული Cashback",
       description,
       url: SITE_URL,
-      siteName: "Shansi",
+      siteName: "შანსი",
       images: [
         {
           url: imageUrl,
           width: 1200,
-          height: 1200,
-          alt: "Welcome to Shansi!",
+          height: 630,
+          alt: "შანსი — გეიმიფიცირებული Cashback",
           type: "image/png",
         },
       ],
@@ -82,7 +82,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: "Welcome to Shansi!",
+      title: "შანსი — გეიმიფიცირებული Cashback",
       description,
       images: [imageUrl],
     },
@@ -106,6 +106,19 @@ export default function RootLayout({
       <head>
         <meta name="theme-color" content="#000000" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        {/* Hardcoded OG fallbacks — crawlers see these immediately without needing generateMetadata */}
+        <meta property="og:title" content="შანსი — გეიმიფიცირებული Cashback" />
+        <meta property="og:description" content="გამოიყენე რეფერალი და მიიღე 10 ₾ სარეგისტრაციო ბონუსი! 🎰" />
+        <meta property="og:image" content="https://backapp-liart.vercel.app/og-image.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:url" content="https://backapp-liart.vercel.app" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="შანსი — გეიმიფიცირებული Cashback" />
+        <meta name="twitter:description" content="გამოიყენე რეფერალი და მიიღე 10 ₾ სარეგისტრაციო ბონუსი! 🎰" />
+        <meta name="twitter:image" content="https://backapp-liart.vercel.app/og-image.png" />
       </head>
       <body className={`${outfit.variable} ${dmSans.variable} antialiased`}>
         {children}
