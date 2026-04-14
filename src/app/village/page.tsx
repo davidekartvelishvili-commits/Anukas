@@ -210,16 +210,25 @@ export default function VillagePage() {
           </svg>
         </div>
 
-        {/* ── REALISTIC TREES — back row (distant forest, outside fence) ── */}
+        {/* ── TREES — back row (distant forest ring behind fence) ── */}
         {[
+          // Left side (outside fence — fence starts at x=20%)
           { left: 2, top: 20, scale: 0.7, delay: 0 },
-          { left: 6, top: 19, scale: 0.65, delay: -1 },
-          { left: 10, top: 21, scale: 0.75, delay: -0.5 },
-          { left: 13, top: 24, scale: 0.6, delay: -1.5 },
-          { left: 87, top: 24, scale: 0.7, delay: -1.2 },
-          { left: 90, top: 21, scale: 0.75, delay: -0.3 },
-          { left: 94, top: 19, scale: 0.65, delay: -1.8 },
-          { left: 98, top: 20, scale: 0.7, delay: -0.7 },
+          { left: 6, top: 18, scale: 0.75, delay: -1 },
+          { left: 10, top: 22, scale: 0.65, delay: -0.5 },
+          { left: 14, top: 20, scale: 0.7, delay: -1.5 },
+          // Top row (above fence top — fence top at y=32%)
+          { left: 25, top: 23, scale: 0.65, delay: -0.8 },
+          { left: 35, top: 22, scale: 0.7, delay: -1.2 },
+          { left: 45, top: 23, scale: 0.65, delay: -0.3 },
+          { left: 55, top: 22, scale: 0.7, delay: -1.8 },
+          { left: 65, top: 23, scale: 0.65, delay: -0.7 },
+          { left: 75, top: 22, scale: 0.7, delay: -1.1 },
+          // Right side (outside fence — fence ends at x=80%)
+          { left: 86, top: 20, scale: 0.7, delay: -0.4 },
+          { left: 90, top: 22, scale: 0.65, delay: -1.3 },
+          { left: 94, top: 18, scale: 0.75, delay: -0.6 },
+          { left: 98, top: 20, scale: 0.7, delay: -1.6 },
         ].map((t, i) => (
           <div
             key={`bt-${i}`}
@@ -260,14 +269,14 @@ export default function VillagePage() {
           </div>
         ))}
 
-        {/* ── REALISTIC TREES — front row (closer, bigger, outside fence) ── */}
+        {/* ── TREES — front row (closer, bigger, at left/right edges only) ── */}
         {[
-          { left: 3, top: 27, scale: 1.1, delay: 0 },
-          { left: 8, top: 32, scale: 0.95, delay: -1.3 },
-          { left: 12, top: 38, scale: 1.05, delay: -0.6 },
-          { left: 88, top: 38, scale: 1.05, delay: -1.7 },
-          { left: 92, top: 32, scale: 0.95, delay: -0.9 },
-          { left: 97, top: 27, scale: 1.1, delay: -2.1 },
+          { left: 3, top: 30, scale: 1.1, delay: 0 },
+          { left: 9, top: 36, scale: 1.0, delay: -1.3 },
+          { left: 14, top: 42, scale: 1.05, delay: -0.6 },
+          { left: 86, top: 42, scale: 1.05, delay: -1.7 },
+          { left: 91, top: 36, scale: 1.0, delay: -0.9 },
+          { left: 97, top: 30, scale: 1.1, delay: -2.1 },
         ].map((t, i) => (
           <div
             key={`ft-${i}`}
@@ -316,14 +325,14 @@ export default function VillagePage() {
           </div>
         ))}
 
-        {/* ── VILLAGE CLEARING (grass) — sized to fit within trees ── */}
+        {/* ── VILLAGE CLEARING (grass) — fence area ── */}
         <div
           className="absolute rounded-[50%]"
           style={{
-            left: "14%",
-            top: "30%",
-            width: "72%",
-            height: "42%",
+            left: "20%",
+            top: "32%",
+            width: "60%",
+            height: "38%",
             background: "radial-gradient(ellipse at 50% 40%, #8fd460 0%, #7ec850 30%, #6ab04c 65%, #5a9e3e 100%)",
             boxShadow: "inset 0 -10px 20px rgba(0,0,0,0.1)",
             zIndex: 2,
@@ -357,10 +366,10 @@ export default function VillagePage() {
         <div
           className="absolute pointer-events-none"
           style={{
-            left: "14%",
-            top: "30%",
-            width: "72%",
-            height: "42%",
+            left: "20%",
+            top: "32%",
+            width: "60%",
+            height: "38%",
             zIndex: 4,
           }}
         >
@@ -412,43 +421,15 @@ export default function VillagePage() {
               </div>
             );
           })}
-          {/* Horizontal fence rails — only on the top arc (where fence exists) */}
-          <svg
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-          >
-            <defs>
-              <linearGradient id="railGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#8B6914" />
-                <stop offset="100%" stopColor="#5a3a10" />
-              </linearGradient>
-            </defs>
-            {/* Top arc rails — connecting posts around the top half */}
-            <path
-              d="M 2,50 A 48,42 0 0,1 98,50"
-              fill="none"
-              stroke="url(#railGrad)"
-              strokeWidth="1.2"
-              opacity="0.85"
-            />
-            <path
-              d="M 2,57 A 48,42 0 0,1 98,57"
-              fill="none"
-              stroke="url(#railGrad)"
-              strokeWidth="1.2"
-              opacity="0.85"
-            />
-          </svg>
         </div>
 
         {/* ── FLOWERS inside clearing ── */}
         {[
-          { x: 22, y: 40, color: "#ff6b6b" }, { x: 30, y: 54, color: "#ffd93d" },
-          { x: 42, y: 44, color: "#fff" }, { x: 50, y: 52, color: "#ff6b9d" },
-          { x: 60, y: 42, color: "#fff" }, { x: 70, y: 50, color: "#ffd93d" },
-          { x: 36, y: 58, color: "#ff6b6b" }, { x: 74, y: 44, color: "#ff6b9d" },
-          { x: 26, y: 58, color: "#fff" }, { x: 64, y: 58, color: "#ffd93d" },
+          { x: 28, y: 42, color: "#ff6b6b" }, { x: 34, y: 54, color: "#ffd93d" },
+          { x: 42, y: 46, color: "#fff" }, { x: 50, y: 54, color: "#ff6b9d" },
+          { x: 58, y: 44, color: "#fff" }, { x: 66, y: 52, color: "#ffd93d" },
+          { x: 38, y: 58, color: "#ff6b6b" }, { x: 72, y: 46, color: "#ff6b9d" },
+          { x: 30, y: 58, color: "#fff" }, { x: 62, y: 58, color: "#ffd93d" },
         ].map((f, i) => (
           <div
             key={`flower-${i}`}
