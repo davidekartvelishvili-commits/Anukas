@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import { apiFetch } from "@/services/api";
@@ -32,6 +32,230 @@ interface VillageData {
   complete: boolean;
 }
 
+// Building positions on the village scene (viewport %)
+const BUILDING_POSITIONS: Record<number, { x: number; y: number }> = {
+  1: { x: 25, y: 56 },  // front-left
+  2: { x: 50, y: 60 },  // front-center
+  3: { x: 75, y: 56 },  // front-right
+  4: { x: 35, y: 44 },  // back-left
+  5: { x: 65, y: 44 },  // back-right
+};
+
+const BUILDING_SIZE = 80; // px, on the village scene (slightly bigger than the 50px card icon)
+
+// ─────────────────────────────────────────────
+// Build animation — dust puffs, tools, sparkles, progress bar
+// ─────────────────────────────────────────────
+function BuildAnimation({ x, y, size }: { x: number; y: number; size: number }) {
+  const dustRef = useRef<HTMLCanvasElement>(null);
+  const sparkRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const W = 160, H = 160, CX = 80, CY = 88;
+    const dustCanvas = dustRef.current;
+    const sparkCanvas = sparkRef.current;
+    if (!dustCanvas || !sparkCanvas) return;
+    const dCtx = dustCanvas.getContext("2d")!;
+    const sCtx = sparkCanvas.getContext("2d")!;
+
+    const dust: any[] = [];
+    const debris: any[] = [];
+    const sparks: any[] = [];
+    const dustColors: number[][] = [
+      [255, 252, 245], [240, 235, 220], [250, 248, 242],
+      [230, 225, 215], [245, 242, 230],
+    ];
+
+    const spawnDust = () => {
+      const a = Math.random() * Math.PI * 2;
+      const s = 0.3 + Math.random() * 0.6;
+      dust.push({
+        x: CX + (Math.random() - 0.5) * 20,
+        y: CY + (Math.random() - 0.5) * 15,
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.35,
+        r: 4 + Math.random() * 9, maxR: 20 + Math.random() * 28,
+        life: 0, maxLife: 70 + Math.random() * 50,
+        col: dustColors[Math.floor(Math.random() * dustColors.length)],
+      });
+    };
+    const spawnDebris = () => {
+      const a = Math.random() * Math.PI * 2;
+      const s = 0.8 + Math.random() * 1.8;
+      debris.push({
+        x: CX + (Math.random() - 0.5) * 15,
+        y: CY + (Math.random() - 0.5) * 10,
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1,
+        gravity: 0.06 + Math.random() * 0.05,
+        size: 1 + Math.random() * 2, life: 0,
+        maxLife: 30 + Math.random() * 30,
+        color: ["#c8a86e", "#b8924a", "#d4b880", "#aaaaaa", "#c0b090"][Math.floor(Math.random() * 5)],
+      });
+    };
+    const spawnSpark = () => {
+      const a = Math.random() * Math.PI * 2;
+      const d = 5 + Math.random() * 55;
+      sparks.push({
+        x: CX + Math.cos(a) * d, y: CY + Math.sin(a) * d,
+        maxSize: 2.5 + Math.random() * 5, life: 0,
+        speed: 0.04 + Math.random() * 0.05,
+        hue: [55, 42, 200, 320, 0, 170][Math.floor(Math.random() * 6)],
+      });
+    };
+
+    for (let i = 0; i < 6; i++) spawnDust();
+    const dustInt = setInterval(spawnDust, 80);
+    const debrisInt = setInterval(spawnDebris, 60);
+    const sparkInt = setInterval(spawnSpark, 75);
+
+    let raf = 0;
+    const loop = () => {
+      // DUST
+      dCtx.clearRect(0, 0, W, H);
+      dust.sort((a, b) => b.life - a.life);
+      for (let i = dust.length - 1; i >= 0; i--) {
+        const p = dust[i];
+        p.x += p.vx; p.y += p.vy; p.vx *= 0.985; p.vy *= 0.985; p.life++;
+        const t = p.life / p.maxLife;
+        const eased = 1 - (1 - t) * (1 - t);
+        const r = p.r + (p.maxR - p.r) * eased;
+        let alpha = t < 0.12 ? (t / 0.12) * 0.82 : t < 0.6 ? 0.82 : 0.82 * (1 - (t - 0.6) / 0.4);
+        const [cr, cg, cb] = p.col;
+        const g = dCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+        g.addColorStop(0, `rgba(${cr},${cg},${cb},${alpha})`);
+        g.addColorStop(0.5, `rgba(${cr},${cg},${cb},${alpha * 0.75})`);
+        g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+        dCtx.beginPath(); dCtx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        dCtx.fillStyle = g; dCtx.fill();
+        if (p.life >= p.maxLife) dust.splice(i, 1);
+      }
+      // DEBRIS
+      for (let i = debris.length - 1; i >= 0; i--) {
+        const d = debris[i];
+        d.x += d.vx; d.y += d.vy; d.vy += d.gravity; d.vx *= 0.97; d.life++;
+        const t = d.life / d.maxLife;
+        const alpha = t < 0.2 ? t / 0.2 : 1 - t;
+        const hex = d.color;
+        const big = parseInt(hex.slice(1), 16);
+        const dr = (big >> 16) & 255, dg = (big >> 8) & 255, db = big & 255;
+        dCtx.beginPath(); dCtx.arc(d.x, d.y, d.size, 0, Math.PI * 2);
+        dCtx.fillStyle = `rgba(${dr},${dg},${db},${alpha})`;
+        dCtx.fill();
+        if (d.life >= d.maxLife) debris.splice(i, 1);
+      }
+      // SPARKS
+      sCtx.clearRect(0, 0, W, H);
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const s = sparks[i];
+        s.life += s.speed;
+        if (s.life >= 1) { sparks.splice(i, 1); continue; }
+        const alpha = s.life < 0.4 ? s.life / 0.4 : 1 - (s.life - 0.4) / 0.6;
+        const ss = s.maxSize * Math.sin(s.life * Math.PI);
+        sCtx.save(); sCtx.globalAlpha = alpha; sCtx.translate(s.x, s.y);
+        const g = sCtx.createRadialGradient(0, 0, 0, 0, 0, ss * 3);
+        g.addColorStop(0, `hsla(${s.hue},100%,100%,${alpha})`);
+        g.addColorStop(0.35, `hsla(${s.hue},100%,92%,${alpha * 0.5})`);
+        g.addColorStop(1, `hsla(${s.hue},80%,85%,0)`);
+        sCtx.beginPath(); sCtx.arc(0, 0, ss * 3, 0, Math.PI * 2);
+        sCtx.fillStyle = g; sCtx.fill();
+        sCtx.beginPath();
+        for (let k = 0; k < 8; k++) {
+          const r = k % 2 === 0 ? ss : ss * 0.1;
+          const a = (k * Math.PI) / 4;
+          if (k === 0) sCtx.moveTo(r * Math.sin(a), -r * Math.cos(a));
+          else sCtx.lineTo(r * Math.sin(a), -r * Math.cos(a));
+        }
+        sCtx.closePath();
+        sCtx.shadowColor = `hsl(${s.hue},100%,96%)`;
+        sCtx.shadowBlur = ss * 4;
+        sCtx.fillStyle = "#fff"; sCtx.fill();
+        sCtx.restore();
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    loop();
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(dustInt);
+      clearInterval(debrisInt);
+      clearInterval(sparkInt);
+    };
+  }, []);
+
+  const BOX = size * 2; // scene box for animation (larger than building for particle spread)
+  return (
+    <div
+      className="absolute pointer-events-none"
+      style={{
+        left: `${x}%`,
+        top: `${y}%`,
+        width: BOX,
+        height: BOX,
+        transform: "translate(-50%, -60%)",
+        zIndex: 15,
+      }}
+    >
+      <div style={{ position: "relative", width: BOX, height: BOX }}>
+        {/* Canvases */}
+        <canvas ref={dustRef} width={160} height={160}
+          style={{ position: "absolute", inset: 0, width: BOX, height: BOX, zIndex: 2 }} />
+        <canvas ref={sparkRef} width={160} height={160}
+          style={{ position: "absolute", inset: 0, width: BOX, height: BOX, zIndex: 8 }} />
+        {/* Tools */}
+        {[
+          { e: "⚙️", rx: 2, ry: -32, delay: 0.35, z: 1 },
+          { e: "🪚", rx: -30, ry: 6, delay: 0, z: 9 },
+          { e: "🪵", rx: 26, ry: -24, delay: 0.17, z: 9 },
+          { e: "🔧", rx: 28, ry: 22, delay: 0.52, z: 9 },
+        ].map((t, i) => (
+          <span
+            key={i}
+            style={{
+              position: "absolute",
+              left: "50%", top: "52%",
+              fontSize: BOX * 0.22,
+              filter: "drop-shadow(2px 4px 6px rgba(0,0,0,0.5))",
+              transform: "translate(-50%, -50%) scale(0)",
+              opacity: 0,
+              zIndex: t.z,
+              animation: `tool-pop 1.4s cubic-bezier(.22,1,.36,1) ${t.delay}s infinite`,
+              ["--rx" as any]: `${t.rx}px`,
+              ["--ry" as any]: `${t.ry}px`,
+            }}
+          >
+            {t.e}
+          </span>
+        ))}
+        {/* Progress bar */}
+        <div style={{
+          position: "absolute",
+          bottom: -2,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: BOX * 0.75,
+        }}>
+          <div style={{
+            background: "rgba(0,0,0,0.35)",
+            borderRadius: 8,
+            height: 10,
+            border: "1.5px solid rgba(0,0,0,0.35)",
+            overflow: "hidden",
+            padding: 1.5,
+          }}>
+            <div style={{
+              height: "100%",
+              background: "linear-gradient(90deg, #F5C800, #FFE000, #FFD600)",
+              borderRadius: 5,
+              width: "0%",
+              animation: "build-fill 2.8s ease-in-out forwards",
+              position: "relative",
+            }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StarRow({ current, total }: { current: number; total: number }) {
   return (
     <div className="flex justify-center gap-0.5 pt-1.5">
@@ -57,6 +281,7 @@ export default function VillagePage() {
   const [coinBalance, setCoinBalanceState] = useState(0);
   const [loading, setLoading] = useState(true);
   const [upgrading, setUpgrading] = useState<string | null>(null);
+  const [animatingBuildingPos, setAnimatingBuildingPos] = useState<number | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
   const [showHand, setShowHand] = useState(true);
   const [profile, setProfile] = useState<{ totalStars: number; shieldActive: boolean; currentLevel: number } | null>(null);
@@ -106,17 +331,24 @@ export default function VillagePage() {
     if (coinBalance < building.nextCost) return;
 
     setUpgrading(building.id);
+    setAnimatingBuildingPos(building.position);
     // Optimistic local coin deduction for snappy UI
     const cost = building.nextCost;
     const optimisticBalance = getCoinBalance() - cost;
     setCoinBalance(optimisticBalance);
     setCoinBalanceState(optimisticBalance);
+
+    // Minimum animation duration so players see the build even when API is fast
+    const animationTime = new Promise((r) => setTimeout(r, 2800));
+
     try {
-      const res: any = await apiFetch("/village/upgrade", {
+      const apiCall = apiFetch("/village/upgrade", {
         method: "POST",
         body: JSON.stringify({ buildingId: building.id }),
       });
-      if (res.success) {
+      // Wait for BOTH animation and API call to complete
+      const [res] = (await Promise.all([apiCall, animationTime])) as any[];
+      if (res?.success) {
         // Refresh village, profile, and user data (syncs real coin balance)
         const [vData, pData] = await Promise.all([
           apiFetch("/village/current").catch(() => null),
@@ -132,10 +364,13 @@ export default function VillagePage() {
         setCoinBalanceState(optimisticBalance + cost);
       }
     } catch {
+      // Still wait for animation to finish for UX
+      await animationTime;
       // Rollback optimistic deduction on error
       setCoinBalance(optimisticBalance + cost);
       setCoinBalanceState(optimisticBalance + cost);
     }
+    setAnimatingBuildingPos(null);
     setUpgrading(null);
   };
 
@@ -159,6 +394,21 @@ export default function VillagePage() {
         @keyframes hand-bounce { 0%,100% { transform: translateY(0) rotate(-15deg); } 50% { transform: translateY(-8px) rotate(-15deg); } }
         @keyframes banner-pop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes banner-fade { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0.9); } }
+        @keyframes tool-pop {
+          0%, 3% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+          22% { transform: translate(calc(-50% + var(--rx)*1.25), calc(-50% + var(--ry)*1.25)) scale(1.4) rotate(14deg); opacity: 1; }
+          34% { transform: translate(calc(-50% + var(--rx)), calc(-50% + var(--ry))) scale(1) rotate(-3deg); opacity: 1; }
+          44% { transform: translate(calc(-50% + var(--rx)), calc(-50% + var(--ry) - 6px)) scale(1.08) rotate(3deg); opacity: 1; }
+          54% { transform: translate(calc(-50% + var(--rx)), calc(-50% + var(--ry))) scale(1) rotate(0deg); opacity: 1; }
+          72% { transform: translate(-50%, -50%) scale(0.04) rotate(-25deg); opacity: 0.15; }
+          74%, 100% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+        }
+        @keyframes build-fill { 0% { width: 0%; } 100% { width: 100%; } }
+        @keyframes building-appear {
+          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+          60% { transform: translate(-50%, -50%) scale(1.15); }
+          100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
         @keyframes water-ripple-1 { 0% { transform: translateX(-100%); opacity: 0; } 30% { opacity: 0.7; } 100% { transform: translateX(100%); opacity: 0; } }
         @keyframes water-ripple-2 { 0% { transform: translateX(-80%); opacity: 0; } 30% { opacity: 0.5; } 100% { transform: translateX(120%); opacity: 0; } }
         @keyframes water-shine { 0%,100% { opacity: 0.2; } 50% { opacity: 0.6; } }
@@ -445,6 +695,46 @@ export default function VillagePage() {
           <div className="absolute -left-[3px] top-[2px] w-[5px] h-[20px] rounded-b-sm" style={{ background: "#6b4a0a" }} />
           <div className="absolute -right-[3px] top-[2px] w-[5px] h-[20px] rounded-b-sm" style={{ background: "#6b4a0a" }} />
         </div>
+
+        {/* ── BUILDINGS on the scene ── */}
+        {village?.buildings.map((b) => {
+          const pos = BUILDING_POSITIONS[b.position];
+          if (!pos) return null;
+          const hasBuilding = b.currentStars > 0 && b.currentImage;
+          if (!hasBuilding) return null;
+          return (
+            <div
+              key={`bld-${b.id}`}
+              className="absolute"
+              style={{
+                left: `${pos.x}%`,
+                top: `${pos.y}%`,
+                transform: "translate(-50%, -50%)",
+                zIndex: 6,
+                animation: "building-appear 0.6s ease-out",
+                filter: "drop-shadow(0 6px 10px rgba(0,0,0,0.25))",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={b.currentImage}
+                alt={b.name}
+                width={BUILDING_SIZE}
+                height={BUILDING_SIZE}
+                style={{ objectFit: "contain", width: BUILDING_SIZE, height: BUILDING_SIZE }}
+              />
+            </div>
+          );
+        })}
+
+        {/* ── BUILD ANIMATION overlay (shown at target building position) ── */}
+        {animatingBuildingPos !== null && BUILDING_POSITIONS[animatingBuildingPos] && (
+          <BuildAnimation
+            x={BUILDING_POSITIONS[animatingBuildingPos].x}
+            y={BUILDING_POSITIONS[animatingBuildingPos].y}
+            size={BUILDING_SIZE}
+          />
+        )}
 
         {/* ── TOP UI ── */}
         <div className="absolute top-0 left-0 right-0 z-30" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
