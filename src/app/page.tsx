@@ -516,22 +516,34 @@ export default function WelcomePage() {
   return (
     <>
       <style>{`
-        html, body { background: #FFE500 !important; }
+        html, body {
+          background: #FFE500 !important;
+          overflow: hidden !important;
+          height: 100%;
+          overscroll-behavior: none;
+        }
       `}</style>
       {/* Override theme-color for Safari status bar + URL bar */}
       <meta name="theme-color" content="#FFE500" />
 
       <main
-        className="relative flex flex-col overflow-hidden"
-        style={{ background: "#FFE500", height: "100dvh", minHeight: "100vh" }}
+        className="fixed inset-0 flex flex-col overflow-hidden"
+        style={{
+          background: "#FFE500",
+          touchAction: "none",
+          overscrollBehavior: "none",
+        }}
         onClick={() => { userTapped.current = true; requestGyro(); }}
       >
         {/* ── Top bar ── */}
-        <div className="flex justify-end px-5 pt-3 relative z-50" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" }}>
+        <div
+          className="flex justify-end px-5 pt-3 relative z-50"
+          style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)", pointerEvents: "none" }}
+        >
           <button
             onClick={(e) => { e.stopPropagation(); router.push("/auth?mode=login"); }}
             className="text-[16px] font-bold text-[#1A1A1A] active:opacity-50 transition-opacity"
-            style={{ fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif" }}
+            style={{ fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif", pointerEvents: "auto" }}
           >
             Log In
           </button>
@@ -544,6 +556,7 @@ export default function WelcomePage() {
             opacity: mounted ? 1 : 0,
             transform: mounted ? "scale(1)" : "scale(0.8)",
             transition: "all 0.5s ease-out 0.1s",
+            pointerEvents: "none",
           }}
         >
           <ShansiLogo />
@@ -556,6 +569,7 @@ export default function WelcomePage() {
             opacity: mounted ? 1 : 0,
             transform: mounted ? "translateY(0)" : "translateY(24px)",
             transition: "all 0.6s ease-out 0.15s",
+            pointerEvents: "none",
           }}
         >
           <h1
@@ -636,6 +650,7 @@ export default function WelcomePage() {
             opacity: mounted ? 1 : 0,
             transform: mounted ? "translateY(0)" : "translateY(16px)",
             transition: "all 0.5s ease-out 0.3s",
+            pointerEvents: "none",
           }}
         >
           <button
@@ -644,6 +659,7 @@ export default function WelcomePage() {
             style={{
               fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif",
               boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+              pointerEvents: "auto",
             }}
           >
             Sign up
