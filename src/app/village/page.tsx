@@ -210,25 +210,25 @@ export default function VillagePage() {
           </svg>
         </div>
 
-        {/* ── TREES — back row (distant forest ring behind fence) ── */}
+        {/* ── TREES — back row (forest ring around top + sides of fence) ── */}
         {[
-          // Left side (outside fence — fence starts at x=20%)
-          { left: 2, top: 20, scale: 0.7, delay: 0 },
-          { left: 6, top: 18, scale: 0.75, delay: -1 },
-          { left: 10, top: 22, scale: 0.65, delay: -0.5 },
-          { left: 14, top: 20, scale: 0.7, delay: -1.5 },
-          // Top row (above fence top — fence top at y=32%)
-          { left: 25, top: 23, scale: 0.65, delay: -0.8 },
-          { left: 35, top: 22, scale: 0.7, delay: -1.2 },
-          { left: 45, top: 23, scale: 0.65, delay: -0.3 },
-          { left: 55, top: 22, scale: 0.7, delay: -1.8 },
-          { left: 65, top: 23, scale: 0.65, delay: -0.7 },
-          { left: 75, top: 22, scale: 0.7, delay: -1.1 },
-          // Right side (outside fence — fence ellipse reaches ~80% of viewport; extra gap)
-          { left: 88, top: 22, scale: 0.55, delay: -0.4 },
-          { left: 92, top: 18, scale: 0.65, delay: -1.3 },
-          { left: 95, top: 24, scale: 0.6, delay: -2.0 },
-          { left: 98, top: 19, scale: 0.7, delay: -0.6 },
+          // Left far-back (outside fence at x=20%, small for depth)
+          { left: 3, top: 23, scale: 0.55, delay: 0 },
+          { left: 8, top: 20, scale: 0.65, delay: -1 },
+          { left: 14, top: 18, scale: 0.7, delay: -0.5 },
+          // Top arc — trees curve around the top of the fence
+          { left: 22, top: 20, scale: 0.65, delay: -0.8 },
+          { left: 30, top: 18, scale: 0.7, delay: -1.2 },
+          { left: 38, top: 20, scale: 0.65, delay: -0.3 },
+          { left: 46, top: 19, scale: 0.7, delay: -1.8 },
+          { left: 54, top: 20, scale: 0.65, delay: -0.7 },
+          { left: 62, top: 19, scale: 0.7, delay: -1.1 },
+          { left: 70, top: 20, scale: 0.65, delay: -0.5 },
+          { left: 78, top: 18, scale: 0.7, delay: -1.5 },
+          // Right far-back (outside fence at x=80%, small for depth)
+          { left: 86, top: 20, scale: 0.7, delay: -1.3 },
+          { left: 92, top: 18, scale: 0.65, delay: -0.6 },
+          { left: 97, top: 23, scale: 0.55, delay: -1.6 },
         ].map((t, i) => (
           <div
             key={`bt-${i}`}
@@ -269,18 +269,20 @@ export default function VillagePage() {
           </div>
         ))}
 
-        {/* ── TREES — front row (closer, bigger, at left/right edges only) ── */}
+        {/* ── TREES — front row (larger, wrapping around left/right of fence) ── */}
         {[
-          // Left cluster
-          { left: 3, top: 30, scale: 1.1, delay: 0 },
-          { left: 9, top: 36, scale: 1.0, delay: -1.3 },
-          { left: 14, top: 42, scale: 1.05, delay: -0.6 },
-          // Right cluster — organic scatter, further from fence (fence ellipse reaches ~80%)
-          { left: 92, top: 30, scale: 1.1, delay: -2.1 },
-          { left: 96, top: 35, scale: 0.9, delay: -1.0 },
-          { left: 99, top: 38, scale: 1.05, delay: -0.9 },
-          { left: 93, top: 43, scale: 0.85, delay: -1.7 },
-          { left: 97, top: 47, scale: 1.15, delay: -0.4 },
+          // LEFT cluster — wraps down along the fence's left side at staggered Y
+          { left: 2, top: 28, scale: 1.0, delay: 0 },       // upper edge
+          { left: 7, top: 32, scale: 1.1, delay: -1.3 },    // upper-mid
+          { left: 12, top: 37, scale: 0.9, delay: -0.6 },   // mid (closer to fence, smaller)
+          { left: 5, top: 43, scale: 1.15, delay: -1.8 },   // lower
+          { left: 13, top: 50, scale: 0.95, delay: -0.9 },  // bottom-mid
+          // RIGHT cluster — mirrored staggered Y, varied scales, no diagonal
+          { left: 98, top: 28, scale: 1.0, delay: -2.1 },   // upper edge
+          { left: 93, top: 32, scale: 1.1, delay: -1.0 },   // upper-mid
+          { left: 88, top: 37, scale: 0.9, delay: -0.9 },   // mid (closer to fence, smaller)
+          { left: 95, top: 43, scale: 1.15, delay: -1.7 },  // lower
+          { left: 87, top: 50, scale: 0.95, delay: -0.4 },  // bottom-mid
         ].map((t, i) => (
           <div
             key={`ft-${i}`}
