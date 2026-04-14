@@ -182,7 +182,29 @@ auth.post("/verify-otp", async (c) => {
               referredCoinsRewarded: config.referredRewardCoins,
             });
             await db.update(users).set({ referredBy: referrer.id }).where(eq(users.id, userId));
-            await db.update(users).set({ totalReferrals: (referrer.totalReferrals || 0) + 1 }).where(eq(users.id, referrer.id));
+            const newTotalRefs = (referrer.totalReferrals || 0) + 1;
+            await db.update(users).set({ totalReferrals: newTotalRefs }).where(eq(users.id, referrer.id));
+
+            // Milestone bonus — every Nth successful referral gives extra coins
+            const bonusEveryN = (config as any).bonusEveryN || 5;
+            const bonusRewardCoins = (config as any).bonusRewardCoins || 0;
+            if (bonusRewardCoins > 0 && bonusEveryN > 0 && newTotalRefs % bonusEveryN === 0) {
+              const [bonusTx] = await db.select().from(transactions)
+                .where(and(eq(transactions.userId, referrer.id), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))))
+                .orderBy(desc(transactions.createdAt)).limit(1);
+              if (bonusTx) {
+                await db.update(transactions).set({
+                  coinsRemaining: bonusTx.coinsRemaining + bonusRewardCoins,
+                  coinsReceived: bonusTx.coinsReceived + bonusRewardCoins,
+                }).where(eq(transactions.id, bonusTx.id));
+              } else {
+                await db.insert(transactions).values({
+                  id: nanoid(), userId: referrer.id, paymentAmount: 0,
+                  coinsReceived: bonusRewardCoins, coinsRemaining: bonusRewardCoins,
+                  totalCashWon: 0, guaranteedMinimum: 0, status: "active",
+                });
+              }
+            }
 
             // Give coins to new user
             if (config.referredRewardCoins > 0) {

@@ -139,7 +139,7 @@ export async function getReferralConfig() {
   return adminFetch("/admin/referral-config");
 }
 
-export async function updateReferralConfig(data: { referrer_reward_coins?: number; referred_reward_coins?: number; is_active?: boolean }) {
+export async function updateReferralConfig(data: { referrer_reward_coins?: number; referred_reward_coins?: number; bonus_every_n?: number; bonus_reward_coins?: number; is_active?: boolean }) {
   return adminFetch("/admin/referral-config", { method: "PATCH", body: JSON.stringify(data) });
 }
 

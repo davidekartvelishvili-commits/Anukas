@@ -49,6 +49,8 @@ interface ReferralConfig {
   id: string;
   referrerRewardCoins: number;
   referredRewardCoins: number;
+  bonusEveryN?: number;
+  bonusRewardCoins?: number;
   isActive: boolean;
   updatedAt: string;
 }
@@ -95,6 +97,8 @@ export default function ReferralsPage() {
   const [config, setConfig] = useState<ReferralConfig | null>(null);
   const [editReferrer, setEditReferrer] = useState(0);
   const [editReferred, setEditReferred] = useState(0);
+  const [editBonusEveryN, setEditBonusEveryN] = useState(5);
+  const [editBonusCoins, setEditBonusCoins] = useState(500);
   const [editActive, setEditActive] = useState(true);
   const [configLoading, setConfigLoading] = useState(true);
   const [configSaving, setConfigSaving] = useState(false);
@@ -134,6 +138,8 @@ export default function ReferralsPage() {
         setConfig(c);
         setEditReferrer(c.referrerRewardCoins);
         setEditReferred(c.referredRewardCoins);
+        setEditBonusEveryN(c.bonusEveryN ?? 5);
+        setEditBonusCoins(c.bonusRewardCoins ?? 500);
         setEditActive(c.isActive);
       }
     } catch {
@@ -173,6 +179,8 @@ export default function ReferralsPage() {
       const res = await updateReferralConfig({
         referrer_reward_coins: editReferrer,
         referred_reward_coins: editReferred,
+        bonus_every_n: editBonusEveryN,
+        bonus_reward_coins: editBonusCoins,
         is_active: editActive,
       });
       if (res.success) {
@@ -275,7 +283,7 @@ export default function ReferralsPage() {
                   <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#F9E741", borderTopColor: "transparent" }} />
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                   {/* Referrer reward */}
                   <div>
                     <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#666666" }}>რეფერერის ჯილდო (ქოინი)</label>
@@ -287,6 +295,20 @@ export default function ReferralsPage() {
                   <div>
                     <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#666666" }}>მოწვეულის ჯილდო (ქოინი)</label>
                     <input type="number" value={editReferred} onChange={(e) => setEditReferred(Number(e.target.value))}
+                      className="w-full px-3 py-2 rounded-[8px] border text-[14px] font-medium outline-none transition-all focus:border-[#F9E741]"
+                      style={{ background: "#1A1A1A", borderColor: "#252525", color: "#FFFFFF" }} />
+                  </div>
+                  {/* Bonus every N */}
+                  <div>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#666666" }}>ბონუსი ყოველ N-ე</label>
+                    <input type="number" min="1" value={editBonusEveryN} onChange={(e) => setEditBonusEveryN(Number(e.target.value))}
+                      className="w-full px-3 py-2 rounded-[8px] border text-[14px] font-medium outline-none transition-all focus:border-[#F9E741]"
+                      style={{ background: "#1A1A1A", borderColor: "#252525", color: "#FFFFFF" }} />
+                  </div>
+                  {/* Bonus coins */}
+                  <div>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#666666" }}>ბონუს ქოინი</label>
+                    <input type="number" min="0" value={editBonusCoins} onChange={(e) => setEditBonusCoins(Number(e.target.value))}
                       className="w-full px-3 py-2 rounded-[8px] border text-[14px] font-medium outline-none transition-all focus:border-[#F9E741]"
                       style={{ background: "#1A1A1A", borderColor: "#252525", color: "#FFFFFF" }} />
                   </div>

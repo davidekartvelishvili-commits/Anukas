@@ -120,6 +120,8 @@ export const referralConfig = sqliteTable("referral_config", {
   id: text("id").primaryKey(),
   referrerRewardCoins: integer("referrer_reward_coins").default(200).notNull(),
   referredRewardCoins: integer("referred_reward_coins").default(100).notNull(),
+  bonusEveryN: integer("bonus_every_n").default(5).notNull(),
+  bonusRewardCoins: integer("bonus_reward_coins").default(500).notNull(),
   isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
   updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
 });

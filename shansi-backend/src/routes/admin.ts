@@ -787,7 +787,14 @@ admin.get("/referral-config", adminMiddleware, async (c) => {
   const [config] = await db.select().from(referralConfig).limit(1);
   return c.json({
     success: true,
-    config: config || { id: "default", referrerRewardCoins: 200, referredRewardCoins: 100, isActive: true },
+    config: config || {
+      id: "default",
+      referrerRewardCoins: 200,
+      referredRewardCoins: 100,
+      bonusEveryN: 5,
+      bonusRewardCoins: 500,
+      isActive: true,
+    },
   });
 });
 
@@ -803,12 +810,16 @@ admin.patch("/referral-config", adminMiddleware, async (c) => {
       id: "default",
       referrerRewardCoins: body.referrer_reward_coins ?? 200,
       referredRewardCoins: body.referred_reward_coins ?? 100,
+      bonusEveryN: body.bonus_every_n ?? 5,
+      bonusRewardCoins: body.bonus_reward_coins ?? 500,
       isActive: body.is_active ?? true,
     });
   } else {
     const updates: Record<string, any> = { updatedAt: new Date().toISOString() };
     if (body.referrer_reward_coins !== undefined) updates.referrerRewardCoins = body.referrer_reward_coins;
     if (body.referred_reward_coins !== undefined) updates.referredRewardCoins = body.referred_reward_coins;
+    if (body.bonus_every_n !== undefined) updates.bonusEveryN = body.bonus_every_n;
+    if (body.bonus_reward_coins !== undefined) updates.bonusRewardCoins = body.bonus_reward_coins;
     if (body.is_active !== undefined) updates.isActive = body.is_active;
     await db.update(referralConfig).set(updates).where(eq(referralConfig.id, existing.id));
   }

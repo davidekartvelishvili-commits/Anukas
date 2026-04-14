@@ -3,7 +3,7 @@ import { z } from "zod";
 import { eq, and, or, desc, sql } from "drizzle-orm";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { users, transactions, referrals, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, gameConfig, gameHistory, promoCodeUses, promoCodes } from "../db/schema.js";
+import { users, transactions, referrals, referralConfig, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, gameConfig, gameHistory, promoCodeUses, promoCodes } from "../db/schema.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { BadRequestError } from "../utils/errors.js";
 import { nanoid } from "nanoid";
@@ -100,10 +100,16 @@ user.get("/referral", async (c) => {
     })
   );
 
+  const totalCoinsEarned = referredUsers.reduce(
+    (sum, r) => sum + (r.referrerCoinsRewarded || 0),
+    0
+  );
+
   return c.json({
     success: true,
     referralCode: u.referralCode,
     totalReferrals: u.totalReferrals || 0,
+    totalCoinsEarned,
     referredUsers: enriched,
   });
 });
@@ -115,6 +121,39 @@ user.get("/referral-code", async (c) => {
   const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!u) return c.json({ success: false, message: "Not found" }, 404);
   return c.json({ success: true, referralCode: u.referralCode || null });
+});
+
+// ── PATCH /user/referral-code ── (user changes their own code)
+user.patch("/referral-code", async (c) => {
+  const userId = c.get("userId") as string;
+  const body = await c.req.json();
+  const raw = (body.code || "").toString().trim().toUpperCase();
+  if (!/^[A-Z0-9-]{4,20}$/.test(raw)) {
+    return c.json({ success: false, message: "Code must be 4-20 chars, A-Z 0-9 -" }, 400);
+  }
+  const db = getDb();
+  const [existing] = await db.select().from(users).where(eq(users.referralCode, raw)).limit(1);
+  if (existing && existing.id !== userId) {
+    return c.json({ success: false, message: "Code already taken" }, 409);
+  }
+  await db.update(users).set({ referralCode: raw }).where(eq(users.id, userId));
+  return c.json({ success: true, referralCode: raw });
+});
+
+// ── GET /user/referral-config ── (public config for the user-facing UI)
+user.get("/referral-config", async (c) => {
+  const db = getDb();
+  const [cfg] = await db.select().from(referralConfig).where(eq(referralConfig.id, "default")).limit(1);
+  return c.json({
+    success: true,
+    config: {
+      referrerRewardCoins: cfg?.referrerRewardCoins ?? 200,
+      referredRewardCoins: cfg?.referredRewardCoins ?? 100,
+      bonusEveryN: (cfg as any)?.bonusEveryN ?? 5,
+      bonusRewardCoins: (cfg as any)?.bonusRewardCoins ?? 500,
+      isActive: cfg?.isActive ?? true,
+    },
+  });
 });
 
 // ── POST /user/withdraw ──

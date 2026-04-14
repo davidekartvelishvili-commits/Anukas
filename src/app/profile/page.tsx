@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getMe, getStoredUser, getUserActivity } from "@/services/auth";
+import { getMyReferral, getReferralConfigPublic, updateMyReferralCode } from "@/services/referral";
 import AuthGuard from "@/components/AuthGuard";
 
 export default function ProfilePage() {
@@ -29,6 +30,17 @@ export default function ProfilePage() {
   const [userPhone, setUserPhone] = useState("");
   const [activities, setActivities] = useState<any[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
+
+  // Referral state
+  const [refTotal, setRefTotal] = useState(0);
+  const [refCoinsEarned, setRefCoinsEarned] = useState(0);
+  const [refConfig, setRefConfig] = useState<{
+    referrerRewardCoins: number;
+    referredRewardCoins: number;
+    bonusEveryN: number;
+    bonusRewardCoins: number;
+    isActive: boolean;
+  }>({ referrerRewardCoins: 10, referredRewardCoins: 10, bonusEveryN: 5, bonusRewardCoins: 25, isActive: true });
 
   useEffect(() => {
     // Load cached data first for instant render
@@ -58,6 +70,26 @@ export default function ProfilePage() {
         setActivities(data.activities);
       }
     }).catch(() => {}).finally(() => setActivityLoading(false));
+
+    // Load referral data (real)
+    getMyReferral().then((data: any) => {
+      if (data?.success) {
+        if (data.referralCode) setReferralCode(data.referralCode);
+        setRefTotal(data.totalReferrals || 0);
+        setRefCoinsEarned(data.totalCoinsEarned || 0);
+      }
+    }).catch(() => {});
+    getReferralConfigPublic().then((data: any) => {
+      if (data?.success && data.config) {
+        setRefConfig({
+          referrerRewardCoins: data.config.referrerRewardCoins ?? 10,
+          referredRewardCoins: data.config.referredRewardCoins ?? 10,
+          bonusEveryN: data.config.bonusEveryN ?? 5,
+          bonusRewardCoins: data.config.bonusRewardCoins ?? 25,
+          isActive: data.config.isActive ?? true,
+        });
+      }
+    }).catch(() => {});
     const saved = localStorage.getItem("user-gender");
     if (saved) setGender(saved);
     const t = setTimeout(() => setMounted(true), 50);
@@ -258,28 +290,76 @@ export default function ProfilePage() {
               className="text-white text-[22px] font-bold mb-3 text-center"
               style={{ fontFamily: "var(--font-outfit)" }}
             >
-              Get 500 Cashback Cash 🎉
+              Earn {refConfig.bonusRewardCoins} Bonus Coins 🎉
             </h2>
             <p
               className="text-[#999] text-[15px] text-center mb-6 leading-relaxed"
               style={{ fontFamily: "var(--font-dm-sans)" }}
             >
-              Earn <span className="text-white font-bold">10</span> Cashback Cash for each referral
-              plus extra <span className="text-white font-bold">25</span> every five referrals
+              Earn <span className="text-white font-bold">{refConfig.referrerRewardCoins}</span> coins for each referral
+              plus extra <span className="text-white font-bold">{refConfig.bonusRewardCoins}</span> every {refConfig.bonusEveryN} referrals
             </p>
 
-            {/* Referral progress dots */}
-            <div className="flex items-center gap-3 mb-6">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  className="w-[44px] h-[44px] rounded-full"
-                  style={{
-                    border: "2px dashed rgba(255,255,255,0.2)",
-                    background: "transparent",
-                  }}
-                />
-              ))}
+            {/* Referral progress dots + bonus circle */}
+            {(() => {
+              const N = Math.max(1, refConfig.bonusEveryN);
+              const progress = refTotal % N;
+              const completed = progress === 0 && refTotal > 0; // just hit milestone
+              return (
+                <div className="flex items-center gap-3 mb-6">
+                  {Array.from({ length: N }).map((_, i) => {
+                    const filled = i < progress || completed;
+                    return (
+                      <div
+                        key={i}
+                        className="rounded-full flex items-center justify-center transition-all duration-300"
+                        style={{
+                          width: 38, height: 38,
+                          border: filled ? "2px solid #FFE500" : "2px dashed rgba(255,255,255,0.2)",
+                          background: filled ? "#FFE500" : "transparent",
+                        }}
+                      >
+                        {filled && (
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 8l3 3 7-7" />
+                          </svg>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {/* Bonus circle — highlighted when the milestone is reached */}
+                  <div className="w-[2px] h-6" style={{ background: "rgba(255,255,255,0.1)" }} />
+                  <div
+                    className="rounded-full flex flex-col items-center justify-center transition-all duration-300"
+                    style={{
+                      width: 52, height: 52,
+                      border: completed ? "3px solid #FFE500" : "2px dashed rgba(255,255,255,0.3)",
+                      background: completed ? "radial-gradient(circle, #FFE500 0%, #FFC700 100%)" : "transparent",
+                      boxShadow: completed ? "0 0 20px rgba(255,229,0,0.4)" : "none",
+                    }}
+                  >
+                    <span className="text-[11px] font-bold" style={{ color: completed ? "#000" : "#FFE500" }}>
+                      +{refConfig.bonusRewardCoins}
+                    </span>
+                    <span className="text-[8px] font-semibold -mt-0.5" style={{ color: completed ? "#000" : "#888" }}>
+                      BONUS
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Referral totals */}
+            <div className="flex items-center gap-6 mb-6">
+              <div className="text-center">
+                <p className="text-[11px] uppercase tracking-wider" style={{ color: "#666", fontFamily: "var(--font-dm-sans)" }}>Referrals</p>
+                <p className="text-white text-[20px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>{refTotal}</p>
+              </div>
+              <div className="w-[1px] h-8" style={{ background: "rgba(255,255,255,0.1)" }} />
+              <div className="text-center">
+                <p className="text-[11px] uppercase tracking-wider" style={{ color: "#666", fontFamily: "var(--font-dm-sans)" }}>Coins earned</p>
+                <p className="text-[20px] font-bold" style={{ color: "#FFE500", fontFamily: "var(--font-outfit)" }}>{refCoinsEarned.toLocaleString()}</p>
+              </div>
             </div>
 
             {/* Referral code */}
@@ -310,6 +390,20 @@ export default function ProfilePage() {
             <button
               className="px-16 py-7 rounded-full flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
               style={{ background: "#FFFFFF" }}
+              onClick={async () => {
+                const msg = `Join me on Shansi! Use my referral code: ${referralCode}`;
+                if (typeof navigator !== "undefined" && (navigator as any).share) {
+                  try {
+                    await (navigator as any).share({ title: "Shansi", text: msg });
+                  } catch { /* user cancelled */ }
+                } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+                  try {
+                    await navigator.clipboard.writeText(msg);
+                    setShowCardNotif(true);
+                    setTimeout(() => setShowCardNotif(false), 1800);
+                  } catch { /* ignore */ }
+                }
+              }}
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 12v5a1 1 0 001 1h10a1 1 0 001-1v-5" />
@@ -523,11 +617,17 @@ export default function ProfilePage() {
                 </span>
               </button>
               <button
-                onClick={() => {
-                  if (editCodeInput.length >= 4) {
-                    setReferralCode(editCodeInput);
-                    // Referral code is read-only from server
-                    setShowEditCode(false);
+                onClick={async () => {
+                  const clean = editCodeInput.trim().toUpperCase();
+                  if (clean.length < 4) return;
+                  try {
+                    const res: any = await updateMyReferralCode(clean);
+                    if (res?.success) {
+                      setReferralCode(res.referralCode || clean);
+                      setShowEditCode(false);
+                    }
+                  } catch (e: any) {
+                    alert(e?.message || "Failed to update code");
                   }
                 }}
                 className="active:opacity-60 transition-opacity"
