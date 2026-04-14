@@ -236,6 +236,22 @@ export const deleteBigWinPrize = (id: string) => adminFetch(`/admin/big-win/priz
 export const getBigWinHistory = () => adminFetch("/admin/big-win/history");
 
 // Villages (NEW system)
+export async function createMerchant(data: {
+  business_name: string;
+  business_name_ka?: string;
+  category?: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  contact_person?: string;
+  commission_percent?: number;
+}) {
+  return adminFetch("/admin/merchants", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export const getVillagesList = () => adminFetch("/admin/villages");
 export const getVillageDetail = (id: string) => adminFetch(`/admin/villages/${id}`);
 export const createVillage = (data: any) => adminFetch("/admin/villages", { method: "POST", body: JSON.stringify(data) });

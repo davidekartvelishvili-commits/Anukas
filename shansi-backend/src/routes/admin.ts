@@ -859,6 +859,53 @@ admin.get("/referrals", adminMiddleware, async (c) => {
 // MERCHANTS
 // ══════════════════════════════════════
 
+// POST /admin/merchants — admin creates merchant directly (auto-approved)
+admin.post("/merchants", adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const adminId = c.get("adminId") as string;
+  const db = getDb();
+
+  const businessName = (body.business_name || "").trim();
+  const phone = (body.phone || "").trim();
+  if (!businessName) throw new BadRequestError("Business name required");
+  if (!phone) throw new BadRequestError("Phone required");
+
+  // Check for duplicate phone
+  const [existing] = await db.select().from(merchants).where(eq(merchants.phone, phone)).limit(1);
+  if (existing) throw new BadRequestError("Phone already registered");
+
+  // Generate next merchant code SH-00001, SH-00002, ...
+  const allMerchants = await db.select({ merchantCode: merchants.merchantCode }).from(merchants);
+  const maxNum = allMerchants.reduce((max, m) => {
+    if (!m.merchantCode) return max;
+    const num = parseInt(m.merchantCode.replace("SH-", ""));
+    return isNaN(num) ? max : Math.max(max, num);
+  }, 0);
+  const merchantCode = `SH-${String(maxNum + 1).padStart(5, "0")}`;
+
+  const id = nanoid();
+  await db.insert(merchants).values({
+    id,
+    merchantCode,
+    businessName,
+    businessNameKa: body.business_name_ka || null,
+    category: body.category || "other",
+    phone,
+    email: body.email || null,
+    address: body.address || null,
+    contactPerson: body.contact_person || null,
+    commissionPercent: body.commission_percent ?? 3.0,
+    isActive: true,
+    isVerified: true,
+    approvedAt: new Date().toISOString(),
+    approvedBy: adminId,
+  });
+
+  await logAction(adminId, "create_merchant", JSON.stringify({ merchantId: id, merchantCode, businessName }));
+  const [created] = await db.select().from(merchants).where(eq(merchants.id, id)).limit(1);
+  return c.json({ success: true, merchant: created });
+});
+
 // GET /admin/merchants
 admin.get("/merchants", adminMiddleware, async (c) => {
   const db = getDb();

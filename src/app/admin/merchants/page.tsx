@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getMerchants, getMerchant, updateMerchant, simulatePayment } from "@/services/admin";
+import { getMerchants, getMerchant, updateMerchant, simulatePayment, createMerchant } from "@/services/admin";
 
 /* ── SVG ICONS ── */
 function NavIcon({ id, active }: { id: string; active: boolean }) {
@@ -102,6 +102,20 @@ export default function MerchantsPage() {
   const [simAmount, setSimAmount] = useState("");
   const [simLoading, setSimLoading] = useState(false);
   const [activeMerchants, setActiveMerchants] = useState<MerchantItem[]>([]);
+
+  // Create merchant modal
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [cForm, setCForm] = useState({
+    business_name: "",
+    business_name_ka: "",
+    category: "other",
+    phone: "+995",
+    email: "",
+    address: "",
+    contact_person: "",
+    commission_percent: "3",
+  });
 
   const showToast = (msg: string, type: "success" | "error" = "success") => setToast({ msg, type });
 
@@ -214,9 +228,22 @@ export default function MerchantsPage() {
             </button>
             <h1 className="text-[16px] font-semibold" style={{ color: "#FFFFFF" }}>Merchants</h1>
           </div>
-          <button onClick={openSimulate} className="px-4 py-2 rounded-[8px] text-[13px] font-medium transition-all hover:opacity-80" style={{ background: "#F9E741", color: "#000000" }}>
-            სიმულაცია
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="px-4 py-2 rounded-[8px] text-[13px] font-medium transition-all hover:opacity-80"
+              style={{ background: "#F9E741", color: "#000000" }}
+            >
+              + ახალი მერჩანტი
+            </button>
+            <button
+              onClick={openSimulate}
+              className="px-4 py-2 rounded-[8px] text-[13px] font-medium transition-all hover:opacity-80"
+              style={{ background: "transparent", color: "#F9E741", border: "1px solid #F9E74140" }}
+            >
+              სიმულაცია
+            </button>
+          </div>
         </header>
 
         <div className="p-4 lg:p-8">
@@ -439,6 +466,112 @@ export default function MerchantsPage() {
           )}
         </div>
       </main>
+
+      {/* Create Merchant Modal */}
+      {createOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-[480px] rounded-[12px] border p-6 max-h-[90vh] overflow-y-auto" style={{ background: "#1A1A1A", borderColor: "#252525" }}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-[16px] font-semibold" style={{ color: "#FFF" }}>ახალი მერჩანტი</h3>
+              <button onClick={() => setCreateOpen(false)} className="transition-all hover:opacity-70">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round"><line x1="5" y1="5" x2="13" y2="13" /><line x1="13" y1="5" x2="5" y2="13" /></svg>
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>ბიზნესის სახელი *</label>
+                <input value={cForm.business_name} onChange={(e) => setCForm((p) => ({ ...p, business_name: e.target.value }))} placeholder="Business name" style={inputStyle} />
+              </div>
+              <div>
+                <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>ქართული სახელი</label>
+                <input value={cForm.business_name_ka} onChange={(e) => setCForm((p) => ({ ...p, business_name_ka: e.target.value }))} placeholder="ქართული დასახელება" style={inputStyle} />
+              </div>
+              <div>
+                <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>ტელეფონი *</label>
+                <input value={cForm.phone} onChange={(e) => setCForm((p) => ({ ...p, phone: e.target.value }))} placeholder="+995..." style={inputStyle} />
+              </div>
+              <div>
+                <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>კატეგორია</label>
+                <select value={cForm.category} onChange={(e) => setCForm((p) => ({ ...p, category: e.target.value }))} style={{ ...inputStyle, appearance: "none" as const }}>
+                  <option value="food">საკვები</option>
+                  <option value="retail">საცალო</option>
+                  <option value="cafe">კაფე</option>
+                  <option value="restaurant">რესტორანი</option>
+                  <option value="pharmacy">აფთიაქი</option>
+                  <option value="grocery">სასურსათო</option>
+                  <option value="entertainment">გართობა</option>
+                  <option value="other">სხვა</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>კომისია %</label>
+                  <input type="number" step="0.5" min="0" max="100" value={cForm.commission_percent} onChange={(e) => setCForm((p) => ({ ...p, commission_percent: e.target.value }))} style={inputStyle} />
+                </div>
+                <div>
+                  <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>საკონტაქტო პირი</label>
+                  <input value={cForm.contact_person} onChange={(e) => setCForm((p) => ({ ...p, contact_person: e.target.value }))} placeholder="Contact person" style={inputStyle} />
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>ელ-ფოსტა</label>
+                <input type="email" value={cForm.email} onChange={(e) => setCForm((p) => ({ ...p, email: e.target.value }))} placeholder="email@example.com" style={inputStyle} />
+              </div>
+              <div>
+                <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>მისამართი</label>
+                <input value={cForm.address} onChange={(e) => setCForm((p) => ({ ...p, address: e.target.value }))} placeholder="Address" style={inputStyle} />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => setCreateOpen(false)}
+                className="flex-1 py-2.5 rounded-[8px] text-[13px] font-medium transition-all hover:brightness-110"
+                style={{ background: "#252525", color: "#A0A0A0" }}
+              >
+                გაუქმება
+              </button>
+              <button
+                onClick={async () => {
+                  if (!cForm.business_name.trim() || !cForm.phone.trim()) {
+                    showToast("სახელი და ტელეფონი სავალდებულოა", "error");
+                    return;
+                  }
+                  setCreateLoading(true);
+                  try {
+                    await createMerchant({
+                      business_name: cForm.business_name.trim(),
+                      business_name_ka: cForm.business_name_ka.trim() || undefined,
+                      category: cForm.category,
+                      phone: cForm.phone.trim(),
+                      email: cForm.email.trim() || undefined,
+                      address: cForm.address.trim() || undefined,
+                      contact_person: cForm.contact_person.trim() || undefined,
+                      commission_percent: parseFloat(cForm.commission_percent) || 3,
+                    });
+                    showToast("მერჩანტი დაემატა");
+                    setCreateOpen(false);
+                    setCForm({
+                      business_name: "", business_name_ka: "", category: "other",
+                      phone: "+995", email: "", address: "", contact_person: "",
+                      commission_percent: "3",
+                    });
+                    fetchMerchants();
+                  } catch (e: any) {
+                    showToast(e.message || "შეცდომა", "error");
+                  } finally {
+                    setCreateLoading(false);
+                  }
+                }}
+                disabled={createLoading}
+                className="flex-1 py-2.5 rounded-[8px] text-[13px] font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                style={{ background: "#F9E741", color: "#000" }}
+              >
+                {createLoading ? "იქმნება..." : "შექმნა"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Simulate Modal */}
       {showSimulate && (
