@@ -47,6 +47,7 @@ async function runStartupMigrations() {
     sql`ALTER TABLE referral_config ADD COLUMN bonus_every_n INTEGER NOT NULL DEFAULT 5`,
     sql`ALTER TABLE referral_config ADD COLUMN bonus_reward_coins INTEGER NOT NULL DEFAULT 500`,
     sql`ALTER TABLE referral_config ADD COLUMN signup_reward_lari INTEGER NOT NULL DEFAULT 10`,
+    sql`ALTER TABLE referral_config ADD COLUMN share_message_template TEXT`,
     sql`CREATE TABLE IF NOT EXISTS offers (
       id TEXT PRIMARY KEY,
       merchant_id TEXT NOT NULL REFERENCES merchants(id),

@@ -40,8 +40,17 @@ export default function ProfilePage() {
     bonusEveryN: number;
     bonusRewardCoins: number;
     signupRewardLari: number;
+    shareMessageTemplate: string;
     isActive: boolean;
-  }>({ referrerRewardCoins: 10, referredRewardCoins: 10, bonusEveryN: 5, bonusRewardCoins: 25, signupRewardLari: 10, isActive: true });
+  }>({
+    referrerRewardCoins: 10,
+    referredRewardCoins: 10,
+    bonusEveryN: 5,
+    bonusRewardCoins: 25,
+    signupRewardLari: 10,
+    shareMessageTemplate: "Join me on Shansi! Use my referral code: {code} to get _ ₾",
+    isActive: true,
+  });
 
   useEffect(() => {
     // Load cached data first for instant render
@@ -88,6 +97,7 @@ export default function ProfilePage() {
           bonusEveryN: data.config.bonusEveryN ?? 5,
           bonusRewardCoins: data.config.bonusRewardCoins ?? 25,
           signupRewardLari: data.config.signupRewardLari ?? 10,
+          shareMessageTemplate: data.config.shareMessageTemplate || "Join me on Shansi! Use my referral code: {code} to get _ ₾",
           isActive: data.config.isActive ?? true,
         });
       }
@@ -395,7 +405,11 @@ export default function ProfilePage() {
               style={{ background: "#FFFFFF" }}
               onClick={async () => {
                 const welcomeUrl = typeof window !== "undefined" ? window.location.origin + "/" : "https://backapp-liart.vercel.app/";
-                const msg = `Join me on Shansi! Use my referral code: ${referralCode} to get ${refConfig.signupRewardLari} ₾`;
+                // Apply template substitutions: {code} → referral code, _ → signup Lari amount
+                const template = refConfig.shareMessageTemplate || "Join me on Shansi! Use my referral code: {code} to get _ ₾";
+                const msg = template
+                  .replace(/\{code\}/gi, referralCode)
+                  .replace(/_/g, String(refConfig.signupRewardLari));
                 const fullText = `${msg}\n\n${welcomeUrl}`;
                 if (typeof navigator !== "undefined" && (navigator as any).share) {
                   try {

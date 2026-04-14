@@ -21,6 +21,7 @@ export interface PublicReferralConfig {
   bonusEveryN?: number;
   bonusRewardCoins?: number;
   signupRewardLari?: number;
+  shareMessageTemplate?: string;
   isActive: boolean;
 }
 

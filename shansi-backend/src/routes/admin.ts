@@ -794,6 +794,7 @@ admin.get("/referral-config", adminMiddleware, async (c) => {
       bonusEveryN: 5,
       bonusRewardCoins: 500,
       signupRewardLari: 10,
+      shareMessageTemplate: "Join me on Shansi! Use my referral code: {code} to get _ ₾",
       isActive: true,
     },
   });
@@ -814,6 +815,7 @@ admin.patch("/referral-config", adminMiddleware, async (c) => {
       bonusEveryN: body.bonus_every_n ?? 5,
       bonusRewardCoins: body.bonus_reward_coins ?? 500,
       signupRewardLari: body.signup_reward_lari ?? 10,
+      shareMessageTemplate: body.share_message_template ?? null,
       isActive: body.is_active ?? true,
     });
   } else {
@@ -823,6 +825,7 @@ admin.patch("/referral-config", adminMiddleware, async (c) => {
     if (body.bonus_every_n !== undefined) updates.bonusEveryN = body.bonus_every_n;
     if (body.bonus_reward_coins !== undefined) updates.bonusRewardCoins = body.bonus_reward_coins;
     if (body.signup_reward_lari !== undefined) updates.signupRewardLari = body.signup_reward_lari;
+    if (body.share_message_template !== undefined) updates.shareMessageTemplate = body.share_message_template;
     if (body.is_active !== undefined) updates.isActive = body.is_active;
     await db.update(referralConfig).set(updates).where(eq(referralConfig.id, existing.id));
   }

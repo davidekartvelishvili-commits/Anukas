@@ -15,8 +15,27 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "BackApp — Smart Cashback",
-  description: "Get cashback on every purchase",
+  title: "Shansi — Smart Cashback",
+  description: "Get cashback on every purchase. Join me on Shansi!",
+  openGraph: {
+    title: "Welcome to Shansi!",
+    description: "Smart cashback on every purchase. Join now and get bonus cash.",
+    images: [
+      {
+        url: "/og-welcome.png",
+        width: 1200,
+        height: 1200,
+        alt: "Welcome to Shansi!",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Welcome to Shansi!",
+    description: "Smart cashback on every purchase. Join now and get bonus cash.",
+    images: ["/og-welcome.png"],
+  },
   viewport: {
     width: "device-width",
     initialScale: 1,
