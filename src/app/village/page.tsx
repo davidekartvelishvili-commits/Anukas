@@ -318,13 +318,13 @@ export default function VillagePage() {
           </div>
         ))}
 
-        {/* ── VILLAGE CLEARING (grass) — larger circle ── */}
+        {/* ── VILLAGE CLEARING (grass) — sized to fit within trees ── */}
         <div
           className="absolute rounded-[50%]"
           style={{
-            left: "4%",
+            left: "14%",
             top: "30%",
-            width: "92%",
+            width: "72%",
             height: "42%",
             background: "radial-gradient(ellipse at 50% 40%, #8fd460 0%, #7ec850 30%, #6ab04c 65%, #5a9e3e 100%)",
             boxShadow: "inset 0 -10px 20px rgba(0,0,0,0.1)",
@@ -359,9 +359,9 @@ export default function VillagePage() {
         <div
           className="absolute pointer-events-none"
           style={{
-            left: "4%",
+            left: "14%",
             top: "30%",
-            width: "92%",
+            width: "72%",
             height: "42%",
             zIndex: 4,
           }}
@@ -446,11 +446,11 @@ export default function VillagePage() {
 
         {/* ── FLOWERS inside clearing ── */}
         {[
-          { x: 18, y: 40, color: "#ff6b6b" }, { x: 28, y: 54, color: "#ffd93d" },
-          { x: 40, y: 44, color: "#fff" }, { x: 50, y: 52, color: "#ff6b9d" },
-          { x: 62, y: 42, color: "#fff" }, { x: 72, y: 50, color: "#ffd93d" },
-          { x: 35, y: 58, color: "#ff6b6b" }, { x: 78, y: 44, color: "#ff6b9d" },
-          { x: 22, y: 58, color: "#fff" }, { x: 82, y: 58, color: "#ffd93d" },
+          { x: 22, y: 40, color: "#ff6b6b" }, { x: 30, y: 54, color: "#ffd93d" },
+          { x: 42, y: 44, color: "#fff" }, { x: 50, y: 52, color: "#ff6b9d" },
+          { x: 60, y: 42, color: "#fff" }, { x: 70, y: 50, color: "#ffd93d" },
+          { x: 36, y: 58, color: "#ff6b6b" }, { x: 74, y: 44, color: "#ff6b9d" },
+          { x: 26, y: 58, color: "#fff" }, { x: 64, y: 58, color: "#ffd93d" },
         ].map((f, i) => (
           <div
             key={`flower-${i}`}
