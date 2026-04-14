@@ -107,6 +107,7 @@ async function migrate() {
     `ALTER TABLE payment_transactions ADD COLUMN commission_status TEXT NOT NULL DEFAULT 'pending'`,
     `ALTER TABLE game_history ADD COLUMN payment_transaction_id TEXT`,
     `ALTER TABLE transactions ADD COLUMN payment_transaction_id TEXT`,
+    `ALTER TABLE merchants ADD COLUMN commission_enabled INTEGER NOT NULL DEFAULT 1`,
     `CREATE TABLE IF NOT EXISTS simulation_runs (
       id TEXT PRIMARY KEY,
       admin_id TEXT NOT NULL,

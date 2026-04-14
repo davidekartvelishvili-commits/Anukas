@@ -918,6 +918,7 @@ admin.patch("/merchants/:id", adminMiddleware, async (c) => {
   }
   if (body.is_verified !== undefined) updates.isVerified = body.is_verified;
   if (body.commission_percent !== undefined) updates.commissionPercent = body.commission_percent;
+  if (body.commission_enabled !== undefined) updates.commissionEnabled = body.commission_enabled;
 
   if (Object.keys(updates).length > 0) {
     await db.update(merchants).set(updates).where(eq(merchants.id, id));
@@ -956,7 +957,10 @@ admin.post("/simulate-payment", adminMiddleware, async (c) => {
   const [cfg] = await db.select().from(gameConfig).limit(1);
   const minReturnPercent = cfg?.minReturnPercent || 0.5;
 
-  const commissionAmount = Math.round(amount * merchant.commissionPercent / 100 * 100) / 100;
+  const commissionEnabled = (merchant as any).commissionEnabled !== false;
+  const commissionAmount = commissionEnabled
+    ? Math.round(amount * merchant.commissionPercent / 100 * 100) / 100
+    : 0;
   const merchantAmount = Math.round((amount - commissionAmount) * 100) / 100;
   const coinsAwarded = Math.round(amount * coinsPerLari);
   const guaranteedMinimum = Math.round(amount * minReturnPercent / 100 * 100) / 100;

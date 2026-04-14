@@ -158,6 +158,7 @@ export const merchants = sqliteTable("merchants", {
   email: text("email"),
   address: text("address"),
   commissionPercent: real("commission_percent").default(3.0).notNull(),
+  commissionEnabled: integer("commission_enabled", { mode: "boolean" }).default(true).notNull(),
   pinHash: text("pin_hash"),
   qrCode: text("qr_code").unique(),
   isActive: integer("is_active", { mode: "boolean" }).default(false).notNull(),

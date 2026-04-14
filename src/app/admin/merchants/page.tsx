@@ -256,7 +256,13 @@ export default function MerchantsPage() {
                           <td className="px-3 py-3 text-[12px] font-mono font-bold" style={{ color: "#F9E741" }}>{m.merchantCode || "—"}</td>
                           <td className="px-3 py-3 text-[13px]" style={{ color: "#FFF" }}>{m.businessName || m.name}</td>
                           <td className="px-3 py-3 text-[12px]" style={{ color: "#A0A0A0" }}>{m.category || "—"}</td>
-                          <td className="px-3 py-3 text-[12px]" style={{ color: "#F9E741" }}>{m.commissionPercent ?? m.commission_percent}%</td>
+                          <td className="px-3 py-3 text-[12px]">
+                            {m.commissionEnabled === false ? (
+                              <span style={{ color: "#666", textDecoration: "line-through" }}>{m.commissionPercent ?? m.commission_percent}%</span>
+                            ) : (
+                              <span style={{ color: "#F9E741" }}>{m.commissionPercent ?? m.commission_percent}%</span>
+                            )}
+                          </td>
                           <td className="px-3 py-3 text-[12px]" style={{ color: "#A0A0A0" }}>{m.totalTransactions ?? m.total_transactions ?? 0}</td>
                           <td className="px-3 py-3">
                             <span className="inline-block px-2 py-1 rounded-[6px] text-[11px] font-medium" style={{ background: m.isActive ? "rgba(34,197,94,0.15)" : "rgba(249,231,65,0.15)", color: m.isActive ? "#22C55E" : "#F9E741" }}>
@@ -330,9 +336,46 @@ export default function MerchantsPage() {
                                     </div>
                                   </div>
                                   <div>
-                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10EF\u10D0\u10DB\u10E3\u10E0\u10D8 \u10D9\u10DD\u10DB\u10D8\u10E1\u10D8\u10D0"}</p>
-                                    <p className="text-[13px]" style={{ color: "#22C55E" }}>{detail.stats?.totalCommission?.toFixed(2) || "0.00"} {"\u20BE"}</p>
+                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10D9\u10DD\u10DB\u10D8\u10E1\u10D8\u10D8\u10E1 \u10E1\u10E2\u10D0\u10E2\u10E3\u10E1\u10D8"}</p>
+                                    <button
+                                      onClick={async () => {
+                                        const current = detail.merchant?.commissionEnabled !== false;
+                                        try {
+                                          await updateMerchant(detail.merchant.id, { commission_enabled: !current });
+                                          showToast(!current ? "\u10D9\u10DD\u10DB\u10D8\u10E1\u10D8\u10D0 \u10E9\u10D0\u10E0\u10D7\u10E3\u10DA\u10D8\u10D0" : "\u10D9\u10DD\u10DB\u10D8\u10E1\u10D8\u10D0 \u10D2\u10D0\u10DB\u10DD\u10E0\u10D7\u10E3\u10DA\u10D8\u10D0");
+                                          fetchMerchants();
+                                        } catch { showToast("\u10E8\u10D4\u10EA\u10D3\u10DD\u10DB\u10D0", "error"); }
+                                      }}
+                                      className="relative inline-flex items-center rounded-full transition-all duration-200"
+                                      style={{
+                                        width: 44,
+                                        height: 24,
+                                        background: detail.merchant?.commissionEnabled !== false ? "#22C55E" : "#444",
+                                      }}
+                                    >
+                                      <span
+                                        className="inline-block rounded-full bg-white transition-all duration-200"
+                                        style={{
+                                          width: 18,
+                                          height: 18,
+                                          transform: `translateX(${detail.merchant?.commissionEnabled !== false ? 22 : 4}px)`,
+                                          boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
+                                        }}
+                                      />
+                                    </button>
+                                    <p className="text-[11px] mt-1" style={{ color: detail.merchant?.commissionEnabled !== false ? "#22C55E" : "#EF4444" }}>
+                                      {detail.merchant?.commissionEnabled !== false
+                                        ? "\u10D0\u10E5\u10E2\u10D8\u10E3\u10E0\u10D8"
+                                        : "\u10D2\u10D0\u10DB\u10DD\u10E0\u10D7\u10E3\u10DA\u10D8"}
+                                    </p>
                                   </div>
+
+                                  {detail.merchant?.commissionEnabled !== false && (
+                                    <div>
+                                      <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10EF\u10D0\u10DB\u10E3\u10E0\u10D8 \u10D9\u10DD\u10DB\u10D8\u10E1\u10D8\u10D0"}</p>
+                                      <p className="text-[13px]" style={{ color: "#22C55E" }}>{detail.stats?.totalCommission?.toFixed(2) || "0.00"} {"\u20BE"}</p>
+                                    </div>
+                                  )}
                                   <div>
                                     <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10E0\u10D4\u10D2\u10D8\u10E1\u10E2\u10E0\u10D0\u10EA\u10D8\u10D0"}</p>
                                     <p className="text-[13px]" style={{ color: "#FFF" }}>{detail.merchant?.createdAt ? new Date(detail.merchant.createdAt).toLocaleDateString("ka-GE") : "—"}</p>
@@ -349,21 +392,26 @@ export default function MerchantsPage() {
                                       </span>
                                     </div>
                                   </div>
-                                  {detail.transactions && detail.transactions.length > 0 && (
-                                    <div className="col-span-full mt-2">
-                                      <p className="text-[12px] font-medium mb-2" style={{ color: "#A0A0A0" }}>{"\u10D1\u10DD\u10DA\u10DD \u10E2\u10E0\u10D0\u10DC\u10D6\u10D0\u10E5\u10EA\u10D8\u10D4\u10D1\u10D8"}</p>
-                                      <div className="space-y-1">
-                                        {detail.transactions.slice(0, 5).map((tx: any) => (
-                                          <div key={tx.id} className="flex justify-between text-[12px] py-1 border-b" style={{ borderColor: "#252525" }}>
-                                            <span style={{ color: "#A0A0A0" }}>{tx.userPhone || "—"}</span>
-                                            <span style={{ color: "#FFF" }}>{tx.amount?.toFixed(2)} {"\u20BE"}</span>
-                                            <span style={{ color: "#22C55E" }}>{tx.commissionAmount?.toFixed(2)} {"\u20BE"}</span>
-                                            <span style={{ color: "#666" }}>{tx.createdAt ? new Date(tx.createdAt).toLocaleDateString("ka-GE") : ""}</span>
-                                          </div>
-                                        ))}
+                                  {detail.transactions && detail.transactions.length > 0 && (() => {
+                                    const showCommission = detail.merchant?.commissionEnabled !== false;
+                                    return (
+                                      <div className="col-span-full mt-2">
+                                        <p className="text-[12px] font-medium mb-2" style={{ color: "#A0A0A0" }}>{"\u10D1\u10DD\u10DA\u10DD \u10E2\u10E0\u10D0\u10DC\u10D6\u10D0\u10E5\u10EA\u10D8\u10D4\u10D1\u10D8"}</p>
+                                        <div className="space-y-1">
+                                          {detail.transactions.slice(0, 5).map((tx: any) => (
+                                            <div key={tx.id} className="flex justify-between text-[12px] py-1 border-b" style={{ borderColor: "#252525" }}>
+                                              <span style={{ color: "#A0A0A0" }}>{tx.userPhone || "—"}</span>
+                                              <span style={{ color: "#FFF" }}>{tx.amount?.toFixed(2)} {"\u20BE"}</span>
+                                              {showCommission && (
+                                                <span style={{ color: "#22C55E" }}>{tx.commissionAmount?.toFixed(2)} {"\u20BE"}</span>
+                                              )}
+                                              <span style={{ color: "#666" }}>{tx.createdAt ? new Date(tx.createdAt).toLocaleDateString("ka-GE") : ""}</span>
+                                            </div>
+                                          ))}
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    );
+                                  })()}
                                 </div>
                               ) : null}
                             </td>

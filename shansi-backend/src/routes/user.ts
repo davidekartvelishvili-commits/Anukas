@@ -262,7 +262,11 @@ user.post("/confirm-payment", async (c) => {
   const [cfg] = await db.select().from(gameConfig).limit(1);
   const minReturnPercent = cfg?.minReturnPercent || 0.5;
 
-  const commissionAmount = Math.round(amount * m.commissionPercent / 100 * 100) / 100;
+  // Respect per-merchant commission toggle — if disabled, zero commission, merchant keeps full amount
+  const commissionEnabled = (m as any).commissionEnabled !== false;
+  const commissionAmount = commissionEnabled
+    ? Math.round(amount * m.commissionPercent / 100 * 100) / 100
+    : 0;
   const merchantAmount = Math.round((amount - commissionAmount) * 100) / 100;
   const coinsAwarded = Math.round(amount * coinsPerLari);
   const guaranteedMinimum = Math.round(amount * minReturnPercent / 100 * 100) / 100;
