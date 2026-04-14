@@ -106,19 +106,7 @@ export default function RootLayout({
       <head>
         <meta name="theme-color" content="#000000" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        {/* Hardcoded OG fallbacks — crawlers see these immediately without needing generateMetadata */}
-        <meta property="og:title" content="შანსი — გეიმიფიცირებული Cashback" />
-        <meta property="og:description" content="გამოიყენე რეფერალი და მიიღე 10 ₾ სარეგისტრაციო ბონუსი! 🎰" />
-        <meta property="og:image" content="https://backapp-liart.vercel.app/og-image.png" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:image:type" content="image/png" />
-        <meta property="og:url" content="https://backapp-liart.vercel.app" />
-        <meta property="og:type" content="website" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="შანსი — გეიმიფიცირებული Cashback" />
-        <meta name="twitter:description" content="გამოიყენე რეფერალი და მიიღე 10 ₾ სარეგისტრაციო ბონუსი! 🎰" />
-        <meta name="twitter:image" content="https://backapp-liart.vercel.app/og-image.png" />
+        {/* Note: OG / Twitter meta tags are emitted by generateMetadata() so admin-uploaded image takes priority */}
       </head>
       <body className={`${outfit.variable} ${dmSans.variable} antialiased`}>
         {children}
