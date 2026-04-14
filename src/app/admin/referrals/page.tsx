@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getReferralConfig, updateReferralConfig, getReferrals } from "@/services/admin";
 
@@ -53,6 +53,7 @@ interface ReferralConfig {
   bonusRewardCoins?: number;
   signupRewardLari?: number;
   shareMessageTemplate?: string;
+  shareImageUrl?: string | null;
   isActive: boolean;
   updatedAt: string;
 }
@@ -90,6 +91,34 @@ interface Stats {
 }
 
 /* ── PAGE ── */
+// Compress uploaded image to ~1200×1200 max, WebP 85%
+async function fileToCompressedBase64(file: File, maxDim = 1200, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const ratio = Math.min(maxDim / width, maxDim / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/webp", quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function ReferralsPage() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -103,6 +132,9 @@ export default function ReferralsPage() {
   const [editBonusCoins, setEditBonusCoins] = useState(500);
   const [editSignupLari, setEditSignupLari] = useState(10);
   const [editShareTemplate, setEditShareTemplate] = useState("Join me on Shansi! Use my referral code: {code} to get _ ₾");
+  const [editShareImage, setEditShareImage] = useState<string | null>(null);
+  const [shareImgLoading, setShareImgLoading] = useState(false);
+  const shareImgInputRef = useRef<HTMLInputElement>(null);
   const [editActive, setEditActive] = useState(true);
   const [configLoading, setConfigLoading] = useState(true);
   const [configSaving, setConfigSaving] = useState(false);
@@ -146,6 +178,7 @@ export default function ReferralsPage() {
         setEditBonusCoins(c.bonusRewardCoins ?? 500);
         setEditSignupLari(c.signupRewardLari ?? 10);
         setEditShareTemplate(c.shareMessageTemplate || "Join me on Shansi! Use my referral code: {code} to get _ ₾");
+        setEditShareImage(c.shareImageUrl || null);
         setEditActive(c.isActive);
       }
     } catch {
@@ -180,6 +213,14 @@ export default function ReferralsPage() {
 
   // Save config
   const handleSaveConfig = async () => {
+    // Validate: template MUST contain both {code} and _ placeholders
+    let finalTemplate = editShareTemplate;
+    const hasCode = /\{code\}/i.test(finalTemplate);
+    const hasAmount = /(^|[^{a-z0-9])_([^a-z0-9]|$)/i.test(finalTemplate) || finalTemplate.includes(" _ ");
+    if (!hasCode || !hasAmount) {
+      showToast("შეტყობინებაში უნდა იყოს {code} და _", "error");
+      return;
+    }
     setConfigSaving(true);
     try {
       const res = await updateReferralConfig({
@@ -188,7 +229,8 @@ export default function ReferralsPage() {
         bonus_every_n: editBonusEveryN,
         bonus_reward_coins: editBonusCoins,
         signup_reward_lari: editSignupLari,
-        share_message_template: editShareTemplate,
+        share_message_template: finalTemplate,
+        share_image_url: editShareImage,
         is_active: editActive,
       });
       if (res.success) {
@@ -348,24 +390,96 @@ export default function ReferralsPage() {
                 </div>
               )}
 
-              {/* Share message template */}
+              {/* Share message template + image */}
               {!configLoading && (
-                <div className="mt-5 pt-5" style={{ borderTop: "1px solid #252525" }}>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#666666" }}>
-                    share-ის შეტყობინება
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={editShareTemplate}
-                    onChange={(e) => setEditShareTemplate(e.target.value)}
-                    placeholder="Join me on Shansi! Use my referral code: {code} to get _ ₾"
-                    className="w-full px-3 py-2 rounded-[8px] border text-[14px] outline-none transition-all focus:border-[#F9E741] resize-none"
-                    style={{ background: "#1A1A1A", borderColor: "#252525", color: "#FFFFFF", fontFamily: "inherit" }}
-                  />
-                  <p className="text-[11px] mt-1.5" style={{ color: "#666" }}>
-                    ჩასასვლები: <code style={{ color: "#F9E741" }}>{"{code}"}</code> = მომხმარებლის რეფერალ კოდი,{" "}
-                    <code style={{ color: "#F9E741" }}>_</code> = Signup ლარი (ზემოთ დაყენებული ₾ რიცხვი).
-                  </p>
+                <div className="mt-5 pt-5 grid grid-cols-1 md:grid-cols-2 gap-5" style={{ borderTop: "1px solid #252525" }}>
+                  {/* Template */}
+                  <div>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#666666" }}>
+                      share-ის შეტყობინება
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={editShareTemplate}
+                      onChange={(e) => setEditShareTemplate(e.target.value)}
+                      placeholder="Join me on Shansi! Use my referral code: {code} to get _ ₾"
+                      className="w-full px-3 py-2 rounded-[8px] border text-[14px] outline-none transition-all focus:border-[#F9E741] resize-none"
+                      style={{ background: "#1A1A1A", borderColor: "#252525", color: "#FFFFFF", fontFamily: "inherit" }}
+                    />
+                    <p className="text-[11px] mt-1.5" style={{ color: "#666" }}>
+                      <span style={{ color: "#F9E741" }}>{"{code}"}</span> და{" "}
+                      <span style={{ color: "#F9E741" }}>_</span> აუცილებელია — არ წაშალო.{" "}
+                      {"{code}"} → რეფერალ კოდი, <span style={{ color: "#F9E741" }}>_</span> → Signup ₾.
+                    </p>
+                  </div>
+
+                  {/* Image uploader */}
+                  <div>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#666666" }}>
+                      share-ის სურათი
+                    </label>
+                    <div
+                      onClick={() => shareImgInputRef.current?.click()}
+                      className="flex items-center gap-3 p-2 rounded-[8px] cursor-pointer transition-all hover:brightness-110"
+                      style={{ background: "#1A1A1A", border: "1px dashed #252525" }}
+                    >
+                      <div
+                        className="w-[72px] h-[72px] rounded-[8px] overflow-hidden flex items-center justify-center shrink-0"
+                        style={{ background: "#0F0F0F" }}
+                      >
+                        {editShareImage ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={editShareImage} alt="" className="w-full h-full object-cover" />
+                        ) : shareImgLoading ? (
+                          <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#F9E741", borderTopColor: "transparent" }} />
+                        ) : (
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <circle cx="9" cy="9" r="2" />
+                            <path d="M21 15l-5-5L5 21" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-medium" style={{ color: editShareImage ? "#22C55E" : "#A0A0A0" }}>
+                          {editShareImage ? "სურათი ატვირთულია" : "ატვირთე სურათი"}
+                        </p>
+                        <p className="text-[11px]" style={{ color: "#666" }}>PNG / JPG / WebP — max 1200×1200</p>
+                      </div>
+                      {editShareImage && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditShareImage(null); }}
+                          className="px-2 py-1 rounded-[6px] text-[11px] font-medium"
+                          style={{ background: "#EF444420", color: "#EF4444" }}
+                        >
+                          წაშლა
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      ref={shareImgInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        setShareImgLoading(true);
+                        try {
+                          const b64 = await fileToCompressedBase64(f);
+                          setEditShareImage(b64);
+                        } catch {
+                          showToast("სურათის ატვირთვა ვერ მოხერხდა", "error");
+                        } finally {
+                          setShareImgLoading(false);
+                          if (shareImgInputRef.current) shareImgInputRef.current.value = "";
+                        }
+                      }}
+                    />
+                    <p className="text-[11px] mt-1.5" style={{ color: "#666" }}>
+                      გამოჩნდება WhatsApp/iMessage/etc-ში ლინკის გაზიარებისას.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

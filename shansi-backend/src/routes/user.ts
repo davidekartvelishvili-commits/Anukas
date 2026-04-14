@@ -153,6 +153,7 @@ user.get("/referral-config", async (c) => {
       bonusRewardCoins: (cfg as any)?.bonusRewardCoins ?? 500,
       signupRewardLari: (cfg as any)?.signupRewardLari ?? 10,
       shareMessageTemplate: (cfg as any)?.shareMessageTemplate ?? "Join me on Shansi! Use my referral code: {code} to get _ ₾",
+      shareImageUrl: (cfg as any)?.shareImageUrl ?? null,
       isActive: cfg?.isActive ?? true,
     },
   });

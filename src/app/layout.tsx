@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     description: "Smart cashback on every purchase. Join now and get bonus cash.",
     images: [
       {
-        url: "/og-welcome.png",
+        url: "/api/og-image",
         width: 1200,
         height: 1200,
         alt: "Welcome to Shansi!",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Welcome to Shansi!",
     description: "Smart cashback on every purchase. Join now and get bonus cash.",
-    images: ["/og-welcome.png"],
+    images: ["/api/og-image"],
   },
   viewport: {
     width: "device-width",

@@ -124,6 +124,7 @@ export const referralConfig = sqliteTable("referral_config", {
   bonusRewardCoins: integer("bonus_reward_coins").default(500).notNull(),
   signupRewardLari: integer("signup_reward_lari").default(10).notNull(),
   shareMessageTemplate: text("share_message_template"),
+  shareImageUrl: text("share_image_url"),
   isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
   updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
 });
