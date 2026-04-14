@@ -224,11 +224,12 @@ export default function VillagePage() {
           { left: 55, top: 22, scale: 0.7, delay: -1.8 },
           { left: 65, top: 23, scale: 0.65, delay: -0.7 },
           { left: 75, top: 22, scale: 0.7, delay: -1.1 },
-          // Right side (outside fence — fence ends at x=80%)
-          { left: 86, top: 20, scale: 0.7, delay: -0.4 },
-          { left: 90, top: 22, scale: 0.65, delay: -1.3 },
-          { left: 94, top: 18, scale: 0.75, delay: -0.6 },
-          { left: 98, top: 20, scale: 0.7, delay: -1.6 },
+          // Right side (outside fence — fence ends at x=80%, organic scatter)
+          { left: 87, top: 23, scale: 0.55, delay: -0.4 },  // smallest, nearest center
+          { left: 91, top: 19, scale: 0.65, delay: -1.3 },
+          { left: 94, top: 25, scale: 0.6, delay: -2.0 },
+          { left: 96, top: 20, scale: 0.7, delay: -0.6 },
+          { left: 99, top: 17, scale: 0.78, delay: -1.6 },  // largest, at edge
         ].map((t, i) => (
           <div
             key={`bt-${i}`}
@@ -271,12 +272,16 @@ export default function VillagePage() {
 
         {/* ── TREES — front row (closer, bigger, at left/right edges only) ── */}
         {[
+          // Left cluster
           { left: 3, top: 30, scale: 1.1, delay: 0 },
           { left: 9, top: 36, scale: 1.0, delay: -1.3 },
           { left: 14, top: 42, scale: 1.05, delay: -0.6 },
-          { left: 86, top: 42, scale: 1.05, delay: -1.7 },
-          { left: 91, top: 36, scale: 1.0, delay: -0.9 },
-          { left: 97, top: 30, scale: 1.1, delay: -2.1 },
+          // Right cluster — organic scatter, further from fence (fence ends x=80%)
+          { left: 99, top: 29, scale: 1.1, delay: -2.1 },   // edge, large, upper
+          { left: 93, top: 32, scale: 0.85, delay: -1.0 },  // smaller, deeper in
+          { left: 96, top: 38, scale: 1.0, delay: -0.9 },   // medium, mid
+          { left: 89, top: 40, scale: 0.9, delay: -1.7 },   // smaller, closer to fence
+          { left: 94, top: 44, scale: 1.15, delay: -0.4 },  // large, bottom
         ].map((t, i) => (
           <div
             key={`ft-${i}`}
