@@ -148,6 +148,10 @@ export default function MerchantsPage() {
   const [cLogo, setCLogo] = useState<string>("");
   const [cLogoLoading, setCLogoLoading] = useState(false);
   const cLogoInputRef = useRef<HTMLInputElement>(null);
+  // Detail-view logo editor (per-merchant)
+  const detailLogoInputRef = useRef<HTMLInputElement>(null);
+  const [editingLogoFor, setEditingLogoFor] = useState<string | null>(null);
+  const [detailLogoLoading, setDetailLogoLoading] = useState(false);
 
   const showToast = (msg: string, type: "success" | "error" = "success") => setToast({ msg, type });
 
@@ -363,6 +367,59 @@ export default function MerchantsPage() {
                                 </div>
                               ) : detail ? (
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                  {/* Logo editor */}
+                                  <div className="md:col-span-3">
+                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>ლოგო</p>
+                                    <div className="flex items-center gap-3">
+                                      <div
+                                        className="w-[72px] h-[72px] rounded-[10px] overflow-hidden flex items-center justify-center shrink-0"
+                                        style={{ background: "#1C1C1E", border: "1px solid #2A2A2A" }}
+                                      >
+                                        {detail.merchant?.logoUrl ? (
+                                          // eslint-disable-next-line @next/next/no-img-element
+                                          <img src={detail.merchant.logoUrl} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                                            <circle cx="9" cy="9" r="2" />
+                                            <path d="M21 15l-5-5L5 21" />
+                                          </svg>
+                                        )}
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <button
+                                          onClick={() => {
+                                            setEditingLogoFor(detail.merchant.id);
+                                            detailLogoInputRef.current?.click();
+                                          }}
+                                          disabled={detailLogoLoading && editingLogoFor === detail.merchant.id}
+                                          className="px-3 py-2 rounded-[8px] text-[12px] font-medium transition-all hover:brightness-110 disabled:opacity-50"
+                                          style={{ background: "#F9E74120", color: "#F9E741", border: "1px solid #F9E74140" }}
+                                        >
+                                          {detailLogoLoading && editingLogoFor === detail.merchant.id
+                                            ? "იტვირთება..."
+                                            : detail.merchant?.logoUrl ? "შეცვლა" : "ატვირთვა"}
+                                        </button>
+                                        {detail.merchant?.logoUrl && (
+                                          <button
+                                            onClick={async () => {
+                                              if (!window.confirm("ლოგოს წაშლა?")) return;
+                                              try {
+                                                await updateMerchant(detail.merchant.id, { logo_url: null });
+                                                showToast("ლოგო წაიშალა");
+                                                fetchMerchants();
+                                              } catch { showToast("შეცდომა", "error"); }
+                                            }}
+                                            className="px-3 py-2 rounded-[8px] text-[12px] font-medium"
+                                            style={{ background: "#EF444420", color: "#EF4444" }}
+                                          >
+                                            წაშლა
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
                                   <div>
                                     <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10DB\u10D4\u10E0\u10E9\u10D0\u10DC\u10E2 ID"}</p>
                                     <p className="text-[16px] font-mono font-bold" style={{ color: "#F9E741" }}>{detail.merchant?.merchantCode || "—"}</p>
@@ -510,6 +567,32 @@ export default function MerchantsPage() {
           )}
         </div>
       </main>
+
+      {/* Hidden file input for per-merchant detail logo upload */}
+      <input
+        ref={detailLogoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          const mid = editingLogoFor;
+          if (!f || !mid) return;
+          setDetailLogoLoading(true);
+          try {
+            const b64 = await fileToCompressedBase64(f);
+            await updateMerchant(mid, { logo_url: b64 });
+            showToast("ლოგო განახლდა");
+            fetchMerchants();
+          } catch {
+            showToast("სურათის ატვირთვა ვერ მოხერხდა", "error");
+          } finally {
+            setDetailLogoLoading(false);
+            setEditingLogoFor(null);
+            if (detailLogoInputRef.current) detailLogoInputRef.current.value = "";
+          }
+        }}
+      />
 
       {/* Create Merchant Modal */}
       {createOpen && (
