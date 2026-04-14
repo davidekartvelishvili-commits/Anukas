@@ -793,6 +793,7 @@ admin.get("/referral-config", adminMiddleware, async (c) => {
       referredRewardCoins: 100,
       bonusEveryN: 5,
       bonusRewardCoins: 500,
+      signupRewardLari: 10,
       isActive: true,
     },
   });
@@ -812,6 +813,7 @@ admin.patch("/referral-config", adminMiddleware, async (c) => {
       referredRewardCoins: body.referred_reward_coins ?? 100,
       bonusEveryN: body.bonus_every_n ?? 5,
       bonusRewardCoins: body.bonus_reward_coins ?? 500,
+      signupRewardLari: body.signup_reward_lari ?? 10,
       isActive: body.is_active ?? true,
     });
   } else {
@@ -820,6 +822,7 @@ admin.patch("/referral-config", adminMiddleware, async (c) => {
     if (body.referred_reward_coins !== undefined) updates.referredRewardCoins = body.referred_reward_coins;
     if (body.bonus_every_n !== undefined) updates.bonusEveryN = body.bonus_every_n;
     if (body.bonus_reward_coins !== undefined) updates.bonusRewardCoins = body.bonus_reward_coins;
+    if (body.signup_reward_lari !== undefined) updates.signupRewardLari = body.signup_reward_lari;
     if (body.is_active !== undefined) updates.isActive = body.is_active;
     await db.update(referralConfig).set(updates).where(eq(referralConfig.id, existing.id));
   }

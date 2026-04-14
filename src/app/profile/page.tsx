@@ -39,8 +39,9 @@ export default function ProfilePage() {
     referredRewardCoins: number;
     bonusEveryN: number;
     bonusRewardCoins: number;
+    signupRewardLari: number;
     isActive: boolean;
-  }>({ referrerRewardCoins: 10, referredRewardCoins: 10, bonusEveryN: 5, bonusRewardCoins: 25, isActive: true });
+  }>({ referrerRewardCoins: 10, referredRewardCoins: 10, bonusEveryN: 5, bonusRewardCoins: 25, signupRewardLari: 10, isActive: true });
 
   useEffect(() => {
     // Load cached data first for instant render
@@ -86,6 +87,7 @@ export default function ProfilePage() {
           referredRewardCoins: data.config.referredRewardCoins ?? 10,
           bonusEveryN: data.config.bonusEveryN ?? 5,
           bonusRewardCoins: data.config.bonusRewardCoins ?? 25,
+          signupRewardLari: data.config.signupRewardLari ?? 10,
           isActive: data.config.isActive ?? true,
         });
       }
@@ -290,14 +292,15 @@ export default function ProfilePage() {
               className="text-white text-[22px] font-bold mb-3 text-center"
               style={{ fontFamily: "var(--font-outfit)" }}
             >
-              Earn {refConfig.bonusRewardCoins} Bonus Coins 🎉
+              Give {refConfig.signupRewardLari} ₾, Earn Coins 🎉
             </h2>
             <p
               className="text-[#999] text-[15px] text-center mb-6 leading-relaxed"
               style={{ fontFamily: "var(--font-dm-sans)" }}
             >
-              Earn <span className="text-white font-bold">{refConfig.referrerRewardCoins}</span> coins for each referral
-              plus extra <span className="text-white font-bold">{refConfig.bonusRewardCoins}</span> every {refConfig.bonusEveryN} referrals
+              Friends get <span className="text-white font-bold">{refConfig.signupRewardLari} ₾</span> when they sign up.
+              You earn <span className="text-white font-bold">{refConfig.referrerRewardCoins}</span> coins per referral,
+              plus <span className="text-white font-bold">{refConfig.bonusRewardCoins}</span> extra every {refConfig.bonusEveryN} referrals.
             </p>
 
             {/* Referral progress dots + bonus circle */}
@@ -391,14 +394,20 @@ export default function ProfilePage() {
               className="px-16 py-7 rounded-full flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
               style={{ background: "#FFFFFF" }}
               onClick={async () => {
-                const msg = `Join me on Shansi! Use my referral code: ${referralCode}`;
+                const welcomeUrl = typeof window !== "undefined" ? window.location.origin + "/" : "https://backapp-liart.vercel.app/";
+                const msg = `Join me on Shansi! Use my referral code: ${referralCode} to get ${refConfig.signupRewardLari} ₾`;
+                const fullText = `${msg}\n\n${welcomeUrl}`;
                 if (typeof navigator !== "undefined" && (navigator as any).share) {
                   try {
-                    await (navigator as any).share({ title: "Shansi", text: msg });
+                    await (navigator as any).share({
+                      title: "Shansi",
+                      text: msg,
+                      url: welcomeUrl,
+                    });
                   } catch { /* user cancelled */ }
                 } else if (typeof navigator !== "undefined" && navigator.clipboard) {
                   try {
-                    await navigator.clipboard.writeText(msg);
+                    await navigator.clipboard.writeText(fullText);
                     setShowCardNotif(true);
                     setTimeout(() => setShowCardNotif(false), 1800);
                   } catch { /* ignore */ }

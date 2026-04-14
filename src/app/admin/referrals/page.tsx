@@ -51,6 +51,7 @@ interface ReferralConfig {
   referredRewardCoins: number;
   bonusEveryN?: number;
   bonusRewardCoins?: number;
+  signupRewardLari?: number;
   isActive: boolean;
   updatedAt: string;
 }
@@ -99,6 +100,7 @@ export default function ReferralsPage() {
   const [editReferred, setEditReferred] = useState(0);
   const [editBonusEveryN, setEditBonusEveryN] = useState(5);
   const [editBonusCoins, setEditBonusCoins] = useState(500);
+  const [editSignupLari, setEditSignupLari] = useState(10);
   const [editActive, setEditActive] = useState(true);
   const [configLoading, setConfigLoading] = useState(true);
   const [configSaving, setConfigSaving] = useState(false);
@@ -140,6 +142,7 @@ export default function ReferralsPage() {
         setEditReferred(c.referredRewardCoins);
         setEditBonusEveryN(c.bonusEveryN ?? 5);
         setEditBonusCoins(c.bonusRewardCoins ?? 500);
+        setEditSignupLari(c.signupRewardLari ?? 10);
         setEditActive(c.isActive);
       }
     } catch {
@@ -181,6 +184,7 @@ export default function ReferralsPage() {
         referred_reward_coins: editReferred,
         bonus_every_n: editBonusEveryN,
         bonus_reward_coins: editBonusCoins,
+        signup_reward_lari: editSignupLari,
         is_active: editActive,
       });
       if (res.success) {
@@ -283,7 +287,7 @@ export default function ReferralsPage() {
                   <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#F9E741", borderTopColor: "transparent" }} />
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                   {/* Referrer reward */}
                   <div>
                     <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#666666" }}>რეფერერის ჯილდო (ქოინი)</label>
@@ -297,6 +301,14 @@ export default function ReferralsPage() {
                     <input type="number" value={editReferred} onChange={(e) => setEditReferred(Number(e.target.value))}
                       className="w-full px-3 py-2 rounded-[8px] border text-[14px] font-medium outline-none transition-all focus:border-[#F9E741]"
                       style={{ background: "#1A1A1A", borderColor: "#252525", color: "#FFFFFF" }} />
+                  </div>
+                  {/* Signup Lari (shown in share message + profile) */}
+                  <div>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#666666" }}>Signup ჯილდო (₾)</label>
+                    <input type="number" min="0" value={editSignupLari} onChange={(e) => setEditSignupLari(Number(e.target.value))}
+                      className="w-full px-3 py-2 rounded-[8px] border text-[14px] font-medium outline-none transition-all focus:border-[#F9E741]"
+                      style={{ background: "#1A1A1A", borderColor: "#252525", color: "#FFFFFF" }} />
+                    <p className="text-[10px] mt-1" style={{ color: "#555" }}>ჩანს share-ში და პროფილზე</p>
                   </div>
                   {/* Bonus every N */}
                   <div>

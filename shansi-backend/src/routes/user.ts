@@ -151,6 +151,7 @@ user.get("/referral-config", async (c) => {
       referredRewardCoins: cfg?.referredRewardCoins ?? 100,
       bonusEveryN: (cfg as any)?.bonusEveryN ?? 5,
       bonusRewardCoins: (cfg as any)?.bonusRewardCoins ?? 500,
+      signupRewardLari: (cfg as any)?.signupRewardLari ?? 10,
       isActive: cfg?.isActive ?? true,
     },
   });

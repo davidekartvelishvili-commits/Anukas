@@ -20,6 +20,7 @@ export interface PublicReferralConfig {
   referredRewardCoins: number;
   bonusEveryN?: number;
   bonusRewardCoins?: number;
+  signupRewardLari?: number;
   isActive: boolean;
 }
 
