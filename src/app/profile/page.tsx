@@ -404,7 +404,9 @@ export default function ProfilePage() {
               className="px-16 py-7 rounded-full flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
               style={{ background: "#FFFFFF" }}
               onClick={async () => {
-                const welcomeUrl = typeof window !== "undefined" ? window.location.origin + "/" : "https://backapp-liart.vercel.app/";
+                const origin = typeof window !== "undefined" ? window.location.origin : "https://backapp-liart.vercel.app";
+                // Unique URL per user — busts WhatsApp/Messenger/iMessage OG cache + lets us track referrals later
+                const welcomeUrl = `${origin}/?ref=${encodeURIComponent(referralCode || "")}`;
                 // Apply template substitutions: {code} → referral code, _ → signup Lari amount
                 const template = refConfig.shareMessageTemplate || "Join me on Shansi! Use my referral code: {code} to get _ ₾";
                 const msg = template

@@ -32,6 +32,7 @@ function buildDescription(template: string | null | undefined, lari: number): st
 export async function generateMetadata(): Promise<Metadata> {
   let imageUrl = `${SITE_URL}/og-welcome.png`;
   let description = "Smart cashback on every purchase. Join now and earn bonus coins.";
+  let imageVersion = "1";
 
   try {
     const res = await fetch(`${API_BASE}/public/referral-config`, { next: { revalidate: 60 } });
@@ -41,12 +42,23 @@ export async function generateMetadata(): Promise<Metadata> {
       // If admin uploaded a custom image, use the /api/og-image route (serves bytes inline)
       if (cfg?.shareImageUrl) {
         imageUrl = `${SITE_URL}/api/og-image`;
+        // Use a short hash of the image so the URL changes when admin re-uploads,
+        // forcing WhatsApp/FB/etc to re-scrape
+        try {
+          const h = Buffer.from(String(cfg.shareImageUrl)).toString("base64").slice(-12);
+          imageVersion = h;
+        } catch {
+          imageVersion = String(Date.now());
+        }
       }
       description = buildDescription(cfg?.shareMessageTemplate, cfg?.signupRewardLari ?? 10);
     }
   } catch {
     // fall back to defaults
   }
+
+  // Append version so scrapers see a new URL when the underlying image changes
+  imageUrl = `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}v=${imageVersion}`;
 
   return {
     metadataBase: new URL(SITE_URL),
