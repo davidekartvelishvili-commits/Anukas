@@ -85,7 +85,6 @@ export async function createPromoCode(data: {
   code: string; description?: string; coin_reward_for_user: number;
   coin_reward_for_creator?: number; max_uses?: number | null;
   max_uses_per_user?: number; starts_at: string; expires_at: string;
-  merchant_id?: string | null;
 }) {
   return adminFetch("/admin/promo-codes", { method: "POST", body: JSON.stringify(data) });
 }

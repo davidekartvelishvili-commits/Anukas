@@ -688,18 +688,7 @@ const promoCodeCreateSchema = z.object({
 admin.get("/promo-codes", adminMiddleware, async (c) => {
   const db = getDb();
   const codes = await db.select().from(promoCodes).orderBy(desc(promoCodes.createdAt));
-  // Enrich each promo with merchant info (name + code + logo) if linked
-  const enriched = await Promise.all(codes.map(async (pc) => {
-    if (!pc.merchantId) return { ...pc, merchant: null };
-    const [m] = await db.select({
-      id: merchants.id,
-      merchantCode: merchants.merchantCode,
-      businessName: merchants.businessName,
-      logoUrl: merchants.logoUrl,
-    }).from(merchants).where(eq(merchants.id, pc.merchantId)).limit(1);
-    return { ...pc, merchant: m || null };
-  }));
-  return c.json({ success: true, promoCodes: enriched });
+  return c.json({ success: true, promoCodes: codes });
 });
 
 // POST /admin/promo-codes
@@ -726,7 +715,6 @@ admin.post("/promo-codes", adminMiddleware, async (c) => {
     maxUsesPerUser: parsed.data.max_uses_per_user || 1,
     startsAt: parsed.data.starts_at,
     expiresAt: parsed.data.expires_at,
-    merchantId: (body.merchant_id as string) || null,
     createdBy: adminId,
   });
 
@@ -755,7 +743,6 @@ admin.patch("/promo-codes/:id", adminMiddleware, async (c) => {
   if (body.starts_at !== undefined) updates.startsAt = body.starts_at;
   if (body.expires_at !== undefined) updates.expiresAt = body.expires_at;
   if (body.is_active !== undefined) updates.isActive = body.is_active;
-  if (body.merchant_id !== undefined) updates.merchantId = body.merchant_id || null;
 
   if (Object.keys(updates).length > 0) {
     await db.update(promoCodes).set(updates).where(eq(promoCodes.id, id));

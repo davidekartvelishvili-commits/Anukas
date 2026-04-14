@@ -136,7 +136,6 @@ export const promoCodes = sqliteTable("promo_codes", {
   startsAt: text("starts_at").notNull(),
   expiresAt: text("expires_at").notNull(),
   isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
-  merchantId: text("merchant_id").references(() => merchants.id),
   createdBy: text("created_by").references(() => admins.id),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
 });

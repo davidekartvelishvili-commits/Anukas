@@ -8,7 +8,6 @@ import {
   updatePromoCode,
   deletePromoCode,
   getPromoCodeUses,
-  getMerchants,
 } from "@/services/admin";
 
 /* ── SVG ICONS (NavIcon) ── */
@@ -86,7 +85,6 @@ interface FormData {
   max_uses_per_user: number;
   starts_at: string;
   expires_at: string;
-  merchant_id: string;
 }
 
 const emptyForm: FormData = {
@@ -98,7 +96,6 @@ const emptyForm: FormData = {
   max_uses_per_user: 1,
   starts_at: "",
   expires_at: "",
-  merchant_id: "",
 };
 
 /* ── INLINE SVG ICONS ── */
@@ -153,8 +150,6 @@ export default function PromosPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>(emptyForm);
   const [saving, setSaving] = useState(false);
-  // Merchant dropdown
-  const [activeMerchantOptions, setActiveMerchantOptions] = useState<Array<{ id: string; businessName: string; merchantCode: string | null; logoUrl?: string | null }>>([]);
 
   // Deactivation confirm
   const [deactivateId, setDeactivateId] = useState<string | null>(null);
@@ -194,24 +189,6 @@ export default function PromosPage() {
   useEffect(() => {
     fetchPromos();
   }, [fetchPromos]);
-
-  // Load active merchants for the dropdown
-  useEffect(() => {
-    (async () => {
-      try {
-        const res: any = await getMerchants("active");
-        const list = (res?.merchants || []).map((m: any) => ({
-          id: m.id,
-          businessName: m.businessName || m.business_name || "",
-          merchantCode: m.merchantCode || m.merchant_code || null,
-          logoUrl: m.logoUrl || m.logo_url || null,
-        }));
-        setActiveMerchantOptions(list);
-      } catch {
-        // ignore — dropdown will be empty
-      }
-    })();
-  }, []);
 
   // Expand row -> fetch uses
   const handleExpand = async (id: string) => {
@@ -253,7 +230,6 @@ export default function PromosPage() {
       max_uses_per_user: promo.maxUsesPerUser,
       starts_at: promo.startsAt ? promo.startsAt.slice(0, 10) : "",
       expires_at: promo.expiresAt ? promo.expiresAt.slice(0, 10) : "",
-      merchant_id: (promo as any).merchantId || (promo as any).merchant?.id || "",
     });
     setModalOpen(true);
   };
@@ -280,7 +256,6 @@ export default function PromosPage() {
         max_uses_per_user: Number(form.max_uses_per_user) || 1,
         starts_at: new Date(form.starts_at).toISOString(),
         expires_at: new Date(form.expires_at + "T23:59:59").toISOString(),
-        merchant_id: form.merchant_id || null,
       };
 
       if (editingId) {
@@ -537,16 +512,8 @@ export default function PromosPage() {
                       className="grid grid-cols-1 md:grid-cols-[1.2fr_1.5fr_0.8fr_1fr_1.2fr_0.7fr] gap-2 px-4 py-3 border-b cursor-pointer transition-all hover:bg-white/[0.02]"
                       style={{ borderColor: "#252525" }}
                     >
-                      {/* Code + merchant logo */}
+                      {/* Code */}
                       <div className="flex items-center gap-2">
-                        {(() => {
-                          const m = (promo as any).merchant;
-                          if (m?.logoUrl) {
-                            // eslint-disable-next-line @next/next/no-img-element
-                            return <img src={m.logoUrl} alt="" className="w-6 h-6 rounded-[4px] object-cover shrink-0" title={m.businessName || ""} />;
-                          }
-                          return null;
-                        })()}
                         <span className="md:hidden text-[10px] font-bold uppercase" style={{ color: "#666666" }}>კოდი:</span>
                         <span className="text-[13px] font-bold tracking-wide" style={{ color: "#F9E741" }}>
                           {promo.code}
@@ -739,44 +706,6 @@ export default function PromosPage() {
                   className="w-full px-3 py-2.5 rounded-[8px] border text-[13px] outline-none transition-all focus:border-[#F9E741]"
                   style={{ background: "#1A1A1A", borderColor: "#252525", color: "#FFFFFF" }}
                 />
-              </div>
-
-              {/* Merchant dropdown */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase mb-1.5" style={{ color: "#666666" }}>
-                  მერჩანტი (არასავალდებულო)
-                </label>
-                <div className="flex items-center gap-2">
-                  {(() => {
-                    const selected = activeMerchantOptions.find((m) => m.id === form.merchant_id);
-                    return selected?.logoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={selected.logoUrl} alt="" className="w-9 h-9 rounded-[6px] object-cover shrink-0" style={{ border: "1px solid #252525" }} />
-                    ) : (
-                      <div className="w-9 h-9 rounded-[6px] flex items-center justify-center shrink-0" style={{ background: "#1A1A1A", border: "1px solid #252525" }}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M2 6l1.5-4h17L22 6M2 6v14h20V6M2 6h20M7 20v-6h4v6" />
-                        </svg>
-                      </div>
-                    );
-                  })()}
-                  <select
-                    value={form.merchant_id}
-                    onChange={(e) => setForm({ ...form, merchant_id: e.target.value })}
-                    className="flex-1 px-3 py-2.5 rounded-[8px] border text-[13px] outline-none transition-all focus:border-[#F9E741]"
-                    style={{ background: "#1A1A1A", borderColor: "#252525", color: "#FFFFFF", appearance: "none" }}
-                  >
-                    <option value="">— მერჩანტი არაა მიბმული —</option>
-                    {activeMerchantOptions.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.merchantCode ? `${m.merchantCode} · ` : ""}{m.businessName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <p className="text-[10px] mt-1" style={{ color: "#666" }}>
-                  მერჩანტის ლოგო გამოჩნდება ამ პრომოსთან ერთად
-                </p>
               </div>
 
               {/* Rewards row */}
