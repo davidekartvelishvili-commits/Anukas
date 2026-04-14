@@ -210,25 +210,15 @@ export default function VillagePage() {
           </svg>
         </div>
 
-        {/* ── TREES — back row (forest ring around top + sides of fence) ── */}
+        {/* ── TREES — circular forest ring curving around fence ── */}
         {[
-          // Left far-back (outside fence at x=20%, small for depth)
-          { left: 3, top: 23, scale: 0.55, delay: 0 },
-          { left: 8, top: 20, scale: 0.65, delay: -1 },
-          { left: 14, top: 18, scale: 0.7, delay: -0.5 },
-          // Top arc — trees curve around the top of the fence
-          { left: 22, top: 20, scale: 0.65, delay: -0.8 },
-          { left: 30, top: 18, scale: 0.7, delay: -1.2 },
-          { left: 38, top: 20, scale: 0.65, delay: -0.3 },
-          { left: 46, top: 19, scale: 0.7, delay: -1.8 },
-          { left: 54, top: 20, scale: 0.65, delay: -0.7 },
-          { left: 62, top: 19, scale: 0.7, delay: -1.1 },
-          { left: 70, top: 20, scale: 0.65, delay: -0.5 },
-          { left: 78, top: 18, scale: 0.7, delay: -1.5 },
-          // Right far-back (outside fence at x=80%, small for depth)
-          { left: 86, top: 20, scale: 0.7, delay: -1.3 },
-          { left: 92, top: 18, scale: 0.65, delay: -0.6 },
-          { left: 97, top: 23, scale: 0.55, delay: -1.6 },
+          // Top arc — smallest (distant, deepest in scene), curves up at center
+          { left: 30, top: 22, scale: 0.5, delay: -0.8 },
+          { left: 38, top: 19, scale: 0.45, delay: -1.2 },
+          { left: 46, top: 17, scale: 0.4, delay: -0.3 },  // top-most, smallest
+          { left: 54, top: 17, scale: 0.4, delay: -1.8 },
+          { left: 62, top: 19, scale: 0.45, delay: -0.7 },
+          { left: 70, top: 22, scale: 0.5, delay: -1.1 },
         ].map((t, i) => (
           <div
             key={`bt-${i}`}
@@ -269,20 +259,21 @@ export default function VillagePage() {
           </div>
         ))}
 
-        {/* ── TREES — front row (larger, wrapping around left/right of fence) ── */}
+        {/* ── TREES — front row: curves around LEFT and RIGHT sides of fence ── */}
         {[
-          // LEFT cluster — wraps down along the fence's left side at staggered Y
-          { left: 2, top: 28, scale: 1.0, delay: 0 },       // upper edge
-          { left: 7, top: 32, scale: 1.1, delay: -1.3 },    // upper-mid
-          { left: 12, top: 37, scale: 0.9, delay: -0.6 },   // mid (closer to fence, smaller)
-          { left: 5, top: 43, scale: 1.15, delay: -1.8 },   // lower
-          { left: 13, top: 50, scale: 0.95, delay: -0.9 },  // bottom-mid
-          // RIGHT cluster — mirrored staggered Y, varied scales, no diagonal
-          { left: 98, top: 28, scale: 1.0, delay: -2.1 },   // upper edge
-          { left: 93, top: 32, scale: 1.1, delay: -1.0 },   // upper-mid
-          { left: 88, top: 37, scale: 0.9, delay: -0.9 },   // mid (closer to fence, smaller)
-          { left: 95, top: 43, scale: 1.15, delay: -1.7 },  // lower
-          { left: 87, top: 50, scale: 0.95, delay: -0.4 },  // bottom-mid
+          // LEFT curve — wraps around fence left arc (fence x=22-78)
+          // Trees follow arc: upper-left small, mid-left medium, lower-left big
+          { left: 14, top: 24, scale: 0.55, delay: 0 },    // upper-left of arc, small
+          { left: 10, top: 30, scale: 0.75, delay: -1.3 }, // upper-left side
+          { left: 6, top: 38, scale: 0.85, delay: -0.6 },  // mid-left
+          { left: 4, top: 48, scale: 0.95, delay: -1.8 },  // lower-left
+          { left: 8, top: 58, scale: 1.05, delay: -0.9 },  // bottom-left (biggest, foreground)
+          // RIGHT curve — mirror, following fence right arc
+          { left: 86, top: 24, scale: 0.55, delay: -2.1 }, // upper-right of arc, small
+          { left: 90, top: 30, scale: 0.75, delay: -1.0 }, // upper-right side
+          { left: 94, top: 38, scale: 0.85, delay: -0.9 }, // mid-right
+          { left: 96, top: 48, scale: 0.95, delay: -1.7 }, // lower-right
+          { left: 92, top: 58, scale: 1.05, delay: -0.4 }, // bottom-right (biggest, foreground)
         ].map((t, i) => (
           <div
             key={`ft-${i}`}
@@ -331,14 +322,14 @@ export default function VillagePage() {
           </div>
         ))}
 
-        {/* ── VILLAGE CLEARING (grass) — fence area ── */}
+        {/* ── VILLAGE CLEARING (grass) — perfect circle ── */}
         <div
-          className="absolute rounded-[50%]"
+          className="absolute rounded-full"
           style={{
-            left: "20%",
-            top: "32%",
-            width: "60%",
-            height: "38%",
+            left: "22%",
+            top: "30%",
+            width: "56%",
+            aspectRatio: "1 / 1",
             background: "radial-gradient(ellipse at 50% 40%, #8fd460 0%, #7ec850 30%, #6ab04c 65%, #5a9e3e 100%)",
             boxShadow: "inset 0 -10px 20px rgba(0,0,0,0.1)",
             zIndex: 2,
@@ -368,14 +359,14 @@ export default function VillagePage() {
           />
         ))}
 
-        {/* ── CIRCULAR WOODEN FENCE — opens toward the lake (bottom) ── */}
+        {/* ── CIRCULAR WOODEN FENCE — perfect circle, opens toward the lake ── */}
         <div
           className="absolute pointer-events-none"
           style={{
-            left: "20%",
-            top: "32%",
-            width: "60%",
-            height: "38%",
+            left: "22%",
+            top: "30%",
+            width: "56%",
+            aspectRatio: "1 / 1",
             zIndex: 4,
           }}
         >
