@@ -523,6 +523,34 @@ admin.post("/users/:id/adjust-balance", adminMiddleware, async (c) => {
   }
 });
 
+// POST /admin/users/:id/reset-village — reset village progress (for testing)
+admin.post("/users/:id/reset-village", adminMiddleware, async (c) => {
+  const id = c.req.param("id") as string;
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  if (!user) throw new BadRequestError("User not found");
+
+  // Delete all active village progress rows so getOrCreateProgress creates fresh
+  await db.delete(userVillageProgress).where(eq(userVillageProgress.userId, id));
+
+  // Reset village profile totals + level
+  await (db as any).run(sql`
+    UPDATE user_village_profile
+       SET total_stars = 0,
+           current_level = 1,
+           updated_at = datetime('now')
+     WHERE user_id = ${id}
+  `);
+
+  // Also clear legacy card collection for completeness
+  await (db as any).run(sql`DELETE FROM user_cards WHERE user_id = ${id}`);
+
+  await logAction(adminId, "reset_village", JSON.stringify({ userId: id, phone: user.phone }));
+  return c.json({ success: true, message: "Village progress reset" });
+});
+
 // PATCH /admin/users/:id/status
 admin.patch("/users/:id/status", adminMiddleware, async (c) => {
   const id = c.req.param("id") as string;

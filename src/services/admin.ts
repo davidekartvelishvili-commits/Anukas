@@ -62,6 +62,12 @@ export async function adjustBalance(userId: string, type: "coin" | "cash", actio
   });
 }
 
+export async function resetUserVillage(userId: string) {
+  return adminFetch(`/admin/users/${userId}/reset-village`, {
+    method: "POST",
+  });
+}
+
 export async function updateUserStatus(userId: string, isActive: boolean) {
   return adminFetch(`/admin/users/${userId}/status`, {
     method: "PATCH",

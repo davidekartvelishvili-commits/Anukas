@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getUsers, getUser, adjustBalance, updateUserStatus } from "@/services/admin";
+import { getUsers, getUser, adjustBalance, updateUserStatus, resetUserVillage } from "@/services/admin";
 
 /* ── SVG ICONS ── */
 function NavIcon({ id, active }: { id: string; active: boolean }) {
@@ -593,6 +593,29 @@ export default function AdminUsersPage() {
                                         >
                                           <CashIcon />
                                           {"\u10E5\u10D4\u10E8\u10D8\u10E1 \u10DB\u10D0\u10E0\u10D7\u10D5\u10D0"}
+                                        </button>
+
+                                        {/* Reset Village */}
+                                        <button
+                                          onClick={async () => {
+                                            const ok = window.confirm(
+                                              `Reset village progress for ${expandedData.user.name || expandedData.user.phone}?\n\nAll purchased buildings & stars will be cleared. This does NOT refund coins.`
+                                            );
+                                            if (!ok) return;
+                                            try {
+                                              await resetUserVillage(user.id);
+                                              showToast("\u10D5\u10D8\u10DA\u10D8\u10EF\u10D8 \u10D2\u10D0\u10EC\u10DB\u10D4\u10DC\u10D3\u10D0 \u10E7\u10D5\u10D4\u10DA\u10D0 \u10D7\u10D0\u10D5\u10D8\u10D3\u10D0\u10DC");
+                                            } catch {
+                                              showToast("\u10E8\u10D4\u10EA\u10D3\u10DD\u10DB\u10D0 \u10D2\u10D0\u10EC\u10DB\u10D4\u10DC\u10D3\u10D8\u10E1\u10D0\u10E1");
+                                            }
+                                          }}
+                                          className="flex items-center gap-2 px-3 py-2 rounded-[8px] text-[12px] font-medium transition-all hover:brightness-110 active:scale-95"
+                                          style={{ background: "#A855F720", color: "#A855F7", border: "1px solid #A855F740" }}
+                                        >
+                                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M3 11l8-7 8 7v10a1 1 0 01-1 1h-5v-6h-4v6H4a1 1 0 01-1-1z" />
+                                          </svg>
+                                          {"\u10D5\u10D8\u10DA\u10D8\u10EF\u10D8\u10E1 \u10D2\u10D0\u10EC\u10DB\u10D4\u10DC\u10D3\u10D0"}
                                         </button>
 
                                         {/* Block / Unblock */}
