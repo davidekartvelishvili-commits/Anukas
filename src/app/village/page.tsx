@@ -210,6 +210,20 @@ export default function VillagePage() {
           </svg>
         </div>
 
+        {/* ── VILLAGE CLEARING (grass) — drawn BEFORE trees so trees render on top ── */}
+        <div
+          className="absolute rounded-full"
+          style={{
+            left: "22%",
+            top: "30%",
+            width: "56%",
+            aspectRatio: "1 / 1",
+            background: "radial-gradient(ellipse at 50% 40%, #8fd460 0%, #7ec850 30%, #6ab04c 65%, #5a9e3e 100%)",
+            boxShadow: "inset 0 -10px 20px rgba(0,0,0,0.1)",
+            zIndex: 1,
+          }}
+        />
+
         {/* ── NATURAL FOREST — mixed tree types arranged in a circular ring ── */}
         {(() => {
           // Deterministic pseudo-random so layout stays consistent across renders
@@ -240,9 +254,10 @@ export default function VillagePage() {
             const angleDeg = baseAngle + (seed(i) - 0.5) * 8;
             const rad = (angleDeg * Math.PI) / 180;
             // Radius jitter — some trees pushed further out, some closer
-            const rJitter = (seed(i + 100) - 0.5) * 5;
-            const rX = 36 + rJitter;
-            const rY = 18 + rJitter * 0.5;
+            // Tree ring is pushed well outside the clearing (clearing radius ~28% wide, ~14% tall)
+            const rJitter = (seed(i + 100) - 0.5) * 4;
+            const rX = 44 + rJitter;  // was 36 — pushed out by 8% horizontally
+            const rY = 23 + rJitter * 0.5;  // was 18 — pushed out by 5% vertically
             const baseX = 50 + Math.cos(rad) * rX;
             const baseY = 44 + Math.sin(rad) * rY;
             // Scale — bigger at sides (foreground), smaller at top (depth)
@@ -388,20 +403,6 @@ export default function VillagePage() {
             </div>
           );
         })}
-
-        {/* ── VILLAGE CLEARING (grass) — perfect circle ── */}
-        <div
-          className="absolute rounded-full"
-          style={{
-            left: "22%",
-            top: "30%",
-            width: "56%",
-            aspectRatio: "1 / 1",
-            background: "radial-gradient(ellipse at 50% 40%, #8fd460 0%, #7ec850 30%, #6ab04c 65%, #5a9e3e 100%)",
-            boxShadow: "inset 0 -10px 20px rgba(0,0,0,0.1)",
-            zIndex: 2,
-          }}
-        />
 
         {/* ── GRASS TEXTURE BLADES ── */}
         {[
