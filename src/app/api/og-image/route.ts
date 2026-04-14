@@ -27,7 +27,8 @@ export async function GET(req: Request) {
       if (url && typeof url === "string") {
         if (url.startsWith("data:")) {
           const decoded = decodeDataUrl(url);
-          if (decoded) {
+          // Skip WebP — Facebook/WhatsApp/iMessage often can't render it in OG cards
+          if (decoded && !/webp/i.test(decoded.mime)) {
             return new NextResponse(new Uint8Array(decoded.buf) as any, {
               headers: {
                 "Content-Type": decoded.mime,
@@ -36,6 +37,7 @@ export async function GET(req: Request) {
               },
             });
           }
+          // WebP or bad decode → fall through to default
         } else if (/^https?:\/\//i.test(url)) {
           const imgRes = await fetch(url);
           if (imgRes.ok) {

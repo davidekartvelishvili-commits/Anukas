@@ -91,7 +91,7 @@ interface Stats {
 }
 
 /* ── PAGE ── */
-// Compress uploaded image to ~1200×1200 max, WebP 85%
+// Compress uploaded image to ~1200×1200 max, JPEG 85% (widely supported by OG scrapers)
 async function fileToCompressedBase64(file: File, maxDim = 1200, quality = 0.85): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -108,8 +108,11 @@ async function fileToCompressedBase64(file: File, maxDim = 1200, quality = 0.85)
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext("2d")!;
+        // Flatten onto white background so JPEG (no alpha) doesn't render black where PNG was transparent
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/webp", quality));
+        resolve(canvas.toDataURL("image/jpeg", quality));
       };
       img.onerror = reject;
       img.src = reader.result as string;
