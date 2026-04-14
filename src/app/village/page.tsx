@@ -210,126 +210,184 @@ export default function VillagePage() {
           </svg>
         </div>
 
-        {/* ── TREES — perfect circle ring around the clearing ── */}
+        {/* ── NATURAL FOREST — mixed tree types arranged in a circular ring ── */}
         {(() => {
-          // Generate positions along a visual circle centered at (50%, 44%)
-          // with radius ~140px (approx 35% viewport width, 17.5% viewport height)
-          // Skip the bottom arc (lake side)
-          const trees: Array<{ left: number; top: number; scale: number; delay: number }> = [];
-          // Angles in screen convention (0°=right, 90°=down, 180°=left, 270°=up)
-          // Sweep from 165° (lower-left) ccw through 270° (top) back down to 15° (lower-right)
-          const N = 16;
+          // Deterministic pseudo-random so layout stays consistent across renders
+          const seed = (n: number) => {
+            const x = Math.sin(n * 12.9898) * 43758.5453;
+            return x - Math.floor(x);
+          };
+
+          type TreeKind = "pine" | "broadleaf" | "bushy" | "tall";
+          const kinds: TreeKind[] = ["pine", "broadleaf", "bushy", "tall"];
+
+          const trees: Array<{
+            left: number;
+            top: number;
+            scale: number;
+            kind: TreeKind;
+            greenShift: number;
+            delay: number;
+          }> = [];
+
+          // Generate 22 trees in an arc, with random jitter
+          const N = 22;
           for (let i = 0; i < N; i++) {
-            // Parametrize arc from 165° ccw through 270° to 15° (total 210°)
             const t = i / (N - 1);
-            const angleDeg = 165 + t * 210;
+            // Arc from 160° ccw through 270° to 20° (220° sweep)
+            const baseAngle = 160 + t * 220;
+            // Jitter angle by ±4°
+            const angleDeg = baseAngle + (seed(i) - 0.5) * 8;
             const rad = (angleDeg * Math.PI) / 180;
-            // Visual circle: rX = 35% viewport width, rY = 17.5% viewport height
-            // Center: (50%, 44%)
-            const baseX = 50 + Math.cos(rad) * 35;
-            const baseY = 44 + Math.sin(rad) * 17.5;
-            // Tree size — smaller toward top (depth perspective), bigger at sides
-            const fromTop = Math.abs(angleDeg - 270) / 105; // 0 at top, 1 at sides
-            const scale = 0.55 + fromTop * 0.35;
-            // Tree top = base - (scaled SVG height in vh)
-            const svgHeight = 90 * scale; // back-row SVG height
-            const treeTopVh = baseY - (svgHeight / 8); // 1vh ≈ 8px on 800px viewport
+            // Radius jitter — some trees pushed further out, some closer
+            const rJitter = (seed(i + 100) - 0.5) * 5;
+            const rX = 36 + rJitter;
+            const rY = 18 + rJitter * 0.5;
+            const baseX = 50 + Math.cos(rad) * rX;
+            const baseY = 44 + Math.sin(rad) * rY;
+            // Scale — bigger at sides (foreground), smaller at top (depth)
+            const fromTop = Math.abs(angleDeg - 270) / 110;
+            const baseScale = 0.5 + fromTop * 0.45;
+            const scale = baseScale + (seed(i + 200) - 0.5) * 0.25;
+            // Pick tree kind pseudo-randomly
+            const kind = kinds[Math.floor(seed(i + 300) * kinds.length)];
+            // Color variation
+            const greenShift = (seed(i + 400) - 0.5) * 30;
+            // SVG height adjusted to kind
+            const svgH = kind === "pine" || kind === "tall" ? 100 : kind === "bushy" ? 70 : 90;
+            const treeTopVh = baseY - (svgH * scale) / 8;
+
             trees.push({
               left: baseX,
               top: treeTopVh,
               scale,
-              delay: -(i * 0.2),
+              kind,
+              greenShift,
+              delay: -(i * 0.17),
             });
           }
-          return trees;
-        })().map((t, i) => (
-          <div
-            key={`bt-${i}`}
-            className="absolute"
-            style={{
-              left: `${t.left}%`,
-              top: `${t.top}%`,
-              transform: `translateX(-50%) scale(${t.scale})`,
-              animation: `tree-sway ${4 + (i % 3)}s ease-in-out infinite`,
-              animationDelay: `${t.delay}s`,
-              transformOrigin: "bottom center",
-              zIndex: 2,
-            }}
-          >
-            <svg width="50" height="90" viewBox="0 0 50 90">
-              <defs>
-                <linearGradient id={`trunkBack${i}`} x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#4a2f18" />
-                  <stop offset="50%" stopColor="#6b4422" />
-                  <stop offset="100%" stopColor="#3a2510" />
-                </linearGradient>
-                <linearGradient id={`leafBack${i}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3a7a3a" />
-                  <stop offset="100%" stopColor="#1a5c2a" />
-                </linearGradient>
-              </defs>
-              {/* Trunk */}
-              <rect x="22" y="60" width="6" height="28" fill={`url(#trunkBack${i})`} rx="1" />
-              {/* Foliage — 3 layered clusters */}
-              <ellipse cx="25" cy="60" rx="20" ry="14" fill={`url(#leafBack${i})`} />
-              <ellipse cx="18" cy="48" rx="14" ry="12" fill={`url(#leafBack${i})`} />
-              <ellipse cx="32" cy="48" rx="14" ry="12" fill={`url(#leafBack${i})`} />
-              <ellipse cx="25" cy="38" rx="12" ry="11" fill={`url(#leafBack${i})`} />
-              {/* Highlights */}
-              <ellipse cx="22" cy="42" rx="5" ry="3" fill="#5a9a4a" opacity="0.6" />
-              <ellipse cx="30" cy="52" rx="4" ry="2.5" fill="#5a9a4a" opacity="0.5" />
-            </svg>
-          </div>
-        ))}
 
-        {/* ── (Second tree array removed — single perfect-circle ring is used now) ── */}
-        {([] as Array<{ left: number; top: number; scale: number; delay: number }>).map((t, i) => (
-          <div
-            key={`ft-${i}`}
-            className="absolute"
-            style={{
-              left: `${t.left}%`,
-              top: `${t.top}%`,
-              transform: `translateX(-50%) scale(${t.scale})`,
-              animation: `tree-sway ${3.5 + (i % 2) * 0.8}s ease-in-out infinite`,
-              animationDelay: `${t.delay}s`,
-              transformOrigin: "bottom center",
-              zIndex: 3,
-            }}
-          >
-            <svg width="60" height="110" viewBox="0 0 60 110">
-              <defs>
-                <linearGradient id={`trunkFront${i}`} x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#5a3820" />
-                  <stop offset="40%" stopColor="#7a5230" />
-                  <stop offset="70%" stopColor="#5a3820" />
-                  <stop offset="100%" stopColor="#3a2210" />
-                </linearGradient>
-                <radialGradient id={`leafFront${i}`} cx="40%" cy="40%">
-                  <stop offset="0%" stopColor="#5aa348" />
-                  <stop offset="60%" stopColor="#388a30" />
-                  <stop offset="100%" stopColor="#1c6622" />
-                </radialGradient>
-              </defs>
-              {/* Trunk with texture lines */}
-              <path d="M26,75 L26,105 L34,105 L34,75 Z" fill={`url(#trunkFront${i})`} />
-              <line x1="28" y1="82" x2="28" y2="100" stroke="#3a2210" strokeWidth="0.8" opacity="0.5" />
-              <line x1="31" y1="85" x2="31" y2="103" stroke="#3a2210" strokeWidth="0.6" opacity="0.4" />
-              {/* Foliage — multiple overlapping clusters for depth */}
-              <ellipse cx="30" cy="75" rx="26" ry="16" fill={`url(#leafFront${i})`} />
-              <ellipse cx="18" cy="60" rx="16" ry="14" fill={`url(#leafFront${i})`} />
-              <ellipse cx="42" cy="60" rx="16" ry="14" fill={`url(#leafFront${i})`} />
-              <ellipse cx="30" cy="48" rx="16" ry="14" fill={`url(#leafFront${i})`} />
-              <ellipse cx="22" cy="38" rx="12" ry="11" fill={`url(#leafFront${i})`} />
-              <ellipse cx="38" cy="38" rx="12" ry="11" fill={`url(#leafFront${i})`} />
-              <ellipse cx="30" cy="28" rx="11" ry="10" fill={`url(#leafFront${i})`} />
-              {/* Highlights — sun catching leaves */}
-              <ellipse cx="24" cy="35" rx="5" ry="4" fill="#7bc26a" opacity="0.7" />
-              <ellipse cx="36" cy="50" rx="5" ry="3.5" fill="#7bc26a" opacity="0.6" />
-              <ellipse cx="20" cy="55" rx="4" ry="3" fill="#7bc26a" opacity="0.5" />
-            </svg>
-          </div>
-        ))}
+          // Sort so trees further back (smaller scale / lower top) render first
+          trees.sort((a, b) => a.top - b.top);
+
+          return trees;
+        })().map((t, i) => {
+          // Build color based on green shift
+          const leafDark = `hsl(${115 + t.greenShift}, 45%, ${22 + (i % 3) * 3}%)`;
+          const leafMid = `hsl(${118 + t.greenShift}, 50%, ${32 + (i % 4) * 2}%)`;
+          const leafLight = `hsl(${105 + t.greenShift}, 55%, ${45 + (i % 3) * 3}%)`;
+          const trunkDark = `hsl(${25 + (i % 5)}, 40%, 18%)`;
+          const trunkLight = `hsl(${30 + (i % 5)}, 45%, 34%)`;
+
+          return (
+            <div
+              key={`tree-${i}`}
+              className="absolute"
+              style={{
+                left: `${t.left}%`,
+                top: `${t.top}%`,
+                transform: `translateX(-50%) scale(${t.scale})`,
+                animation: `tree-sway ${3 + (i % 4) * 0.6}s ease-in-out infinite`,
+                animationDelay: `${t.delay}s`,
+                transformOrigin: "bottom center",
+                zIndex: 2,
+                filter: `drop-shadow(0 3px 3px rgba(0,0,0,${0.15 + t.scale * 0.1}))`,
+              }}
+            >
+              {t.kind === "pine" && (
+                <svg width="40" height="100" viewBox="0 0 40 100">
+                  <defs>
+                    <linearGradient id={`pineTrunk${i}`} x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={trunkDark} />
+                      <stop offset="100%" stopColor={trunkLight} />
+                    </linearGradient>
+                  </defs>
+                  {/* Trunk */}
+                  <rect x="17" y="75" width="6" height="23" fill={`url(#pineTrunk${i})`} rx="1" />
+                  {/* Layered triangular foliage (3 tiers) */}
+                  <path d="M20,10 L8,40 L32,40 Z" fill={leafDark} />
+                  <path d="M20,10 L12,36 L28,36 Z" fill={leafMid} />
+                  <path d="M20,32 L5,62 L35,62 Z" fill={leafDark} />
+                  <path d="M20,32 L9,58 L31,58 Z" fill={leafMid} />
+                  <path d="M20,52 L2,82 L38,82 Z" fill={leafDark} />
+                  <path d="M20,52 L6,78 L34,78 Z" fill={leafMid} />
+                  {/* Highlight */}
+                  <path d="M20,15 L15,30 L18,30 Z" fill={leafLight} opacity="0.5" />
+                  <path d="M20,58 L13,73 L17,73 Z" fill={leafLight} opacity="0.4" />
+                </svg>
+              )}
+
+              {t.kind === "tall" && (
+                <svg width="30" height="100" viewBox="0 0 30 100">
+                  <defs>
+                    <linearGradient id={`tallTrunk${i}`} x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={trunkDark} />
+                      <stop offset="100%" stopColor={trunkLight} />
+                    </linearGradient>
+                  </defs>
+                  <rect x="12" y="80" width="5" height="18" fill={`url(#tallTrunk${i})`} rx="1" />
+                  {/* Narrow tall conifer — 4 tiers */}
+                  <path d="M15,8 L6,32 L24,32 Z" fill={leafDark} />
+                  <path d="M15,26 L4,52 L26,52 Z" fill={leafMid} />
+                  <path d="M15,46 L3,72 L27,72 Z" fill={leafDark} />
+                  <path d="M15,64 L2,86 L28,86 Z" fill={leafMid} />
+                  {/* Highlight strip */}
+                  <path d="M15,12 L11,28 L13,28 Z" fill={leafLight} opacity="0.5" />
+                </svg>
+              )}
+
+              {t.kind === "broadleaf" && (
+                <svg width="50" height="90" viewBox="0 0 50 90">
+                  <defs>
+                    <linearGradient id={`broadTrunk${i}`} x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={trunkDark} />
+                      <stop offset="50%" stopColor={trunkLight} />
+                      <stop offset="100%" stopColor={trunkDark} />
+                    </linearGradient>
+                  </defs>
+                  {/* Trunk with branch hint */}
+                  <rect x="22" y="58" width="6" height="30" fill={`url(#broadTrunk${i})`} rx="1" />
+                  <path d="M23,60 Q18,54 15,50" stroke={trunkDark} strokeWidth="1.5" fill="none" />
+                  {/* Irregular organic foliage clusters */}
+                  <ellipse cx="25" cy="58" rx="22" ry="15" fill={leafDark} />
+                  <ellipse cx="15" cy="46" rx="13" ry="11" fill={leafDark} />
+                  <ellipse cx="35" cy="48" rx="13" ry="11" fill={leafDark} />
+                  <ellipse cx="25" cy="38" rx="15" ry="13" fill={leafMid} />
+                  <ellipse cx="19" cy="32" rx="8" ry="7" fill={leafMid} />
+                  <ellipse cx="31" cy="33" rx="9" ry="8" fill={leafMid} />
+                  <ellipse cx="25" cy="26" rx="7" ry="6" fill={leafMid} />
+                  {/* Sun-catching highlights */}
+                  <ellipse cx="21" cy="30" rx="6" ry="4" fill={leafLight} opacity="0.6" />
+                  <ellipse cx="33" cy="42" rx="5" ry="3" fill={leafLight} opacity="0.5" />
+                  <ellipse cx="18" cy="50" rx="4" ry="3" fill={leafLight} opacity="0.4" />
+                </svg>
+              )}
+
+              {t.kind === "bushy" && (
+                <svg width="55" height="70" viewBox="0 0 55 70">
+                  <defs>
+                    <linearGradient id={`bushyTrunk${i}`} x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={trunkDark} />
+                      <stop offset="100%" stopColor={trunkLight} />
+                    </linearGradient>
+                  </defs>
+                  {/* Short trunk */}
+                  <rect x="24" y="52" width="7" height="16" fill={`url(#bushyTrunk${i})`} rx="1" />
+                  {/* Wide bushy foliage */}
+                  <ellipse cx="27" cy="52" rx="25" ry="14" fill={leafDark} />
+                  <ellipse cx="15" cy="42" rx="14" ry="12" fill={leafDark} />
+                  <ellipse cx="40" cy="42" rx="14" ry="12" fill={leafDark} />
+                  <ellipse cx="27" cy="36" rx="17" ry="12" fill={leafMid} />
+                  <ellipse cx="20" cy="28" rx="8" ry="7" fill={leafMid} />
+                  <ellipse cx="35" cy="28" rx="9" ry="7" fill={leafMid} />
+                  {/* Highlights */}
+                  <ellipse cx="22" cy="32" rx="5" ry="3" fill={leafLight} opacity="0.55" />
+                  <ellipse cx="36" cy="44" rx="5" ry="3" fill={leafLight} opacity="0.5" />
+                </svg>
+              )}
+            </div>
+          );
+        })}
 
         {/* ── VILLAGE CLEARING (grass) — perfect circle ── */}
         <div
