@@ -338,38 +338,6 @@ export default function HomePage() {
           </div>
           )}
 
-          {/* ── Link a Card ── */}
-          <div
-            className="mt-6 rounded-[20px] p-5 cursor-pointer active:scale-[0.98] transition-transform"
-            style={{ ...stagger(4), background: "#1C1C1E" }}
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-[14px] text-[#9CA3AF] font-medium" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                  Link a Card
-                </p>
-                <h3 className="text-[24px] font-bold text-white mt-1 leading-[1.15]" style={{ fontFamily: "var(--font-outfit)" }}>
-                  Win back<br />your purchases
-                </h3>
-              </div>
-              {/* Card visual */}
-              <div className="w-[140px] h-[90px] rounded-[12px] flex flex-col justify-between p-3 mt-2" style={{ background: "linear-gradient(135deg, #2A2A2E, #3A3A3E)", border: "1px solid #4A4A4E" }}>
-                <div className="flex justify-between items-start">
-                  <div className="w-[24px] h-[18px] rounded-[3px]" style={{ background: "linear-gradient(135deg, #C0C0C0, #E0E0E0)" }} />
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <path d="M2 7c0 0 2.5-4 5-4s5 4 5 4-2.5 4-5 4-5-4-5-4z" stroke="#666" strokeWidth="1" />
-                    <circle cx="7" cy="7" r="1.5" stroke="#666" strokeWidth="1" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-[11px] text-[#9CA3AF] font-medium" style={{ fontFamily: "var(--font-dm-sans)" }}>CoverdFan User</p>
-                </div>
-              </div>
-            </div>
-            <p className="text-[13px] text-[#4B5563] mt-3" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              Get Started
-            </p>
-          </div>
         </div>
 
         {/* ── Bottom Tab Bar — floating glass island ── */}
