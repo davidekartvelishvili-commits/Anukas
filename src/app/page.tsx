@@ -76,6 +76,18 @@ export default function WelcomePage() {
   const [gyroGranted, setGyroGranted] = useState(false);
   const userTapped = useRef(false);
 
+  // Capture ?ref=CODE from share link → store for the signup flow
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get("ref");
+      if (ref && ref.trim()) {
+        localStorage.setItem("pending_referral_code", ref.trim().toUpperCase());
+      }
+    } catch {}
+  }, []);
+
   const rawTilt = useRef({ x: 0, y: 0 });
   const smoothTilt = useRef({ x: 0, y: 0 });
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);

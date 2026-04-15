@@ -33,9 +33,14 @@ function VerifyContent() {
   const [pinError, setPinError] = useState("");
   const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Focus first input on mount
+  // Focus first input on mount + auto-fill referral code from share link
   useEffect(() => {
     setTimeout(() => inputRefs.current[0]?.focus(), 300);
+    try {
+      // Captured by the welcome page when user opened ?ref=CODE link
+      const stored = typeof window !== "undefined" ? localStorage.getItem("pending_referral_code") : null;
+      if (stored) setReferralCode(stored);
+    } catch {}
   }, []);
 
   const handleChange = (index: number, value: string) => {
@@ -82,6 +87,8 @@ function VerifyContent() {
     setVerifyError("");
     try {
       const data = await verifyOtp(phoneRaw, code, referralCode.trim() || undefined) as any;
+      // Clear pending referral code from share link so it doesn't apply twice
+      try { localStorage.removeItem("pending_referral_code"); } catch {}
       if (data.referralReward) {
         setReferralToast(`\u10DB\u10D8\u10D8\u10E6\u10D4 ${data.referralReward.coinsEarned} \u10E5\u10DD\u10D8\u10DC\u10D8 \u10E0\u10D4\u10E4\u10D4\u10E0\u10D0\u10DA \u10D1\u10DD\u10DC\u10E3\u10E1\u10D8! \uD83C\uDF89`);
         await new Promise(r => setTimeout(r, 2000));
@@ -410,11 +417,21 @@ function VerifyContent() {
             value={referralCode}
             onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
             className="w-full px-4 py-3 rounded-[12px] text-[14px] text-white placeholder-[#666] outline-none text-center"
-            style={{ background: "#1C1C1E", fontFamily: "var(--font-dm-sans), system-ui, sans-serif" }}
+            style={{
+              background: "#1C1C1E",
+              fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
+              border: referralCode ? "1px solid #22C55E" : "1px solid transparent",
+            }}
           />
-          <p className="text-[11px] text-center mt-1.5" style={{ color: "#666666", fontFamily: "var(--font-dm-sans)" }}>
-            {"\u10DB\u10D0\u10D2: SHANSI-A7B3K9"}
-          </p>
+          {referralCode ? (
+            <p className="text-[11px] text-center mt-1.5" style={{ color: "#22C55E", fontFamily: "var(--font-dm-sans)" }}>
+              ✓ {"\u10E0\u10D4\u10E4\u10D4\u10E0\u10D0\u10DA\u10D8 \u10D9\u10DD\u10D3\u10D8 \u10D2\u10D0\u10DB\u10DD\u10E7\u10D4\u10DC\u10D4\u10D1\u10E3\u10DA\u10D8\u10D0"}
+            </p>
+          ) : (
+            <p className="text-[11px] text-center mt-1.5" style={{ color: "#666666", fontFamily: "var(--font-dm-sans)" }}>
+              {"\u10DB\u10D0\u10D2: SHANSI-A7B3K9"}
+            </p>
+          )}
         </div>
 
         {/* ── Referral Toast ── */}
