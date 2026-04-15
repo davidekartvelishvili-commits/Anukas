@@ -313,19 +313,22 @@ export default function ProfilePage() {
               plus <span className="text-white font-bold">{refConfig.bonusRewardCoins}</span> extra every {refConfig.bonusEveryN} referrals.
             </p>
 
-            {/* Referral progress — sequential fill, left → right.
-                1 referral = 1 full circle. When all N circles are full, the
-                +BONUS circle activates. */}
+            {/* Referral progress — 10 segments per circle, 1 referral = 1 segment.
+                Segments fill clockwise; when a circle's 10 segments are full it
+                turns solid yellow with a black checkmark. The next referral
+                begins filling segment 1 of the following circle. */}
             {(() => {
-              const N = Math.max(1, refConfig.bonusEveryN);
-              const SEGMENTS_PER_CIRCLE = 12;
-              const progressInCycle = refTotal % N;
+              const N = Math.max(1, refConfig.bonusEveryN); // number of circles
+              const SEGMENTS_PER_CIRCLE = 10;
+              const totalSegments = N * SEGMENTS_PER_CIRCLE; // referrals to bonus
+              const progressInCycle = refTotal % totalSegments; // 0..totalSegments-1
               const completedAll = progressInCycle === 0 && refTotal > 0;
+              const filledSegments = completedAll ? totalSegments : progressInCycle;
               return (
                 <SegmentedReferralRow
                   count={N}
                   segmentsPerCircle={SEGMENTS_PER_CIRCLE}
-                  completedCircles={completedAll ? N : progressInCycle}
+                  filledSegments={filledSegments}
                   completedAll={completedAll}
                   bonusCoins={refConfig.bonusRewardCoins}
                 />
@@ -976,10 +979,10 @@ function SegmentedRing({
     return (
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transition: "all 0.3s" }}>
         <circle cx={cx} cy={cy} r={r + stroke / 2} fill="#F9E741" />
-        {/* white checkmark */}
+        {/* black checkmark */}
         <path
           d={`M ${size * 0.3} ${size * 0.52} L ${size * 0.45} ${size * 0.66} L ${size * 0.72} ${size * 0.38}`}
-          stroke="#fff"
+          stroke="#000"
           strokeWidth={Math.max(2.5, stroke)}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -1014,82 +1017,67 @@ function SegmentedRing({
 function SegmentedReferralRow({
   count,
   segmentsPerCircle,
-  completedCircles,
+  filledSegments,
   completedAll,
   bonusCoins,
 }: {
   count: number;
   segmentsPerCircle: number;
-  completedCircles: number; // 0..count — first N circles are fully filled
+  filledSegments: number; // total yellow segments across the whole row
   completedAll: boolean;
   bonusCoins: number;
 }) {
   const SIZE = 46;
   const BONUS_SIZE = 56;
 
-  // Per-segment fill animation. When `completedCircles` increases, the newly
-  // completed circle plays a clockwise segment-by-segment fill (~80ms each)
-  // before settling into the solid yellow + check state.
-  const STAGGER_MS = 80;
-  const HOLD_MS = 200;
-  const [animatingIdx, setAnimatingIdx] = useState<number | null>(null);
-  const [animatedSegments, setAnimatedSegments] = useState(0);
-  const prevCompletedRef = useRef<number | null>(null);
+  // Animate the most recently added segment with a tiny stagger so multiple
+  // referrals arriving at once visually fill one-by-one. CSS handles the
+  // per-segment color transition; this just paces the visible target.
+  const STEP_MS = 120;
+  const [renderedSegments, setRenderedSegments] = useState(filledSegments);
+  const prevSegRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // First run after data loads — establish baseline without animating.
-    if (prevCompletedRef.current === null) {
-      prevCompletedRef.current = completedCircles;
+    if (prevSegRef.current === null) {
+      // First run — snap to current value without animating
+      prevSegRef.current = filledSegments;
+      setRenderedSegments(filledSegments);
       return;
     }
-    if (completedCircles > prevCompletedRef.current) {
-      // Animate the newest circle (the one that just completed)
-      const newIdx = completedCircles - 1;
-      setAnimatingIdx(newIdx);
-      setAnimatedSegments(0);
-
-      let seg = 0;
-      const tick = setInterval(() => {
-        seg += 1;
-        setAnimatedSegments(seg);
-        if (seg >= segmentsPerCircle) {
-          clearInterval(tick);
-          // Brief hold with all segments yellow, then transition to solid + check
-          setTimeout(() => {
-            setAnimatingIdx(null);
-            setAnimatedSegments(0);
-          }, HOLD_MS);
-        }
-      }, STAGGER_MS);
-
-      prevCompletedRef.current = completedCircles;
-      return () => clearInterval(tick);
+    if (filledSegments === renderedSegments) return;
+    if (filledSegments < renderedSegments) {
+      // Cycle reset (e.g. user just hit milestone and counter wrapped) — snap
+      setRenderedSegments(filledSegments);
+      prevSegRef.current = filledSegments;
+      return;
     }
-    prevCompletedRef.current = completedCircles;
-  }, [completedCircles, segmentsPerCircle]);
+    // Step up one segment at a time
+    const tick = setInterval(() => {
+      setRenderedSegments((s) => {
+        const next = s + 1;
+        if (next >= filledSegments) {
+          clearInterval(tick);
+        }
+        return next;
+      });
+    }, STEP_MS);
+    prevSegRef.current = filledSegments;
+    return () => clearInterval(tick);
+  }, [filledSegments, renderedSegments]);
 
   return (
     <div className="flex items-center gap-2 mb-6">
       {Array.from({ length: count }).map((_, i) => {
-        // Mid-animation override: render this circle as in-progress segments
-        if (animatingIdx === i) {
-          return (
-            <SegmentedRing
-              key={i}
-              size={SIZE}
-              segments={segmentsPerCircle}
-              filled={animatedSegments}
-              completed={false}
-            />
-          );
-        }
-        const completed = i < completedCircles;
+        // Map global filledSegments → local fill count for circle i
+        const segStart = i * segmentsPerCircle;
+        const filledForThis = Math.max(0, Math.min(segmentsPerCircle, renderedSegments - segStart));
+        const completed = filledForThis === segmentsPerCircle;
         return (
           <SegmentedRing
             key={i}
             size={SIZE}
             segments={segmentsPerCircle}
-            filled={completed ? segmentsPerCircle : 0}
+            filled={filledForThis}
             completed={completed}
           />
         );
