@@ -375,9 +375,17 @@ export default function PromosPage() {
             >
               Today&apos;s Promos
             </h1>
-            <div className="w-[28px] h-[28px] rounded-full bg-[#EF4444] flex items-center justify-center">
-              <span className="text-[13px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>5</span>
-            </div>
+            {(() => {
+              const total = featuredDeals.length + flashDealsAll.length + partnerPromos.length;
+              if (total <= 0) return <div className="w-[28px]" />;
+              return (
+                <div className="w-[28px] h-[28px] rounded-full bg-[#EF4444] flex items-center justify-center">
+                  <span className="text-[13px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
+                    {total}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
 
           {/* ── 2. Category pills ── */}
