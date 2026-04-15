@@ -312,9 +312,7 @@ export default function WinAnimation({
   // Trigger when `show` becomes true
   useEffect(() => {
     if (show && phase === "idle") {
-      setPhase("flash");
-      const t = setTimeout(() => setPhase("celebrate"), 120);
-      return () => clearTimeout(t);
+      setPhase("celebrate");
     }
     if (!show && (phase === "done" || phase === "finishing")) {
       setPhase("idle");
@@ -336,10 +334,14 @@ export default function WinAnimation({
 
   return (
     <div
-      className="fixed inset-0 z-[1000] flex flex-col items-center justify-center pointer-events-none"
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
       style={{
-        background: "transparent",
+        // Semi-transparent dark backdrop — blocks taps so user can't drop balls during animation
+        background: "rgba(0,0,0,0.65)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
         fontFamily: "'Montserrat', 'Outfit', sans-serif",
+        animation: phase === "finishing" || phase === "done" ? "fadeOut 2s forwards" : undefined,
       }}
     >
       <style>{`
@@ -366,15 +368,6 @@ export default function WinAnimation({
         @keyframes raysSpin { from { transform: translate(-50%,-50%) rotate(0deg); } to { transform: translate(-50%,-50%) rotate(360deg); } }
         @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
       `}</style>
-
-      {/* Screen flash */}
-      {phase === "flash" && (
-        <div style={{
-          position: "fixed", inset: 0, background: Y,
-          animation: "screenFlash 0.4s ease-out forwards",
-          zIndex: 100, pointerEvents: "none",
-        }} />
-      )}
 
       {/* Background glow */}
       {showCounter && (

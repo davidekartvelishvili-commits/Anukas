@@ -376,6 +376,8 @@ export default function LuckyDropPage() {
 
   const handleDrop = useCallback(() => {
     if (betAmount <= 0 || balance < betAmount) return;
+    // Block drops while win animation is playing
+    if (showWinAnim) return;
 
     // Deduct locally for instant UI feedback
     setBalance((prev) => prev - betAmount);
@@ -484,7 +486,7 @@ export default function LuckyDropPage() {
       setBigWinText(err.message || "\u10E8\u10D4\u10EA\u10D3\u10DD\u10DB\u10D0");
       setTimeout(() => setBigWinText(""), 2000);
     });
-  }, [balance, betAmount]);
+  }, [balance, betAmount, showWinAnim]);
 
   return (
     <div className="relative w-full h-[100dvh] bg-[#050a1a] overflow-hidden">
