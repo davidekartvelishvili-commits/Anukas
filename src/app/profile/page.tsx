@@ -313,50 +313,83 @@ export default function ProfilePage() {
               plus <span className="text-white font-bold">{refConfig.bonusRewardCoins}</span> extra every {refConfig.bonusEveryN} referrals.
             </p>
 
-            {/* Referral progress dots + bonus circle */}
+            {/* Referral progress — N dots arranged IN a circle; when all yellow, center fills */}
             {(() => {
               const N = Math.max(1, refConfig.bonusEveryN);
               const progress = refTotal % N;
               const completed = progress === 0 && refTotal > 0; // just hit milestone
+              // Ring geometry
+              const SIZE = 160;       // outer box size
+              const RADIUS = 64;      // circle on which dots sit
+              const DOT = 16;         // dot diameter
+              const cx = SIZE / 2;
+              const cy = SIZE / 2;
               return (
-                <div className="flex items-center gap-3 mb-6">
+                <div
+                  className="relative mb-6"
+                  style={{ width: SIZE, height: SIZE }}
+                >
+                  {/* Dots arranged on a circle */}
                   {Array.from({ length: N }).map((_, i) => {
+                    // Start at top (-90deg), go clockwise
+                    const angle = (-Math.PI / 2) + (i / N) * Math.PI * 2;
+                    const dx = cx + Math.cos(angle) * RADIUS - DOT / 2;
+                    const dy = cy + Math.sin(angle) * RADIUS - DOT / 2;
                     const filled = i < progress || completed;
                     return (
                       <div
                         key={i}
-                        className="rounded-full flex items-center justify-center transition-all duration-300"
+                        className="absolute rounded-full transition-all duration-300"
                         style={{
-                          width: 38, height: 38,
-                          border: filled ? "2px solid #FFE500" : "2px dashed rgba(255,255,255,0.2)",
+                          left: dx,
+                          top: dy,
+                          width: DOT,
+                          height: DOT,
                           background: filled ? "#FFE500" : "transparent",
+                          border: filled ? "2px solid #FFE500" : "2px dashed rgba(255,255,255,0.25)",
+                          boxShadow: filled ? "0 0 10px rgba(255,229,0,0.6)" : "none",
                         }}
-                      >
-                        {filled && (
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M3 8l3 3 7-7" />
-                          </svg>
-                        )}
-                      </div>
+                      />
                     );
                   })}
-                  {/* Bonus circle — highlighted when the milestone is reached */}
-                  <div className="w-[2px] h-6" style={{ background: "rgba(255,255,255,0.1)" }} />
+
+                  {/* Center: bonus amount; becomes fully filled yellow disk with checkmark only when all dots are yellow */}
                   <div
-                    className="rounded-full flex flex-col items-center justify-center transition-all duration-300"
+                    className="absolute rounded-full flex flex-col items-center justify-center transition-all duration-500"
                     style={{
-                      width: 52, height: 52,
-                      border: completed ? "3px solid #FFE500" : "2px dashed rgba(255,255,255,0.3)",
-                      background: completed ? "radial-gradient(circle, #FFE500 0%, #FFC700 100%)" : "transparent",
-                      boxShadow: completed ? "0 0 20px rgba(255,229,0,0.4)" : "none",
+                      left: cx - 42,
+                      top: cy - 42,
+                      width: 84,
+                      height: 84,
+                      background: completed
+                        ? "radial-gradient(circle, #FFE500 0%, #FFC700 100%)"
+                        : "rgba(255,229,0,0.06)",
+                      border: completed ? "3px solid #FFE500" : "2px dashed rgba(255,229,0,0.35)",
+                      boxShadow: completed ? "0 0 30px rgba(255,229,0,0.7)" : "none",
                     }}
                   >
-                    <span className="text-[11px] font-bold" style={{ color: completed ? "#000" : "#FFE500" }}>
-                      +{refConfig.bonusRewardCoins}
-                    </span>
-                    <span className="text-[8px] font-semibold -mt-0.5" style={{ color: completed ? "#000" : "#888" }}>
-                      BONUS
-                    </span>
+                    {completed ? (
+                      <>
+                        <svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 8l3 3 7-7" />
+                        </svg>
+                        <span className="text-[10px] font-bold mt-0.5" style={{ color: "#000" }}>
+                          +{refConfig.bonusRewardCoins}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[16px] font-black" style={{ color: "#FFE500" }}>
+                          +{refConfig.bonusRewardCoins}
+                        </span>
+                        <span className="text-[9px] font-semibold mt-0.5 tracking-wider" style={{ color: "#888" }}>
+                          BONUS
+                        </span>
+                        <span className="text-[9px] mt-0.5" style={{ color: "#666" }}>
+                          {progress}/{N}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               );
