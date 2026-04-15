@@ -27,6 +27,7 @@ const ITEMS: FloatingItem[] = [
   { src: "/images/onboarding/ring.png",      x: 65,  y: -2,  width: 95,  rotation: -10, depth: 0.9, zIndex: 3 },
   { src: "/images/onboarding/golfball.png", x: -2,  y: 55,  width: 80,  rotation: 0,   depth: 1.7, zIndex: 4 },
   { src: "/images/onboarding/cards.png",   x: 42,  y: 25,  width: 120, rotation: -8,  depth: 1.1, zIndex: 3 },
+  { src: "/images/onboarding/ali-nino.png", x: 10,  y: 75,  width: 105, rotation: 10,  depth: 1.5, zIndex: 6 },
 ];
 
 /* ───────── ENTRANCE ANIMATION ───────── */
@@ -61,6 +62,10 @@ interface PhysicsBody {
   // Velocity
   vx: number;
   vy: number;
+  // Rotation (degrees, accumulated; cosmos-style 360° spins on impact)
+  r: number;
+  // Rotational velocity (degrees per frame)
+  vr: number;
 }
 
 /* ───────── MAIN ───────── */
@@ -77,7 +82,7 @@ export default function WelcomePage() {
   const rafRef = useRef<number>(0);
 
   // Physics bodies — one per item
-  const bodies = useRef<PhysicsBody[]>(ITEMS.map(() => ({ x: 0, y: 0, vx: 0, vy: 0 })));
+  const bodies = useRef<PhysicsBody[]>(ITEMS.map(() => ({ x: 0, y: 0, vx: 0, vy: 0, r: 0, vr: 0 })));
 
   // Entrance animation state
   const animPhase = useRef<"carousel" | "falling" | "settled">("carousel");
@@ -300,13 +305,23 @@ export default function WelcomePage() {
         // ── Apply velocity + friction to non-dragged items ──
         for (let i = 0; i < n; i++) {
           const b = bodies.current[i];
-          if (draggingIdx.current === i) continue;
+          if (draggingIdx.current === i) {
+            // While dragging: no inertia damping (direct follow). Rotation still spins down.
+            b.vr *= 0.92;
+            if (Math.abs(b.vr) < 0.05) b.vr = 0;
+            b.r += b.vr;
+            continue;
+          }
           b.x += b.vx;
           b.y += b.vy;
           b.vx *= FRICTION;
           b.vy *= FRICTION;
           if (Math.abs(b.vx) < 0.05) b.vx = 0;
           if (Math.abs(b.vy) < 0.05) b.vy = 0;
+          // Rotation — spinning body with angular friction (cosmos-style, free spin)
+          b.r += b.vr;
+          b.vr *= 0.985;
+          if (Math.abs(b.vr) < 0.03) b.vr = 0;
         }
 
         // ── Collision detection + momentum transfer ──
@@ -352,6 +367,15 @@ export default function WelcomePage() {
                   bj.vx += nx * impulse;
                   bj.vy += ny * impulse;
                 }
+
+                // ── Angular impulse — cosmos-style 360° spin on collision ──
+                // Tangent component of relative velocity creates spin
+                const tx = -ny, ty = nx;
+                const tangential = dvx * tx + dvy * ty;
+                const spinMagnitude = Math.min(25, Math.abs(tangential) * 2.5 + Math.abs(dvDotN) * 1.8);
+                const spinDir = tangential >= 0 ? 1 : -1;
+                if (draggingIdx.current !== j) bj.vr += spinDir * spinMagnitude;
+                if (draggingIdx.current !== i) bi.vr -= spinDir * spinMagnitude;
               }
 
               const sep = overlap * 0.5;
@@ -390,24 +414,34 @@ export default function WelcomePage() {
             }
           };
 
+          // Wall-bounce angular impulse: tangential velocity component spins the body
+          const addSpinFromWall = (tangential: number) => {
+            const mag = Math.min(20, Math.abs(tangential) * 2 + 3);
+            b.vr += (tangential >= 0 ? 1 : -1) * mag;
+          };
+
           if (actualLeft < -10) {
             b.x = -10 - baseX;
             wallVibrate(b.vx);
+            addSpinFromWall(b.vy); // vertical motion at left wall → spin
             b.vx = Math.abs(b.vx) * BOUNCE;
           }
           if (actualRight > screenW + 10) {
             b.x = screenW + 10 - item.width - baseX;
             wallVibrate(b.vx);
+            addSpinFromWall(-b.vy);
             b.vx = -Math.abs(b.vx) * BOUNCE;
           }
           if (actualTop < -10) {
             b.y = -10 - baseY;
             wallVibrate(b.vy);
+            addSpinFromWall(-b.vx);
             b.vy = Math.abs(b.vy) * BOUNCE;
           }
           if (actualBottom > screenH + 10) {
             b.y = screenH + 10 - item.width - baseY;
             wallVibrate(b.vy);
+            addSpinFromWall(b.vx);
             b.vy = -Math.abs(b.vy) * BOUNCE;
           }
         }
@@ -423,10 +457,12 @@ export default function WelcomePage() {
         const useGyro = animPhase.current === "settled";
         const gyroX = useGyro ? Math.max(-MAX_GYRO, Math.min(MAX_GYRO, sx * item.depth * 30 * SENSITIVITY)) : 0;
         const gyroY = useGyro ? Math.max(-MAX_GYRO, Math.min(MAX_GYRO, sy * item.depth * 18 * SENSITIVITY)) : 0;
-        const dr = useGyro ? sx * item.depth * 3 : 0;
+        const gyroDr = useGyro ? sx * item.depth * 3 : 0;
         const totalX = gyroX + b.x;
         const totalY = gyroY + b.y;
-        el.style.transform = `translate3d(${totalX}px, ${totalY}px, 0) rotate(${item.rotation + dr}deg) scale(${scale})`;
+        // Total rotation = original resting angle + gyro tilt + accumulated spin from collisions/walls
+        const totalRotation = item.rotation + gyroDr + b.r;
+        el.style.transform = `translate3d(${totalX}px, ${totalY}px, 0) rotate(${totalRotation}deg) scale(${scale})`;
       });
 
       rafRef.current = requestAnimationFrame(loop);
