@@ -156,16 +156,40 @@ export default function WelcomePage() {
       // ── PHASE: Carousel (first 2 seconds) ──
       if (animPhase.current === "carousel") {
         if (elapsed >= CAROUSEL_DURATION) {
-          // Transition to falling — snapshot each item's current carousel offset as body position
+          // Transition to EXPLOSION — blast items outward from the carousel center
+          const sw = window.innerWidth;
+          const sh = window.innerHeight;
           for (let i = 0; i < n; i++) {
             const off = getCarouselOffset(i, elapsed);
             bodies.current[i].x = off.x;
             bodies.current[i].y = off.y;
-            bodies.current[i].vx = 0;
-            bodies.current[i].vy = 0;
-            itemScale.current[i] = 1;
+
+            // Outward direction = item's current offset from center, plus some jitter
+            const item = ITEMS[i];
+            const baseX = (item.x / 100) * sw;
+            const baseY = ((45 + item.y * 0.55) / 100) * sh;
+            const absX = baseX + off.x;
+            const absY = baseY + off.y;
+            const dx = absX - sw / 2;
+            const dy = absY - sh * 0.38; // carousel center Y
+            const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+            // Explosion speed — varies per item for organic feel
+            const speed = 22 + Math.random() * 14; // px/frame
+            const jitter = (Math.random() - 0.5) * 0.25; // small angle offset
+            const cos = dx / dist, sin = dy / dist;
+            // Rotate by jitter
+            const rc = Math.cos(jitter), rs = Math.sin(jitter);
+            const vxDir = cos * rc - sin * rs;
+            const vyDir = sin * rc + cos * rs;
+            bodies.current[i].vx = vxDir * speed;
+            bodies.current[i].vy = vyDir * speed;
+            // Random spin from the blast
+            bodies.current[i].vr = (Math.random() - 0.5) * 18;
+
+            itemScale.current[i] = 1.25; // pulse out on explosion
             hasBouncedFloor.current[i] = false;
-            itemReleased.current[i] = false;
+            itemReleased.current[i] = true; // all released at once — no stagger
+            itemFrozen.current[i] = false;
           }
           animPhase.current = "falling";
         } else {
@@ -178,71 +202,43 @@ export default function WelcomePage() {
         }
       }
 
-      // ── PHASE: Falling (real gravity) ──
+      // ── PHASE: Explosion (items blast outward from carousel center, then settle) ──
       if (animPhase.current === "falling") {
-        const fallElapsed = elapsed - CAROUSEL_DURATION;
-        const GRAVITY = 0.45;
-        const FLOOR_BOUNCE = 0.45;
-        const WALL_BOUNCE_FALL = 0.4;
+        const WALL_BOUNCE_FALL = 0.5;
         let allSettled = true;
 
         const screenW = window.innerWidth;
         const screenH = window.innerHeight;
 
         for (let i = 0; i < n; i++) {
-          const itemDelay = i * STAGGER_DELAY;
-          if (fallElapsed < itemDelay) {
-            allSettled = false;
-            continue;
-          }
-          if (!itemReleased.current[i]) {
-            itemReleased.current[i] = true;
-          }
-
           const b = bodies.current[i];
           const item = ITEMS[i];
 
-          // Skip frozen items — they've already landed
+          // Skip frozen items — they've settled
           if (itemFrozen.current[i]) {
             continue;
           }
 
-          // Pure gravity
-          b.vy += GRAVITY;
-
-          // Air friction
-          b.vx *= 0.99;
-          b.vy *= 0.99;
+          // Air friction — slows the blast gradually (no gravity, zero-G feel)
+          b.vx *= 0.965;
+          b.vy *= 0.965;
 
           b.x += b.vx;
           b.y += b.vy;
+
+          // Angular motion + friction
+          b.r += b.vr;
+          b.vr *= 0.94;
 
           // Absolute position for wall checks
           const baseX = (item.x / 100) * screenW;
           const baseY = ((45 + item.y * 0.55) / 100) * screenH;
           const absLeft = baseX + b.x;
           const absRight = absLeft + item.width;
-          const absBottom = baseY + b.y + item.width;
+          const absTop = baseY + b.y;
+          const absBottom = absTop + item.width;
 
-          // Floor bounce — items land and stay where they fall
-          if (absBottom > screenH - 20) {
-            b.y = screenH - 20 - item.width - baseY;
-            b.vy = -Math.abs(b.vy) * FLOOR_BOUNCE;
-            if (!hasBouncedFloor.current[i]) {
-              hasBouncedFloor.current[i] = true;
-              itemScale.current[i] = 1.2;
-            }
-            // Freeze item if bounce is tiny — it's resting on floor
-            if (Math.abs(b.vy) < 2) {
-              b.vx = 0;
-              b.vy = 0;
-              itemFrozen.current[i] = true;
-              itemScale.current[i] = 1;
-              continue;
-            }
-          }
-
-          // Side walls
+          // Wall bounces — keep items on screen (no floor, it's 4 walls)
           if (absLeft < -10) {
             b.x = -10 - baseX;
             b.vx = Math.abs(b.vx) * WALL_BOUNCE_FALL;
@@ -251,12 +247,31 @@ export default function WelcomePage() {
             b.x = screenW + 10 - item.width - baseX;
             b.vx = -Math.abs(b.vx) * WALL_BOUNCE_FALL;
           }
+          if (absTop < -10) {
+            b.y = -10 - baseY;
+            b.vy = Math.abs(b.vy) * WALL_BOUNCE_FALL;
+          }
+          if (absBottom > screenH + 10) {
+            b.y = screenH + 10 - item.width - baseY;
+            b.vy = -Math.abs(b.vy) * WALL_BOUNCE_FALL;
+          }
 
-          // Scale settle: 1.2 → 1.0
+          // Scale settle: 1.25 → 1.0
           if (itemScale.current[i] > 1.001) {
-            itemScale.current[i] += (1.0 - itemScale.current[i]) * 0.15;
+            itemScale.current[i] += (1.0 - itemScale.current[i]) * 0.08;
           } else {
             itemScale.current[i] = 1;
+          }
+
+          // Freeze once motion is essentially zero — wherever the item ends up is fine
+          const speedSq = b.vx * b.vx + b.vy * b.vy;
+          if (speedSq < 0.08 && Math.abs(b.vr) < 0.25) {
+            b.vx = 0;
+            b.vy = 0;
+            b.vr = 0;
+            itemFrozen.current[i] = true;
+            itemScale.current[i] = 1;
+            continue;
           }
 
           allSettled = false;
