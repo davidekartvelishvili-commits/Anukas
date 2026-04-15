@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getMe, getStoredUser, getUserActivity } from "@/services/auth";
 import { getMyReferral, getReferralConfigPublic, updateMyReferralCode } from "@/services/referral";
@@ -1026,25 +1026,78 @@ function SegmentedReferralRow({
 }) {
   const SIZE = 46;
   const BONUS_SIZE = 56;
+
+  // Per-segment fill animation. When `completedCircles` increases, the newly
+  // completed circle plays a clockwise segment-by-segment fill (~80ms each)
+  // before settling into the solid yellow + check state.
+  const STAGGER_MS = 80;
+  const HOLD_MS = 200;
+  const [animatingIdx, setAnimatingIdx] = useState<number | null>(null);
+  const [animatedSegments, setAnimatedSegments] = useState(0);
+  const prevCompletedRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    // First run after data loads — establish baseline without animating.
+    if (prevCompletedRef.current === null) {
+      prevCompletedRef.current = completedCircles;
+      return;
+    }
+    if (completedCircles > prevCompletedRef.current) {
+      // Animate the newest circle (the one that just completed)
+      const newIdx = completedCircles - 1;
+      setAnimatingIdx(newIdx);
+      setAnimatedSegments(0);
+
+      let seg = 0;
+      const tick = setInterval(() => {
+        seg += 1;
+        setAnimatedSegments(seg);
+        if (seg >= segmentsPerCircle) {
+          clearInterval(tick);
+          // Brief hold with all segments yellow, then transition to solid + check
+          setTimeout(() => {
+            setAnimatingIdx(null);
+            setAnimatedSegments(0);
+          }, HOLD_MS);
+        }
+      }, STAGGER_MS);
+
+      prevCompletedRef.current = completedCircles;
+      return () => clearInterval(tick);
+    }
+    prevCompletedRef.current = completedCircles;
+  }, [completedCircles, segmentsPerCircle]);
+
   return (
     <div className="flex items-center gap-2 mb-6">
       {Array.from({ length: count }).map((_, i) => {
+        // Mid-animation override: render this circle as in-progress segments
+        if (animatingIdx === i) {
+          return (
+            <SegmentedRing
+              key={i}
+              size={SIZE}
+              segments={segmentsPerCircle}
+              filled={animatedSegments}
+              completed={false}
+            />
+          );
+        }
         const completed = i < completedCircles;
-        // Each referral fills one full circle — no partial state in between
-        const filled = completed ? segmentsPerCircle : 0;
         return (
           <SegmentedRing
             key={i}
             size={SIZE}
             segments={segmentsPerCircle}
-            filled={filled}
+            filled={completed ? segmentsPerCircle : 0}
             completed={completed}
           />
         );
       })}
       {/* Divider */}
       <div className="w-[2px] h-6 mx-1" style={{ background: "rgba(255,255,255,0.1)" }} />
-      {/* Bonus circle — same segmented dash style; segments turn yellow when all small circles are complete */}
+      {/* Bonus circle — same segmented dash style as the small circles, just larger.
+          Activated state: 12 yellow segments, "+5000" yellow, "BONUS" white. */}
       <div
         className="relative flex flex-col items-center justify-center transition-all duration-300"
         style={{
@@ -1072,7 +1125,7 @@ function SegmentedReferralRow({
           </span>
           <span
             className="text-[8px] font-semibold mt-0.5 tracking-wider"
-            style={{ color: completedAll ? "#F9E741" : "#666" }}
+            style={{ color: completedAll ? "#FFFFFF" : "#666" }}
           >
             BONUS
           </span>
