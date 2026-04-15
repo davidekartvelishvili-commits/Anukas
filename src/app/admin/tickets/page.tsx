@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   getTicketsAdmin,
@@ -50,9 +50,51 @@ const NAV_ITEMS = [
 
 const ACTIVE_ID = "tickets";
 
+// Category presets — chooses which back-side fields are relevant
+const CATEGORY_OPTIONS = [
+  { value: "cinema", label: "🎬 Cinema (კინო)", emoji: "🎬", showSeating: true },
+  { value: "event", label: "🎤 Event (ღონისძიება)", emoji: "🎤", showSeating: true },
+  { value: "cafe", label: "☕ Cafe (კაფე)", emoji: "☕", showSeating: false },
+  { value: "restaurant", label: "🍽 Restaurant (რესტორანი)", emoji: "🍽", showSeating: false },
+  { value: "retail", label: "🛍 Retail (მაღაზია)", emoji: "🛍", showSeating: false },
+  { value: "service", label: "💼 Service (სერვისი)", emoji: "💼", showSeating: false },
+  { value: "other", label: "🎫 Other (სხვა)", emoji: "🎫", showSeating: false },
+];
+
+function categoryMeta(value: string) {
+  return CATEGORY_OPTIONS.find((c) => c.value === value) || CATEGORY_OPTIONS[CATEGORY_OPTIONS.length - 1];
+}
+
+async function fileToCompressedBase64(file: File, maxDim = 400, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const ratio = Math.min(maxDim / width, maxDim / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 const emptyForm = {
-  emoji: "🎫",
-  category: "Offer",
+  logo_url: "" as string | null,
+  category: "cinema",
   title: "",
   title_ka: "",
   brand: "SHANSI",
@@ -64,7 +106,6 @@ const emptyForm = {
   screen: "",
   row: "",
   seat: "",
-  serial: "",
   social: "",
   terms: "", // newline-separated in form, converted to array on submit
   website: "WWW.SHANSI.GE",
@@ -83,6 +124,8 @@ export default function TicketsAdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<typeof emptyForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
@@ -112,9 +155,11 @@ export default function TicketsAdminPage() {
 
   const openEdit = (t: AdminTicket) => {
     setEditingId(t.id);
+    // Map legacy free-text category to one of our presets if possible
+    const matched = CATEGORY_OPTIONS.find((c) => c.value.toLowerCase() === (t.category || "").toLowerCase());
     setForm({
-      emoji: t.emoji,
-      category: t.category,
+      logo_url: t.logoUrl || "",
+      category: matched?.value || "other",
       title: t.title,
       title_ka: t.titleKa,
       brand: t.brand,
@@ -126,7 +171,6 @@ export default function TicketsAdminPage() {
       screen: t.screen || "",
       row: t.row || "",
       seat: t.seat || "",
-      serial: t.serial,
       social: t.social || "",
       terms: (t.terms || []).join("\n"),
       website: t.website,
@@ -136,16 +180,31 @@ export default function TicketsAdminPage() {
     setModalOpen(true);
   };
 
+  const handleLogoFile = async (file: File) => {
+    setLogoUploading(true);
+    try {
+      const b64 = await fileToCompressedBase64(file);
+      setForm((p) => ({ ...p, logo_url: b64 }));
+    } catch {
+      showToast("სურათის ატვირთვა ვერ მოხერხდა", "error");
+    } finally {
+      setLogoUploading(false);
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  };
+
   const handleSave = async () => {
-    if (!form.title.trim() || !form.serial.trim() || !form.brand.trim()) {
-      showToast("title, brand, serial სავალდებულოა", "error");
+    if (!form.title.trim() || !form.brand.trim()) {
+      showToast("title, brand სავალდებულოა", "error");
       return;
     }
     setSaving(true);
     try {
-      const payload = {
-        emoji: form.emoji.trim() || "🎫",
-        category: form.category.trim(),
+      const meta = categoryMeta(form.category);
+      const payload: Record<string, any> = {
+        emoji: meta.emoji, // fallback used only if no logo
+        logo_url: form.logo_url || null,
+        category: form.category,
         title: form.title.trim(),
         title_ka: form.title_ka.trim() || form.title.trim(),
         brand: form.brand.trim(),
@@ -154,12 +213,11 @@ export default function TicketsAdminPage() {
         price: form.price.trim(),
         bonus: form.bonus.trim(),
         person_name: form.person_name.trim(),
-        screen: form.screen.trim() || null,
-        row: form.row.trim() || null,
-        seat: form.seat.trim() || null,
-        serial: form.serial.trim(),
+        screen: meta.showSeating ? (form.screen.trim() || null) : null,
+        row: meta.showSeating ? (form.row.trim() || null) : null,
+        seat: meta.showSeating ? (form.seat.trim() || null) : null,
         social: form.social.trim() || null,
-        terms: form.terms.split("\n").map(s => s.trim()).filter(Boolean),
+        terms: form.terms.split("\n").map((s) => s.trim()).filter(Boolean),
         website: form.website.trim(),
         sort_order: parseInt(form.sort_order) || 0,
         is_active: form.is_active,
@@ -169,7 +227,7 @@ export default function TicketsAdminPage() {
         showToast("შენახულია");
       } else {
         await createTicket(payload);
-        showToast("შეიქმნა");
+        showToast("შეიქმნა — სერიული ნომერი ავტომატურად დაგენერირდა");
       }
       setModalOpen(false);
       await fetchList();
@@ -201,6 +259,8 @@ export default function TicketsAdminPage() {
     background: "#0F0F0F", border: "1px solid #252525", borderRadius: 8,
     color: "#FFF", outline: "none",
   };
+
+  const showSeating = categoryMeta(form.category).showSeating;
 
   return (
     <div className="flex min-h-screen" style={{ background: "#000" }}>
@@ -260,6 +320,7 @@ export default function TicketsAdminPage() {
                     <th className="text-left px-3 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>ტიკეტი</th>
                     <th className="text-left px-3 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>ბრენდი</th>
                     <th className="text-left px-3 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>კატეგორია</th>
+                    <th className="text-left px-3 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>სერიული</th>
                     <th className="text-left px-3 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>ფასი / ბონუსი</th>
                     <th className="text-left px-3 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>აქტ.</th>
                     <th className="text-right px-3 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>ქმედებები</th>
@@ -270,7 +331,11 @@ export default function TicketsAdminPage() {
                     <tr key={t.id} style={{ borderBottom: "1px solid #1A1A1A" }}>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-2">
-                          <span style={{ fontSize: 24 }}>{t.emoji}</span>
+                          {t.logoUrl ? (
+                            <img src={t.logoUrl} alt="" style={{ width: 32, height: 32, borderRadius: 6, objectFit: "cover", background: "#fff" }} />
+                          ) : (
+                            <span style={{ fontSize: 24 }}>{t.emoji}</span>
+                          )}
                           <div>
                             <div className="text-[13px] font-medium" style={{ color: "#FFF" }}>{t.title}</div>
                             <div className="text-[11px]" style={{ color: "#666" }}>{t.titleKa}</div>
@@ -279,6 +344,7 @@ export default function TicketsAdminPage() {
                       </td>
                       <td className="px-3 py-3 text-[12px] font-mono font-bold" style={{ color: "#F9E741" }}>{t.brand}</td>
                       <td className="px-3 py-3 text-[12px]" style={{ color: "#A0A0A0" }}>{t.category}</td>
+                      <td className="px-3 py-3 text-[11px] font-mono" style={{ color: "#888" }}>{t.serial}</td>
                       <td className="px-3 py-3 text-[12px]">
                         <span style={{ color: "#FFF" }}>{t.price}</span>{" "}
                         <span style={{ color: "#22C55E" }}>{t.bonus}</span>
@@ -317,12 +383,72 @@ export default function TicketsAdminPage() {
             </div>
 
             <div className="space-y-3">
-              <div className="grid grid-cols-4 gap-3">
-                <div>
-                  <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>ემოჯი</label>
-                  <input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} style={{ ...inputStyle, textAlign: "center", fontSize: 20 }} />
+              {/* Logo upload */}
+              <div>
+                <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>ლოგო (მერჩანტის ლოგო)</label>
+                <div
+                  onClick={() => !logoUploading && logoInputRef.current?.click()}
+                  className="flex items-center gap-3 p-2 rounded-[8px] cursor-pointer transition-all hover:brightness-110"
+                  style={{ background: "#0F0F0F", border: "1px dashed #333" }}
+                >
+                  <div
+                    style={{
+                      width: 56, height: 56, borderRadius: 8, background: "#fff",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      overflow: "hidden", flexShrink: 0,
+                    }}
+                  >
+                    {form.logo_url ? (
+                      <img src={form.logo_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <span style={{ fontSize: 28 }}>{categoryMeta(form.category).emoji}</span>
+                    )}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div className="text-[12px]" style={{ color: form.logo_url ? "#22C55E" : "#A0A0A0" }}>
+                      {logoUploading ? "ატვირთვა..." : form.logo_url ? "✓ ლოგო ატვირთულია" : "📤 ჩააწექი ლოგოს ასატვირთად"}
+                    </div>
+                    <div className="text-[10px] mt-0.5" style={{ color: "#666" }}>
+                      ლოგო რომ არ ატვირთო, კატეგორიის ემოჯი გამოჩნდება
+                    </div>
+                  </div>
+                  {form.logo_url && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setForm((p) => ({ ...p, logo_url: "" })); }}
+                      className="text-[11px] px-2 py-1 rounded-[6px]"
+                      style={{ background: "#EF444420", color: "#EF4444" }}
+                    >
+                      წაშლა
+                    </button>
+                  )}
                 </div>
-                <div className="col-span-3">
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleLogoFile(f);
+                  }}
+                />
+              </div>
+
+              {/* Category dropdown */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>კატეგორია *</label>
+                  <select
+                    value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value })}
+                    style={{ ...inputStyle, appearance: "none" as const }}
+                  >
+                    {CATEGORY_OPTIONS.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>ბრენდი (badge) *</label>
                   <input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} placeholder="SHANSI" style={inputStyle} />
                 </div>
@@ -330,18 +456,13 @@ export default function TicketsAdminPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>კატეგორია</label>
-                  <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Movie / Cafe / Restaurant..." style={inputStyle} />
-                </div>
-                <div>
-                  <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>სახელი *</label>
+                  <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>სახელი (EN) *</label>
                   <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Cinepark" style={inputStyle} />
                 </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>ქართული დასახელება</label>
-                <input value={form.title_ka} onChange={(e) => setForm({ ...form, title_ka: e.target.value })} placeholder="კინოს ბილეთი" style={inputStyle} />
+                <div>
+                  <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>ქართული დასახელება</label>
+                  <input value={form.title_ka} onChange={(e) => setForm({ ...form, title_ka: e.target.value })} placeholder="კინოს ბილეთი" style={inputStyle} />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -375,25 +496,32 @@ export default function TicketsAdminPage() {
               <div className="pt-3 mt-2" style={{ borderTop: "1px dashed #333" }}>
                 <p className="text-[11px] mb-3" style={{ color: "#F9E741" }}>🔒 Sensitive (ნაჩვენებია მხოლოდ activation-ის შემდეგ)</p>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>Screen</label>
-                    <input value={form.screen} onChange={(e) => setForm({ ...form, screen: e.target.value })} placeholder="18" style={inputStyle} />
+                {!editingId && (
+                  <div className="mb-3 px-3 py-2 rounded-[8px] text-[11px]" style={{ background: "#F9E74110", color: "#F9E741", border: "1px solid #F9E74130" }}>
+                    ℹ️ სერიული ნომერი ავტომატურად დაგენერირდება შენახვისას (უნიკალური)
                   </div>
-                  <div>
-                    <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>Row</label>
-                    <input value={form.row} onChange={(e) => setForm({ ...form, row: e.target.value })} placeholder="H" style={inputStyle} />
-                  </div>
-                  <div>
-                    <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>Seat</label>
-                    <input value={form.seat} onChange={(e) => setForm({ ...form, seat: e.target.value })} placeholder="55" style={inputStyle} />
-                  </div>
-                </div>
+                )}
 
-                <div className="mt-3">
-                  <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>Serial *</label>
-                  <input value={form.serial} onChange={(e) => setForm({ ...form, serial: e.target.value })} placeholder="SH2025001234" style={inputStyle} />
-                </div>
+                {/* Cinema/Event-only fields */}
+                {showSeating && (
+                  <div>
+                    <p className="text-[11px] mb-2" style={{ color: "#888" }}>დარბაზის/ადგილის ინფო ({categoryMeta(form.category).label})</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>Screen / Hall</label>
+                        <input value={form.screen} onChange={(e) => setForm({ ...form, screen: e.target.value })} placeholder="18" style={inputStyle} />
+                      </div>
+                      <div>
+                        <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>Row</label>
+                        <input value={form.row} onChange={(e) => setForm({ ...form, row: e.target.value })} placeholder="H" style={inputStyle} />
+                      </div>
+                      <div>
+                        <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>Seat</label>
+                        <input value={form.seat} onChange={(e) => setForm({ ...form, seat: e.target.value })} placeholder="55" style={inputStyle} />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-3">
                   <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>Social handles</label>

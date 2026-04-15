@@ -110,6 +110,7 @@ export async function deleteUser(userId: string) {
 export interface AdminTicket {
   id: string;
   emoji: string;
+  logoUrl: string | null;
   category: string;
   title: string;
   titleKa: string;

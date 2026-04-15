@@ -39,6 +39,7 @@ export interface TicketData {
   id: string;
   // ── Front (public info) ──
   emoji: string;
+  logoUrl?: string | null;
   category: string;
   title: string;
   titleKa: string;
@@ -110,9 +111,19 @@ export default function Ticket({ data, onActivate }: { data: TicketData; onActiv
                     justifyContent: "center",
                     fontSize: 26,
                     background: "#fafafa",
+                    overflow: "hidden",
                   }}
                 >
-                  {data.emoji}
+                  {data.logoUrl ? (
+                    <img
+                      src={data.logoUrl}
+                      alt=""
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      draggable={false}
+                    />
+                  ) : (
+                    data.emoji
+                  )}
                 </div>
                 <div
                   style={{

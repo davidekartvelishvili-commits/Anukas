@@ -2414,20 +2414,39 @@ admin.get("/tickets", adminMiddleware, async (c) => {
   return c.json({ success: true, tickets: shaped });
 });
 
+// Generate a unique SH-YYYYMMDD-XXXXX serial that doesn't already exist in the tickets table.
+async function generateUniqueSerial(db: any): Promise<string> {
+  const d = new Date();
+  const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no confusing 0/O/1/I
+  for (let attempt = 0; attempt < 10; attempt++) {
+    let rand = "";
+    for (let i = 0; i < 5; i++) rand += chars[Math.floor(Math.random() * chars.length)];
+    const candidate = `SH-${ymd}-${rand}`;
+    const [existing] = await db.select({ id: tickets.id }).from(tickets).where(eq(tickets.serial, candidate)).limit(1);
+    if (!existing) return candidate;
+  }
+  throw new BadRequestError("Could not generate unique serial, please retry");
+}
+
 admin.post("/tickets", adminMiddleware, async (c) => {
   const body = await c.req.json();
   const adminId = c.get("adminId") as string;
   const db = getDb();
 
-  if (!body.title || !body.brand || !body.serial) {
-    throw new BadRequestError("title, brand, and serial are required");
+  if (!body.title || !body.brand) {
+    throw new BadRequestError("title and brand are required");
   }
+
+  // Always auto-generate a unique serial server-side
+  const serial = await generateUniqueSerial(db);
 
   const id = nanoid();
   await db.insert(tickets).values({
     id,
     emoji: body.emoji || "🎫",
-    category: body.category || "Offer",
+    logoUrl: body.logo_url || null,
+    category: body.category || "other",
     title: body.title,
     titleKa: body.title_ka || body.title,
     brand: body.brand || "SHANSI",
@@ -2439,7 +2458,7 @@ admin.post("/tickets", adminMiddleware, async (c) => {
     screen: body.screen || null,
     rowLabel: body.row || null,
     seat: body.seat || null,
-    serial: body.serial,
+    serial,
     social: body.social || null,
     termsJson: JSON.stringify(Array.isArray(body.terms) ? body.terms : []),
     website: body.website || "WWW.SHANSI.GE",
@@ -2448,7 +2467,7 @@ admin.post("/tickets", adminMiddleware, async (c) => {
     createdBy: adminId,
   });
 
-  await logAction(adminId, "create_ticket", JSON.stringify({ id, title: body.title }));
+  await logAction(adminId, "create_ticket", JSON.stringify({ id, title: body.title, serial }));
   const [created] = await db.select().from(tickets).where(eq(tickets.id, id)).limit(1);
   return c.json({ success: true, ticket: created });
 });
@@ -2465,6 +2484,7 @@ admin.patch("/tickets/:id", adminMiddleware, async (c) => {
   const updates: Record<string, any> = {};
   const fieldMap: Record<string, string> = {
     emoji: "emoji",
+    logo_url: "logoUrl",
     category: "category",
     title: "title",
     title_ka: "titleKa",
@@ -2477,7 +2497,6 @@ admin.patch("/tickets/:id", adminMiddleware, async (c) => {
     screen: "screen",
     row: "rowLabel",
     seat: "seat",
-    serial: "serial",
     social: "social",
     website: "website",
   };

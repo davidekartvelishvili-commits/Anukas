@@ -193,7 +193,8 @@ export const offers = sqliteTable("offers", {
 
 export const tickets = sqliteTable("tickets", {
   id: text("id").primaryKey(),
-  emoji: text("emoji").notNull(),
+  emoji: text("emoji").notNull(), // fallback when no logo uploaded
+  logoUrl: text("logo_url"),       // base64 or https URL of merchant logo
   category: text("category").notNull(),
   title: text("title").notNull(),
   titleKa: text("title_ka").notNull(),

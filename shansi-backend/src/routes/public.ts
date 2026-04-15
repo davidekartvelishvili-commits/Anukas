@@ -49,6 +49,7 @@ publicRoute.get("/tickets", async (c) => {
     return {
       id: r.id,
       emoji: r.emoji,
+      logoUrl: (r as any).logoUrl,
       category: r.category,
       title: r.title,
       titleKa: r.titleKa,

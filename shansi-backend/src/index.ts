@@ -50,6 +50,7 @@ async function runStartupMigrations() {
     sql`ALTER TABLE referral_config ADD COLUMN signup_reward_lari INTEGER NOT NULL DEFAULT 10`,
     sql`ALTER TABLE referral_config ADD COLUMN share_message_template TEXT`,
     sql`ALTER TABLE referral_config ADD COLUMN share_image_url TEXT`,
+    sql`ALTER TABLE tickets ADD COLUMN logo_url TEXT`,
     sql`CREATE TABLE IF NOT EXISTS tickets (
       id TEXT PRIMARY KEY,
       emoji TEXT NOT NULL,
