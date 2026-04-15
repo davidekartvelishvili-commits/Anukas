@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { MULTIPLIERS, SLOT_COLORS, BET_COST, type RiskLevel, type DropResult } from "./drop-config";
 import { playGame, ensureActiveTransaction } from "@/services/games";
 import { setCoinBalance as storeCoin, setCashBalance as storeCash } from "@/services/balance";
+import WinAnimation from "@/components/WinAnimation";
 
 const ROWS = 12;
 
@@ -116,6 +117,8 @@ export default function LuckyDropPage() {
     }).catch(() => {});
   }, []);
   const [bigWinText, setBigWinText] = useState("");
+  const [showWinAnim, setShowWinAnim] = useState(false);
+  const [winAnimAmount, setWinAnimAmount] = useState(0);
   const [bonusRoundInfo, setBonusRoundInfo] = useState<{ coins: number; gamesLeft: number } | null>(null);
   const dropCount = useRef(0);
   const BET_OPTIONS = [10, 25, 50, 100, 250, 500];
@@ -451,9 +454,10 @@ export default function LuckyDropPage() {
         }
         if (serverResult.totalWin > 0 && serverResult.won) {
           setWinAmount(serverResult.totalWin);
-          setBigWinText(`+${serverResult.totalWin}`);
           spawnParticles(serverResult.bonusWin > 20 ? 50 : 20, serverResult.bonusWin > 20);
-          setTimeout(() => setBigWinText(""), 2000);
+          // Trigger the new fancy win animation overlay
+          setWinAnimAmount(serverResult.totalWin);
+          setShowWinAnim(true);
         }
         // Always sync to server balance — never let it go UP from local
         setBalance((prev) => Math.min(prev, serverResult.coinsRemaining));
@@ -515,12 +519,12 @@ export default function LuckyDropPage() {
 
       {/* Risk selector removed — single mode */}
 
-      {/* Big center win text */}
-      <div className={`absolute inset-0 z-20 flex items-center justify-center pointer-events-none transition-all duration-300 ${bigWinText ? "opacity-100 scale-100" : "opacity-0 scale-75"}`}>
-        <span className="text-[64px] font-black bg-gradient-to-br from-yellow-400 to-amber-600 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 40px rgba(255,215,0,.6))", fontFamily: "var(--font-outfit)" }}>
-          {bigWinText}
-        </span>
-      </div>
+      {/* Win animation overlay — coin/bill rain + slot counter ramping to winAmount */}
+      <WinAnimation
+        show={showWinAnim}
+        amount={winAnimAmount}
+        onDone={() => setShowWinAnim(false)}
+      />
 
       {/* Bonus round banner */}
       {bonusRoundInfo && (
