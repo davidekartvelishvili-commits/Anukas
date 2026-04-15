@@ -48,6 +48,7 @@ publicRoute.get("/tickets", async (c) => {
     try { termsArr = JSON.parse((r as any).termsJson || "[]"); } catch {}
     return {
       id: r.id,
+      merchantId: (r as any).merchantId,
       emoji: r.emoji,
       logoUrl: (r as any).logoUrl,
       category: r.category,

@@ -991,7 +991,7 @@ admin.get("/merchants", adminMiddleware, async (c) => {
   const db = getDb();
   const status = c.req.query("status") || "all";
   const page = parseInt(c.req.query("page") || "1");
-  const limit = 20;
+  const limit = Math.min(parseInt(c.req.query("limit") || "20"), 500);
   const offset = (page - 1) * limit;
 
   let merchantList;
@@ -2434,8 +2434,26 @@ admin.post("/tickets", adminMiddleware, async (c) => {
   const adminId = c.get("adminId") as string;
   const db = getDb();
 
-  if (!body.title || !body.brand) {
-    throw new BadRequestError("title and brand are required");
+  // If merchant_id is provided, hydrate defaults from the merchant record
+  // so admin doesn't have to retype data we already have on file.
+  let merchantDefaults: { logo: string | null; brand: string; category: string; title: string; titleKa: string } | null = null;
+  if (body.merchant_id) {
+    const [m] = await db.select().from(merchants).where(eq(merchants.id, body.merchant_id)).limit(1);
+    if (m) {
+      merchantDefaults = {
+        logo: (m as any).logoUrl || null,
+        brand: m.businessName || "SHANSI",
+        category: m.category || "other",
+        title: m.businessName || "",
+        titleKa: (m as any).businessNameKa || m.businessName || "",
+      };
+    }
+  }
+
+  const title = body.title || merchantDefaults?.title;
+  const brand = body.brand || merchantDefaults?.brand;
+  if (!title || !brand) {
+    throw new BadRequestError("title and brand (or merchant_id) are required");
   }
 
   // Always auto-generate a unique serial server-side
@@ -2444,12 +2462,13 @@ admin.post("/tickets", adminMiddleware, async (c) => {
   const id = nanoid();
   await db.insert(tickets).values({
     id,
+    merchantId: body.merchant_id || null,
     emoji: body.emoji || "🎫",
-    logoUrl: body.logo_url || null,
-    category: body.category || "other",
-    title: body.title,
-    titleKa: body.title_ka || body.title,
-    brand: body.brand || "SHANSI",
+    logoUrl: body.logo_url || merchantDefaults?.logo || null,
+    category: body.category || merchantDefaults?.category || "other",
+    title,
+    titleKa: body.title_ka || merchantDefaults?.titleKa || title,
+    brand,
     validity: body.validity || "7 დღე",
     type: body.type || "ერთჯერადი",
     price: body.price || "0",
@@ -2465,7 +2484,7 @@ admin.post("/tickets", adminMiddleware, async (c) => {
     sortOrder: Number(body.sort_order ?? 0),
     isActive: body.is_active !== false,
     createdBy: adminId,
-  });
+  } as any);
 
   await logAction(adminId, "create_ticket", JSON.stringify({ id, title: body.title, serial }));
   const [created] = await db.select().from(tickets).where(eq(tickets.id, id)).limit(1);
@@ -2483,6 +2502,7 @@ admin.patch("/tickets/:id", adminMiddleware, async (c) => {
 
   const updates: Record<string, any> = {};
   const fieldMap: Record<string, string> = {
+    merchant_id: "merchantId",
     emoji: "emoji",
     logo_url: "logoUrl",
     category: "category",

@@ -7,6 +7,7 @@ import {
   createTicket,
   updateTicket,
   deleteTicket,
+  getMerchants,
   type AdminTicket,
 } from "@/services/admin";
 
@@ -53,13 +54,34 @@ const ACTIVE_ID = "tickets";
 // Category presets — chooses which back-side fields are relevant
 const CATEGORY_OPTIONS = [
   { value: "cinema", label: "🎬 Cinema (კინო)", emoji: "🎬", showSeating: true },
-  { value: "event", label: "🎤 Event (ღონისძიება)", emoji: "🎤", showSeating: true },
+  { value: "event", label: "🎤 Event / Concert (ღონისძიება)", emoji: "🎤", showSeating: true },
+  { value: "theatre", label: "🎭 Theatre (თეატრი)", emoji: "🎭", showSeating: true },
+  { value: "sport", label: "⚽ Sport Match (სპორტი)", emoji: "⚽", showSeating: true },
   { value: "cafe", label: "☕ Cafe (კაფე)", emoji: "☕", showSeating: false },
   { value: "restaurant", label: "🍽 Restaurant (რესტორანი)", emoji: "🍽", showSeating: false },
+  { value: "bar", label: "🍸 Bar / Club (ბარი)", emoji: "🍸", showSeating: false },
+  { value: "gamelounge", label: "🎮 Game Lounge (გეიმინგი)", emoji: "🎮", showSeating: false },
+  { value: "billiard", label: "🎱 Billiard (ბილიარდი)", emoji: "🎱", showSeating: false },
+  { value: "bowling", label: "🎳 Bowling (ბოულინგი)", emoji: "🎳", showSeating: false },
+  { value: "karaoke", label: "🎤 Karaoke (კარაოკე)", emoji: "🎤", showSeating: false },
+  { value: "escape", label: "🗝 Escape Room", emoji: "🗝", showSeating: false },
+  { value: "gym", label: "💪 Gym / Fitness (სპორტდარბაზი)", emoji: "💪", showSeating: false },
+  { value: "spa", label: "💆 Spa / Beauty (სპა)", emoji: "💆", showSeating: false },
   { value: "retail", label: "🛍 Retail (მაღაზია)", emoji: "🛍", showSeating: false },
   { value: "service", label: "💼 Service (სერვისი)", emoji: "💼", showSeating: false },
   { value: "other", label: "🎫 Other (სხვა)", emoji: "🎫", showSeating: false },
 ];
+
+// Map merchant.category → ticket category preset
+function mapMerchantCategory(mc: string | null | undefined): string {
+  const c = (mc || "").toLowerCase();
+  if (CATEGORY_OPTIONS.find((o) => o.value === c)) return c;
+  if (c === "food") return "restaurant";
+  if (c === "grocery") return "retail";
+  if (c === "pharmacy") return "service";
+  if (c === "entertainment") return "event";
+  return "other";
+}
 
 function categoryMeta(value: string) {
   return CATEGORY_OPTIONS.find((c) => c.value === value) || CATEGORY_OPTIONS[CATEGORY_OPTIONS.length - 1];
@@ -92,7 +114,16 @@ async function fileToCompressedBase64(file: File, maxDim = 400, quality = 0.85):
   });
 }
 
+type ActiveMerchant = {
+  id: string;
+  businessName: string;
+  businessNameKa?: string | null;
+  category: string;
+  logoUrl?: string | null;
+};
+
 const emptyForm = {
+  merchant_id: "" as string,
   logo_url: "" as string | null,
   category: "cinema",
   title: "",
@@ -117,6 +148,7 @@ export default function TicketsAdminPage() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [rows, setRows] = useState<AdminTicket[]>([]);
+  const [activeMerchants, setActiveMerchants] = useState<ActiveMerchant[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
@@ -147,6 +179,26 @@ export default function TicketsAdminPage() {
 
   useEffect(() => { fetchList(); }, [fetchList]);
 
+  // Load active merchants once for the dropdown
+  useEffect(() => {
+    (async () => {
+      try {
+        const res: any = await getMerchants("active", 1, 500);
+        setActiveMerchants(
+          (res?.merchants || []).map((m: any) => ({
+            id: m.id,
+            businessName: m.businessName,
+            businessNameKa: m.businessNameKa,
+            category: m.category,
+            logoUrl: m.logoUrl,
+          }))
+        );
+      } catch {
+        // non-fatal — admin can still create with manual entry
+      }
+    })();
+  }, []);
+
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm);
@@ -158,6 +210,7 @@ export default function TicketsAdminPage() {
     // Map legacy free-text category to one of our presets if possible
     const matched = CATEGORY_OPTIONS.find((c) => c.value.toLowerCase() === (t.category || "").toLowerCase());
     setForm({
+      merchant_id: t.merchantId || "",
       logo_url: t.logoUrl || "",
       category: matched?.value || "other",
       title: t.title,
@@ -178,6 +231,26 @@ export default function TicketsAdminPage() {
       is_active: t.isActive,
     });
     setModalOpen(true);
+  };
+
+  const selectMerchant = (mid: string) => {
+    if (!mid) {
+      // Detach merchant — keep current manual fields
+      setForm((p) => ({ ...p, merchant_id: "" }));
+      return;
+    }
+    const m = activeMerchants.find((x) => x.id === mid);
+    if (!m) return;
+    const cat = mapMerchantCategory(m.category);
+    setForm((p) => ({
+      ...p,
+      merchant_id: m.id,
+      logo_url: m.logoUrl || p.logo_url,
+      category: cat,
+      brand: m.businessName?.toUpperCase().slice(0, 12) || p.brand,
+      title: p.title || m.businessName,
+      title_ka: p.title_ka || m.businessNameKa || m.businessName,
+    }));
   };
 
   const handleLogoFile = async (file: File) => {
@@ -202,6 +275,7 @@ export default function TicketsAdminPage() {
     try {
       const meta = categoryMeta(form.category);
       const payload: Record<string, any> = {
+        merchant_id: form.merchant_id || null,
         emoji: meta.emoji, // fallback used only if no logo
         logo_url: form.logo_url || null,
         category: form.category,
@@ -383,9 +457,54 @@ export default function TicketsAdminPage() {
             </div>
 
             <div className="space-y-3">
+              {/* Merchant picker — pre-fills logo, brand, category, title */}
+              <div className="rounded-[10px] p-3" style={{ background: "#0F0F0F", border: "1px solid #252525" }}>
+                <label className="text-[11px] mb-2 block font-semibold" style={{ color: "#F9E741" }}>
+                  🏪 აირჩიე მერჩანტი (არასავალდებულო)
+                </label>
+                <select
+                  value={form.merchant_id}
+                  onChange={(e) => selectMerchant(e.target.value)}
+                  style={{ ...inputStyle, appearance: "none" as const }}
+                >
+                  <option value="">— ცარიელი (manual entry) —</option>
+                  {activeMerchants.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.businessName}{m.businessNameKa ? ` (${m.businessNameKa})` : ""} — {m.category}
+                    </option>
+                  ))}
+                </select>
+                {form.merchant_id && (
+                  <div className="flex items-center gap-2 mt-2">
+                    {(() => {
+                      const m = activeMerchants.find((x) => x.id === form.merchant_id);
+                      return m ? (
+                        <>
+                          {m.logoUrl ? (
+                            <img src={m.logoUrl} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover", background: "#fff" }} />
+                          ) : (
+                            <div style={{ width: 28, height: 28, borderRadius: 6, background: "#222" }} />
+                          )}
+                          <div className="text-[11px]" style={{ color: "#22C55E" }}>
+                            ✓ ლოგო, ბრენდი და კატეგორია გადმოიწერა — შეგიძლია გადააწერო ქვემოთ
+                          </div>
+                        </>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
+                {!form.merchant_id && activeMerchants.length === 0 && (
+                  <div className="text-[10px] mt-2" style={{ color: "#666" }}>
+                    აქტიური მერჩანტი არ მოიძებნა — ჯერ დაამატე მერჩანტი Merchants გვერდიდან
+                  </div>
+                )}
+              </div>
+
               {/* Logo upload */}
               <div>
-                <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>ლოგო (მერჩანტის ლოგო)</label>
+                <label className="text-[11px] mb-1 block" style={{ color: "#A0A0A0" }}>
+                  ლოგო {form.merchant_id ? "(მერჩანტიდან გადმოიწერა — შეგიძლია შეცვლა)" : "(მერჩანტის ლოგო)"}
+                </label>
                 <div
                   onClick={() => !logoUploading && logoInputRef.current?.click()}
                   className="flex items-center gap-3 p-2 rounded-[8px] cursor-pointer transition-all hover:brightness-110"

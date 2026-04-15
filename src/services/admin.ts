@@ -109,6 +109,7 @@ export async function deleteUser(userId: string) {
 // ── Tickets ──
 export interface AdminTicket {
   id: string;
+  merchantId: string | null;
   emoji: string;
   logoUrl: string | null;
   category: string;
@@ -240,9 +241,10 @@ export async function setMasterSwitch(enabled: boolean) {
 
 // ── Merchants ──
 
-export async function getMerchants(status?: string, page = 1) {
+export async function getMerchants(status?: string, page = 1, limit?: number) {
   const params = new URLSearchParams({ page: String(page) });
   if (status && status !== "all") params.set("status", status);
+  if (limit) params.set("limit", String(limit));
   return adminFetch(`/admin/merchants?${params}`);
 }
 

@@ -193,6 +193,7 @@ export const offers = sqliteTable("offers", {
 
 export const tickets = sqliteTable("tickets", {
   id: text("id").primaryKey(),
+  merchantId: text("merchant_id"), // optional link to merchants table — when set, logo/brand can be inherited
   emoji: text("emoji").notNull(), // fallback when no logo uploaded
   logoUrl: text("logo_url"),       // base64 or https URL of merchant logo
   category: text("category").notNull(),
