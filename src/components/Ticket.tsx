@@ -243,20 +243,22 @@ export default function Ticket({ data, onActivate }: { data: TicketData; onActiv
         )}
       </div>
 
-      {/* Activate button — same style as welcome sign-up button, but more compact */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onActivate?.();
-        }}
-        className="mt-3 w-full h-[44px] rounded-[22px] bg-[#1A1A1A] text-white text-[14px] font-bold active:scale-[0.96] transition-transform duration-150"
-        style={{
-          fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-        }}
-      >
-        Activate
-      </button>
+      {/* Activate button — narrower, taller, centered pill like the welcome sign-up button */}
+      <div className="mt-4 flex justify-center">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onActivate?.();
+          }}
+          className="w-[170px] h-[58px] rounded-[29px] bg-[#1A1A1A] text-white text-[16px] font-bold active:scale-[0.96] transition-transform duration-150"
+          style={{
+            fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+          }}
+        >
+          Activate
+        </button>
+      </div>
     </div>
   );
 }
