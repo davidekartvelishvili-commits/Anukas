@@ -119,7 +119,15 @@ export default function HomePage() {
   const [coinBalance, setCoinBalanceState] = useState(0);
   const [gender, setGender] = useState("Male");
   const [activeGameTypes, setActiveGameTypes] = useState<string[]>(["slot", "plinko", "chicken_rush"]);
+  const [promoCount, setPromoCount] = useState(0);
   const countdown = useCountdown(15.58);
+
+  // "Seen" tracking — hide badge after user visits /promos on a given day
+  const todayKey = () => {
+    const d = new Date();
+    return `promos_seen_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const [promoSeenToday, setPromoSeenToday] = useState(false);
 
   useEffect(() => {
     seedTestUser();
@@ -142,6 +150,20 @@ export default function HomePage() {
         }
       }).catch(() => {});
     }
+
+    // Fetch real promo (offer) count — public endpoint, no auth needed
+    apiFetch("/offers?active=true").then((data: any) => {
+      if (data?.success && Array.isArray(data.offers)) {
+        setPromoCount(data.offers.length);
+      }
+    }).catch(() => {});
+
+    // Check if user has already visited /promos today — hide badge if so
+    try {
+      if (typeof window !== "undefined" && localStorage.getItem(todayKey()) === "1") {
+        setPromoSeenToday(true);
+      }
+    } catch {}
     const saved = localStorage.getItem("user-gender");
     if (saved) setGender(saved);
     const t = setTimeout(() => setMounted(true), 50);
@@ -245,7 +267,16 @@ export default function HomePage() {
           <div
             className="mt-6 flex items-center justify-between px-5 py-5 rounded-[20px] cursor-pointer active:scale-[0.98] transition-transform"
             style={{ ...stagger(2), background: "#A8E06C" }}
-            onClick={() => router.push("/promos")}
+            onClick={() => {
+              // Mark as seen for the day — badge won't reappear until tomorrow
+              try {
+                if (typeof window !== "undefined") {
+                  localStorage.setItem(todayKey(), "1");
+                }
+              } catch {}
+              setPromoSeenToday(true);
+              router.push("/promos");
+            }}
           >
             <div className="flex items-center gap-3">
               <TrophyIcon />
@@ -253,9 +284,13 @@ export default function HomePage() {
                 Today&apos;s Promo Inbox
               </span>
             </div>
-            <div className="w-[28px] h-[28px] rounded-full bg-[#EF4444] flex items-center justify-center">
-              <span className="text-[13px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>5</span>
-            </div>
+            {!promoSeenToday && promoCount > 0 && (
+              <div className="w-[28px] h-[28px] rounded-full bg-[#EF4444] flex items-center justify-center">
+                <span className="text-[13px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
+                  {promoCount}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* ── Mystery Box ── */}
