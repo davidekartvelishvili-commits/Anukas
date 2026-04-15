@@ -321,6 +321,32 @@ admin.patch("/master-switch", adminMiddleware, async (c) => {
   return c.json({ success: true, enabled });
 });
 
+// GET /admin/mystery-box-enabled
+admin.get("/mystery-box-enabled", adminMiddleware, async (c) => {
+  const db = getDb();
+  const [row] = await db.select().from(systemConfig).where(eq(systemConfig.key, "mystery_box_enabled")).limit(1);
+  // Default: enabled
+  return c.json({ success: true, enabled: row?.value !== "false" });
+});
+
+// PATCH /admin/mystery-box-enabled
+admin.patch("/mystery-box-enabled", adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const enabled = body.enabled === true;
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  const [existing] = await db.select().from(systemConfig).where(eq(systemConfig.key, "mystery_box_enabled")).limit(1);
+  if (existing) {
+    await db.update(systemConfig).set({ value: String(enabled), updatedAt: new Date().toISOString() }).where(eq(systemConfig.key, "mystery_box_enabled"));
+  } else {
+    await db.insert(systemConfig).values({ key: "mystery_box_enabled", value: String(enabled) });
+  }
+
+  await logAction(adminId, "mystery_box_toggle", JSON.stringify({ enabled }));
+  return c.json({ success: true, enabled });
+});
+
 // GET /admin/users
 admin.get("/users", adminMiddleware, async (c) => {
   const db = getDb();

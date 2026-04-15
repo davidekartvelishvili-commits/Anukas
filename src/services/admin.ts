@@ -106,6 +106,18 @@ export async function deleteUser(userId: string) {
   });
 }
 
+// Mystery box feature toggle
+export async function getMysteryBoxEnabled() {
+  return adminFetch<{ enabled: boolean }>("/admin/mystery-box-enabled");
+}
+
+export async function setMysteryBoxEnabled(enabled: boolean) {
+  return adminFetch("/admin/mystery-box-enabled", {
+    method: "PATCH",
+    body: JSON.stringify({ enabled }),
+  });
+}
+
 export async function updateUserStatus(userId: string, isActive: boolean) {
   return adminFetch(`/admin/users/${userId}/status`, {
     method: "PATCH",

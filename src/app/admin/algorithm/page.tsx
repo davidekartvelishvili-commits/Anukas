@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getGameConfig, updateGameConfig, getPool, fundPool, getMasterSwitch, setMasterSwitch, getBigWinConfig, updateBigWinConfig, getBigWinPrizes, createBigWinPrize, updateBigWinPrize, deleteBigWinPrize, getFinanceData } from "@/services/admin";
+import { getGameConfig, updateGameConfig, getPool, fundPool, getMasterSwitch, setMasterSwitch, getBigWinConfig, updateBigWinConfig, getBigWinPrizes, createBigWinPrize, updateBigWinPrize, deleteBigWinPrize, getFinanceData, getMysteryBoxEnabled, setMysteryBoxEnabled } from "@/services/admin";
 import AdminAuthGuard from "@/components/admin/AdminAuthGuard";
 
 /* ── SVG ICONS (same as dashboard) ── */
@@ -71,6 +71,8 @@ function AlgorithmContent() {
 
   // Master switch
   const [winningsEnabled, setWinningsEnabled] = useState(true);
+  const [mysteryEnabled, setMysteryEnabled] = useState(true);
+  const [mysteryBusy, setMysteryBusy] = useState(false);
   const [showConfirmOff, setShowConfirmOff] = useState(false);
 
   // Params
@@ -117,6 +119,10 @@ function AlgorithmContent() {
 
     getMasterSwitch().then((data: any) => {
       if (data.success !== undefined) setWinningsEnabled(data.enabled);
+    }).catch(() => {});
+
+    getMysteryBoxEnabled().then((data: any) => {
+      if (data?.success !== undefined) setMysteryEnabled(data.enabled !== false);
     }).catch(() => {});
 
     loadBigWin();
@@ -553,6 +559,39 @@ function AlgorithmContent() {
                 style={{ background: winningsEnabled ? "#22C55E" : "#EF4444" }}
               >
                 <div className="absolute top-[3px] w-[24px] h-[24px] rounded-full bg-white transition-all duration-300" style={{ left: winningsEnabled ? "29px" : "3px" }} />
+              </button>
+            </div>
+          </div>
+
+          {/* ═══ SECTION 2b: MYSTERY BOX TOGGLE ═══ */}
+          <div className="rounded-[12px] p-5 border-2 transition-all" style={{ background: "#111111", borderColor: mysteryEnabled ? "#22C55E" : "#444" }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[14px] font-bold mb-1" style={{ color: "#FFFFFF" }}>Mystery Box (Home)</p>
+                <p className="text-[13px] font-medium" style={{ color: mysteryEnabled ? "#22C55E" : "#888" }}>
+                  {mysteryEnabled
+                    ? "Mystery Box ჩანს მთავარ გვერდზე"
+                    : "Mystery Box დამალულია მთავარი გვერდიდან"}
+                </p>
+              </div>
+              <button
+                disabled={mysteryBusy}
+                onClick={async () => {
+                  setMysteryBusy(true);
+                  const next = !mysteryEnabled;
+                  setMysteryEnabled(next); // optimistic
+                  try {
+                    await setMysteryBoxEnabled(next);
+                  } catch {
+                    setMysteryEnabled(!next); // rollback
+                  } finally {
+                    setMysteryBusy(false);
+                  }
+                }}
+                className="relative w-[56px] h-[30px] rounded-full transition-all duration-300 disabled:opacity-50"
+                style={{ background: mysteryEnabled ? "#22C55E" : "#444" }}
+              >
+                <div className="absolute top-[3px] w-[24px] h-[24px] rounded-full bg-white transition-all duration-300" style={{ left: mysteryEnabled ? "29px" : "3px" }} />
               </button>
             </div>
           </div>

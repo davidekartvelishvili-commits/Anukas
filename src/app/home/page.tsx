@@ -101,6 +101,7 @@ export default function HomePage() {
   const [gender, setGender] = useState("Male");
   const [activeGameTypes, setActiveGameTypes] = useState<string[]>(["slot", "plinko", "chicken_rush"]);
   const [promoCount, setPromoCount] = useState(0);
+  const [mysteryBoxEnabled, setMysteryBoxEnabled] = useState(true);
   const countdown = useCountdown(15.58);
 
   // "Seen" tracking — hide badge after user visits /promos on a given day
@@ -136,6 +137,13 @@ export default function HomePage() {
     apiFetch("/offers?active=true").then((data: any) => {
       if (data?.success && Array.isArray(data.offers)) {
         setPromoCount(data.offers.length);
+      }
+    }).catch(() => {});
+
+    // Fetch feature flags (mystery box on/off)
+    apiFetch("/public/features").then((data: any) => {
+      if (data?.success && data.features) {
+        setMysteryBoxEnabled(data.features.mysteryBoxEnabled !== false);
       }
     }).catch(() => {});
 
@@ -275,6 +283,7 @@ export default function HomePage() {
           </div>
 
           {/* ── Mystery Box ── */}
+          {mysteryBoxEnabled && (
           <div
             className="mt-6 rounded-[20px] overflow-hidden relative cursor-pointer active:scale-[0.98] transition-transform"
             style={{ ...stagger(3), background: "#E8C840", minHeight: 220 }}
@@ -327,6 +336,7 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+          )}
 
           {/* ── Link a Card ── */}
           <div
