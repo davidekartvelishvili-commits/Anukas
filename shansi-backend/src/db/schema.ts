@@ -191,6 +191,31 @@ export const offers = sqliteTable("offers", {
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
 });
 
+export const tickets = sqliteTable("tickets", {
+  id: text("id").primaryKey(),
+  emoji: text("emoji").notNull(),
+  category: text("category").notNull(),
+  title: text("title").notNull(),
+  titleKa: text("title_ka").notNull(),
+  brand: text("brand").notNull(),
+  validity: text("validity").notNull(),
+  type: text("type").notNull(),
+  price: text("price").notNull(),
+  bonus: text("bonus").notNull(),
+  personName: text("person_name").notNull(),
+  screen: text("screen"),
+  rowLabel: text("row_label"),
+  seat: text("seat"),
+  serial: text("serial").notNull(),
+  social: text("social"),
+  termsJson: text("terms_json").notNull().default("[]"), // JSON array of strings
+  website: text("website").notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  createdBy: text("created_by"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
 export const pendingPayments = sqliteTable("pending_payments", {
   id: text("id").primaryKey(),
   merchantId: text("merchant_id").notNull().references(() => merchants.id),

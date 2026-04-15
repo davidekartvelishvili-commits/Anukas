@@ -39,6 +39,7 @@ const NAV_ITEMS = [
   { label: "Transactions", id: "transactions", href: "/admin/transactions" },
   { label: "Games", id: "games", href: "/admin/games" },
   { label: "Offers", id: "offers", href: "/admin/offers" },
+  { label: "Tickets", id: "tickets", href: "/admin/tickets" },
   { label: "Promos", id: "promos", href: "/admin/promos" },
   { label: "Referrals", id: "referrals", href: "/admin/referrals" },
   { label: "Withdrawals", id: "withdrawals", href: "/admin/withdrawals" },

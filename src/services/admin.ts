@@ -106,6 +106,47 @@ export async function deleteUser(userId: string) {
   });
 }
 
+// ── Tickets ──
+export interface AdminTicket {
+  id: string;
+  emoji: string;
+  category: string;
+  title: string;
+  titleKa: string;
+  brand: string;
+  validity: string;
+  type: string;
+  price: string;
+  bonus: string;
+  personName: string;
+  screen: string | null;
+  row: string | null;
+  seat: string | null;
+  serial: string;
+  social: string | null;
+  terms: string[];
+  website: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export async function getTicketsAdmin() {
+  return adminFetch<{ tickets: AdminTicket[] }>("/admin/tickets");
+}
+
+export async function createTicket(data: Record<string, any>) {
+  return adminFetch("/admin/tickets", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updateTicket(id: string, data: Record<string, any>) {
+  return adminFetch(`/admin/tickets/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function deleteTicket(id: string) {
+  return adminFetch(`/admin/tickets/${id}`, { method: "DELETE" });
+}
+
 // Mystery box feature toggle
 export async function getMysteryBoxEnabled() {
   return adminFetch<{ enabled: boolean }>("/admin/mystery-box-enabled");

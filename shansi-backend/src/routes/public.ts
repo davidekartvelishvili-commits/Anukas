@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { referralConfig, systemConfig } from "../db/schema.js";
+import { referralConfig, systemConfig, tickets } from "../db/schema.js";
+import { desc, and } from "drizzle-orm";
 
 // Public endpoints (no auth required) — used by OG metadata / scrapers / share pages
 const publicRoute = new Hono<AppEnv>();
@@ -36,6 +37,37 @@ publicRoute.get("/features", async (c) => {
       mysteryBoxEnabled: mbx?.value !== "false", // default enabled
     },
   });
+});
+
+// GET /public/tickets — active tickets for home page strip
+publicRoute.get("/tickets", async (c) => {
+  const db = getDb();
+  const rows = await db.select().from(tickets).where(eq(tickets.isActive, true)).orderBy(tickets.sortOrder, desc(tickets.createdAt));
+  const shaped = rows.map((r) => {
+    let termsArr: string[] = [];
+    try { termsArr = JSON.parse((r as any).termsJson || "[]"); } catch {}
+    return {
+      id: r.id,
+      emoji: r.emoji,
+      category: r.category,
+      title: r.title,
+      titleKa: r.titleKa,
+      brand: r.brand,
+      validity: r.validity,
+      type: r.type,
+      price: r.price,
+      bonus: r.bonus,
+      personName: r.personName,
+      screen: r.screen,
+      row: (r as any).rowLabel,
+      seat: r.seat,
+      serial: r.serial,
+      social: r.social,
+      terms: termsArr,
+      website: r.website,
+    };
+  });
+  return c.json({ success: true, tickets: shaped });
 });
 
 export { publicRoute };

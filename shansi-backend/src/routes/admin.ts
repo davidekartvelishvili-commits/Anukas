@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig, bigWinConfig, bigWinPrizes, bigWinHistory, villages, villageBuildings, userVillageProgress, offers } from "../db/schema.js";
+import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig, bigWinConfig, bigWinPrizes, bigWinHistory, villages, villageBuildings, userVillageProgress, offers, tickets } from "../db/schema.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/errors.js";
@@ -2396,6 +2396,112 @@ admin.delete("/offers/:id", adminMiddleware, async (c) => {
   const adminId = c.get("adminId") as string;
   await db.delete(offers).where(eq(offers.id, id));
   await logAction(adminId, "delete_offer", JSON.stringify({ id }));
+  return c.json({ success: true });
+});
+
+// ══════════════════════════════════════
+// TICKETS (home page swipeable strip)
+// ══════════════════════════════════════
+
+admin.get("/tickets", adminMiddleware, async (c) => {
+  const db = getDb();
+  const rows = await db.select().from(tickets).orderBy(tickets.sortOrder, desc(tickets.createdAt));
+  const shaped = rows.map((r) => {
+    let termsArr: string[] = [];
+    try { termsArr = JSON.parse((r as any).termsJson || "[]"); } catch {}
+    return { ...r, terms: termsArr, row: (r as any).rowLabel };
+  });
+  return c.json({ success: true, tickets: shaped });
+});
+
+admin.post("/tickets", adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const adminId = c.get("adminId") as string;
+  const db = getDb();
+
+  if (!body.title || !body.brand || !body.serial) {
+    throw new BadRequestError("title, brand, and serial are required");
+  }
+
+  const id = nanoid();
+  await db.insert(tickets).values({
+    id,
+    emoji: body.emoji || "🎫",
+    category: body.category || "Offer",
+    title: body.title,
+    titleKa: body.title_ka || body.title,
+    brand: body.brand || "SHANSI",
+    validity: body.validity || "7 დღე",
+    type: body.type || "ერთჯერადი",
+    price: body.price || "0",
+    bonus: body.bonus || "+ 0₾",
+    personName: body.person_name || "",
+    screen: body.screen || null,
+    rowLabel: body.row || null,
+    seat: body.seat || null,
+    serial: body.serial,
+    social: body.social || null,
+    termsJson: JSON.stringify(Array.isArray(body.terms) ? body.terms : []),
+    website: body.website || "WWW.SHANSI.GE",
+    sortOrder: Number(body.sort_order ?? 0),
+    isActive: body.is_active !== false,
+    createdBy: adminId,
+  });
+
+  await logAction(adminId, "create_ticket", JSON.stringify({ id, title: body.title }));
+  const [created] = await db.select().from(tickets).where(eq(tickets.id, id)).limit(1);
+  return c.json({ success: true, ticket: created });
+});
+
+admin.patch("/tickets/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id") as string;
+  const body = await c.req.json();
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  const [existing] = await db.select().from(tickets).where(eq(tickets.id, id)).limit(1);
+  if (!existing) return c.json({ success: false, message: "Not found" }, 404);
+
+  const updates: Record<string, any> = {};
+  const fieldMap: Record<string, string> = {
+    emoji: "emoji",
+    category: "category",
+    title: "title",
+    title_ka: "titleKa",
+    brand: "brand",
+    validity: "validity",
+    type: "type",
+    price: "price",
+    bonus: "bonus",
+    person_name: "personName",
+    screen: "screen",
+    row: "rowLabel",
+    seat: "seat",
+    serial: "serial",
+    social: "social",
+    website: "website",
+  };
+  for (const [bodyKey, dbKey] of Object.entries(fieldMap)) {
+    if (body[bodyKey] !== undefined) updates[dbKey] = body[bodyKey];
+  }
+  if (body.terms !== undefined && Array.isArray(body.terms)) updates.termsJson = JSON.stringify(body.terms);
+  if (body.sort_order !== undefined) updates.sortOrder = Number(body.sort_order);
+  if (body.is_active !== undefined) updates.isActive = !!body.is_active;
+
+  if (Object.keys(updates).length > 0) {
+    await db.update(tickets).set(updates).where(eq(tickets.id, id));
+  }
+  await logAction(adminId, "update_ticket", JSON.stringify({ id, updates: Object.keys(updates) }));
+  const [updated] = await db.select().from(tickets).where(eq(tickets.id, id)).limit(1);
+  return c.json({ success: true, ticket: updated });
+});
+
+admin.delete("/tickets/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id") as string;
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+  await db.delete(tickets).where(eq(tickets.id, id));
+  await logAction(adminId, "delete_ticket", JSON.stringify({ id }));
   return c.json({ success: true });
 });
 

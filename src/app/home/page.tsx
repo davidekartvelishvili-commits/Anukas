@@ -60,76 +60,6 @@ function TrophyIcon() {
 
 /* ───────── GAMES DATA ───────── */
 
-const MOCK_TICKETS: TicketData[] = [
-  {
-    id: "t1",
-    emoji: "🎬",
-    category: "Movie",
-    title: "Cinepark",
-    titleKa: "კინოს ბილეთი",
-    brand: "SHANSI",
-    screen: "18",
-    row: "H",
-    seat: "55",
-    validity: "7 დღე",
-    type: "ნებ. ფილმი",
-    price: "2.50",
-    bonus: "+ 1₾",
-    personName: "Adam Park",
-    serial: "SH2025001234",
-    social: "f  X  @SHANSIAPP",
-    terms: [
-      "ერთჯერადად გამოყენებადია",
-      "მოქმედებს გამოწერიდან 7 დღე",
-      "გადაცემა შეუძლებელია",
-      "მხოლოდ Cinepark ფილიალებში",
-    ],
-    website: "WWW.SHANSI.GE",
-  },
-  {
-    id: "t2",
-    emoji: "☕",
-    category: "Cafe",
-    title: "Stamba",
-    titleKa: "ყავის კუპონი",
-    brand: "SHANSI",
-    validity: "14 დღე",
-    type: "ცხელი სასმელი",
-    price: "1.80",
-    bonus: "+ 2₾",
-    personName: "Nino K.",
-    serial: "SH2025001235",
-    social: "f  X  @STAMBACAFE",
-    terms: [
-      "1x ნებისმიერი ცხელი სასმელი",
-      "მოქმედებს 14 დღე",
-      "ვრცელდება ყველა ფილიალზე",
-    ],
-    website: "WWW.STAMBA.GE",
-  },
-  {
-    id: "t3",
-    emoji: "🍔",
-    category: "Restaurant",
-    title: "Wendy's",
-    titleKa: "5₾ ფასდაკლება",
-    brand: "SHANSI",
-    validity: "30 დღე",
-    type: "შეკვეთა",
-    price: "3.20",
-    bonus: "+ 5₾",
-    personName: "Giorgi M.",
-    serial: "SH2025001236",
-    social: "f  @WENDYSGE",
-    terms: [
-      "მინ. შეკვეთა 15₾",
-      "არ ერთიანდება სხვა აქციებთან",
-      "ერთჯერადად",
-    ],
-    website: "WWW.WENDYS.GE",
-  },
-];
-
 const ALL_GAMES = [
   { id: 1, name: "Midnight Machine", gameType: "slot", color: "#4338CA", gradient: "linear-gradient(135deg, #4338CA, #6366F1)" },
   { id: 3, name: "Lucky Step", gameType: "chicken_rush", color: "#1a237e", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)" },
@@ -173,6 +103,7 @@ export default function HomePage() {
   const [activeGameTypes, setActiveGameTypes] = useState<string[]>(["slot", "plinko", "chicken_rush"]);
   const [promoCount, setPromoCount] = useState(0);
   const [mysteryBoxEnabled, setMysteryBoxEnabled] = useState(true);
+  const [liveTickets, setLiveTickets] = useState<TicketData[]>([]);
   const countdown = useCountdown(15.58);
 
   // "Seen" tracking — hide badge after user visits /promos on a given day
@@ -215,6 +146,13 @@ export default function HomePage() {
     apiFetch("/public/features").then((data: any) => {
       if (data?.success && data.features) {
         setMysteryBoxEnabled(data.features.mysteryBoxEnabled !== false);
+      }
+    }).catch(() => {});
+
+    // Fetch live tickets from backend
+    apiFetch("/public/tickets").then((data: any) => {
+      if (data?.success && Array.isArray(data.tickets)) {
+        setLiveTickets(data.tickets);
       }
     }).catch(() => {});
 
@@ -353,32 +291,34 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* ── Swipeable Tickets Row ── */}
-          <div
-            className="mt-6 -mx-4 overflow-x-auto scrollbar-hide"
-            style={{
-              ...stagger(3),
-              scrollSnapType: "x mandatory",
-              WebkitOverflowScrolling: "touch",
-              paddingLeft: 16,
-              paddingRight: 16,
-            }}
-          >
-            <div className="flex gap-4" style={{ width: "max-content" }}>
-              {MOCK_TICKETS.map((t) => (
-                <div
-                  key={t.id}
-                  style={{
-                    scrollSnapAlign: "center",
-                    scrollSnapStop: "always",
-                    flexShrink: 0,
-                  }}
-                >
-                  <Ticket data={t} />
-                </div>
-              ))}
+          {/* ── Swipeable Tickets Row (admin-managed via /admin/tickets) ── */}
+          {liveTickets.length > 0 && (
+            <div
+              className="mt-6 -mx-4 overflow-x-auto scrollbar-hide"
+              style={{
+                ...stagger(3),
+                scrollSnapType: "x mandatory",
+                WebkitOverflowScrolling: "touch",
+                paddingLeft: 16,
+                paddingRight: 16,
+              }}
+            >
+              <div className="flex gap-4" style={{ width: "max-content" }}>
+                {liveTickets.map((t) => (
+                  <div
+                    key={t.id}
+                    style={{
+                      scrollSnapAlign: "center",
+                      scrollSnapStop: "always",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Ticket data={t} />
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* ── Mystery Box ── */}
           {mysteryBoxEnabled && (
