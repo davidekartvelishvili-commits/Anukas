@@ -306,9 +306,9 @@ export default function WelcomePage() {
         for (let i = 0; i < n; i++) {
           const b = bodies.current[i];
           if (draggingIdx.current === i) {
-            // While dragging: no inertia damping (direct follow). Rotation still spins down.
-            b.vr *= 0.92;
-            if (Math.abs(b.vr) < 0.05) b.vr = 0;
+            // While dragging: no inertia damping (direct follow). Rotation settles quickly.
+            b.vr *= 0.85;
+            if (Math.abs(b.vr) < 0.08) b.vr = 0;
             b.r += b.vr;
             continue;
           }
@@ -318,10 +318,10 @@ export default function WelcomePage() {
           b.vy *= FRICTION;
           if (Math.abs(b.vx) < 0.05) b.vx = 0;
           if (Math.abs(b.vy) < 0.05) b.vy = 0;
-          // Rotation — spinning body with angular friction (cosmos-style, free spin)
+          // Rotation — strong angular friction so items don't keep spinning like a top
           b.r += b.vr;
-          b.vr *= 0.985;
-          if (Math.abs(b.vr) < 0.03) b.vr = 0;
+          b.vr *= 0.93;
+          if (Math.abs(b.vr) < 0.08) b.vr = 0;
         }
 
         // ── Collision detection + momentum transfer ──
@@ -368,11 +368,11 @@ export default function WelcomePage() {
                   bj.vy += ny * impulse;
                 }
 
-                // ── Angular impulse — cosmos-style 360° spin on collision ──
-                // Tangent component of relative velocity creates spin
+                // ── Gentle angular impulse — natural, subtle rotation on collision (not a fidget spinner) ──
                 const tx = -ny, ty = nx;
                 const tangential = dvx * tx + dvy * ty;
-                const spinMagnitude = Math.min(25, Math.abs(tangential) * 2.5 + Math.abs(dvDotN) * 1.8);
+                // Small multiplier + low cap so the spin is a subtle rotation, not a full spin
+                const spinMagnitude = Math.min(3.5, Math.abs(tangential) * 0.5);
                 const spinDir = tangential >= 0 ? 1 : -1;
                 if (draggingIdx.current !== j) bj.vr += spinDir * spinMagnitude;
                 if (draggingIdx.current !== i) bi.vr -= spinDir * spinMagnitude;
@@ -414,9 +414,9 @@ export default function WelcomePage() {
             }
           };
 
-          // Wall-bounce angular impulse: tangential velocity component spins the body
+          // Wall-bounce angular impulse — very gentle, only noticeable on corner/glancing hits
           const addSpinFromWall = (tangential: number) => {
-            const mag = Math.min(20, Math.abs(tangential) * 2 + 3);
+            const mag = Math.min(2.5, Math.abs(tangential) * 0.35);
             b.vr += (tangential >= 0 ? 1 : -1) * mag;
           };
 
