@@ -6,6 +6,7 @@ import { getCoinBalance, getCashBalance, exchange as doExchange, seedTestUser } 
 import { getMe, getStoredToken } from "@/services/auth";
 import { apiFetch } from "@/services/api";
 import AuthGuard from "@/components/AuthGuard";
+import Ticket, { type TicketData } from "@/components/Ticket";
 
 /* ───────── ICONS ───────── */
 
@@ -58,6 +59,76 @@ function TrophyIcon() {
 }
 
 /* ───────── GAMES DATA ───────── */
+
+const MOCK_TICKETS: TicketData[] = [
+  {
+    id: "t1",
+    emoji: "🎬",
+    category: "Movie",
+    title: "Cinepark",
+    titleKa: "კინოს ბილეთი",
+    brand: "SHANSI",
+    screen: "18",
+    row: "H",
+    seat: "55",
+    validity: "7 დღე",
+    type: "ნებ. ფილმი",
+    price: "2.50",
+    bonus: "+ 1₾",
+    personName: "Adam Park",
+    serial: "SH2025001234",
+    social: "f  X  @SHANSIAPP",
+    terms: [
+      "ერთჯერადად გამოყენებადია",
+      "მოქმედებს გამოწერიდან 7 დღე",
+      "გადაცემა შეუძლებელია",
+      "მხოლოდ Cinepark ფილიალებში",
+    ],
+    website: "WWW.SHANSI.GE",
+  },
+  {
+    id: "t2",
+    emoji: "☕",
+    category: "Cafe",
+    title: "Stamba",
+    titleKa: "ყავის კუპონი",
+    brand: "SHANSI",
+    validity: "14 დღე",
+    type: "ცხელი სასმელი",
+    price: "1.80",
+    bonus: "+ 2₾",
+    personName: "Nino K.",
+    serial: "SH2025001235",
+    social: "f  X  @STAMBACAFE",
+    terms: [
+      "1x ნებისმიერი ცხელი სასმელი",
+      "მოქმედებს 14 დღე",
+      "ვრცელდება ყველა ფილიალზე",
+    ],
+    website: "WWW.STAMBA.GE",
+  },
+  {
+    id: "t3",
+    emoji: "🍔",
+    category: "Restaurant",
+    title: "Wendy's",
+    titleKa: "5₾ ფასდაკლება",
+    brand: "SHANSI",
+    validity: "30 დღე",
+    type: "შეკვეთა",
+    price: "3.20",
+    bonus: "+ 5₾",
+    personName: "Giorgi M.",
+    serial: "SH2025001236",
+    social: "f  @WENDYSGE",
+    terms: [
+      "მინ. შეკვეთა 15₾",
+      "არ ერთიანდება სხვა აქციებთან",
+      "ერთჯერადად",
+    ],
+    website: "WWW.WENDYS.GE",
+  },
+];
 
 const ALL_GAMES = [
   { id: 1, name: "Midnight Machine", gameType: "slot", color: "#4338CA", gradient: "linear-gradient(135deg, #4338CA, #6366F1)" },
@@ -280,6 +351,33 @@ export default function HomePage() {
                 </span>
               </div>
             )}
+          </div>
+
+          {/* ── Swipeable Tickets Row ── */}
+          <div
+            className="mt-6 -mx-4 overflow-x-auto scrollbar-hide"
+            style={{
+              ...stagger(3),
+              scrollSnapType: "x mandatory",
+              WebkitOverflowScrolling: "touch",
+              paddingLeft: 16,
+              paddingRight: 16,
+            }}
+          >
+            <div className="flex gap-4" style={{ width: "max-content" }}>
+              {MOCK_TICKETS.map((t) => (
+                <div
+                  key={t.id}
+                  style={{
+                    scrollSnapAlign: "center",
+                    scrollSnapStop: "always",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Ticket data={t} />
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* ── Mystery Box ── */}
