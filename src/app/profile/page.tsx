@@ -313,21 +313,24 @@ export default function ProfilePage() {
               plus <span className="text-white font-bold">{refConfig.bonusRewardCoins}</span> extra every {refConfig.bonusEveryN} referrals.
             </p>
 
-            {/* Referral progress — segmented arc circles + bonus circle */}
+            {/* Referral progress — segmented arc circles + bonus circle.
+                All N circles fill at the same rate as referrals come in,
+                so e.g. 1 of 5 referrals shows ~20% fill on every circle
+                (not 100% on the first). Once N referrals are reached, all
+                circles transition to solid yellow + white check together. */}
             {(() => {
               const N = Math.max(1, refConfig.bonusEveryN);
               const SEGMENTS_PER_CIRCLE = 12;
-              const totalSegments = N * SEGMENTS_PER_CIRCLE;
-              // Each referral fills one full circle (= SEGMENTS_PER_CIRCLE segments).
-              // refTotal % N gives how many circles in the current cycle are complete.
               const progressInCycle = refTotal % N;
-              const completedAll = progressInCycle === 0 && refTotal > 0; // just hit milestone — all 5 done
-              const filledSegments = completedAll ? totalSegments : progressInCycle * SEGMENTS_PER_CIRCLE;
+              const completedAll = progressInCycle === 0 && refTotal > 0;
+              const filledPerCircle = completedAll
+                ? SEGMENTS_PER_CIRCLE
+                : Math.round((progressInCycle / N) * SEGMENTS_PER_CIRCLE);
               return (
                 <SegmentedReferralRow
                   count={N}
                   segmentsPerCircle={SEGMENTS_PER_CIRCLE}
-                  filledSegments={filledSegments}
+                  filledPerCircle={filledPerCircle}
                   completedAll={completedAll}
                   bonusCoins={refConfig.bonusRewardCoins}
                 />
@@ -1015,13 +1018,13 @@ function SegmentedRing({
 function SegmentedReferralRow({
   count,
   segmentsPerCircle,
-  filledSegments,
+  filledPerCircle,
   completedAll,
   bonusCoins,
 }: {
   count: number;
   segmentsPerCircle: number;
-  filledSegments: number;
+  filledPerCircle: number; // same value applied to every circle
   completedAll: boolean;
   bonusCoins: number;
 }) {
@@ -1029,22 +1032,15 @@ function SegmentedReferralRow({
   const BONUS_SIZE = 56;
   return (
     <div className="flex items-center gap-2 mb-6">
-      {Array.from({ length: count }).map((_, i) => {
-        // Number of segments belonging to circle i that are currently filled
-        const segStart = i * segmentsPerCircle;
-        const segEnd = segStart + segmentsPerCircle;
-        const filledForThis = Math.max(0, Math.min(segmentsPerCircle, filledSegments - segStart));
-        const completed = filledForThis === segmentsPerCircle;
-        return (
-          <SegmentedRing
-            key={i}
-            size={SIZE}
-            segments={segmentsPerCircle}
-            filled={filledForThis}
-            completed={completed}
-          />
-        );
-      })}
+      {Array.from({ length: count }).map((_, i) => (
+        <SegmentedRing
+          key={i}
+          size={SIZE}
+          segments={segmentsPerCircle}
+          filled={filledPerCircle}
+          completed={completedAll}
+        />
+      ))}
       {/* Divider */}
       <div className="w-[2px] h-6 mx-1" style={{ background: "rgba(255,255,255,0.1)" }} />
       {/* Bonus circle — yellow dashed border + yellow text only when all circles complete */}
