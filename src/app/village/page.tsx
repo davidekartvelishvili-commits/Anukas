@@ -767,11 +767,28 @@ export default function VillagePage() {
               </span>
             </div>
 
-            {/* Shields */}
-            <div className="flex items-center gap-1 px-3 py-1 rounded-full" style={{ background: "rgba(150,200,240,0.5)" }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
+            {/* Shields — show shield image when active, empty circle placeholder when not */}
+            <div className="flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full" style={{ background: "rgba(150,200,240,0.5)" }}>
+              {profile?.shieldActive ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src="/images/shield.png"
+                  alt="shield"
+                  width={28}
+                  height={28}
+                  style={{ objectFit: "contain" }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%",
+                    border: "2px dashed rgba(255,255,255,0.55)",
+                    background: "rgba(255,255,255,0.08)",
+                  }}
+                />
+              )}
               <span className="text-white text-[13px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
                 {profile?.shieldActive ? "1" : "0"}
               </span>
