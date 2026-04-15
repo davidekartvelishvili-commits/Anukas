@@ -960,7 +960,7 @@ function SegmentedRing({
   segments,
   filled,
   completed,
-  stroke = 3,
+  stroke = 3.5,
 }: {
   size: number;
   segments: number;
@@ -972,7 +972,10 @@ function SegmentedRing({
   const cy = size / 2;
   const r = (size - stroke) / 2 - 1;
   const segDeg = 360 / segments;
-  const gapDeg = 6;
+  // Wide enough gap that the rounded line caps don't visually swallow it.
+  // For 10 segments (segDeg=36°), each segment slot is split ~16° drawn arc
+  // + ~20° gap → produces very clearly separated pill-shaped dashes.
+  const gapDeg = Math.min(20, segDeg * 0.55);
   const arcDeg = segDeg - gapDeg;
 
   if (completed) {
