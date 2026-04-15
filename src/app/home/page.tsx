@@ -46,33 +46,14 @@ function CardIcon({ active }: { active: boolean }) {
 
 function TrophyIcon() {
   return (
-    <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
-      <defs>
-        <linearGradient id="trophyGold" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#FFE44D" />
-          <stop offset="40%" stopColor="#FFD700" />
-          <stop offset="100%" stopColor="#B8860B" />
-        </linearGradient>
-        <linearGradient id="trophyStem" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#DAA520" />
-          <stop offset="100%" stopColor="#8B6914" />
-        </linearGradient>
-      </defs>
-      {/* Cup body */}
-      <path d="M8 4h14v9a7 7 0 01-14 0V4z" fill="url(#trophyGold)" />
-      {/* Shine */}
-      <path d="M10 5h4v7a3 3 0 01-4 0V5z" fill="rgba(255,255,255,0.25)" />
-      {/* Left handle */}
-      <path d="M8 7H5.5a2 2 0 00-2 2v1.5a5 5 0 005 5" stroke="url(#trophyGold)" strokeWidth="2" fill="none" />
-      {/* Right handle */}
-      <path d="M22 7h2.5a2 2 0 012 2v1.5a5 5 0 01-5 5" stroke="url(#trophyGold)" strokeWidth="2" fill="none" />
-      {/* Stem */}
-      <rect x="13" y="17" width="4" height="4" rx="1" fill="url(#trophyStem)" />
-      {/* Base */}
-      <rect x="10" y="21" width="10" height="3" rx="1.5" fill="url(#trophyStem)" />
-      {/* Star on cup */}
-      <path d="M15 8l1.2 2.4 2.6.4-1.9 1.8.4 2.6L15 14l-2.3 1.2.4-2.6-1.9-1.8 2.6-.4L15 8z" fill="#FFF8DC" opacity="0.6" />
-    </svg>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/images/trophy.png"
+      alt="trophy"
+      width={36}
+      height={36}
+      style={{ objectFit: "contain" }}
+    />
   );
 }
 
