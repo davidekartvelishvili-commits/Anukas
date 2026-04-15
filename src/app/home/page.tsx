@@ -291,10 +291,17 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* ── Swipeable Tickets Row (admin-managed via /admin/tickets) ── */}
+          {/* ── Shansi Drops (admin-managed via /admin/tickets) ── */}
+          {liveTickets.length > 0 && (
+            <div className="mt-6" style={stagger(3)}>
+              <h2 className="text-[22px] font-bold text-white mb-4" style={{ fontFamily: "var(--font-outfit)" }}>
+                Shansi Drops
+              </h2>
+            </div>
+          )}
           {liveTickets.length > 0 && (
             <div
-              className="mt-6 -mx-4 overflow-x-auto scrollbar-hide"
+              className="-mx-4 overflow-x-auto scrollbar-hide"
               style={{
                 ...stagger(3),
                 scrollSnapType: "x mandatory",

@@ -38,7 +38,7 @@ const NAV_ITEMS = [
   { label: "Users", id: "users", href: "/admin/users" },
   { label: "Merchants", id: "merchants", href: "/admin/merchants" },
   { label: "Offers", id: "offers", href: "/admin/offers" },
-  { label: "Tickets", id: "tickets", href: "/admin/tickets" },
+  { label: "Shansi Drops", id: "tickets", href: "/admin/tickets" },
   { label: "Promos", id: "promos", href: "/admin/promos" },
   { label: "Transactions", id: "transactions", href: "/admin/transactions" },
   { label: "Games", id: "games", href: "/admin/games" },
@@ -367,10 +367,10 @@ export default function TicketsAdminPage() {
             <button className="lg:hidden p-1" onClick={() => setSidebarOpen(true)}>
               <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#A0A0A0" strokeWidth="1.5"><line x1="4" y1="7" x2="18" y2="7" /><line x1="4" y1="11" x2="18" y2="11" /><line x1="4" y1="15" x2="18" y2="15" /></svg>
             </button>
-            <h1 className="text-[16px] font-semibold" style={{ color: "#FFFFFF" }}>Tickets</h1>
+            <h1 className="text-[16px] font-semibold" style={{ color: "#FFFFFF" }}>Shansi Drops</h1>
           </div>
           <button onClick={openCreate} className="px-4 py-2 rounded-[8px] text-[13px] font-medium transition-all hover:opacity-80" style={{ background: "#F9E741", color: "#000" }}>
-            + ახალი ტიკეტი
+            + New Drop
           </button>
         </header>
 
@@ -381,9 +381,9 @@ export default function TicketsAdminPage() {
             </div>
           ) : rows.length === 0 ? (
             <div className="text-center py-20 rounded-[12px] border" style={{ background: "#111", borderColor: "#252525" }}>
-              <p className="text-[14px] mb-3" style={{ color: "#666" }}>ტიკეტები არ არის. დაამატე პირველი!</p>
+              <p className="text-[14px] mb-3" style={{ color: "#666" }}>No drops yet. Create your first one!</p>
               <button onClick={openCreate} className="px-4 py-2 rounded-[8px] text-[13px] font-bold" style={{ background: "#F9E741", color: "#000" }}>
-                + ახალი ტიკეტი
+                + New Drop
               </button>
             </div>
           ) : (
@@ -391,7 +391,7 @@ export default function TicketsAdminPage() {
               <table className="w-full">
                 <thead>
                   <tr style={{ background: "#0A0A0A", borderBottom: "1px solid #1A1A1A" }}>
-                    <th className="text-left px-3 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>ტიკეტი</th>
+                    <th className="text-left px-3 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>Drop</th>
                     <th className="text-left px-3 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>ბრენდი</th>
                     <th className="text-left px-3 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>კატეგორია</th>
                     <th className="text-left px-3 py-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>სერიული</th>
@@ -450,7 +450,7 @@ export default function TicketsAdminPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setModalOpen(false)}>
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[560px] max-h-[92vh] overflow-y-auto rounded-[12px] border p-6" style={{ background: "#1A1A1A", borderColor: "#252525" }}>
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-[16px] font-semibold" style={{ color: "#FFF" }}>{editingId ? "რედაქტირება" : "ახალი ტიკეტი"}</h3>
+              <h3 className="text-[16px] font-semibold" style={{ color: "#FFF" }}>{editingId ? "Edit Drop" : "New Shansi Drop"}</h3>
               <button onClick={() => setModalOpen(false)}>
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#666" strokeWidth="2"><line x1="5" y1="5" x2="13" y2="13" /><line x1="13" y1="5" x2="5" y2="13" /></svg>
               </button>
@@ -698,7 +698,7 @@ export default function TicketsAdminPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setDeleteConfirm(null)}>
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[380px] rounded-[12px] border p-5" style={{ background: "#1A1A1A", borderColor: "#7F1D1D" }}>
             <h3 className="text-[15px] font-bold mb-2" style={{ color: "#EF4444" }}>წავშალოთ?</h3>
-            <p className="text-[13px] mb-4" style={{ color: "#A0A0A0" }}>ტიკეტი გაქრება მომხმარებლის გვერდიდან.</p>
+            <p className="text-[13px] mb-4" style={{ color: "#A0A0A0" }}>Drop will disappear from the user's home page.</p>
             <div className="flex gap-2">
               <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 rounded-[8px] text-[13px]" style={{ background: "#252525", color: "#A0A0A0" }}>გაუქმება</button>
               <button onClick={() => handleDelete(deleteConfirm)} className="flex-1 py-2.5 rounded-[8px] text-[13px] font-bold" style={{ background: "#EF4444", color: "#fff" }}>წაშლა</button>

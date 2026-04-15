@@ -37,7 +37,7 @@ const NAV_ITEMS = [
   { label: "Users", id: "users", href: "/admin/users" },
   { label: "Merchants", id: "merchants", href: "/admin/merchants" },
   { label: "Offers", id: "offers", href: "/admin/offers" },
-  { label: "Tickets", id: "tickets", href: "/admin/tickets" },
+  { label: "Shansi Drops", id: "tickets", href: "/admin/tickets" },
   { label: "Promos", id: "promos", href: "/admin/promos" },
   { label: "Transactions", id: "transactions", href: "/admin/transactions" },
   { label: "Games", id: "games", href: "/admin/games" },
