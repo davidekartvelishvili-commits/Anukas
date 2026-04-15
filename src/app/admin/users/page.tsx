@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getUsers, getUser, adjustBalance, updateUserStatus, resetUserVillage } from "@/services/admin";
+import { getUsers, getUser, adjustBalance, updateUserStatus, resetUserVillage, deleteUser } from "@/services/admin";
 
 /* ── SVG ICONS ── */
 function NavIcon({ id, active }: { id: string; active: boolean }) {
@@ -140,6 +140,8 @@ export default function AdminUsersPage() {
 
   // Block modal
   const [blockModal, setBlockModal] = useState<string | null>(null);
+  const [deleteModal, setDeleteModal] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Action state
   const [actionLoading, setActionLoading] = useState(false);
@@ -632,6 +634,26 @@ export default function AdminUsersPage() {
                                           <ShieldIcon />
                                           {user.is_active ? "\u10D3\u10D0\u10D1\u10DA\u10DD\u10D9\u10D5\u10D0" : "\u10D2\u10D0\u10DC\u10D1\u10DA\u10DD\u10D9\u10D5\u10D0"}
                                         </button>
+
+                                        {/* Delete user (hard delete with all related data) */}
+                                        <button
+                                          onClick={() => setDeleteModal(user.id)}
+                                          className="flex items-center gap-2 px-3 py-2 rounded-[8px] text-[12px] font-medium transition-all hover:brightness-110 active:scale-95"
+                                          style={{
+                                            background: "#7F1D1D",
+                                            color: "#FCA5A5",
+                                            border: "1px solid #991B1B",
+                                          }}
+                                        >
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="3 6 5 6 21 6" />
+                                            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                                            <path d="M10 11v6" />
+                                            <path d="M14 11v6" />
+                                            <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                                          </svg>
+                                          {"\u10EC\u10D0\u10E8\u10DA\u10D0"}
+                                        </button>
                                       </div>
                                     </div>
                                   </>
@@ -854,6 +876,65 @@ export default function AdminUsersPage() {
                 </button>
                 <button onClick={() => setBlockModal(null)} className="flex-1 py-3 rounded-[8px] text-[14px] font-bold transition-all active:scale-95" style={{ background: "#1A1A1A", color: "#A0A0A0" }}>
                   {"\u10D2\u10D0\u10E3\u10E5\u10DB\u10D4\u10D1\u10D0"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Delete user confirmation modal */}
+      {deleteModal !== null && (() => {
+        const targetUser = usersList.find((u) => u.id === deleteModal);
+        if (!targetUser) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => !deleting && setDeleteModal(null)}>
+            <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.7)" }} />
+            <div onClick={(e) => e.stopPropagation()} className="relative w-[92%] max-w-[400px] rounded-[16px] p-5 border" style={{ background: "#0F0F0F", borderColor: "#7F1D1D" }}>
+              <div className="flex items-center gap-2 mb-3">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                  <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                </svg>
+                <h3 className="text-[16px] font-bold" style={{ color: "#EF4444" }}>
+                  მომხმარებლის წაშლა
+                </h3>
+              </div>
+              <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "#A0A0A0" }}>
+                სრულად წავშალოთ{" "}
+                <span className="font-bold text-white">{targetUser.name || targetUser.phone}</span>
+                ? წაიშლება ყველა მონაცემი (ბალანსი, ტრანზაქციები, ვილიჯი, რეფერალები, სესიები). მოქმედება შეუქცევადია.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    if (deleting) return;
+                    setDeleting(true);
+                    try {
+                      await deleteUser(deleteModal);
+                      showToast("მომხმარებელი წაიშალა");
+                      setDeleteModal(null);
+                      setExpandedId(null);
+                      fetchUsers();
+                    } catch (e: any) {
+                      showToast(e?.message || "შეცდომა წაშლისას");
+                    } finally {
+                      setDeleting(false);
+                    }
+                  }}
+                  disabled={deleting}
+                  className="flex-1 py-3 rounded-[8px] text-[14px] font-bold transition-all active:scale-95 disabled:opacity-50"
+                  style={{ background: "#EF4444", color: "#FFFFFF" }}
+                >
+                  {deleting ? "იშლება..." : "წაშლა"}
+                </button>
+                <button
+                  onClick={() => !deleting && setDeleteModal(null)}
+                  className="flex-1 py-3 rounded-[8px] text-[14px] font-bold transition-all active:scale-95"
+                  style={{ background: "#1A1A1A", color: "#A0A0A0" }}
+                >
+                  გაუქმება
                 </button>
               </div>
             </div>

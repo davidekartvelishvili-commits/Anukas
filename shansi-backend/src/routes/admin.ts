@@ -571,6 +571,39 @@ admin.patch("/users/:id/status", adminMiddleware, async (c) => {
   return c.json({ success: true, user: { id: user.id, phone: user.phone, name: user.name, isActive: is_active } });
 });
 
+// DELETE /admin/users/:id — hard delete user + all related rows (for testing)
+admin.delete("/users/:id", adminMiddleware, async (c) => {
+  const id = c.req.param("id") as string;
+  const db = getDb();
+  const adminId = c.get("adminId") as string;
+
+  const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  if (!user) return c.json({ success: false, message: "Not found" }, 404);
+
+  // Decrement totalReferrals on referrer (if this user was referred by someone)
+  if (user.referredBy) {
+    await (db as any).run(sql`UPDATE users SET total_referrals = MAX(0, total_referrals - 1) WHERE id = ${user.referredBy}`);
+  }
+
+  // Cascade delete in dependency order
+  await (db as any).run(sql`DELETE FROM user_cards WHERE user_id = ${id}`);
+  await (db as any).run(sql`DELETE FROM user_village_progress WHERE user_id = ${id}`);
+  await (db as any).run(sql`DELETE FROM user_village_profile WHERE user_id = ${id}`);
+  await (db as any).run(sql`DELETE FROM payment_transactions WHERE user_id = ${id}`);
+  await (db as any).run(sql`DELETE FROM transactions WHERE user_id = ${id}`);
+  await (db as any).run(sql`DELETE FROM withdrawals WHERE user_id = ${id}`);
+  await (db as any).run(sql`DELETE FROM sessions WHERE user_id = ${id}`);
+  await (db as any).run(sql`DELETE FROM promo_code_uses WHERE user_id = ${id}`);
+  await (db as any).run(sql`DELETE FROM game_history WHERE user_id = ${id}`);
+  await (db as any).run(sql`DELETE FROM referrals WHERE referrer_id = ${id} OR referred_id = ${id}`);
+
+  // Finally delete the user
+  await db.delete(users).where(eq(users.id, id));
+
+  await logAction(adminId, "delete_user", JSON.stringify({ userId: id, phone: user.phone }));
+  return c.json({ success: true, message: "User deleted" });
+});
+
 // GET /admin/game-history
 admin.get("/game-history", adminMiddleware, async (c) => {
   const db = getDb();

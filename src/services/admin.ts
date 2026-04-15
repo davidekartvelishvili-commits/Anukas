@@ -100,6 +100,12 @@ export async function resetUserVillage(userId: string) {
   });
 }
 
+export async function deleteUser(userId: string) {
+  return adminFetch(`/admin/users/${userId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function updateUserStatus(userId: string, isActive: boolean) {
   return adminFetch(`/admin/users/${userId}/status`, {
     method: "PATCH",
