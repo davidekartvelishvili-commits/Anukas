@@ -313,24 +313,19 @@ export default function ProfilePage() {
               plus <span className="text-white font-bold">{refConfig.bonusRewardCoins}</span> extra every {refConfig.bonusEveryN} referrals.
             </p>
 
-            {/* Referral progress — segmented arc circles + bonus circle.
-                All N circles fill at the same rate as referrals come in,
-                so e.g. 1 of 5 referrals shows ~20% fill on every circle
-                (not 100% on the first). Once N referrals are reached, all
-                circles transition to solid yellow + white check together. */}
+            {/* Referral progress — sequential fill, left → right.
+                1 referral = 1 full circle. When all N circles are full, the
+                +BONUS circle activates. */}
             {(() => {
               const N = Math.max(1, refConfig.bonusEveryN);
               const SEGMENTS_PER_CIRCLE = 12;
               const progressInCycle = refTotal % N;
               const completedAll = progressInCycle === 0 && refTotal > 0;
-              const filledPerCircle = completedAll
-                ? SEGMENTS_PER_CIRCLE
-                : Math.round((progressInCycle / N) * SEGMENTS_PER_CIRCLE);
               return (
                 <SegmentedReferralRow
                   count={N}
                   segmentsPerCircle={SEGMENTS_PER_CIRCLE}
-                  filledPerCircle={filledPerCircle}
+                  completedCircles={completedAll ? N : progressInCycle}
                   completedAll={completedAll}
                   bonusCoins={refConfig.bonusRewardCoins}
                 />
@@ -962,15 +957,16 @@ function SegmentedRing({
   segments,
   filled,
   completed,
+  stroke = 3,
 }: {
   size: number;
   segments: number;
   filled: number; // 0..segments
   completed: boolean;
+  stroke?: number;
 }) {
   const cx = size / 2;
   const cy = size / 2;
-  const stroke = 3;
   const r = (size - stroke) / 2 - 1;
   const segDeg = 360 / segments;
   const gapDeg = 6;
@@ -984,7 +980,7 @@ function SegmentedRing({
         <path
           d={`M ${size * 0.3} ${size * 0.52} L ${size * 0.45} ${size * 0.66} L ${size * 0.72} ${size * 0.38}`}
           stroke="#fff"
-          strokeWidth={3}
+          strokeWidth={Math.max(2.5, stroke)}
           strokeLinecap="round"
           strokeLinejoin="round"
           fill="none"
@@ -1003,7 +999,7 @@ function SegmentedRing({
           <path
             key={i}
             d={arcPath(cx, cy, r, start, end)}
-            stroke={isFilled ? "#F9E741" : "rgba(255,255,255,0.18)"}
+            stroke={isFilled ? "#F9E741" : "#2A2A2A"}
             strokeWidth={stroke}
             strokeLinecap="round"
             fill="none"
@@ -1018,13 +1014,13 @@ function SegmentedRing({
 function SegmentedReferralRow({
   count,
   segmentsPerCircle,
-  filledPerCircle,
+  completedCircles,
   completedAll,
   bonusCoins,
 }: {
   count: number;
   segmentsPerCircle: number;
-  filledPerCircle: number; // same value applied to every circle
+  completedCircles: number; // 0..count — first N circles are fully filled
   completedAll: boolean;
   bonusCoins: number;
 }) {
@@ -1032,42 +1028,55 @@ function SegmentedReferralRow({
   const BONUS_SIZE = 56;
   return (
     <div className="flex items-center gap-2 mb-6">
-      {Array.from({ length: count }).map((_, i) => (
-        <SegmentedRing
-          key={i}
-          size={SIZE}
-          segments={segmentsPerCircle}
-          filled={filledPerCircle}
-          completed={completedAll}
-        />
-      ))}
+      {Array.from({ length: count }).map((_, i) => {
+        const completed = i < completedCircles;
+        // Each referral fills one full circle — no partial state in between
+        const filled = completed ? segmentsPerCircle : 0;
+        return (
+          <SegmentedRing
+            key={i}
+            size={SIZE}
+            segments={segmentsPerCircle}
+            filled={filled}
+            completed={completed}
+          />
+        );
+      })}
       {/* Divider */}
       <div className="w-[2px] h-6 mx-1" style={{ background: "rgba(255,255,255,0.1)" }} />
-      {/* Bonus circle — yellow dashed border + yellow text only when all circles complete */}
+      {/* Bonus circle — same segmented dash style; segments turn yellow when all small circles are complete */}
       <div
-        className="rounded-full flex flex-col items-center justify-center transition-all duration-300"
+        className="relative flex flex-col items-center justify-center transition-all duration-300"
         style={{
           width: BONUS_SIZE,
           height: BONUS_SIZE,
-          border: completedAll
-            ? "2px dashed #F9E741"
-            : "2px dashed rgba(255,255,255,0.18)",
-          background: "transparent",
-          boxShadow: completedAll ? "0 0 16px rgba(249,231,65,0.35)" : "none",
+          filter: completedAll ? "drop-shadow(0 0 10px rgba(249,231,65,0.45))" : "none",
         }}
       >
-        <span
-          className="text-[11px] font-bold leading-none"
-          style={{ color: completedAll ? "#F9E741" : "#666", fontFamily: "var(--font-outfit)" }}
+        <SegmentedRing
+          size={BONUS_SIZE}
+          segments={segmentsPerCircle}
+          filled={completedAll ? segmentsPerCircle : 0}
+          completed={false}
+          stroke={3}
+        />
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+          style={{ transition: "color 0.3s" }}
         >
-          +{bonusCoins}
-        </span>
-        <span
-          className="text-[8px] font-semibold mt-0.5 tracking-wider"
-          style={{ color: completedAll ? "#F9E741" : "#666" }}
-        >
-          BONUS
-        </span>
+          <span
+            className="text-[11px] font-bold leading-none"
+            style={{ color: completedAll ? "#F9E741" : "#666", fontFamily: "var(--font-outfit)" }}
+          >
+            +{bonusCoins}
+          </span>
+          <span
+            className="text-[8px] font-semibold mt-0.5 tracking-wider"
+            style={{ color: completedAll ? "#F9E741" : "#666" }}
+          >
+            BONUS
+          </span>
+        </div>
       </div>
     </div>
   );
