@@ -499,12 +499,13 @@ export default function LuckyDropPage() {
           // eventually arrives where it has to — but across most of its
           // flight it's free to bounce chaotically like a real Plinko ball.
           const GRAVITY = 0.4;
-          const MAX_VY = 12;
-          const RESTITUTION = 0.6;
-          const AIR = 0.995;          // very light air resistance (was 0.94 aggressive damping)
+          const MAX_VY = 10;          // slightly slower terminal (was 12; less "bullet" feel)
+          const RESTITUTION = 0.42;   // gentler peg bounce (was 0.6 — ball was popping up too high)
+          const MAX_BOUNCE_UP = 3.5;  // cap how strongly a peg bounce can send ball upward
+          const AIR = 0.995;
           const WALL_BOUNCE = 0.45;
-          const JITTER_X = 1.5;       // horizontal scatter per collision
-          const JITTER_Y = 0.3;       // tiny vertical randomness
+          const JITTER_X = 1.2;       // small reduction paired with lower restitution
+          const JITTER_Y = 0.25;
           const lastWp = b.path[b.path.length - 1]; // server-determined slot center
 
           // Vertical gravity
@@ -513,26 +514,34 @@ export default function LuckyDropPage() {
           // Gentle air resistance — lets bounces preserve most of their energy
           b.vx *= AIR;
 
-          // Guidance is QUADRATICALLY ramped so the top ~60% of the fall
-          // is essentially pure physics (guidance < 0.005) and only the
-          // bottom approach tightens toward the target slot.
+          // Guidance — ball commits to the correct slot WHILE STILL inside
+          // the triangle (last two peg rows). Once below the triangle, X
+          // is fully locked and the ball drops straight down.
           const topY = s.startY;
-          const bottomY = s.startY + ROWS * s.gapY;
-          const fallFrac = Math.max(0, Math.min(1, (b.y - topY) / (bottomY - topY)));
-          const guidance = fallFrac * fallFrac * 0.028;
-          b.vx += (lastWp.x - b.x) * guidance;
+          const bottomY = s.startY + ROWS * s.gapY;        // y just past last peg row
+          const commitStartY = s.startY + (ROWS - 2) * s.gapY; // start committing at 2nd-to-last row
 
-          // Channel zone — between the last peg row and the slots. Here
-          // we hard-lerp X toward the target slot center so the ball is
-          // already in the correct column before the final settle. Without
-          // this the settle step at `y >= last.y` had to snap X across a
-          // large gap, which looked like a teleport from one slot to another.
-          if (b.y > bottomY) {
-            const channelFrac = Math.min(1, (b.y - bottomY) / (lastWp.y - bottomY));
-            const lerpK = 0.15 + channelFrac * 0.25; // 0.15 → 0.40 as we near slot
+          if (b.y < commitStartY) {
+            // Free plinko physics: very gentle attractor, mostly just pegs
+            const fallFrac = Math.max(0, (b.y - topY) / (commitStartY - topY));
+            const guidance = fallFrac * fallFrac * 0.010;
+            b.vx += (lastWp.x - b.x) * guidance;
+          } else if (b.y < bottomY) {
+            // Commit zone (last two peg rows) — strong X lerp toward target,
+            // still allowing peg collisions to deflect briefly. The ball
+            // should exit this zone already in the correct column.
+            const commitFrac = (b.y - commitStartY) / (bottomY - commitStartY);
+            const lerpK = 0.08 + commitFrac * 0.22; // 0.08 → 0.30
             b.x += (lastWp.x - b.x) * lerpK;
-            // Dampen horizontal velocity so the ball drops cleanly into the slot
-            b.vx *= 0.6;
+            b.vx *= 0.75;
+          } else {
+            // Below the last peg row: direction is FIXED. Lock X to the
+            // target slot column and kill horizontal velocity so the ball
+            // drops straight into the slot with no side-to-side drift.
+            b.x += (lastWp.x - b.x) * 0.45;
+            b.vx = 0;
+            // Also cap vy so it doesn't "bullet" into the slot
+            if (b.vy > 6) b.vy = 6;
           }
 
           // Integrate velocity
@@ -584,12 +593,14 @@ export default function LuckyDropPage() {
             b.y += ny * overlap;
             const vDotN = b.vx * nx + b.vy * ny;
             if (vDotN < 0) {
-              // Reflect with restitution (energy loss) — real Plinko feel
+              // Reflect with restitution (energy loss)
               b.vx -= (1 + RESTITUTION) * vDotN * nx;
               b.vy -= (1 + RESTITUTION) * vDotN * ny;
-              // Scatter — organic left/right randomness + minor vertical
+              // Scatter
               b.vx += (Math.random() - 0.5) * 2 * JITTER_X;
               b.vy += (Math.random() - 0.5) * 2 * JITTER_Y;
+              // Cap upward bounce so the ball doesn't pop too high
+              if (b.vy < -MAX_BOUNCE_UP) b.vy = -MAX_BOUNCE_UP;
               peg.glow = 1;
               playPegSfx();
             }
