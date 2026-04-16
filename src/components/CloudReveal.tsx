@@ -26,8 +26,17 @@ export default function CloudReveal({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
   const doneCalledRef = useRef(false);
+  const hasMountedRef = useRef(false);
 
   useEffect(() => {
+    // Guard against React 18 StrictMode double-invoking effects in dev.
+    // This is a one-shot visual animation; running it twice would replay
+    // the sequence (visible as "animation plays, clouds disappear,
+    // animation plays again"). In production StrictMode doesn't
+    // double-invoke, so this is a no-op there.
+    if (hasMountedRef.current) return;
+    hasMountedRef.current = true;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
