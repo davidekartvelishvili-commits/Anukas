@@ -377,36 +377,13 @@ export default function LuckyDropPage() {
             }
           }
 
-          // Trail (motion-blur feel)
-          b.trail.push({ x: b.x, y: b.y, a: 1 });
-          if (b.trail.length > 14) b.trail.shift();
-          b.trail.forEach((t) => (t.a *= 0.88));
         }
 
-        // Draw trail
-        b.trail.forEach((t, ti) => {
-          ctx.beginPath();
-          ctx.arc(t.x, t.y, b.r * 0.6 * (ti / b.trail.length), 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255,215,0,${t.a * 0.3})`; ctx.fill();
-        });
-
-        // Draw glow
-        const gg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r * 3);
-        gg.addColorStop(0, "rgba(255,215,0,0.3)"); gg.addColorStop(1, "transparent");
-        ctx.fillStyle = gg;
-        ctx.fillRect(b.x - b.r * 3, b.y - b.r * 3, b.r * 6, b.r * 6);
-
-        // Draw ball
-        const bg2 = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.1, b.x, b.y, b.r);
-        bg2.addColorStop(0, "#fff8e1"); bg2.addColorStop(0.3, "#FFD700");
-        bg2.addColorStop(0.8, "#FFA000"); bg2.addColorStop(1, "#E65100");
-        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-        ctx.fillStyle = bg2; ctx.fill();
-
-        // Shine
+        // Draw ball — flat welcome-page yellow, no glow, no trail
         ctx.beginPath();
-        ctx.arc(b.x - b.r * 0.25, b.y - b.r * 0.25, b.r * 0.35, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.fill();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.fillStyle = "#FFE500";
+        ctx.fill();
       }
     }
     loop();
