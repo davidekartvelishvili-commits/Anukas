@@ -292,7 +292,7 @@ export default function CloudReveal({
 
     const t0 = performance.now();
     let doneAt = -1;
-    let firstFrameShown = false;
+    let animRevealed = false;
 
     function frame(ts: number) {
       const el = ts - t0;
@@ -303,14 +303,15 @@ export default function CloudReveal({
 
       const w = W();
       const h = H();
-      // Transparent canvas each frame so the village shows through the
-      // gaps BETWEEN the drifting clouds. Puffs are now drawn directly
-      // to the main canvas — no offscreen layer, no full-screen copy.
+      // Clear to transparent each frame so cloud gaps can show the village —
+      // but only AFTER the HOLD phase ends. During HOLD the wrapper stays
+      // white so the screen is fully covered even before every puff has
+      // finished baking in the chunked baker.
       ctx!.clearRect(0, 0, w, h);
       renderClouds(progress);
 
-      if (!firstFrameShown) {
-        firstFrameShown = true;
+      if (!animRevealed && el >= holdMs) {
+        animRevealed = true;
         if (wrapperRef.current) wrapperRef.current.style.background = "transparent";
         canvas!.style.background = "transparent";
       }
