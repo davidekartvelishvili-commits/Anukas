@@ -222,9 +222,11 @@ export default function LuckyDropPage() {
         ctx.fill(); ctx.shadowBlur = 0; ctx.restore();
       }
 
-      // Pegs
+      // Pegs — bright, crisp dots with a soft blue glow
       for (const peg of s.pegs) {
         peg.glow *= 0.92;
+
+        // Purple impact halo on collision (unchanged)
         if (peg.glow > 0.05) {
           const g = ctx.createRadialGradient(peg.x, peg.y, 0, peg.x, peg.y, peg.r * 5);
           g.addColorStop(0, `rgba(124,77,255,${peg.glow * 0.5})`);
@@ -232,15 +234,31 @@ export default function LuckyDropPage() {
           ctx.fillStyle = g;
           ctx.fillRect(peg.x - peg.r * 5, peg.y - peg.r * 5, peg.r * 10, peg.r * 10);
         }
-        const a = 0.4 + peg.glow * 0.6;
-        const pg = ctx.createRadialGradient(peg.x, peg.y, 0, peg.x, peg.y, peg.r);
-        pg.addColorStop(0, `rgba(180,180,240,${a})`);
-        pg.addColorStop(1, `rgba(90,100,180,${a * 0.7})`);
-        ctx.beginPath(); ctx.arc(peg.x, peg.y, peg.r, 0, Math.PI * 2);
-        ctx.fillStyle = pg; ctx.fill();
-        ctx.beginPath(); ctx.arc(peg.x, peg.y, peg.r + 1, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(124,77,255,${0.2 + peg.glow * 0.8})`;
-        ctx.lineWidth = 1; ctx.stroke();
+
+        // Visual radius is 1.5px bigger than physics radius for clearer read
+        // (does not affect collision — peg.r is unchanged).
+        const visR = peg.r + 1.5;
+
+        ctx.save();
+        ctx.shadowColor = "rgba(150,180,255,1)";
+        ctx.shadowBlur = 8 + peg.glow * 6;
+
+        const pg = ctx.createRadialGradient(peg.x, peg.y, 0, peg.x, peg.y, visR);
+        pg.addColorStop(0, "rgba(255,255,255,1)");
+        pg.addColorStop(0.55, "rgba(200,215,255,0.95)");
+        pg.addColorStop(1, "rgba(150,170,230,0.9)");
+        ctx.beginPath();
+        ctx.arc(peg.x, peg.y, visR, 0, Math.PI * 2);
+        ctx.fillStyle = pg;
+        ctx.fill();
+        ctx.restore();
+
+        // Crisp hairline outer ring
+        ctx.beginPath();
+        ctx.arc(peg.x, peg.y, visR + 0.5, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(200,215,255,${0.5 + peg.glow * 0.5})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
       }
 
       // Slots
