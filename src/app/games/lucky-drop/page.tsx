@@ -119,7 +119,7 @@ export default function LuckyDropPage() {
   // per-hit, nothing that allocates or causes state churn in the hot path.
   const pegHitPoolRef = useRef<HTMLAudioElement[]>([]);
   const pegHitIndexRef = useRef(0);
-  const lastPegSoundTime = useRef(0);
+  const lastPegSoundRef = useRef(0);
   const pegSfxMuted = useRef(false); // silenced while win audio is playing
 
   // Win audio: main music (loud) + coin sound (quieter) that fire in
@@ -165,7 +165,7 @@ export default function LuckyDropPage() {
     if (typeof window === "undefined") return;
     pegHitPoolRef.current = Array.from({ length: 6 }, () => {
       const audio = new Audio("/audio/peg-pop.mp3");
-      audio.volume = 0.2;
+      audio.volume = 0.3;
       audio.preload = "auto";
       return audio;
     });
@@ -176,18 +176,17 @@ export default function LuckyDropPage() {
   }, []);
   const playPegSfx = () => {
     if (pegSfxMuted.current) return;
-    // Pure time-based throttle — max 20 sounds/sec. No counters, no
-    // modulo on hit-count, no allocations. Runs inside the collision
-    // block so it MUST stay O(1) and allocation-free.
+    // Pure time-based throttle — max ~16 sounds/sec. No counters, no
+    // modulo on hit-count, no allocations. O(1) and allocation-free.
     const now = performance.now();
-    if (now - lastPegSoundTime.current <= 50) return;
+    if (now - lastPegSoundRef.current <= 60) return;
     const pool = pegHitPoolRef.current;
     if (!pool.length) return;
     const audio = pool[pegHitIndexRef.current];
-    pegHitIndexRef.current = (pegHitIndexRef.current + 1) % 6;
+    pegHitIndexRef.current = (pegHitIndexRef.current + 1) % pool.length;
     audio.currentTime = 0;
     audio.play().catch(() => {});
-    lastPegSoundTime.current = now;
+    lastPegSoundRef.current = now;
   };
 
   useEffect(() => {
