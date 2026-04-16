@@ -115,9 +115,11 @@ export default function LuckyDropPage() {
   // Peg-hit SFX — pool of preloaded Audio objects we cycle through so
   // overlapping hits each get their own voice (a single Audio can't play
   // the same source simultaneously on top of itself).
-  const pegSfxPool = useRef<HTMLAudioElement[]>([]);
-  const pegSfxIdx = useRef(0);
-  const pegSfxLastAt = useRef(0);
+  // Throttling is TIME-BASED ONLY — no modulo counters, no arrays mutated
+  // per-hit, nothing that allocates or causes state churn in the hot path.
+  const pegHitPoolRef = useRef<HTMLAudioElement[]>([]);
+  const pegHitIndexRef = useRef(0);
+  const lastPegSoundTime = useRef(0);
   const pegSfxMuted = useRef(false); // silenced while win audio is playing
 
   // Win audio: main music (loud) + coin sound (quieter) that fire in
@@ -144,7 +146,7 @@ export default function LuckyDropPage() {
   const playWinAudio = () => {
     pegSfxMuted.current = true;
     // Stop any in-flight pegs that might still be mid-playback
-    pegSfxPool.current.forEach((a) => { try { a.pause(); a.currentTime = 0; } catch {} });
+    pegHitPoolRef.current.forEach((a) => { try { a.pause(); a.currentTime = 0; } catch {} });
     const m = winMusicRef.current;
     const c = winCoinRef.current;
     if (m) { try { m.currentTime = 0; m.play().catch(() => {}); } catch {} }
@@ -158,33 +160,34 @@ export default function LuckyDropPage() {
     pegSfxMuted.current = false;
   };
   useEffect(() => {
+    // One-time pool creation on mount. 6 preloaded Audio elements we
+    // cycle through round-robin; NEVER allocate Audio in the hot path.
     if (typeof window === "undefined") return;
-    const POOL = 6;
-    const pool: HTMLAudioElement[] = [];
-    for (let i = 0; i < POOL; i++) {
-      const a = new Audio("/audio/peg-pop.mp3");
-      a.preload = "auto";
-      a.volume = 0.25;
-      pool.push(a);
-    }
-    pegSfxPool.current = pool;
+    pegHitPoolRef.current = Array.from({ length: 6 }, () => {
+      const audio = new Audio("/audio/peg-pop.mp3");
+      audio.volume = 0.2;
+      audio.preload = "auto";
+      return audio;
+    });
     return () => {
-      pool.forEach((a) => { a.pause(); a.src = ""; });
-      pegSfxPool.current = [];
+      pegHitPoolRef.current.forEach((a) => { a.pause(); a.src = ""; });
+      pegHitPoolRef.current = [];
     };
   }, []);
   const playPegSfx = () => {
     if (pegSfxMuted.current) return;
-    const pool = pegSfxPool.current;
-    if (!pool.length) return;
-    // Hard throttle: max ~25 hits/sec so very rapid multi-peg grazes
-    // in consecutive frames don't overlap into audible noise.
+    // Pure time-based throttle — max 20 sounds/sec. No counters, no
+    // modulo on hit-count, no allocations. Runs inside the collision
+    // block so it MUST stay O(1) and allocation-free.
     const now = performance.now();
-    if (now - pegSfxLastAt.current < 40) return;
-    pegSfxLastAt.current = now;
-    const a = pool[pegSfxIdx.current];
-    pegSfxIdx.current = (pegSfxIdx.current + 1) % pool.length;
-    try { a.currentTime = 0; a.play().catch(() => {}); } catch {}
+    if (now - lastPegSoundTime.current <= 50) return;
+    const pool = pegHitPoolRef.current;
+    if (!pool.length) return;
+    const audio = pool[pegHitIndexRef.current];
+    pegHitIndexRef.current = (pegHitIndexRef.current + 1) % 6;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+    lastPegSoundTime.current = now;
   };
 
   useEffect(() => {
