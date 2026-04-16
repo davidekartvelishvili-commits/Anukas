@@ -250,27 +250,32 @@ export default function LuckyDropPage() {
         ctx.fill();
       }
 
-      // Slots
+      // Slots — crisp flat cards, no pulse, pixel-aligned
       for (let i = 0; i < s.slots.length; i++) {
         const sl = s.slots[i];
         sl.glow *= 0.95;
-        const pulse = 0.5 + Math.sin(now * 0.003 + i * 0.5) * 0.15;
-        ctx.fillStyle = sl.color + "18";
-        ctx.fillRect(sl.x + 1, sl.y, sl.w - 2, sl.h);
+        // Pixel-align to avoid sub-pixel anti-aliasing that reads as blur
+        const sx = Math.round(sl.x);
+        const sy = Math.round(sl.y);
+        const sw = Math.round(sl.w);
+        const sh = Math.round(sl.h);
+        // Base card fill — firmer alpha so it reads as a solid card, not a ghost tint
+        ctx.fillStyle = sl.color + "30";
+        ctx.fillRect(sx + 1, sy, sw - 2, sh);
         if (sl.glow > 0.05) {
-          const ga = Math.min(255, Math.floor(sl.glow * 80));
+          const ga = Math.min(255, Math.floor(sl.glow * 120));
           ctx.fillStyle = sl.color + ga.toString(16).padStart(2, "0");
-          ctx.fillRect(sl.x, sl.y, sl.w, sl.h);
+          ctx.fillRect(sx, sy, sw, sh);
         }
-        const la = Math.min(255, Math.floor((pulse + sl.glow) * 180));
-        ctx.fillStyle = sl.color + la.toString(16).padStart(2, "0").slice(0, 2);
-        ctx.fillRect(sl.x + 2, sl.y, sl.w - 4, 2.5);
+        // Steady top accent bar (no more pulse shimmer)
+        ctx.fillStyle = sl.color;
+        ctx.fillRect(sx + 2, sy, sw - 4, 2.5);
         ctx.font = `${sl.mult >= 10 ? "900" : "700"} ${Math.min(sl.w * 0.38, 18)}px sans-serif`;
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.fillStyle = sl.mult === 0 ? "rgba(255,255,255,0.2)" : sl.color;
-        ctx.fillText(sl.mult === 0 ? "0" : "WIN", sl.x + sl.w / 2, sl.y + sl.h / 2);
+        ctx.fillText(sl.mult === 0 ? "0" : "WIN", sx + sw / 2, sy + sh / 2);
         ctx.fillStyle = "rgba(255,255,255,0.04)";
-        ctx.fillRect(sl.x + sl.w - 0.5, sl.y, 1, sl.h);
+        ctx.fillRect(sx + sw - 1, sy, 1, sh);
       }
 
       // Balls — path-based animation
