@@ -519,20 +519,52 @@ export default function LuckyDropPage() {
           const topY = s.startY;
           const bottomY = s.startY + ROWS * s.gapY;
           const fallFrac = Math.max(0, Math.min(1, (b.y - topY) / (bottomY - topY)));
-          const guidance = fallFrac * fallFrac * 0.028; // 0 at top → 0.028 at bottom
+          const guidance = fallFrac * fallFrac * 0.028;
           b.vx += (lastWp.x - b.x) * guidance;
+
+          // Channel zone — between the last peg row and the slots. Here
+          // we hard-lerp X toward the target slot center so the ball is
+          // already in the correct column before the final settle. Without
+          // this the settle step at `y >= last.y` had to snap X across a
+          // large gap, which looked like a teleport from one slot to another.
+          if (b.y > bottomY) {
+            const channelFrac = Math.min(1, (b.y - bottomY) / (lastWp.y - bottomY));
+            const lerpK = 0.15 + channelFrac * 0.25; // 0.15 → 0.40 as we near slot
+            b.x += (lastWp.x - b.x) * lerpK;
+            // Dampen horizontal velocity so the ball drops cleanly into the slot
+            b.vx *= 0.6;
+          }
 
           // Integrate velocity
           b.x += b.vx;
           b.y += b.vy;
 
-          // Canvas-edge wall bounces (keeps wild bounces on-screen)
-          if (b.x < b.r) {
-            b.x = b.r;
-            b.vx = Math.abs(b.vx) * WALL_BOUNCE;
-          } else if (b.x > s.W - b.r) {
-            b.x = s.W - b.r;
-            b.vx = -Math.abs(b.vx) * WALL_BOUNCE;
+          // Triangle-wall containment — ball cannot escape out the angled
+          // sides of the peg field. Interpolates the wall X at current Y
+          // and bounces if the ball crosses it.
+          if (s.leftWall.length && b.y >= s.leftWall[0].y1 && b.y <= s.leftWall[s.leftWall.length - 1].y2) {
+            for (const seg of s.leftWall) {
+              if (b.y >= seg.y1 && b.y <= seg.y2) {
+                const t = (b.y - seg.y1) / (seg.y2 - seg.y1 || 1);
+                const wx = seg.x1 + (seg.x2 - seg.x1) * t;
+                if (b.x < wx + b.r) {
+                  b.x = wx + b.r;
+                  b.vx = Math.abs(b.vx) * WALL_BOUNCE;
+                }
+                break;
+              }
+            }
+            for (const seg of s.rightWall) {
+              if (b.y >= seg.y1 && b.y <= seg.y2) {
+                const t = (b.y - seg.y1) / (seg.y2 - seg.y1 || 1);
+                const wx = seg.x1 + (seg.x2 - seg.x1) * t;
+                if (b.x > wx - b.r) {
+                  b.x = wx - b.r;
+                  b.vx = -Math.abs(b.vx) * WALL_BOUNCE;
+                }
+                break;
+              }
+            }
           }
 
           // ── Peg collisions (circle vs circle) ──
