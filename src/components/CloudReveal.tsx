@@ -51,6 +51,13 @@ export default function CloudReveal({
     }
     resize();
 
+    // Fix 1: immediately fill the canvas with opaque white so the village
+    // underneath is hidden from the very first paint, even before puffs
+    // finish baking. Baked puffs will draw on top of this in the first
+    // animation frame.
+    ctx!.fillStyle = "#ffffff";
+    ctx!.fillRect(0, 0, canvas!.width, canvas!.height);
+
     type Bump = { rdx: number; rdy: number; r: number; warm: number };
     type Puff = {
       x: number;
@@ -175,7 +182,11 @@ export default function CloudReveal({
       const cx = w / 2;
       const cy = h / 2;
       const maxDim = Math.max(w, h);
-      const spacing = maxDim / 13;
+      // Fix 3: mobile budget — fewer, larger-spaced puffs so the first
+      // frame lands quickly and the main thread isn't starved
+      const isMobile = w < 768;
+      const spacing = maxDim / (isMobile ? 9 : 13);
+      const centerCluster = isMobile ? 25 : 65;
 
       function addPuff(px: number, py: number, rMin: number, rMax: number, delayScale: number) {
         const dx = px - cx;
@@ -225,8 +236,7 @@ export default function CloudReveal({
         }
       }
 
-      // Reduced center clusters — keep perf in check on mobile
-      for (let i = 0; i < 35; i++) {
+      for (let i = 0; i < centerCluster; i++) {
         const a = rng() * Math.PI * 2;
         const d = rng() * maxDim * 0.27;
         addPuff(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 85, 155, 0.45);
@@ -277,18 +287,14 @@ export default function CloudReveal({
 
       const w = W();
       const h = H();
-      ctx!.clearRect(0, 0, w, h);
+      // White base every frame so transparent gaps never reveal the village
+      // until clouds actually drift off screen.
+      ctx!.fillStyle = "#ffffff";
+      ctx!.fillRect(0, 0, w, h);
       renderClouds(progress);
-
-      ctx!.save();
-      ctx!.filter = "blur(5px)";
-      ctx!.globalAlpha = 0.42;
+      // Single bitmap composite — baked puffs already have soft gradients,
+      // no filter stack needed (fixes mobile stutter).
       ctx!.drawImage(clC, 0, 0);
-      ctx!.filter = "blur(1.5px)";
-      ctx!.globalAlpha = 1;
-      ctx!.drawImage(clC, 0, 0);
-      ctx!.filter = "none";
-      ctx!.restore();
 
       // Once animation finishes, keep rendering one more frame then unmount
       if (progress >= 1 && doneAt < 0) doneAt = ts;
@@ -325,11 +331,12 @@ export default function CloudReveal({
         zIndex: 100,
         pointerEvents: "none",
         transition: "opacity 0.1s linear",
+        background: "#ffffff", // instant paint fallback — covers village before canvas is ready
       }}
     >
       <canvas
         ref={canvasRef}
-        style={{ width: "100%", height: "100%", display: "block", background: "transparent" }}
+        style={{ width: "100%", height: "100%", display: "block", background: "#ffffff" }}
       />
     </div>
   );
