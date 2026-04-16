@@ -294,48 +294,73 @@ export default function LuckyDropPage() {
         if (!b.alive) { s.balls.splice(i, 1); continue; }
 
         if (!b.settled) {
-          // Physics constants — real weight-and-bounce feel. The `path`
-          // array is the spine that guarantees we land in the server-
-          // determined slot; these just govern HOW we traverse it.
+          // Real circle-circle collisions with pegs for visual bounce feel.
+          // The `path` array is still used as a weak horizontal guide so the
+          // ball arrives at the server-determined slot — at the bottom,
+          // guidance ramps up + a hard lerp locks the final position.
           const GRAVITY = 0.4;
           const MAX_VY = 12;
-          const RESTITUTION = 0.6;  // vy dampening on peg hit
-          const X_SPRING = 0.018;   // pull strength toward next waypoint X
-          const X_DAMPING = 0.88;   // vx decay per frame
-          const JITTER = 1.2;       // horizontal spread on each peg hit
+          const RESTITUTION = 0.6;   // energy retained after peg bounce
+          const X_DAMPING = 0.94;    // vx decay per frame (keeps energy longer)
+          const JITTER = 0.8;        // random horizontal kick per collision
 
           // Vertical: gravity accumulates, clamped to terminal velocity
           b.vy = Math.min(MAX_VY, b.vy + GRAVITY);
 
-          // Determine which path segment we're in based on Y
+          // Which path segment we're in, based on Y
           let segIdx = b.segIdx;
           while (segIdx < b.path.length - 1 && b.y > b.path[segIdx + 1].y) {
             segIdx++;
           }
+          b.segIdx = segIdx;
 
-          // Horizontal: spring-pull toward the upcoming waypoint's X
+          // Horizontal guidance toward upcoming waypoint — ramps up as we
+          // fall so true collisions dominate at the top and guidance takes
+          // over near the bottom to guarantee the correct slot.
+          const topY = s.startY;
+          const bottomY = s.startY + ROWS * s.gapY;
+          const fallFrac = Math.max(0, Math.min(1, (b.y - topY) / (bottomY - topY)));
+          const guidance = 0.004 + fallFrac * 0.022; // 0.004 at top → 0.026 at bottom
           const targetWp = b.path[Math.min(segIdx + 1, b.path.length - 1)];
-          b.vx += (targetWp.x - b.x) * X_SPRING;
+          b.vx += (targetWp.x - b.x) * guidance;
           b.vx *= X_DAMPING;
 
-          // Apply velocities
+          // Integrate velocity
           b.x += b.vx;
           b.y += b.vy;
 
-          // Peg bounce: when we cross a new waypoint (even segments are
-          // peg-level bounce points; odd are wobble-above-peg) apply
-          // realistic energy loss + horizontal jitter so it looks organic
-          if (segIdx !== b.segIdx) {
-            const entered = segIdx;
-            b.segIdx = segIdx;
-            if (entered > 0 && entered % 2 === 0) {
-              b.vy *= RESTITUTION;
-              b.vx += (Math.random() - 0.5) * JITTER;
+          // ── Peg collisions (circle vs circle) ──
+          for (const peg of s.pegs) {
+            const dx = b.x - peg.x;
+            const dy = b.y - peg.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const minDist = b.r + peg.r;
+            if (dist < minDist && dist > 0.0001) {
+              // Collision normal (peg → ball)
+              const nx = dx / dist;
+              const ny = dy / dist;
+              // Push ball outside the peg so they don't overlap
+              const overlap = minDist - dist;
+              b.x += nx * overlap;
+              b.y += ny * overlap;
+              // Reflect velocity along the normal, only if approaching
+              const vDotN = b.vx * nx + b.vy * ny;
+              if (vDotN < 0) {
+                b.vx -= (1 + RESTITUTION) * vDotN * nx;
+                b.vy -= (1 + RESTITUTION) * vDotN * ny;
+                // Small random horizontal nudge for organic Plinko feel
+                b.vx += (Math.random() - 0.5) * 2 * JITTER;
+                // Strong glow on direct hit
+                peg.glow = 1;
+              }
+            } else if (dist < s.gapY * 0.4) {
+              // Near-miss halo
+              peg.glow = Math.max(peg.glow, 1 - dist / (s.gapY * 0.4));
             }
           }
 
-          // Settle: once Y reaches the final waypoint, smoothly lerp X to
-          // the exact slot center so it drops in cleanly instead of snapping
+          // Settle: once Y reaches the final waypoint, lock Y and ease X
+          // to the exact slot center so the outcome is guaranteed.
           const last = b.path[b.path.length - 1];
           if (b.y >= last.y) {
             b.y = last.y;
@@ -349,15 +374,6 @@ export default function LuckyDropPage() {
               }
               if (typeof (b as any)._onSettle === "function") (b as any)._onSettle();
               setTimeout(() => { b.alive = false; }, 500);
-            }
-          }
-
-          // Light up nearby pegs
-          for (const peg of s.pegs) {
-            const dx = b.x - peg.x, dy = b.y - peg.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < s.gapY * 0.4) {
-              peg.glow = Math.max(peg.glow, 1 - dist / (s.gapY * 0.4));
             }
           }
 
