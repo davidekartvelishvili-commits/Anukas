@@ -112,6 +112,40 @@ export default function LuckyDropPage() {
   const pendingBallsRef = useRef(0);
   const lastServerCoinsRef = useRef(-1);
 
+  // Peg-hit SFX — pool of preloaded Audio objects we cycle through so
+  // overlapping hits each get their own voice (a single Audio can't play
+  // the same source simultaneously on top of itself).
+  const pegSfxPool = useRef<HTMLAudioElement[]>([]);
+  const pegSfxIdx = useRef(0);
+  const pegSfxLastAt = useRef(0);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const POOL = 8;
+    const pool: HTMLAudioElement[] = [];
+    for (let i = 0; i < POOL; i++) {
+      const a = new Audio("/audio/peg-pop.mp3");
+      a.preload = "auto";
+      a.volume = 0.35;
+      pool.push(a);
+    }
+    pegSfxPool.current = pool;
+    return () => {
+      pool.forEach((a) => { a.pause(); a.src = ""; });
+      pegSfxPool.current = [];
+    };
+  }, []);
+  const playPegSfx = () => {
+    const pool = pegSfxPool.current;
+    if (!pool.length) return;
+    // Throttle to avoid machine-gun overlap when a ball grazes multiple pegs
+    const now = performance.now();
+    if (now - pegSfxLastAt.current < 35) return;
+    pegSfxLastAt.current = now;
+    const a = pool[pegSfxIdx.current];
+    pegSfxIdx.current = (pegSfxIdx.current + 1) % pool.length;
+    try { a.currentTime = 0; a.play().catch(() => {}); } catch {}
+  };
+
   useEffect(() => {
     ensureActiveTransaction().then((tx) => {
       setBalance(tx.coinsRemaining);
@@ -364,6 +398,7 @@ export default function LuckyDropPage() {
                 b.vx += (Math.random() - 0.5) * 2 * JITTER;
                 // Strong shine only on direct hit
                 peg.glow = 1;
+                playPegSfx();
               }
             }
           }
