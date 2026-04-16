@@ -9,7 +9,7 @@ import WinAnimation from "@/components/WinAnimation";
 const ROWS = 12;
 
 interface Peg { x: number; y: number; r: number; glow: number }
-interface Slot { x: number; y: number; w: number; h: number; mult: number; color: string; glow: number }
+interface Slot { x: number; y: number; w: number; h: number; mult: number; color: string; glow: number; sprite?: HTMLCanvasElement }
 interface TrailPoint { x: number; y: number; a: number }
 
 // Physics-based ball that tracks a path (path guarantees the predetermined slot)
@@ -248,6 +248,34 @@ export default function LuckyDropPage() {
       mult: m, color: colors[i], glow: 0,
     }));
 
+    // Bake each slot as a static sprite once. Per-frame rendering then
+    // becomes a single drawImage — no text, no multiple fillRects, no
+    // font-metric lookups. The glow overlay is applied on top at runtime.
+    for (const sl of slots) {
+      const sw = Math.max(1, Math.round(sl.w));
+      const sh = Math.max(1, Math.round(sl.h));
+      const sp = document.createElement("canvas");
+      sp.width = sw;
+      sp.height = sh;
+      const sctx = sp.getContext("2d")!;
+      // base card
+      sctx.fillStyle = sl.color;
+      sctx.fillRect(1, 0, sw - 2, sh);
+      // top accent
+      sctx.fillStyle = "rgba(255,255,255,0.35)";
+      sctx.fillRect(2, 0, sw - 4, 2);
+      // label
+      sctx.font = `${sl.mult >= 10 ? "900" : "700"} ${Math.min(sl.w * 0.38, 18)}px sans-serif`;
+      sctx.textAlign = "center";
+      sctx.textBaseline = "middle";
+      sctx.fillStyle = "#FFFFFF";
+      sctx.fillText(sl.mult === 0 ? "0" : "WIN", sw / 2, sh / 2);
+      // right divider
+      sctx.fillStyle = "rgba(0,0,0,0.15)";
+      sctx.fillRect(sw - 1, 0, 1, sh);
+      sl.sprite = sp;
+    }
+
     const s = stateRef.current;
     s.W = W; s.H = H; s.pegs = pegs; s.slots = slots;
     s.gapX = gapX; s.gapY = gapY; s.startY = startY; s.slotH = slotH; s.pegR = pegR;
@@ -276,10 +304,29 @@ export default function LuckyDropPage() {
       gctx.fillRect(0, 0, GLOW_SIZE, GLOW_SIZE);
     }
 
+    // Pre-baked background — radial gradient rebuilt every frame was a
+    // major mobile hit. Bake once per resize, drawImage each frame.
+    const bgSprite = document.createElement("canvas");
+    function bakeBackground() {
+      const w = cvs!.width;
+      const h = cvs!.height;
+      bgSprite.width = w;
+      bgSprite.height = h;
+      const bctx = bgSprite.getContext("2d")!;
+      const bg = bctx.createRadialGradient(w / 2, h * 0.3, 50, w / 2, h * 0.5, h * 0.8);
+      bg.addColorStop(0, "#1a237e");
+      bg.addColorStop(0.35, "#0d1254");
+      bg.addColorStop(0.7, "#070b2e");
+      bg.addColorStop(1, "#030612");
+      bctx.fillStyle = bg;
+      bctx.fillRect(0, 0, w, h);
+    }
+
     function resize() {
       cvs!.width = document.documentElement.clientWidth;
       cvs!.height = document.documentElement.clientHeight;
       calcLayout();
+      bakeBackground();
     }
     resize();
     // Debounce so iOS URL-bar/pull-to-refresh gestures (which fire rapid
@@ -299,10 +346,8 @@ export default function LuckyDropPage() {
       const s = stateRef.current;
       const { W, H } = s;
 
-      const bg = ctx.createRadialGradient(W / 2, H * 0.3, 50, W / 2, H * 0.5, H * 0.8);
-      bg.addColorStop(0, "#1a237e"); bg.addColorStop(0.35, "#0d1254");
-      bg.addColorStop(0.7, "#070b2e"); bg.addColorStop(1, "#030612");
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+      // Background — baked once per resize, cheap bitmap copy per frame
+      ctx.drawImage(bgSprite, 0, 0);
 
       if (s.balls.length === 0) {
         const pulse = Math.sin(now * 0.004) * 0.3 + 0.7;
@@ -340,52 +385,28 @@ export default function LuckyDropPage() {
         ctx.fill();
       }
 
-      // Slots — solid red / green cards; shine bright on ball landing
+      // Slots — draw pre-baked sprite (entire card + text + accents)
+      // and overlay glow/lift only when the ball just landed. No text
+      // rendering, no per-frame fillRects for the card body.
       for (let i = 0; i < s.slots.length; i++) {
         const sl = s.slots[i];
         sl.glow *= 0.94;
-        // Pixel-align to avoid sub-pixel anti-aliasing
         const sx = Math.round(sl.x);
         const sy = Math.round(sl.y);
-        const sw = Math.round(sl.w);
-        const sh = Math.round(sl.h);
-
-        // On-landing shine: pre-baked white glow sprite tinted via alpha.
-        // (Cheaper than rebuilding a radial gradient per frame; the tint
-        //  is visually subtle since the sprite is white and we overlay a
-        //  colored white-lift on the card itself below.)
+        if (sl.sprite) ctx.drawImage(sl.sprite, sx, sy);
         if (sl.glow > 0.05) {
+          const sw = Math.round(sl.w);
+          const sh = Math.round(sl.h);
           const cx2 = sx + sw / 2;
           const cy2 = sy + sh / 2;
           const haloR = Math.max(sw, sh) * 1.8;
           ctx.globalAlpha = sl.glow * 0.8;
           ctx.drawImage(glowSprite, cx2 - haloR, cy2 - haloR, haloR * 2, haloR * 2);
+          ctx.globalAlpha = sl.glow * 0.55;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(sx + 1, sy, sw - 2, sh);
           ctx.globalAlpha = 1;
         }
-
-        // Solid card fill — base is fully opaque; a brightness boost stacks
-        // on top when the ball lands
-        ctx.fillStyle = sl.color;
-        ctx.fillRect(sx + 1, sy, sw - 2, sh);
-        if (sl.glow > 0.05) {
-          // Overlay a white lift so the solid color brightens on hit
-          ctx.fillStyle = `rgba(255,255,255,${sl.glow * 0.55})`;
-          ctx.fillRect(sx + 1, sy, sw - 2, sh);
-        }
-
-        // Top accent line (subtle white highlight)
-        ctx.fillStyle = "rgba(255,255,255,0.35)";
-        ctx.fillRect(sx + 2, sy, sw - 4, 2);
-
-        // Text — white stays crisp on both red and green
-        ctx.font = `${sl.mult >= 10 ? "900" : "700"} ${Math.min(sl.w * 0.38, 18)}px sans-serif`;
-        ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillStyle = "#FFFFFF";
-        ctx.fillText(sl.mult === 0 ? "0" : "WIN", sx + sw / 2, sy + sh / 2);
-
-        // Right divider
-        ctx.fillStyle = "rgba(0,0,0,0.15)";
-        ctx.fillRect(sx + sw - 1, sy, 1, sh);
       }
 
       // Balls — path-based animation
@@ -430,12 +451,18 @@ export default function LuckyDropPage() {
           b.y += b.vy;
 
           // ── Peg collisions (circle vs circle) ──
+          // Compare squared distances first so sqrt only runs on an
+          // actual collision (60 pegs × N balls × 60 fps would be a lot
+          // of sqrt calls otherwise).
           for (const peg of s.pegs) {
             const dx = b.x - peg.x;
             const dy = b.y - peg.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+            const distSq = dx * dx + dy * dy;
             const minDist = b.r + peg.r;
-            if (dist < minDist && dist > 0.0001) {
+            const minDistSq = minDist * minDist;
+            if (distSq >= minDistSq || distSq < 0.00000001) continue;
+            const dist = Math.sqrt(distSq);
+            {
               // Collision normal (peg → ball)
               const nx = dx / dist;
               const ny = dy / dist;
