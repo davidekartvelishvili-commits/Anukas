@@ -424,7 +424,7 @@ export default function VillagePage() {
       {exitTarget && (
         <CloudReveal
           mode="exit"
-          animMs={1400}
+          animMs={2200}
           onDone={() => router.push(exitTarget)}
         />
       )}

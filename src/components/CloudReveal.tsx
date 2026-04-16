@@ -15,7 +15,7 @@ export default function CloudReveal({
   onDone,
   mode = "enter",
   holdMs = 250,
-  animMs = 2400,
+  animMs = 3600,
   fadeMs = 320,
 }: {
   onDone?: () => void;
@@ -269,20 +269,14 @@ export default function CloudReveal({
 
     buildPuffs();
 
-    // Chunked bake: process a small batch per frame so the main thread
-    // never blocks long enough to drop frames. We don't reveal the village
-    // until this finishes, so the animation cover is always guaranteed.
-    let bakeIdx = 0;
-    let bakeDone = false;
-    let bakeRaf = 0;
-    const BAKE_PER_FRAME = 12;
-    function bakeSlice() {
-      const end = Math.min(puffs.length, bakeIdx + BAKE_PER_FRAME);
-      for (; bakeIdx < end; bakeIdx++) bakePuff(puffs[bakeIdx]);
-      if (bakeIdx < puffs.length) bakeRaf = requestAnimationFrame(bakeSlice);
-      else bakeDone = true;
-    }
-    bakeRaf = requestAnimationFrame(bakeSlice);
+    // Synchronous bake: blocks for ~20-40ms on mobile but happens ONCE
+    // under the wrapper's white cover (browser doesn't paint during the
+    // block). Guarantees every puff is ready on the first animation frame
+    // so there's no visible progressive "clouds appearing top-to-bottom"
+    // reveal — which is what caused the "clouds come from top 2 times"
+    // artifact under React dev StrictMode (each re-run re-showed the
+    // progressive reveal).
+    for (const p of puffs) bakePuff(p);
 
     function puffState(p: Puff, progress: number) {
       const span = 1 - p.delay;
@@ -335,9 +329,10 @@ export default function CloudReveal({
       renderClouds(isExit ? 1 - progress : progress);
 
       if (!isExit) {
-        // Enter mode: reveal the village only after HOLD ends AND the
-        // chunked baker has finished (village must be fully covered first).
-        if (!animRevealed && el >= holdMs && bakeDone) {
+        // Enter mode: reveal the village when HOLD ends. All puffs are
+        // baked synchronously in useEffect, so the cover is guaranteed
+        // full by the time this fires.
+        if (!animRevealed && el >= holdMs) {
           animRevealed = true;
           if (wrapperRef.current) wrapperRef.current.style.background = "transparent";
           canvas!.style.background = "transparent";
@@ -378,7 +373,6 @@ export default function CloudReveal({
 
     return () => {
       cancelAnimationFrame(rafRef.current);
-      if (bakeRaf) cancelAnimationFrame(bakeRaf);
     };
   }, [onDone, mode, holdMs, animMs, fadeMs, isExit]);
 
