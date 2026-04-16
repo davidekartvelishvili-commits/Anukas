@@ -224,43 +224,30 @@ export default function LuckyDropPage() {
         ctx.fill(); ctx.shadowBlur = 0; ctx.restore();
       }
 
-      // Pegs — bright, crisp dots with a soft blue glow
+      // Pegs — flat white dots; only shine when hit by the ball
       for (const peg of s.pegs) {
-        peg.glow *= 0.92;
+        peg.glow *= 0.9;
 
-        // Purple impact halo on collision (unchanged)
-        if (peg.glow > 0.05) {
-          const g = ctx.createRadialGradient(peg.x, peg.y, 0, peg.x, peg.y, peg.r * 5);
-          g.addColorStop(0, `rgba(124,77,255,${peg.glow * 0.5})`);
-          g.addColorStop(1, "transparent");
-          ctx.fillStyle = g;
-          ctx.fillRect(peg.x - peg.r * 5, peg.y - peg.r * 5, peg.r * 10, peg.r * 10);
-        }
-
-        // Visual radius is a hair bigger than physics radius for a clean read
-        // (does not affect collision — peg.r is unchanged).
+        // Visual radius is a hair bigger than physics radius for a clean
+        // read (does not affect collision — peg.r is unchanged).
         const visR = peg.r + 0.5;
 
-        ctx.save();
-        ctx.shadowColor = "rgba(150,180,255,0.9)";
-        ctx.shadowBlur = 3 + peg.glow * 5;
+        // On-impact shine: bright white halo that fades quickly
+        if (peg.glow > 0.05) {
+          const g = ctx.createRadialGradient(peg.x, peg.y, 0, peg.x, peg.y, visR * 4);
+          g.addColorStop(0, `rgba(255,255,255,${peg.glow * 0.85})`);
+          g.addColorStop(0.5, `rgba(255,255,255,${peg.glow * 0.25})`);
+          g.addColorStop(1, "transparent");
+          ctx.fillStyle = g;
+          ctx.fillRect(peg.x - visR * 4, peg.y - visR * 4, visR * 8, visR * 8);
+        }
 
-        const pg = ctx.createRadialGradient(peg.x, peg.y, 0, peg.x, peg.y, visR);
-        pg.addColorStop(0, "rgba(255,255,255,1)");
-        pg.addColorStop(0.6, "rgba(210,220,255,0.98)");
-        pg.addColorStop(1, "rgba(160,180,235,0.95)");
+        // The dot itself — solid white, no ambient glow
+        const hitR = visR + peg.glow * 1.5; // swells slightly on impact
         ctx.beginPath();
-        ctx.arc(peg.x, peg.y, visR, 0, Math.PI * 2);
-        ctx.fillStyle = pg;
+        ctx.arc(peg.x, peg.y, hitR, 0, Math.PI * 2);
+        ctx.fillStyle = "#FFFFFF";
         ctx.fill();
-        ctx.restore();
-
-        // Crisp hairline outer ring
-        ctx.beginPath();
-        ctx.arc(peg.x, peg.y, visR + 0.4, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(200,215,255,${0.55 + peg.glow * 0.45})`;
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
       }
 
       // Slots
@@ -350,12 +337,9 @@ export default function LuckyDropPage() {
                 b.vy -= (1 + RESTITUTION) * vDotN * ny;
                 // Small random horizontal nudge for organic Plinko feel
                 b.vx += (Math.random() - 0.5) * 2 * JITTER;
-                // Strong glow on direct hit
+                // Strong shine only on direct hit
                 peg.glow = 1;
               }
-            } else if (dist < s.gapY * 0.4) {
-              // Near-miss halo
-              peg.glow = Math.max(peg.glow, 1 - dist / (s.gapY * 0.4));
             }
           }
 
