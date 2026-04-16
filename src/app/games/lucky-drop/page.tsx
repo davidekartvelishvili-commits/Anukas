@@ -536,7 +536,7 @@ export default function LuckyDropPage() {
                 b.vx += (Math.random() - 0.5) * 2 * JITTER;
                 // Strong shine only on direct hit
                 peg.glow = 1;
-                playPegSfx();
+                // playPegSfx(); // TEMP DISABLED FOR TESTING
               }
             }
           }
