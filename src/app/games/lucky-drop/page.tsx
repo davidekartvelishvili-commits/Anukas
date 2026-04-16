@@ -235,18 +235,18 @@ export default function LuckyDropPage() {
           ctx.fillRect(peg.x - peg.r * 5, peg.y - peg.r * 5, peg.r * 10, peg.r * 10);
         }
 
-        // Visual radius is 1.5px bigger than physics radius for clearer read
+        // Visual radius is a hair bigger than physics radius for a clean read
         // (does not affect collision — peg.r is unchanged).
-        const visR = peg.r + 1.5;
+        const visR = peg.r + 0.5;
 
         ctx.save();
-        ctx.shadowColor = "rgba(150,180,255,1)";
-        ctx.shadowBlur = 8 + peg.glow * 6;
+        ctx.shadowColor = "rgba(150,180,255,0.9)";
+        ctx.shadowBlur = 3 + peg.glow * 5;
 
         const pg = ctx.createRadialGradient(peg.x, peg.y, 0, peg.x, peg.y, visR);
         pg.addColorStop(0, "rgba(255,255,255,1)");
-        pg.addColorStop(0.55, "rgba(200,215,255,0.95)");
-        pg.addColorStop(1, "rgba(150,170,230,0.9)");
+        pg.addColorStop(0.6, "rgba(210,220,255,0.98)");
+        pg.addColorStop(1, "rgba(160,180,235,0.95)");
         ctx.beginPath();
         ctx.arc(peg.x, peg.y, visR, 0, Math.PI * 2);
         ctx.fillStyle = pg;
@@ -255,9 +255,9 @@ export default function LuckyDropPage() {
 
         // Crisp hairline outer ring
         ctx.beginPath();
-        ctx.arc(peg.x, peg.y, visR + 0.5, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(200,215,255,${0.5 + peg.glow * 0.5})`;
-        ctx.lineWidth = 1;
+        ctx.arc(peg.x, peg.y, visR + 0.4, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(200,215,255,${0.55 + peg.glow * 0.45})`;
+        ctx.lineWidth = 0.8;
         ctx.stroke();
       }
 
@@ -540,7 +540,7 @@ export default function LuckyDropPage() {
         </button>
         <div className="bg-white/[0.08] backdrop-blur-2xl border border-white/10 rounded-[22px] px-5 py-2 flex flex-col items-center gap-px">
           <div className="flex items-center gap-1.5 font-bold text-[17px] text-white" style={{ fontFamily: "var(--font-outfit)" }}>
-            <span className="text-[14px]">₾</span>
+            <img src="/images/coin-icon.png" alt="coin" width={16} height={16} style={{ objectFit: "contain" }} />
             {betAmount > 0 ? betAmount : "—"}
           </div>
           <span className="text-[10px] text-white/[0.45] font-medium uppercase tracking-wider" style={{ fontFamily: "var(--font-dm-sans)" }}>Lucky Drop</span>
@@ -624,8 +624,9 @@ export default function LuckyDropPage() {
           <div className="flex flex-col items-center gap-0.5">
             {betAmount > 0 && (
               <div className="flex items-center gap-1.5">
+                <img src="/images/coin-icon.png" alt="coin" width={15} height={15} style={{ objectFit: "contain" }} />
                 <span className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
-                  ₾ {betAmount}
+                  {betAmount}
                 </span>
                 <span className="text-white/30 text-[13px]">&rsaquo;</span>
               </div>
