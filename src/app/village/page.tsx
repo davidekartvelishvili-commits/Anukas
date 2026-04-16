@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
+import CloudReveal from "@/components/CloudReveal";
 import { apiFetch } from "@/services/api";
 import { getCoinBalance, setCoinBalance } from "@/services/balance";
 import { getMe } from "@/services/auth";
@@ -285,6 +286,8 @@ export default function VillagePage() {
   const [showWelcome, setShowWelcome] = useState(true);
   const [showHand, setShowHand] = useState(true);
   const [profile, setProfile] = useState<{ totalStars: number; shieldActive: boolean; currentLevel: number } | null>(null);
+  // Intro cloud reveal — plays once per page entry then unmounts
+  const [showReveal, setShowReveal] = useState(true);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
@@ -415,6 +418,7 @@ export default function VillagePage() {
 
   return (
     <AuthGuard>
+      {showReveal && <CloudReveal onDone={() => setShowReveal(false)} />}
       <style>{`
         html, body { background: #87CEEB !important; }
         @keyframes drift-slow { 0% { transform: translateX(-20px); } 100% { transform: translateX(20px); } }
