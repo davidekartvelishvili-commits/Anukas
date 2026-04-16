@@ -119,7 +119,46 @@ export default function LuckyDropPage() {
   const pegSfxIdx = useRef(0);
   const pegSfxLastAt = useRef(0);
   const pegSfxHitCount = useRef(0);
-  const PEG_SFX_EVERY_N = 3; // only play on every 3rd peg collision
+  const pegSfxMuted = useRef(false); // silenced while win audio is playing
+  const PEG_SFX_EVERY_N = 6; // only play on every 6th peg collision
+
+  // Win audio: main music (loud) + coin sound (quieter) that fire in
+  // parallel when a win animation starts. Pop SFX is silenced during.
+  const winMusicRef = useRef<HTMLAudioElement | null>(null);
+  const winCoinRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const music = new Audio("/audio/win-music.mp3");
+    music.preload = "auto";
+    music.volume = 0.85;
+    const coin = new Audio("/audio/win-coin.mp3");
+    coin.preload = "auto";
+    coin.volume = 0.35; // quieter than the music
+    winMusicRef.current = music;
+    winCoinRef.current = coin;
+    return () => {
+      music.pause(); music.src = "";
+      coin.pause(); coin.src = "";
+      winMusicRef.current = null;
+      winCoinRef.current = null;
+    };
+  }, []);
+  const playWinAudio = () => {
+    pegSfxMuted.current = true;
+    // Stop any in-flight pegs that might still be mid-playback
+    pegSfxPool.current.forEach((a) => { try { a.pause(); a.currentTime = 0; } catch {} });
+    const m = winMusicRef.current;
+    const c = winCoinRef.current;
+    if (m) { try { m.currentTime = 0; m.play().catch(() => {}); } catch {} }
+    if (c) { try { c.currentTime = 0; c.play().catch(() => {}); } catch {} }
+  };
+  const stopWinAudio = () => {
+    const m = winMusicRef.current;
+    const c = winCoinRef.current;
+    if (m) { try { m.pause(); m.currentTime = 0; } catch {} }
+    if (c) { try { c.pause(); c.currentTime = 0; } catch {} }
+    pegSfxMuted.current = false;
+  };
   useEffect(() => {
     if (typeof window === "undefined") return;
     const POOL = 8;
@@ -137,6 +176,7 @@ export default function LuckyDropPage() {
     };
   }, []);
   const playPegSfx = () => {
+    if (pegSfxMuted.current) return; // silenced during win audio
     // Only fire on every Nth collision to keep the soundscape calm
     pegSfxHitCount.current += 1;
     if (pegSfxHitCount.current % PEG_SFX_EVERY_N !== 0) return;
@@ -551,9 +591,10 @@ export default function LuckyDropPage() {
         if (serverResult.totalWin > 0 && serverResult.won) {
           setWinAmount(serverResult.totalWin);
           spawnParticles(serverResult.bonusWin > 20 ? 50 : 20, serverResult.bonusWin > 20);
-          // Trigger the new fancy win animation overlay
+          // Trigger the new fancy win animation overlay + audio
           setWinAnimAmount(serverResult.totalWin);
           setShowWinAnim(true);
+          playWinAudio();
         }
         // Always sync to server balance — never let it go UP from local
         setBalance((prev) => Math.min(prev, serverResult.coinsRemaining));
@@ -622,7 +663,7 @@ export default function LuckyDropPage() {
       <WinAnimation
         show={showWinAnim}
         amount={winAnimAmount}
-        onDone={() => setShowWinAnim(false)}
+        onDone={() => { setShowWinAnim(false); stopWinAudio(); }}
       />
 
       {/* Bonus round banner */}
