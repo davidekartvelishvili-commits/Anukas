@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { MULTIPLIERS, SLOT_COLORS, BET_COST, type RiskLevel, type DropResult } from "./drop-config";
 import { playGame, ensureActiveTransaction } from "@/services/games";
 import { setCoinBalance as storeCoin, setCashBalance as storeCash } from "@/services/balance";
@@ -193,11 +193,31 @@ export default function LuckyDropPage() {
       storeCoin(tx.coinsRemaining);
     }).catch(() => {});
   }, []);
-  const [bigWinText, setBigWinText] = useState("");
+  // bigWinText: imperative DOM update via ref instead of useState, so
+  // transient error text doesn't re-render the whole LuckyDropPage tree
+  // while balls are mid-flight.
+  const bigWinRef = useRef<HTMLDivElement>(null);
+  const setBigWinText = (t: string) => {
+    const el = bigWinRef.current;
+    if (el) el.textContent = t || "";
+  };
   const [showWinAnim, setShowWinAnim] = useState(false);
+  const showWinAnimRef = useRef(false);
+  useEffect(() => { showWinAnimRef.current = showWinAnim; }, [showWinAnim]);
   const [winAnimAmount, setWinAnimAmount] = useState(0);
   const [bonusRoundInfo, setBonusRoundInfo] = useState<{ coins: number; gamesLeft: number } | null>(null);
   const dropCount = useRef(0);
+
+  // Canvas-rendered confetti particles. Replaces the old DOM-div-per-particle
+  // approach which was creating 20-50 <div>s per win, each running a 4s CSS
+  // transform animation — severe jank on mobile.
+  type CanvasParticle = {
+    x: number; y: number; vx: number; vy: number;
+    rot: number; rotV: number;
+    life: number; maxLife: number;
+    color: string; size: number; shape: 0 | 1; // 0 circle, 1 square
+  };
+  const particlesRef = useRef<CanvasParticle[]>([]);
   const BET_OPTIONS = [10, 25, 50, 100, 250, 500];
 
   const riskRef = useRef(risk);
@@ -304,6 +324,19 @@ export default function LuckyDropPage() {
       gctx.fillRect(0, 0, GLOW_SIZE, GLOW_SIZE);
     }
 
+    // Pre-baked peg dot sprite. 60 arc+fill calls per frame was adding up
+    // to ~6-12ms on mobile; one drawImage per peg is ~free.
+    const PEG_SPRITE_SIZE = 24; // generous, high-res; scaled down by drawImage
+    const pegSprite = document.createElement("canvas");
+    pegSprite.width = pegSprite.height = PEG_SPRITE_SIZE;
+    {
+      const pctx = pegSprite.getContext("2d")!;
+      pctx.fillStyle = "#FFFFFF";
+      pctx.beginPath();
+      pctx.arc(PEG_SPRITE_SIZE / 2, PEG_SPRITE_SIZE / 2, PEG_SPRITE_SIZE / 2 - 0.5, 0, Math.PI * 2);
+      pctx.fill();
+    }
+
     // Pre-baked background — radial gradient rebuilt every frame was a
     // major mobile hit. Bake once per resize, drawImage each frame.
     const bgSprite = document.createElement("canvas");
@@ -361,28 +394,20 @@ export default function LuckyDropPage() {
         ctx.fill(); ctx.shadowBlur = 0; ctx.restore();
       }
 
-      // Pegs — flat white dots; only shine when hit by the ball
+      // Pegs — pre-baked white-dot sprite via drawImage; only shine halo
+      // when hit by a ball (separate glow sprite).
       for (const peg of s.pegs) {
         peg.glow *= 0.9;
-
-        // Visual radius is a hair bigger than physics radius for a clean
-        // read (does not affect collision — peg.r is unchanged).
         const visR = peg.r + 0.5;
-
-        // On-impact shine: pre-baked glow sprite, drawn with alpha
         if (peg.glow > 0.05) {
           const haloR = visR * 4;
           ctx.globalAlpha = peg.glow;
           ctx.drawImage(glowSprite, peg.x - haloR, peg.y - haloR, haloR * 2, haloR * 2);
           ctx.globalAlpha = 1;
         }
-
-        // The dot itself — solid white, no ambient glow
-        const hitR = visR + peg.glow * 1.5; // swells slightly on impact
-        ctx.beginPath();
-        ctx.arc(peg.x, peg.y, hitR, 0, Math.PI * 2);
-        ctx.fillStyle = "#FFFFFF";
-        ctx.fill();
+        // Dot swells slightly on impact for punch
+        const hitR = visR + peg.glow * 1.5;
+        ctx.drawImage(pegSprite, peg.x - hitR, peg.y - hitR, hitR * 2, hitR * 2);
       }
 
       // Slots — draw pre-baked sprite (entire card + text + accents)
@@ -510,6 +535,40 @@ export default function LuckyDropPage() {
         ctx.fillStyle = "#FFE500";
         ctx.fill();
       }
+
+      // Particles (canvas-rendered, replaces the old DOM-div cascade)
+      const pList = particlesRef.current;
+      if (pList.length) {
+        const GRAVITY = 0.18;
+        let writeIdx = 0;
+        for (let i = 0; i < pList.length; i++) {
+          const p = pList[i];
+          p.vy += GRAVITY;
+          p.x += p.vx;
+          p.y += p.vy;
+          p.rot += p.rotV;
+          p.life -= 1;
+          if (p.life <= 0 || p.y > s.H + 20) continue;
+          // Compact alive particles in-place (cheaper than splice)
+          pList[writeIdx++] = p;
+          const a = Math.max(0, Math.min(1, p.life / p.maxLife));
+          ctx.globalAlpha = a;
+          ctx.fillStyle = p.color;
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          if (p.shape === 0) {
+            ctx.beginPath();
+            ctx.arc(0, 0, p.size * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            const h = p.size * 0.5;
+            ctx.fillRect(-h, -h, p.size, p.size);
+          }
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+        }
+        pList.length = writeIdx;
+        ctx.globalAlpha = 1;
+      }
     }
     loop();
 
@@ -526,26 +585,33 @@ export default function LuckyDropPage() {
     const colors = isJP
       ? ["#FFD700", "#FF6D00", "#FF3D00", "#FFAB00", "#fff"]
       : ["#FFD700", "#FFC107", "#00E676", "#fff"];
+    const W = stateRef.current.W || window.innerWidth;
+    const H = stateRef.current.H || window.innerHeight;
+    const arr = particlesRef.current;
     for (let i = 0; i < count; i++) {
-      const p = document.createElement("div");
-      const sz = 4 + Math.random() * 10;
-      Object.assign(p.style, {
-        position: "absolute", width: `${sz}px`, height: `${sz}px`,
-        left: `${10 + Math.random() * 80}%`, top: `${-5 + Math.random() * 20}%`,
-        background: colors[Math.floor(Math.random() * colors.length)],
-        borderRadius: Math.random() > 0.5 ? "50%" : "2px",
-        pointerEvents: "none", zIndex: "50",
-        animation: `particleFall ${1.5 + Math.random() * 2}s linear ${Math.random() * 0.5}s forwards`,
+      arr.push({
+        x: W * (0.1 + Math.random() * 0.8),
+        y: H * (-0.05 + Math.random() * 0.25),
+        vx: (Math.random() - 0.5) * 1.6,
+        vy: 1 + Math.random() * 1.5,
+        rot: Math.random() * Math.PI * 2,
+        rotV: (Math.random() - 0.5) * 0.3,
+        life: 60 * (1.5 + Math.random() * 2), // in frames, 1.5-3.5s at 60fps
+        maxLife: 60 * 2.5,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        size: 4 + Math.random() * 10,
+        shape: Math.random() > 0.5 ? 0 : 1,
       });
-      document.body.appendChild(p);
-      setTimeout(() => p.remove(), 4000);
     }
   }
 
   const handleDrop = useCallback(() => {
     if (betAmount <= 0 || balance < betAmount) return;
-    // Block drops while win animation is playing
-    if (showWinAnim) return;
+    // Block drops while win animation is playing (ref — reading this
+    // from the showWinAnimRef instead of state so handleDrop stays
+    // stable when showWinAnim toggles, letting the memoized bottom UI
+    // skip re-renders on win-animation transitions).
+    if (showWinAnimRef.current) return;
 
     // Deduct locally for instant UI feedback
     setBalance((prev) => prev - betAmount);
@@ -631,14 +697,19 @@ export default function LuckyDropPage() {
           setShowWinAnim(true);
           playWinAudio();
         }
-        // Always sync to server balance — never let it go UP from local
-        setBalance((prev) => Math.min(prev, serverResult.coinsRemaining));
-        // When last ball settles, set exact server balance and reset for next batch
-        if (pendingBallsRef.current === 0) {
-          setBalance(lastServerCoinsRef.current);
-          storeCoin(lastServerCoinsRef.current);
-          lastServerCoinsRef.current = -1;
-        }
+        // Coalesced balance update — ONE setBalance per ball settle
+        // instead of two. If parallel balls are still in flight, clamp to
+        // the lowest known server value; if this is the last ball, snap
+        // to the exact server value and reset bookkeeping.
+        setBalance((prev) => {
+          if (pendingBallsRef.current === 0) {
+            const final = lastServerCoinsRef.current;
+            storeCoin(final);
+            lastServerCoinsRef.current = -1;
+            return final;
+          }
+          return Math.min(prev, serverResult.coinsRemaining);
+        });
       };
 
       s.balls.push(ball);
@@ -656,21 +727,94 @@ export default function LuckyDropPage() {
       setBigWinText(err.message || "\u10E8\u10D4\u10EA\u10D3\u10DD\u10DB\u10D0");
       setTimeout(() => setBigWinText(""), 2000);
     });
-  }, [balance, betAmount, showWinAnim]);
+  }, [balance, betAmount]);
+
+  // Memoized bottom UI — only re-renders when these props actually change.
+  // Unrelated state (showWinAnim, winAnimAmount, bonusRoundInfo, result,
+  // winAmount) changing won't force the bottom buttons / balance pill to
+  // re-reconcile during gameplay.
+  const bottomUI = useMemo(() => (
+    <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center z-10 pointer-events-none gap-3" style={{ paddingBottom: "max(18px, calc(env(safe-area-inset-bottom, 0px) + 12px))" }}>
+      <div className="min-h-[4px]" />
+
+      {showBetPicker && (
+        <p className="text-white/50 text-[14px] font-medium" style={{ fontFamily: "var(--font-dm-sans)" }}>
+          Pick amount to play
+        </p>
+      )}
+
+      {showBetPicker && (
+        <div className="pointer-events-auto flex gap-2.5 overflow-x-auto px-4 pb-1 scrollbar-hide w-full max-w-[420px]">
+          {BET_OPTIONS.map((amt) => (
+            <button
+              key={amt}
+              onClick={() => { setBetAmount(amt); setShowBetPicker(false); }}
+              className="shrink-0 px-8 py-5 rounded-full text-[20px] font-bold active:scale-[0.95] transition-transform"
+              style={{ background: "#FFD700", color: "#1a1a2e", fontFamily: "var(--font-outfit)" }}
+            >
+              {amt}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!showBetPicker && betAmount > 0 && (
+        <button
+          onClick={handleDrop}
+          disabled={balance < betAmount}
+          className="pointer-events-auto px-12 py-6 rounded-full text-[19px] font-black tracking-wide transition-all duration-150 active:scale-[0.97] disabled:bg-[#3a3a4a] disabled:text-[#777] disabled:cursor-not-allowed"
+          style={{
+            background: balance < betAmount ? "#3a3a4a" : "#FFD700",
+            color: balance < betAmount ? "#777" : "#1a1a2e",
+            boxShadow: balance < betAmount ? "none" : "0 4px 24px rgba(255,215,0,.25), inset 0 1px 0 rgba(255,255,255,.3)",
+            fontFamily: "var(--font-outfit)",
+          }}
+        >
+          Drop
+        </button>
+      )}
+
+      <button
+        onClick={() => setShowBetPicker(true)}
+        className="pointer-events-auto px-8 py-4 rounded-full active:scale-[0.97] transition-transform"
+        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+      >
+        <div className="flex flex-col items-center gap-0.5">
+          {betAmount > 0 && (
+            <div className="flex items-center gap-1.5">
+              <img src="/images/coin-icon.png" alt="coin" width={15} height={15} style={{ objectFit: "contain" }} />
+              <span className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
+                {betAmount}
+              </span>
+              <span className="text-white/30 text-[13px]">&rsaquo;</span>
+            </div>
+          )}
+          <span className="text-[11px] text-white/40" style={{ fontFamily: "var(--font-dm-sans)" }}>
+            {betAmount > 0 ? "Balance " : "Pick amount to play"}
+            {betAmount > 0 && (
+              <span className="text-white font-bold">
+                {balance.toLocaleString("en-US", { maximumFractionDigits: 1 })}
+              </span>
+            )}
+          </span>
+        </div>
+      </button>
+    </div>
+  ), [balance, betAmount, showBetPicker, handleDrop]);
 
   return (
     <div
       className="relative w-full h-[100dvh] bg-[#050a1a] overflow-hidden"
       style={{ overscrollBehavior: "none", touchAction: "none" }}
     >
-      <style>{`
-        @keyframes particleFall {
-          0% { opacity:1; transform:translateY(0) rotate(0deg) scale(1); }
-          100% { opacity:0; transform:translateY(100vh) rotate(720deg) scale(.2); }
-        }
-      `}</style>
-
       <canvas ref={canvasRef} className="absolute inset-0 z-[1]" />
+
+      {/* Transient error text (updated imperatively via ref — never triggers a React re-render) */}
+      <div
+        ref={bigWinRef}
+        className="absolute z-20 text-center text-[13px] font-medium pointer-events-none"
+        style={{ top: "calc(env(safe-area-inset-top, 0px) + 80px)", left: 0, right: 0, color: "#ffb4b4", fontFamily: "var(--font-outfit)" }}
+      />
 
       {/* Top Bar */}
       <div className="absolute top-0 left-0 right-0 flex justify-between items-start p-3.5 z-10" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 14px)" }}>
@@ -715,77 +859,7 @@ export default function LuckyDropPage() {
         </div>
       )}
 
-      {/* Bottom UI */}
-      <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center z-10 pointer-events-none gap-3" style={{ paddingBottom: "max(18px, calc(env(safe-area-inset-bottom, 0px) + 12px))" }}>
-        <div className="min-h-[4px]" />
-
-        {/* Pick amount label */}
-        {showBetPicker && (
-          <p className="text-white/50 text-[14px] font-medium" style={{ fontFamily: "var(--font-dm-sans)" }}>
-            Pick amount to play
-          </p>
-        )}
-
-        {/* Bet picker pills */}
-        {showBetPicker && (
-          <div className="pointer-events-auto flex gap-2.5 overflow-x-auto px-4 pb-1 scrollbar-hide w-full max-w-[420px]">
-            {BET_OPTIONS.map((amt) => (
-              <button
-                key={amt}
-                onClick={() => { setBetAmount(amt); setShowBetPicker(false); }}
-                className="shrink-0 px-8 py-5 rounded-full text-[20px] font-bold active:scale-[0.95] transition-transform"
-                style={{ background: "#FFD700", color: "#1a1a2e", fontFamily: "var(--font-outfit)" }}
-              >
-                {amt}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Drop button (after bet selected) */}
-        {!showBetPicker && betAmount > 0 && (
-          <button
-            onClick={handleDrop}
-            disabled={balance < betAmount}
-            className="pointer-events-auto px-12 py-6 rounded-full text-[19px] font-black tracking-wide transition-all duration-150 active:scale-[0.97] disabled:bg-[#3a3a4a] disabled:text-[#777] disabled:cursor-not-allowed"
-            style={{
-              background: balance < betAmount ? "#3a3a4a" : "#FFD700",
-              color: balance < betAmount ? "#777" : "#1a1a2e",
-              boxShadow: balance < betAmount ? "none" : "0 4px 24px rgba(255,215,0,.25), inset 0 1px 0 rgba(255,255,255,.3)",
-              fontFamily: "var(--font-outfit)",
-            }}
-          >
-            Drop
-          </button>
-        )}
-
-        {/* Balance bar — same pill shape as Drop button */}
-        <button
-          onClick={() => setShowBetPicker(true)}
-          className="pointer-events-auto px-8 py-4 rounded-full active:scale-[0.97] transition-transform"
-          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
-        >
-          <div className="flex flex-col items-center gap-0.5">
-            {betAmount > 0 && (
-              <div className="flex items-center gap-1.5">
-                <img src="/images/coin-icon.png" alt="coin" width={15} height={15} style={{ objectFit: "contain" }} />
-                <span className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
-                  {betAmount}
-                </span>
-                <span className="text-white/30 text-[13px]">&rsaquo;</span>
-              </div>
-            )}
-            <span className="text-[11px] text-white/40" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              {betAmount > 0 ? "Balance " : "Pick amount to play"}
-              {betAmount > 0 && (
-                <span className="text-white font-bold">
-                  {balance.toLocaleString("en-US", { maximumFractionDigits: 1 })}
-                </span>
-              )}
-            </span>
-          </div>
-        </button>
-      </div>
+      {bottomUI}
     </div>
   );
 }

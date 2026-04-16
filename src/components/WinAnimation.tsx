@@ -336,10 +336,11 @@ export default function WinAnimation({
     <div
       className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
       style={{
-        // Semi-transparent dark backdrop — blocks taps so user can't drop balls during animation
-        background: "rgba(0,0,0,0.65)",
-        backdropFilter: "blur(4px)",
-        WebkitBackdropFilter: "blur(4px)",
+        // Semi-transparent dark backdrop — blocks taps so user can't drop
+        // balls during animation. backdrop-filter:blur removed: it was
+        // forcing a full-screen GPU recomposite every frame for the whole
+        // duration of the win animation, stealing 3-8ms per frame on mobile.
+        background: "rgba(0,0,0,0.72)",
         fontFamily: "'Montserrat', 'Outfit', sans-serif",
         animation: phase === "finishing" || phase === "done" ? "fadeOut 2s forwards" : undefined,
       }}
