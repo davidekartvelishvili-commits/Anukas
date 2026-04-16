@@ -182,11 +182,12 @@ export default function CloudReveal({
       const cx = w / 2;
       const cy = h / 2;
       const maxDim = Math.max(w, h);
-      // Fix 3: mobile budget — fewer, larger-spaced puffs so the first
-      // frame lands quickly and the main thread isn't starved
+      // Aggressive mobile budget — the baking phase dominates first-frame
+      // latency, so we keep total puff count low (~60-80 on mobile) and
+      // let larger individual puffs cover the screen instead.
       const isMobile = w < 768;
-      const spacing = maxDim / (isMobile ? 9 : 13);
-      const centerCluster = isMobile ? 25 : 65;
+      const spacing = maxDim / (isMobile ? 7 : 13);
+      const centerCluster = isMobile ? 15 : 45;
 
       function addPuff(px: number, py: number, rMin: number, rMax: number, delayScale: number) {
         const dx = px - cx;
@@ -228,11 +229,13 @@ export default function CloudReveal({
 
       const cols = Math.ceil(w / spacing) + 5;
       const rows = Math.ceil(h / spacing) + 5;
+      const rMin = isMobile ? 75 : 58;
+      const rMax = isMobile ? 145 : 125;
       for (let c = -2; c < cols; c++) {
         for (let r = -2; r < rows; r++) {
           const bx = c * spacing + (rng() - 0.5) * spacing * 1.4;
           const by = r * spacing + (rng() - 0.5) * spacing * 1.4;
-          addPuff(bx, by, 58, 125, 1.0);
+          addPuff(bx, by, rMin, rMax, 1.0);
         }
       }
 
@@ -277,6 +280,7 @@ export default function CloudReveal({
 
     const t0 = performance.now();
     let doneAt = -1;
+    let firstFrameShown = false;
 
     function frame(ts: number) {
       const el = ts - t0;
@@ -287,14 +291,20 @@ export default function CloudReveal({
 
       const w = W();
       const h = H();
-      // White base every frame so transparent gaps never reveal the village
-      // until clouds actually drift off screen.
-      ctx!.fillStyle = "#ffffff";
-      ctx!.fillRect(0, 0, w, h);
+      // Transparent canvas each frame so the village shows through the
+      // gaps BETWEEN the drifting clouds. The initial white fill in
+      // useEffect + the white wrapper background hides the village during
+      // the ~50ms baking phase only; once the first cloud frame renders,
+      // the wrapper flips transparent so gaps reveal what's underneath.
+      ctx!.clearRect(0, 0, w, h);
       renderClouds(progress);
-      // Single bitmap composite — baked puffs already have soft gradients,
-      // no filter stack needed (fixes mobile stutter).
       ctx!.drawImage(clC, 0, 0);
+
+      if (!firstFrameShown) {
+        firstFrameShown = true;
+        if (wrapperRef.current) wrapperRef.current.style.background = "transparent";
+        canvas!.style.background = "transparent";
+      }
 
       // Once animation finishes, keep rendering one more frame then unmount
       if (progress >= 1 && doneAt < 0) doneAt = ts;
