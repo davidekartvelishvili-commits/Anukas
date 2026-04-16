@@ -325,7 +325,7 @@ export default function LuckyDropPage() {
             b.y = p0.y + (p1.y - p0.y) * easedFrac;
 
             // Speed up as ball falls (gravity acceleration)
-            b.pathSpeed = Math.min(0.014, b.pathSpeed + 0.00005);
+            b.pathSpeed = Math.min(0.022, b.pathSpeed + 0.00010);
 
             // Light up nearby pegs
             for (const peg of s.pegs) {
@@ -471,7 +471,7 @@ export default function LuckyDropPage() {
         data,
         path,
         pathProgress: 0,
-        pathSpeed: 0.004 + Math.random() * 0.002,
+        pathSpeed: 0.007 + Math.random() * 0.003,
       };
 
       (ball as any)._onSettle = () => {
