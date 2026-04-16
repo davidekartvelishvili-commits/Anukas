@@ -26,17 +26,8 @@ export default function CloudReveal({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
   const doneCalledRef = useRef(false);
-  const hasMountedRef = useRef(false);
 
   useEffect(() => {
-    // Guard against React 18 StrictMode double-invoking effects in dev.
-    // This is a one-shot visual animation; running it twice would replay
-    // the sequence (visible as "animation plays, clouds disappear,
-    // animation plays again"). In production StrictMode doesn't
-    // double-invoke, so this is a no-op there.
-    if (hasMountedRef.current) return;
-    hasMountedRef.current = true;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -56,10 +47,16 @@ export default function CloudReveal({
     }
     resize();
 
-    // Fix 1: immediately fill the canvas with opaque white so the village
+    // Reset wrapper + canvas backgrounds to opaque white. If a previous
+    // effect invocation (e.g. StrictMode dev double-invoke) left them
+    // transparent, this puts the cover back in place before the new
+    // animation starts.
+    if (wrapperRef.current) wrapperRef.current.style.background = "#ffffff";
+    canvas!.style.background = "#ffffff";
+
+    // Immediately fill the canvas with opaque white so the village
     // underneath is hidden from the very first paint, even before puffs
-    // finish baking. Baked puffs will draw on top of this in the first
-    // animation frame.
+    // finish baking.
     ctx!.fillStyle = "#ffffff";
     ctx!.fillRect(0, 0, canvas!.width, canvas!.height);
 
@@ -257,18 +254,19 @@ export default function CloudReveal({
     buildPuffs();
 
     // Chunked bake: process a small batch per frame so the main thread
-    // never blocks long enough to drop frames. renderClouds skips puffs
-    // whose `baked` isn't ready yet, so the animation can start before
-    // every puff is finished (they'll appear as they finish in the first
-    // few frames — effectively invisible given the ~250ms hold phase).
+    // never blocks long enough to drop frames. We don't reveal the village
+    // until this finishes, so the animation cover is always guaranteed.
     let bakeIdx = 0;
+    let bakeDone = false;
+    let bakeRaf = 0;
     const BAKE_PER_FRAME = 12;
     function bakeSlice() {
       const end = Math.min(puffs.length, bakeIdx + BAKE_PER_FRAME);
       for (; bakeIdx < end; bakeIdx++) bakePuff(puffs[bakeIdx]);
-      if (bakeIdx < puffs.length) requestAnimationFrame(bakeSlice);
+      if (bakeIdx < puffs.length) bakeRaf = requestAnimationFrame(bakeSlice);
+      else bakeDone = true;
     }
-    requestAnimationFrame(bakeSlice);
+    bakeRaf = requestAnimationFrame(bakeSlice);
 
     function puffState(p: Puff, progress: number) {
       const span = 1 - p.delay;
@@ -319,7 +317,10 @@ export default function CloudReveal({
       ctx!.clearRect(0, 0, w, h);
       renderClouds(progress);
 
-      if (!animRevealed && el >= holdMs) {
+      // Flip wrapper + canvas to transparent only when HOLD has ended
+      // AND the chunked baker has finished — guarantees the village is
+      // fully covered before it becomes reachable through cloud gaps.
+      if (!animRevealed && el >= holdMs && bakeDone) {
         animRevealed = true;
         if (wrapperRef.current) wrapperRef.current.style.background = "transparent";
         canvas!.style.background = "transparent";
@@ -348,6 +349,7 @@ export default function CloudReveal({
 
     return () => {
       cancelAnimationFrame(rafRef.current);
+      if (bakeRaf) cancelAnimationFrame(bakeRaf);
     };
   }, [onDone, holdMs, animMs, fadeMs]);
 
