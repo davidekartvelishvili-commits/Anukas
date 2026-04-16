@@ -118,9 +118,7 @@ export default function LuckyDropPage() {
   const pegSfxPool = useRef<HTMLAudioElement[]>([]);
   const pegSfxIdx = useRef(0);
   const pegSfxLastAt = useRef(0);
-  const pegSfxHitCount = useRef(0);
   const pegSfxMuted = useRef(false); // silenced while win audio is playing
-  const PEG_SFX_EVERY_N = 6; // only play on every 6th peg collision
 
   // Win audio: main music (loud) + coin sound (quieter) that fire in
   // parallel when a win animation starts. Pop SFX is silenced during.
@@ -177,13 +175,10 @@ export default function LuckyDropPage() {
   }, []);
   const playPegSfx = () => {
     if (pegSfxMuted.current) return; // silenced during win audio
-    // Only fire on every Nth collision to keep the soundscape calm
-    pegSfxHitCount.current += 1;
-    if (pegSfxHitCount.current % PEG_SFX_EVERY_N !== 0) return;
-
     const pool = pegSfxPool.current;
     if (!pool.length) return;
-    // Throttle to avoid machine-gun overlap when a ball grazes multiple pegs
+    // Throttle only by wall-clock time so multi-peg grazes in one frame
+    // don't overlap. Every real bounce gets its own pop.
     const now = performance.now();
     if (now - pegSfxLastAt.current < 35) return;
     pegSfxLastAt.current = now;
@@ -264,6 +259,23 @@ export default function LuckyDropPage() {
     if (!cvs) return;
     const ctx = cvs.getContext("2d")!;
 
+    // Pre-baked white-radial glow sprite — used for both peg hits and
+    // slot landings. Rendered once, then drawn per-frame via drawImage
+    // (MUCH cheaper than createRadialGradient + fillRect per hit per frame).
+    const GLOW_SIZE = 128;
+    const glowSprite = document.createElement("canvas");
+    glowSprite.width = glowSprite.height = GLOW_SIZE;
+    {
+      const gctx = glowSprite.getContext("2d")!;
+      const cx = GLOW_SIZE / 2;
+      const g = gctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
+      g.addColorStop(0, "rgba(255,255,255,0.85)");
+      g.addColorStop(0.45, "rgba(255,255,255,0.25)");
+      g.addColorStop(1, "rgba(255,255,255,0)");
+      gctx.fillStyle = g;
+      gctx.fillRect(0, 0, GLOW_SIZE, GLOW_SIZE);
+    }
+
     function resize() {
       cvs!.width = document.documentElement.clientWidth;
       cvs!.height = document.documentElement.clientHeight;
@@ -312,14 +324,12 @@ export default function LuckyDropPage() {
         // read (does not affect collision — peg.r is unchanged).
         const visR = peg.r + 0.5;
 
-        // On-impact shine: bright white halo that fades quickly
+        // On-impact shine: pre-baked glow sprite, drawn with alpha
         if (peg.glow > 0.05) {
-          const g = ctx.createRadialGradient(peg.x, peg.y, 0, peg.x, peg.y, visR * 4);
-          g.addColorStop(0, `rgba(255,255,255,${peg.glow * 0.85})`);
-          g.addColorStop(0.5, `rgba(255,255,255,${peg.glow * 0.25})`);
-          g.addColorStop(1, "transparent");
-          ctx.fillStyle = g;
-          ctx.fillRect(peg.x - visR * 4, peg.y - visR * 4, visR * 8, visR * 8);
+          const haloR = visR * 4;
+          ctx.globalAlpha = peg.glow;
+          ctx.drawImage(glowSprite, peg.x - haloR, peg.y - haloR, haloR * 2, haloR * 2);
+          ctx.globalAlpha = 1;
         }
 
         // The dot itself — solid white, no ambient glow
@@ -340,19 +350,17 @@ export default function LuckyDropPage() {
         const sw = Math.round(sl.w);
         const sh = Math.round(sl.h);
 
-        // On-landing shine: bright radial halo above the card (same feel
-        // as the peg white-flash, but in the slot's own color)
+        // On-landing shine: pre-baked white glow sprite tinted via alpha.
+        // (Cheaper than rebuilding a radial gradient per frame; the tint
+        //  is visually subtle since the sprite is white and we overlay a
+        //  colored white-lift on the card itself below.)
         if (sl.glow > 0.05) {
-          const cx = sx + sw / 2;
-          const cy = sy + sh / 2;
+          const cx2 = sx + sw / 2;
+          const cy2 = sy + sh / 2;
           const haloR = Math.max(sw, sh) * 1.8;
-          const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, haloR);
-          const hex = sl.color;
-          halo.addColorStop(0, `${hex}${Math.floor(sl.glow * 170).toString(16).padStart(2, "0")}`);
-          halo.addColorStop(0.5, `${hex}${Math.floor(sl.glow * 60).toString(16).padStart(2, "0")}`);
-          halo.addColorStop(1, "transparent");
-          ctx.fillStyle = halo;
-          ctx.fillRect(cx - haloR, cy - haloR, haloR * 2, haloR * 2);
+          ctx.globalAlpha = sl.glow * 0.8;
+          ctx.drawImage(glowSprite, cx2 - haloR, cy2 - haloR, haloR * 2, haloR * 2);
+          ctx.globalAlpha = 1;
         }
 
         // Solid card fill — base is fully opaque; a brightness boost stacks
