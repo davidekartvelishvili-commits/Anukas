@@ -33,10 +33,6 @@ export default function CloudReveal({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Offscreen cloud layer (so we can blur-stack the composite)
-    const clC = document.createElement("canvas");
-    const clX = clC.getContext("2d")!;
-
     const W = () => canvas.width;
     const H = () => canvas.height;
     const rng = () => Math.random();
@@ -46,8 +42,8 @@ export default function CloudReveal({
     function resize() {
       const w = window.innerWidth;
       const h = window.innerHeight;
-      canvas!.width = clC.width = w;
-      canvas!.height = clC.height = h;
+      canvas!.width = w;
+      canvas!.height = h;
     }
     resize();
 
@@ -223,7 +219,8 @@ export default function CloudReveal({
           bumps,
         };
 
-        bakePuff(p);
+        // Descriptor only — baking is deferred and chunked so the first
+        // animation frame can paint before all puffs are ready.
         puffs.push(p);
       }
 
@@ -250,6 +247,20 @@ export default function CloudReveal({
 
     buildPuffs();
 
+    // Chunked bake: process a small batch per frame so the main thread
+    // never blocks long enough to drop frames. renderClouds skips puffs
+    // whose `baked` isn't ready yet, so the animation can start before
+    // every puff is finished (they'll appear as they finish in the first
+    // few frames — effectively invisible given the ~250ms hold phase).
+    let bakeIdx = 0;
+    const BAKE_PER_FRAME = 12;
+    function bakeSlice() {
+      const end = Math.min(puffs.length, bakeIdx + BAKE_PER_FRAME);
+      for (; bakeIdx < end; bakeIdx++) bakePuff(puffs[bakeIdx]);
+      if (bakeIdx < puffs.length) requestAnimationFrame(bakeSlice);
+    }
+    requestAnimationFrame(bakeSlice);
+
     function puffState(p: Puff, progress: number) {
       const span = 1 - p.delay;
       const pt = span <= 0 ? 1 : Math.max(0, Math.min(1, (progress - p.delay) / span));
@@ -263,7 +274,9 @@ export default function CloudReveal({
     function renderClouds(progress: number) {
       const w = W();
       const h = H();
-      clX.clearRect(0, 0, w, h);
+      // Direct-to-main-canvas draw: no offscreen layer, no per-puff
+      // save()/restore(). globalAlpha is set per puff and reset once at
+      // the end — far cheaper than a full context snapshot per puff.
       for (const p of puffs) {
         if (!p.baked) continue;
         const { x, y, alpha } = puffState(p, progress);
@@ -271,11 +284,10 @@ export default function CloudReveal({
         const dx = x - p.bakedOX!;
         const dy = y - p.bakedOY!;
         if (dx + p.bakedSz! < 0 || dx > w || dy + p.bakedSz! < 0 || dy > h) continue;
-        clX.save();
-        clX.globalAlpha = alpha;
-        clX.drawImage(p.baked, dx, dy);
-        clX.restore();
+        ctx!.globalAlpha = alpha;
+        ctx!.drawImage(p.baked, dx, dy);
       }
+      ctx!.globalAlpha = 1;
     }
 
     const t0 = performance.now();
@@ -292,13 +304,10 @@ export default function CloudReveal({
       const w = W();
       const h = H();
       // Transparent canvas each frame so the village shows through the
-      // gaps BETWEEN the drifting clouds. The initial white fill in
-      // useEffect + the white wrapper background hides the village during
-      // the ~50ms baking phase only; once the first cloud frame renders,
-      // the wrapper flips transparent so gaps reveal what's underneath.
+      // gaps BETWEEN the drifting clouds. Puffs are now drawn directly
+      // to the main canvas — no offscreen layer, no full-screen copy.
       ctx!.clearRect(0, 0, w, h);
       renderClouds(progress);
-      ctx!.drawImage(clC, 0, 0);
 
       if (!firstFrameShown) {
         firstFrameShown = true;
