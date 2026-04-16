@@ -498,15 +498,16 @@ export default function LuckyDropPage() {
           // as a gentle attractor in the bottom approach zone so the ball
           // eventually arrives where it has to — but across most of its
           // flight it's free to bounce chaotically like a real Plinko ball.
-          const GRAVITY = 0.4;
-          const MAX_VY = 10;          // slightly slower terminal (was 12; less "bullet" feel)
-          const RESTITUTION = 0.42;   // gentler peg bounce (was 0.6 — ball was popping up too high)
-          const MAX_BOUNCE_UP = 3.5;  // cap how strongly a peg bounce can send ball upward
+          const GRAVITY = 0.35;       // gentler gravity — less bullet-like
+          const MAX_VY = 7.5;         // slower terminal speed (was 10)
+          const RESTITUTION = 0.30;   // low bounce energy so hits barely deflect (was 0.42)
+          const MAX_BOUNCE_UP = 2.5;
           const AIR = 0.995;
-          const WALL_BOUNCE = 0.45;
-          const JITTER_X = 1.2;       // small reduction paired with lower restitution
-          const JITTER_Y = 0.25;
-          const lastWp = b.path[b.path.length - 1]; // server-determined slot center
+          const WALL_BOUNCE = 0.40;
+          const JITTER_X = 0.45;      // much less random scatter (was 1.2)
+          const JITTER_Y = 0.18;
+          const lastWp = b.path[b.path.length - 1];
+          const targetSlot = s.slots[b.data.slotIndex] || null;
 
           // Vertical gravity
           b.vy = Math.min(MAX_VY, b.vy + GRAVITY);
@@ -514,35 +515,37 @@ export default function LuckyDropPage() {
           // Gentle air resistance — lets bounces preserve most of their energy
           b.vx *= AIR;
 
-          // Guidance — velocity-based with a MAX px/frame cap so the ball
-          // always glides smoothly, never teleports. Committed inside
-          // the triangle (last three peg rows) so once past the last row,
-          // only vertical fall remains.
+          // Guidance — continuous pull toward target column throughout
+          // the entire fall (ramped by depth) so the ball trends toward
+          // its slot from early on, not zigzagging across the board.
           const topY = s.startY;
-          const bottomY = s.startY + ROWS * s.gapY;             // past last peg row
-          const commitStartY = s.startY + (ROWS - 3) * s.gapY;  // start at 3rd-to-last row
-
+          const bottomY = s.startY + ROWS * s.gapY;
+          const fallFrac = Math.max(0, Math.min(1, (b.y - topY) / (bottomY - topY)));
           const dxToTarget = lastWp.x - b.x;
-          if (b.y < commitStartY) {
-            // Free fall — very gentle attractor, pegs dominate
-            const fallFrac = Math.max(0, (b.y - topY) / (commitStartY - topY));
-            const guidance = fallFrac * fallFrac * 0.008;
-            b.vx += dxToTarget * guidance;
-          } else if (b.y < bottomY) {
-            // Commit zone — accelerate vx toward target, but cap its
-            // magnitude so a far-off ball glides at a steady speed
-            // instead of being yanked sideways in one frame.
-            const commitFrac = (b.y - commitStartY) / (bottomY - commitStartY);
-            const MAX_DRIFT_VX = 1.8 + commitFrac * 1.2;     // 1.8 → 3.0 px/frame
-            const desiredVx = Math.sign(dxToTarget) * Math.min(Math.abs(dxToTarget) * 0.18, MAX_DRIFT_VX);
-            b.vx += (desiredVx - b.vx) * (0.15 + commitFrac * 0.15);
+
+          if (b.y < bottomY) {
+            // In-triangle: constant pull with depth-ramped strength.
+            // Pegs still deflect via collision reflection below.
+            const pull = 0.004 + fallFrac * 0.030;     // 0.004 at top → 0.034 at bottom
+            b.vx += dxToTarget * pull;
+            // Cap vx so even a far-off ball can't dart across sideways.
+            // Allowed speed grows slightly with depth for the final approach.
+            const maxVx = 1.4 + fallFrac * 1.6;        // 1.4 → 3.0 px/frame
+            if (b.vx > maxVx) b.vx = maxVx;
+            else if (b.vx < -maxVx) b.vx = -maxVx;
           } else {
-            // Lock zone — no side-to-side. vx is a bounded drift toward
-            // target (max 2 px/frame) so close-range arrival is smooth;
-            // still effectively "straight down" from user perspective.
-            const MAX_LOCK_VX = 2.0;
-            b.vx = Math.sign(dxToTarget) * Math.min(Math.abs(dxToTarget), MAX_LOCK_VX);
-            if (b.vy > 6) b.vy = 6;
+            // LOCK ZONE — below last peg row, ball MUST stay within its
+            // target slot's column. Clamp x strictly, zero vx, cap vy.
+            // No more bouncing, no more peg deflections (peg collisions
+            // are spatially above this zone anyway). Ball falls straight.
+            if (targetSlot) {
+              const minX = targetSlot.x + b.r;
+              const maxX = targetSlot.x + targetSlot.w - b.r;
+              if (b.x < minX) b.x = minX;
+              else if (b.x > maxX) b.x = maxX;
+            }
+            b.vx = 0;
+            if (b.vy > 4.5) b.vy = 4.5;
           }
 
           // Integrate velocity
