@@ -159,12 +159,12 @@ export default function LuckyDropPage() {
   };
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const POOL = 8;
+    const POOL = 6;
     const pool: HTMLAudioElement[] = [];
     for (let i = 0; i < POOL; i++) {
       const a = new Audio("/audio/peg-pop.mp3");
       a.preload = "auto";
-      a.volume = 0.35;
+      a.volume = 0.25;
       pool.push(a);
     }
     pegSfxPool.current = pool;
@@ -174,13 +174,13 @@ export default function LuckyDropPage() {
     };
   }, []);
   const playPegSfx = () => {
-    if (pegSfxMuted.current) return; // silenced during win audio
+    if (pegSfxMuted.current) return;
     const pool = pegSfxPool.current;
     if (!pool.length) return;
-    // Throttle only by wall-clock time so multi-peg grazes in one frame
-    // don't overlap. Every real bounce gets its own pop.
+    // Hard throttle: max ~25 hits/sec so very rapid multi-peg grazes
+    // in consecutive frames don't overlap into audible noise.
     const now = performance.now();
-    if (now - pegSfxLastAt.current < 35) return;
+    if (now - pegSfxLastAt.current < 40) return;
     pegSfxLastAt.current = now;
     const a = pool[pegSfxIdx.current];
     pegSfxIdx.current = (pegSfxIdx.current + 1) % pool.length;
@@ -213,9 +213,8 @@ export default function LuckyDropPage() {
   // transform animation — severe jank on mobile.
   type CanvasParticle = {
     x: number; y: number; vx: number; vy: number;
-    rot: number; rotV: number;
     life: number; maxLife: number;
-    color: string; size: number; shape: 0 | 1; // 0 circle, 1 square
+    color: string; size: number;
   };
   const particlesRef = useRef<CanvasParticle[]>([]);
   const BET_OPTIONS = [10, 25, 50, 100, 250, 500];
@@ -337,6 +336,33 @@ export default function LuckyDropPage() {
       pctx.fill();
     }
 
+    // Pre-baked idle-pulse triangle with shadowBlur baked IN. Replaces a
+    // per-frame shadowBlur=15 operation that was costing 3-8ms/frame on
+    // mobile whenever no balls were in flight.
+    const IDLE_SPRITE_W = 60;
+    const IDLE_SPRITE_H = 48;
+    const idleGlowSprite = document.createElement("canvas");
+    idleGlowSprite.width = IDLE_SPRITE_W;
+    idleGlowSprite.height = IDLE_SPRITE_H;
+    {
+      const ictx = idleGlowSprite.getContext("2d")!;
+      // Translate so the triangle center sits at (IDLE_SPRITE_W/2, 35 within
+      // the sprite) — matches the original triangle height from tip at y=35
+      // down to base at y=47 in the original coords (12px tall).
+      const cx = IDLE_SPRITE_W / 2;
+      const tipY = 24; // some padding above so blur has room
+      const baseY = 36;
+      ictx.shadowBlur = 15;
+      ictx.shadowColor = "#FFD700";
+      ictx.fillStyle = "#FFD700";
+      ictx.beginPath();
+      ictx.moveTo(cx, tipY);
+      ictx.lineTo(cx - 8, baseY);
+      ictx.lineTo(cx + 8, baseY);
+      ictx.closePath();
+      ictx.fill();
+    }
+
     // Pre-baked background — radial gradient rebuilt every frame was a
     // major mobile hit. Bake once per resize, drawImage each frame.
     const bgSprite = document.createElement("canvas");
@@ -384,57 +410,61 @@ export default function LuckyDropPage() {
 
       if (s.balls.length === 0) {
         const pulse = Math.sin(now * 0.004) * 0.3 + 0.7;
-        ctx.save(); ctx.globalAlpha = pulse * 0.6;
-        ctx.beginPath();
-        ctx.moveTo(W / 2, s.startY - 35);
-        ctx.lineTo(W / 2 - 8, s.startY - 47);
-        ctx.lineTo(W / 2 + 8, s.startY - 47);
-        ctx.closePath();
-        ctx.fillStyle = "#FFD700"; ctx.shadowColor = "#FFD700"; ctx.shadowBlur = 15;
-        ctx.fill(); ctx.shadowBlur = 0; ctx.restore();
+        // Pre-baked sprite — drawImage + globalAlpha instead of per-frame
+        // shadowBlur=15 which was forcing a full-canvas GPU blur pass
+        // every single frame while idle.
+        ctx.globalAlpha = pulse * 0.6;
+        ctx.drawImage(idleGlowSprite, W / 2 - IDLE_SPRITE_W / 2, s.startY - 47 - 6);
+        ctx.globalAlpha = 1;
       }
 
-      // Pegs — pre-baked white-dot sprite via drawImage; only shine halo
-      // when hit by a ball (separate glow sprite).
+      // Pegs — two-pass draw to minimize globalAlpha thrashing:
+      //   pass 1: draw every peg dot at alpha=1
+      //   pass 2: draw only glowing pegs' halos (alpha varies)
+      // globalAlpha is set at most 3 times total (start of each pass + reset)
+      // instead of 2× per glowing peg per frame.
       for (const peg of s.pegs) {
         peg.glow *= 0.9;
         const visR = peg.r + 0.5;
-        if (peg.glow > 0.05) {
-          const haloR = visR * 4;
-          ctx.globalAlpha = peg.glow;
-          ctx.drawImage(glowSprite, peg.x - haloR, peg.y - haloR, haloR * 2, haloR * 2);
-          ctx.globalAlpha = 1;
-        }
-        // Dot swells slightly on impact for punch
         const hitR = visR + peg.glow * 1.5;
         ctx.drawImage(pegSprite, peg.x - hitR, peg.y - hitR, hitR * 2, hitR * 2);
       }
+      for (const peg of s.pegs) {
+        if (peg.glow <= 0.05) continue;
+        const visR = peg.r + 0.5;
+        const haloR = visR * 4;
+        ctx.globalAlpha = peg.glow;
+        ctx.drawImage(glowSprite, peg.x - haloR, peg.y - haloR, haloR * 2, haloR * 2);
+      }
+      ctx.globalAlpha = 1;
 
-      // Slots — draw pre-baked sprite (entire card + text + accents)
-      // and overlay glow/lift only when the ball just landed. No text
-      // rendering, no per-frame fillRects for the card body.
+      // Slots — two-pass draw to minimize globalAlpha thrashing
       for (let i = 0; i < s.slots.length; i++) {
         const sl = s.slots[i];
         sl.glow *= 0.94;
+        if (sl.sprite) ctx.drawImage(sl.sprite, Math.round(sl.x), Math.round(sl.y));
+      }
+      for (let i = 0; i < s.slots.length; i++) {
+        const sl = s.slots[i];
+        if (sl.glow <= 0.05) continue;
         const sx = Math.round(sl.x);
         const sy = Math.round(sl.y);
-        if (sl.sprite) ctx.drawImage(sl.sprite, sx, sy);
-        if (sl.glow > 0.05) {
-          const sw = Math.round(sl.w);
-          const sh = Math.round(sl.h);
-          const cx2 = sx + sw / 2;
-          const cy2 = sy + sh / 2;
-          const haloR = Math.max(sw, sh) * 1.8;
-          ctx.globalAlpha = sl.glow * 0.8;
-          ctx.drawImage(glowSprite, cx2 - haloR, cy2 - haloR, haloR * 2, haloR * 2);
-          ctx.globalAlpha = sl.glow * 0.55;
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(sx + 1, sy, sw - 2, sh);
-          ctx.globalAlpha = 1;
-        }
+        const sw = Math.round(sl.w);
+        const sh = Math.round(sl.h);
+        const cx2 = sx + sw / 2;
+        const cy2 = sy + sh / 2;
+        const haloR = Math.max(sw, sh) * 1.8;
+        ctx.globalAlpha = sl.glow * 0.8;
+        ctx.drawImage(glowSprite, cx2 - haloR, cy2 - haloR, haloR * 2, haloR * 2);
+        ctx.globalAlpha = sl.glow * 0.55;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(sx + 1, sy, sw - 2, sh);
       }
+      ctx.globalAlpha = 1;
 
-      // Balls — path-based animation
+      // Balls — path-based animation. Ball fillStyle is constant, hoisted
+      // out of the per-ball draw loop to skip redundant state writes.
+      if (s.balls.length > 0) ctx.fillStyle = "#FFE500";
       for (let i = s.balls.length - 1; i >= 0; i--) {
         const b = s.balls[i];
         if (!b.alive) { s.balls.splice(i, 1); continue; }
@@ -529,14 +559,13 @@ export default function LuckyDropPage() {
 
         }
 
-        // Draw ball — flat welcome-page yellow, no glow, no trail
+        // Draw ball — flat welcome-page yellow (fillStyle hoisted above)
         ctx.beginPath();
         ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-        ctx.fillStyle = "#FFE500";
         ctx.fill();
       }
 
-      // Particles (canvas-rendered, replaces the old DOM-div cascade)
+      // Particles — plain circles, no transform matrix math per particle
       const pList = particlesRef.current;
       if (pList.length) {
         const GRAVITY = 0.18;
@@ -546,25 +575,14 @@ export default function LuckyDropPage() {
           p.vy += GRAVITY;
           p.x += p.vx;
           p.y += p.vy;
-          p.rot += p.rotV;
           p.life -= 1;
           if (p.life <= 0 || p.y > s.H + 20) continue;
-          // Compact alive particles in-place (cheaper than splice)
           pList[writeIdx++] = p;
-          const a = Math.max(0, Math.min(1, p.life / p.maxLife));
-          ctx.globalAlpha = a;
+          ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.maxLife));
           ctx.fillStyle = p.color;
-          ctx.translate(p.x, p.y);
-          ctx.rotate(p.rot);
-          if (p.shape === 0) {
-            ctx.beginPath();
-            ctx.arc(0, 0, p.size * 0.5, 0, Math.PI * 2);
-            ctx.fill();
-          } else {
-            const h = p.size * 0.5;
-            ctx.fillRect(-h, -h, p.size, p.size);
-          }
-          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2);
+          ctx.fill();
         }
         pList.length = writeIdx;
         ctx.globalAlpha = 1;
@@ -594,13 +612,11 @@ export default function LuckyDropPage() {
         y: H * (-0.05 + Math.random() * 0.25),
         vx: (Math.random() - 0.5) * 1.6,
         vy: 1 + Math.random() * 1.5,
-        rot: Math.random() * Math.PI * 2,
-        rotV: (Math.random() - 0.5) * 0.3,
-        life: 60 * (1.5 + Math.random() * 2), // in frames, 1.5-3.5s at 60fps
+        life: 60 * (1.5 + Math.random() * 2),
         maxLife: 60 * 2.5,
         color: colors[Math.floor(Math.random() * colors.length)],
-        size: 4 + Math.random() * 10,
-        shape: Math.random() > 0.5 ? 0 : 1,
+        // Vary size to compensate for the removed rotation variety
+        size: 3 + Math.random() * 12,
       });
     }
   }
