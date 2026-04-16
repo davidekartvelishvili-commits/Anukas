@@ -13,15 +13,26 @@ import { useEffect, useRef } from "react";
  */
 export default function CloudReveal({
   onDone,
+  mode = "enter",
   holdMs = 250,
   animMs = 2400,
   fadeMs = 320,
 }: {
   onDone?: () => void;
+  /**
+   * "enter" (default): wrapper starts covered in white, clouds drift
+   *   outward revealing whatever is beneath. Fades out at the end.
+   * "exit": wrapper starts transparent, clouds sweep INTO the viewport
+   *   from outside and pile up covering everything. At the end, wrapper
+   *   flips fully white and stays until onDone fires — the parent should
+   *   use onDone to navigate.
+   */
+  mode?: "enter" | "exit";
   holdMs?: number;
   animMs?: number;
   fadeMs?: number;
 }) {
+  const isExit = mode === "exit";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
@@ -47,18 +58,23 @@ export default function CloudReveal({
     }
     resize();
 
-    // Reset wrapper + canvas backgrounds to opaque white. If a previous
-    // effect invocation (e.g. StrictMode dev double-invoke) left them
-    // transparent, this puts the cover back in place before the new
-    // animation starts.
-    if (wrapperRef.current) wrapperRef.current.style.background = "#ffffff";
-    canvas!.style.background = "#ffffff";
+    // Reset wrapper + canvas backgrounds so a re-run starts from a clean
+    // state (handles StrictMode dev double-invoke).
+    // Enter mode starts with a white cover that hides the village during
+    // the bake phase; exit mode starts transparent so the user sees the
+    // village normally while clouds sweep in to cover it.
+    if (wrapperRef.current) {
+      wrapperRef.current.style.background = isExit ? "transparent" : "#ffffff";
+    }
+    canvas!.style.background = isExit ? "transparent" : "#ffffff";
 
-    // Immediately fill the canvas with opaque white so the village
-    // underneath is hidden from the very first paint, even before puffs
-    // finish baking.
-    ctx!.fillStyle = "#ffffff";
-    ctx!.fillRect(0, 0, canvas!.width, canvas!.height);
+    if (!isExit) {
+      // Immediately fill the canvas with opaque white so the village
+      // underneath is hidden from the very first paint, even before
+      // puffs finish baking.
+      ctx!.fillStyle = "#ffffff";
+      ctx!.fillRect(0, 0, canvas!.width, canvas!.height);
+    }
 
     type Bump = { rdx: number; rdy: number; r: number; warm: number };
     type Puff = {
@@ -300,36 +316,49 @@ export default function CloudReveal({
     const t0 = performance.now();
     let doneAt = -1;
     let animRevealed = false;
+    // Exit mode has no HOLD pause — clouds start sweeping in immediately.
+    const effectiveHold = isExit ? 0 : holdMs;
 
     function frame(ts: number) {
       const el = ts - t0;
       let progress: number;
-      if (el < holdMs) progress = 0;
-      else if (el < holdMs + animMs) progress = (el - holdMs) / animMs;
+      if (el < effectiveHold) progress = 0;
+      else if (el < effectiveHold + animMs) progress = (el - effectiveHold) / animMs;
       else progress = 1;
 
       const w = W();
       const h = H();
-      // Clear to transparent each frame so cloud gaps can show the village —
-      // but only AFTER the HOLD phase ends. During HOLD the wrapper stays
-      // white so the screen is fully covered even before every puff has
-      // finished baking in the chunked baker.
       ctx!.clearRect(0, 0, w, h);
-      renderClouds(progress);
+      // Exit mode: feed (1 - progress) to puffState so clouds move from
+      // "scattered/drifted-out" → "packed at origin positions" as time
+      // advances. Visually this is the enter animation played backwards.
+      renderClouds(isExit ? 1 - progress : progress);
 
-      // Flip wrapper + canvas to transparent only when HOLD has ended
-      // AND the chunked baker has finished — guarantees the village is
-      // fully covered before it becomes reachable through cloud gaps.
-      if (!animRevealed && el >= holdMs && bakeDone) {
-        animRevealed = true;
-        if (wrapperRef.current) wrapperRef.current.style.background = "transparent";
-        canvas!.style.background = "transparent";
+      if (!isExit) {
+        // Enter mode: reveal the village only after HOLD ends AND the
+        // chunked baker has finished (village must be fully covered first).
+        if (!animRevealed && el >= holdMs && bakeDone) {
+          animRevealed = true;
+          if (wrapperRef.current) wrapperRef.current.style.background = "transparent";
+          canvas!.style.background = "transparent";
+        }
       }
 
-      // Once animation finishes, keep rendering one more frame then unmount
       if (progress >= 1 && doneAt < 0) doneAt = ts;
       if (doneAt > 0) {
-        // Fade the wrapper out so the transition isn't abrupt
+        if (isExit) {
+          // Exit: clouds are fully covering. Snap wrapper + canvas to
+          // opaque white so the screen stays covered through the
+          // navigation, then fire onDone immediately.
+          if (wrapperRef.current) wrapperRef.current.style.background = "#ffffff";
+          canvas!.style.background = "#ffffff";
+          if (!doneCalledRef.current) {
+            doneCalledRef.current = true;
+            onDone?.();
+          }
+          return;
+        }
+        // Enter: fade the wrapper out so the transition isn't abrupt
         const fadeEl = ts - doneAt;
         if (wrapperRef.current) {
           wrapperRef.current.style.opacity = `${Math.max(0, 1 - fadeEl / fadeMs)}`;
@@ -339,7 +368,7 @@ export default function CloudReveal({
             doneCalledRef.current = true;
             onDone?.();
           }
-          return; // stop the loop
+          return;
         }
       }
 
@@ -351,7 +380,7 @@ export default function CloudReveal({
       cancelAnimationFrame(rafRef.current);
       if (bakeRaf) cancelAnimationFrame(bakeRaf);
     };
-  }, [onDone, holdMs, animMs, fadeMs]);
+  }, [onDone, mode, holdMs, animMs, fadeMs, isExit]);
 
   return (
     <div

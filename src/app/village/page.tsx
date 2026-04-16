@@ -288,6 +288,8 @@ export default function VillagePage() {
   const [profile, setProfile] = useState<{ totalStars: number; shieldActive: boolean; currentLevel: number } | null>(null);
   // Intro cloud reveal — plays once per page entry then unmounts
   const [showReveal, setShowReveal] = useState(true);
+  // Exit cloud-cover — when set, plays the reverse animation then navigates
+  const [exitTarget, setExitTarget] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
@@ -419,6 +421,13 @@ export default function VillagePage() {
   return (
     <AuthGuard>
       {showReveal && <CloudReveal onDone={() => setShowReveal(false)} />}
+      {exitTarget && (
+        <CloudReveal
+          mode="exit"
+          animMs={1400}
+          onDone={() => router.push(exitTarget)}
+        />
+      )}
       <style>{`
         html, body { background: #87CEEB !important; }
         @keyframes drift-slow { 0% { transform: translateX(-20px); } 100% { transform: translateX(20px); } }
@@ -971,9 +980,11 @@ export default function VillagePage() {
                 <button
                   key={idx}
                   onClick={() => {
-                    if (idx === 0) router.push("/home");
-                    if (idx === 1) router.push("/games");
-                    if (idx === 3) router.push("/scan");
+                    let dest: string | null = null;
+                    if (idx === 0) dest = "/home";
+                    if (idx === 1) dest = "/games";
+                    if (idx === 3) dest = "/scan";
+                    if (dest && !exitTarget) setExitTarget(dest);
                   }}
                   className="flex flex-col items-center px-3.5 py-1.5 rounded-full transition-all duration-200"
                   style={{ background: isActive ? "rgba(255,255,255,0.1)" : "transparent" }}
