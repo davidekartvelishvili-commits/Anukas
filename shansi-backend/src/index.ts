@@ -52,6 +52,7 @@ async function runStartupMigrations() {
     sql`ALTER TABLE referral_config ADD COLUMN share_image_url TEXT`,
     sql`ALTER TABLE tickets ADD COLUMN logo_url TEXT`,
     sql`ALTER TABLE tickets ADD COLUMN merchant_id TEXT`,
+    sql`ALTER TABLE user_village_profile ADD COLUMN balls_dropped INTEGER NOT NULL DEFAULT 0`,
     sql`CREATE TABLE IF NOT EXISTS user_tickets (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id),
@@ -268,6 +269,11 @@ async function runStartupMigrations() {
       ["attack_cards_needed", "3"],
       ["attack_star_bonus", "15"],
       ["attack_success_rate", "50"],
+      // Milestone rewards: grant a shield every N plinko drops, an
+      // attack card every M drops. 0 disables the reward.
+      ["balls_per_shield", "50"],
+      ["balls_per_attack_card", "25"],
+      ["shield_reward_hours", "24"],
     ];
     for (const [k, v] of configDefaults) {
       try { await (db as any).run(sql`INSERT INTO village_config (key, value) VALUES (${k}, ${v})`); } catch {}

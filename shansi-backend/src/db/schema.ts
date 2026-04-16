@@ -391,6 +391,9 @@ export const userVillageProfile = sqliteTable("user_village_profile", {
   currentLevel: integer("current_level").default(1).notNull(),
   totalStars: integer("total_stars").default(0).notNull(),
   shieldActiveUntil: text("shield_active_until"),
+  // Cumulative Lucky Drop balls — used for milestone rewards (every N
+  // drops grants a shield; every M drops grants an attack card).
+  ballsDropped: integer("balls_dropped").default(0).notNull(),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
   updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
 });

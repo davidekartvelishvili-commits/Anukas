@@ -4,7 +4,8 @@ import { eq, desc, and, or } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { gameConfig, gameHistory, transactions, promoCodes, promoCodeUses } from "../db/schema.js";
+import { gameConfig, gameHistory, transactions, promoCodes, promoCodeUses, userVillageProfile, villageCards, userCards, villageConfig } from "../db/schema.js";
+import { sql } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { playGame, playChickenRush, createTransaction } from "../services/gameEngine.js";
 import { BadRequestError } from "../utils/errors.js";
@@ -29,6 +30,20 @@ games.post("/play", async (c) => {
   try {
     const result = await playGame(userId, gameType, betAmount);
 
+    // Plinko milestone rewards: every N drops → shield; every M drops →
+    // attack card. Thresholds are admin-configurable via village_config
+    // keys `balls_per_shield` and `balls_per_attack_card` (0 = disabled).
+    const rewards: { shield?: { until: string; hours: number }; card?: { id: string; name: string } } = {};
+    if (gameType === "plinko") {
+      try {
+        const milestone = await grantPlinkoMilestoneRewards(userId);
+        if (milestone.shield) rewards.shield = milestone.shield;
+        if (milestone.card) rewards.card = milestone.card;
+      } catch (e: any) {
+        console.error("[plinko milestone]", e?.message);
+      }
+    }
+
     return c.json({
       success: true,
       result: {
@@ -44,12 +59,63 @@ games.post("/play", async (c) => {
         freeCoins: result.freeCoins,
         bonusGamesLeft: result.bonusGamesLeft,
         transactionComplete: result.transactionComplete,
+        rewards, // { shield?, card? } — present only if a milestone fired
       },
     });
   } catch (err: any) {
     throw new BadRequestError(err.message || "Game play failed");
   }
 });
+
+// Increment the user's balls_dropped counter and grant shield/card rewards
+// when cumulative count hits admin-configured thresholds. Returns whatever
+// was granted so the client can show a notification.
+async function grantPlinkoMilestoneRewards(userId: string) {
+  const db = getDb();
+  // Read the three relevant config keys
+  const cfg = await db.select().from(villageConfig);
+  const cfgMap = new Map(cfg.map((r: any) => [r.key, r.value]));
+  const ballsPerShield = parseInt(cfgMap.get("balls_per_shield") || "0", 10);
+  const ballsPerCard = parseInt(cfgMap.get("balls_per_attack_card") || "0", 10);
+  const shieldHours = parseInt(cfgMap.get("shield_reward_hours") || "24", 10);
+
+  // Ensure profile exists, then atomically increment and fetch new count
+  await (db as any).run(
+    sql`INSERT OR IGNORE INTO user_village_profile (id, user_id, balls_dropped) VALUES (${nanoid()}, ${userId}, 0)`
+  );
+  await (db as any).run(
+    sql`UPDATE user_village_profile SET balls_dropped = balls_dropped + 1, updated_at = datetime('now') WHERE user_id = ${userId}`
+  );
+  const [profile] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);
+  if (!profile) return {};
+  const count = profile.ballsDropped || 0;
+
+  const out: any = {};
+
+  if (ballsPerShield > 0 && count > 0 && count % ballsPerShield === 0) {
+    const untilDate = new Date(Date.now() + shieldHours * 3600 * 1000);
+    const untilIso = untilDate.toISOString();
+    await db.update(userVillageProfile)
+      .set({ shieldActiveUntil: untilIso, updatedAt: new Date().toISOString() } as any)
+      .where(eq(userVillageProfile.userId, userId));
+    out.shield = { until: untilIso, hours: shieldHours };
+  }
+
+  if (ballsPerCard > 0 && count > 0 && count % ballsPerCard === 0) {
+    // Grant the first active Common Pack card (the default "attack" card).
+    // If it doesn't exist, fall back to any active card.
+    const [common] = await db.select().from(villageCards)
+      .where(and(eq(villageCards.isActive, true), eq(villageCards.rarity, "common")))
+      .limit(1);
+    const card = common || (await db.select().from(villageCards).where(eq(villageCards.isActive, true)).limit(1))[0];
+    if (card) {
+      await db.insert(userCards).values({ id: nanoid(), userId, cardId: card.id } as any);
+      out.card = { id: card.id, name: card.name };
+    }
+  }
+
+  return out;
+}
 
 // POST /games/chicken-rush
 const chickenRushSchema = z.object({

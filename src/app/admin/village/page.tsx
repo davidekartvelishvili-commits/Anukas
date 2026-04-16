@@ -329,24 +329,50 @@ function VillageContent() {
 
           {/* SETTINGS TAB */}
           {tab === "settings" && (
-            <div className="rounded-2xl border p-5" style={{ background: "#111111", borderColor: "#252525" }}>
-              <h3 className="text-[14px] font-bold mb-4" style={{ color: "#FFF" }}>სოფლის პარამეტრები</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  { key: "shield_cost_stars", label: "ფარის ფასი (⭐ ვარსკვლავი)" },
-                  { key: "attack_cards_needed", label: "შეტევისთვის საჭირო ბარათი" },
-                  { key: "attack_star_bonus", label: "შეტევის წარმატების ბონუსი (⭐)" },
-                  { key: "attack_success_rate", label: "შეტევის წარმატების %" },
-                ].map(s => (
-                  <div key={s.key}>
-                    <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>{s.label}</label>
-                    <input type="number" value={configDirty[s.key] || ""} onChange={(e) => setConfigDirty({ ...configDirty, [s.key]: e.target.value })}
-                      className="w-full rounded-lg px-3 py-2 text-[14px] outline-none"
-                      style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
-                  </div>
-                ))}
+            <div className="space-y-4">
+              <div className="rounded-2xl border p-5" style={{ background: "#111111", borderColor: "#252525" }}>
+                <h3 className="text-[14px] font-bold mb-4" style={{ color: "#FFF" }}>სოფლის პარამეტრები</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    { key: "shield_cost_stars", label: "ფარის ფასი (⭐ ვარსკვლავი)" },
+                    { key: "attack_cards_needed", label: "შეტევისთვის საჭირო ბარათი" },
+                    { key: "attack_star_bonus", label: "შეტევის წარმატების ბონუსი (⭐)" },
+                    { key: "attack_success_rate", label: "შეტევის წარმატების %" },
+                  ].map(s => (
+                    <div key={s.key}>
+                      <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>{s.label}</label>
+                      <input type="number" value={configDirty[s.key] || ""} onChange={(e) => setConfigDirty({ ...configDirty, [s.key]: e.target.value })}
+                        className="w-full rounded-lg px-3 py-2 text-[14px] outline-none"
+                        style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
+                    </div>
+                  ))}
+                </div>
               </div>
-              <button onClick={async () => { await updateVillageConfig(configDirty); alert("შენახულია"); }} className="mt-4 px-6 py-2 rounded-xl text-[13px] font-bold" style={{ background: "#F9E741", color: "#000" }}>შენახვა</button>
+
+              {/* Plinko milestone rewards — grant a shield / attack card
+                  automatically after the user drops N balls in Lucky Drop. */}
+              <div className="rounded-2xl border p-5" style={{ background: "#111111", borderColor: "#F9E74130" }}>
+                <h3 className="text-[14px] font-bold mb-1" style={{ color: "#F9E741" }}>🎯 Lucky Drop ჯილდოები</h3>
+                <p className="text-[11px] mb-4" style={{ color: "#888" }}>
+                  მიუთითე რამდენ ბურთზე მიიღოს user-მა ფარი / შეტევის ბარათი. 0 = გამორთული.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    { key: "balls_per_shield", label: "ყოველ N ბურთზე — ფარი" },
+                    { key: "balls_per_attack_card", label: "ყოველ N ბურთზე — ბარათი" },
+                    { key: "shield_reward_hours", label: "ფარის ხანგრძლივობა (საათი)" },
+                  ].map(s => (
+                    <div key={s.key}>
+                      <label className="text-[11px] block mb-1.5" style={{ color: "#A0A0A0" }}>{s.label}</label>
+                      <input type="number" min={0} value={configDirty[s.key] || ""} onChange={(e) => setConfigDirty({ ...configDirty, [s.key]: e.target.value })}
+                        className="w-full rounded-lg px-3 py-2 text-[14px] outline-none"
+                        style={{ background: "#1A1A1A", border: "1px solid #252525", color: "#FFF" }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button onClick={async () => { await updateVillageConfig(configDirty); alert("შენახულია"); }} className="px-6 py-2 rounded-xl text-[13px] font-bold" style={{ background: "#F9E741", color: "#000" }}>შენახვა</button>
             </div>
           )}
 
