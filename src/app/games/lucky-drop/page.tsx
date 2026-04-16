@@ -118,6 +118,8 @@ export default function LuckyDropPage() {
   const pegSfxPool = useRef<HTMLAudioElement[]>([]);
   const pegSfxIdx = useRef(0);
   const pegSfxLastAt = useRef(0);
+  const pegSfxHitCount = useRef(0);
+  const PEG_SFX_EVERY_N = 3; // only play on every 3rd peg collision
   useEffect(() => {
     if (typeof window === "undefined") return;
     const POOL = 8;
@@ -135,6 +137,10 @@ export default function LuckyDropPage() {
     };
   }, []);
   const playPegSfx = () => {
+    // Only fire on every Nth collision to keep the soundscape calm
+    pegSfxHitCount.current += 1;
+    if (pegSfxHitCount.current % PEG_SFX_EVERY_N !== 0) return;
+
     const pool = pegSfxPool.current;
     if (!pool.length) return;
     // Throttle to avoid machine-gun overlap when a ball grazes multiple pegs
