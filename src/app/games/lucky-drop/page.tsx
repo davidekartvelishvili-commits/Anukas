@@ -250,31 +250,53 @@ export default function LuckyDropPage() {
         ctx.fill();
       }
 
-      // Slots — crisp flat cards, no pulse, pixel-aligned
+      // Slots — solid red / green cards; shine bright on ball landing
       for (let i = 0; i < s.slots.length; i++) {
         const sl = s.slots[i];
-        sl.glow *= 0.95;
-        // Pixel-align to avoid sub-pixel anti-aliasing that reads as blur
+        sl.glow *= 0.94;
+        // Pixel-align to avoid sub-pixel anti-aliasing
         const sx = Math.round(sl.x);
         const sy = Math.round(sl.y);
         const sw = Math.round(sl.w);
         const sh = Math.round(sl.h);
-        // Base card fill — firmer alpha so it reads as a solid card, not a ghost tint
-        ctx.fillStyle = sl.color + "30";
+
+        // On-landing shine: bright radial halo above the card (same feel
+        // as the peg white-flash, but in the slot's own color)
+        if (sl.glow > 0.05) {
+          const cx = sx + sw / 2;
+          const cy = sy + sh / 2;
+          const haloR = Math.max(sw, sh) * 1.8;
+          const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, haloR);
+          const hex = sl.color;
+          halo.addColorStop(0, `${hex}${Math.floor(sl.glow * 170).toString(16).padStart(2, "0")}`);
+          halo.addColorStop(0.5, `${hex}${Math.floor(sl.glow * 60).toString(16).padStart(2, "0")}`);
+          halo.addColorStop(1, "transparent");
+          ctx.fillStyle = halo;
+          ctx.fillRect(cx - haloR, cy - haloR, haloR * 2, haloR * 2);
+        }
+
+        // Solid card fill — base is fully opaque; a brightness boost stacks
+        // on top when the ball lands
+        ctx.fillStyle = sl.color;
         ctx.fillRect(sx + 1, sy, sw - 2, sh);
         if (sl.glow > 0.05) {
-          const ga = Math.min(255, Math.floor(sl.glow * 120));
-          ctx.fillStyle = sl.color + ga.toString(16).padStart(2, "0");
-          ctx.fillRect(sx, sy, sw, sh);
+          // Overlay a white lift so the solid color brightens on hit
+          ctx.fillStyle = `rgba(255,255,255,${sl.glow * 0.55})`;
+          ctx.fillRect(sx + 1, sy, sw - 2, sh);
         }
-        // Steady top accent bar (no more pulse shimmer)
-        ctx.fillStyle = sl.color;
-        ctx.fillRect(sx + 2, sy, sw - 4, 2.5);
+
+        // Top accent line (subtle white highlight)
+        ctx.fillStyle = "rgba(255,255,255,0.35)";
+        ctx.fillRect(sx + 2, sy, sw - 4, 2);
+
+        // Text — white stays crisp on both red and green
         ctx.font = `${sl.mult >= 10 ? "900" : "700"} ${Math.min(sl.w * 0.38, 18)}px sans-serif`;
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillStyle = sl.mult === 0 ? "rgba(255,255,255,0.2)" : sl.color;
+        ctx.fillStyle = "#FFFFFF";
         ctx.fillText(sl.mult === 0 ? "0" : "WIN", sx + sw / 2, sy + sh / 2);
-        ctx.fillStyle = "rgba(255,255,255,0.04)";
+
+        // Right divider
+        ctx.fillStyle = "rgba(0,0,0,0.15)";
         ctx.fillRect(sx + sw - 1, sy, 1, sh);
       }
 
