@@ -514,33 +514,34 @@ export default function LuckyDropPage() {
           // Gentle air resistance — lets bounces preserve most of their energy
           b.vx *= AIR;
 
-          // Guidance — ball commits to the correct slot WHILE STILL inside
-          // the triangle (last two peg rows). Once below the triangle, X
-          // is fully locked and the ball drops straight down.
+          // Guidance — velocity-based with a MAX px/frame cap so the ball
+          // always glides smoothly, never teleports. Committed inside
+          // the triangle (last three peg rows) so once past the last row,
+          // only vertical fall remains.
           const topY = s.startY;
-          const bottomY = s.startY + ROWS * s.gapY;        // y just past last peg row
-          const commitStartY = s.startY + (ROWS - 2) * s.gapY; // start committing at 2nd-to-last row
+          const bottomY = s.startY + ROWS * s.gapY;             // past last peg row
+          const commitStartY = s.startY + (ROWS - 3) * s.gapY;  // start at 3rd-to-last row
 
+          const dxToTarget = lastWp.x - b.x;
           if (b.y < commitStartY) {
-            // Free plinko physics: very gentle attractor, mostly just pegs
+            // Free fall — very gentle attractor, pegs dominate
             const fallFrac = Math.max(0, (b.y - topY) / (commitStartY - topY));
-            const guidance = fallFrac * fallFrac * 0.010;
-            b.vx += (lastWp.x - b.x) * guidance;
+            const guidance = fallFrac * fallFrac * 0.008;
+            b.vx += dxToTarget * guidance;
           } else if (b.y < bottomY) {
-            // Commit zone (last two peg rows) — strong X lerp toward target,
-            // still allowing peg collisions to deflect briefly. The ball
-            // should exit this zone already in the correct column.
+            // Commit zone — accelerate vx toward target, but cap its
+            // magnitude so a far-off ball glides at a steady speed
+            // instead of being yanked sideways in one frame.
             const commitFrac = (b.y - commitStartY) / (bottomY - commitStartY);
-            const lerpK = 0.08 + commitFrac * 0.22; // 0.08 → 0.30
-            b.x += (lastWp.x - b.x) * lerpK;
-            b.vx *= 0.75;
+            const MAX_DRIFT_VX = 1.8 + commitFrac * 1.2;     // 1.8 → 3.0 px/frame
+            const desiredVx = Math.sign(dxToTarget) * Math.min(Math.abs(dxToTarget) * 0.18, MAX_DRIFT_VX);
+            b.vx += (desiredVx - b.vx) * (0.15 + commitFrac * 0.15);
           } else {
-            // Below the last peg row: direction is FIXED. Lock X to the
-            // target slot column and kill horizontal velocity so the ball
-            // drops straight into the slot with no side-to-side drift.
-            b.x += (lastWp.x - b.x) * 0.45;
-            b.vx = 0;
-            // Also cap vy so it doesn't "bullet" into the slot
+            // Lock zone — no side-to-side. vx is a bounded drift toward
+            // target (max 2 px/frame) so close-range arrival is smooth;
+            // still effectively "straight down" from user perspective.
+            const MAX_LOCK_VX = 2.0;
+            b.vx = Math.sign(dxToTarget) * Math.min(Math.abs(dxToTarget), MAX_LOCK_VX);
             if (b.vy > 6) b.vy = 6;
           }
 
