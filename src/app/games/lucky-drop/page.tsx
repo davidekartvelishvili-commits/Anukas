@@ -126,8 +126,8 @@ export default function LuckyDropPage() {
   const riskRef = useRef(risk);
 
   const calcLayout = useCallback(() => {
-    const W = window.innerWidth;
-    const H = window.innerHeight;
+    const W = document.documentElement.clientWidth;
+    const H = document.documentElement.clientHeight;
     const scale = Math.min(W / 430, 1); // Scale relative to iPhone size
     const pegR = Math.max(3, W * 0.008);
     const cols = ROWS + 2;
@@ -183,12 +183,19 @@ export default function LuckyDropPage() {
     const ctx = cvs.getContext("2d")!;
 
     function resize() {
-      cvs!.width = window.innerWidth;
-      cvs!.height = window.innerHeight;
+      cvs!.width = document.documentElement.clientWidth;
+      cvs!.height = document.documentElement.clientHeight;
       calcLayout();
     }
     resize();
-    window.addEventListener("resize", resize);
+    // Debounce so iOS URL-bar/pull-to-refresh gestures (which fire rapid
+    // resize events) don't cause the board to visibly stretch.
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedResize = () => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(resize, 150);
+    };
+    window.addEventListener("resize", debouncedResize);
 
     let animId: number;
 
@@ -347,7 +354,8 @@ export default function LuckyDropPage() {
     loop();
 
     return () => {
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("resize", debouncedResize);
+      if (resizeTimer) clearTimeout(resizeTimer);
       cancelAnimationFrame(animId);
     };
   }, [calcLayout]);
@@ -489,7 +497,10 @@ export default function LuckyDropPage() {
   }, [balance, betAmount, showWinAnim]);
 
   return (
-    <div className="relative w-full h-[100dvh] bg-[#050a1a] overflow-hidden">
+    <div
+      className="relative w-full h-[100dvh] bg-[#050a1a] overflow-hidden"
+      style={{ overscrollBehavior: "none", touchAction: "none" }}
+    >
       <style>{`
         @keyframes particleFall {
           0% { opacity:1; transform:translateY(0) rotate(0deg) scale(1); }

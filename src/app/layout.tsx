@@ -109,7 +109,10 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         {/* Note: OG / Twitter meta tags are emitted by generateMetadata() so admin-uploaded image takes priority */}
       </head>
-      <body className={`${outfit.variable} ${dmSans.variable} antialiased`}>
+      <body
+        className={`${outfit.variable} ${dmSans.variable} antialiased`}
+        style={{ overscrollBehavior: "none" }}
+      >
         {children}
       </body>
     </html>
