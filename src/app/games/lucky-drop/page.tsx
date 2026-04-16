@@ -112,13 +112,14 @@ export default function LuckyDropPage() {
   const pendingBallsRef = useRef(0);
   const lastServerCoinsRef = useRef(-1);
 
-  // Peg-hit SFX — pool of preloaded Audio objects we cycle through so
-  // overlapping hits each get their own voice (a single Audio can't play
-  // the same source simultaneously on top of itself).
-  // Throttling is TIME-BASED ONLY — no modulo counters, no arrays mutated
-  // per-hit, nothing that allocates or causes state churn in the hot path.
-  const pegHitPoolRef = useRef<HTMLAudioElement[]>([]);
-  const pegHitIndexRef = useRef(0);
+  // Peg-hit SFX — programmatic WebAudio pop, no file I/O. A tiny pre-
+  // synthesized AudioBuffer (60ms, 8kHz, single sine with exponential
+  // decay) is created once and replayed via BufferSource on each hit.
+  // Zero decoding overhead on every play — the original 33KB MP3 was
+  // causing mobile stutter even when the file itself was tiny because
+  // every Audio.play() call invoked the audio engine's decode pipeline.
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const clickBufferRef = useRef<AudioBuffer | null>(null);
   const lastPegSoundRef = useRef(0);
   const pegSfxMuted = useRef(false); // silenced while win audio is playing
 
@@ -145,8 +146,6 @@ export default function LuckyDropPage() {
   }, []);
   const playWinAudio = () => {
     pegSfxMuted.current = true;
-    // Stop any in-flight pegs that might still be mid-playback
-    pegHitPoolRef.current.forEach((a) => { try { a.pause(); a.currentTime = 0; } catch {} });
     const m = winMusicRef.current;
     const c = winCoinRef.current;
     if (m) { try { m.currentTime = 0; m.play().catch(() => {}); } catch {} }
@@ -160,34 +159,55 @@ export default function LuckyDropPage() {
     pegSfxMuted.current = false;
   };
   useEffect(() => {
-    // One-time pool creation on mount. 6 preloaded Audio elements we
-    // cycle through round-robin; NEVER allocate Audio in the hot path.
+    // One-time: create a single AudioContext + pre-synthesize a 60ms
+    // pop into an AudioBuffer. This is the entire audio pipeline —
+    // every hit replays this in-memory buffer, zero file I/O, zero
+    // decoder invocation.
     if (typeof window === "undefined") return;
-    pegHitPoolRef.current = Array.from({ length: 6 }, () => {
-      const audio = new Audio("/audio/peg-pop.mp3");
-      audio.volume = 0.3;
-      audio.preload = "auto";
-      return audio;
-    });
+    const AC = (window.AudioContext || (window as any).webkitAudioContext);
+    if (!AC) return;
+    const ac = new AC();
+    audioContextRef.current = ac;
+
+    const sampleRate = 8000;
+    const duration = 0.06; // 60ms
+    const samples = Math.floor(sampleRate * duration);
+    const buffer = ac.createBuffer(1, samples, sampleRate);
+    const channelData = buffer.getChannelData(0);
+    for (let i = 0; i < samples; i++) {
+      const t = i / samples;
+      const envelope = Math.exp(-t * 12);           // quick decay
+      const freq = 900 + (1 - t) * 300;              // downward sweep
+      channelData[i] = envelope * Math.sin(2 * Math.PI * freq * t) * 0.2;
+    }
+    clickBufferRef.current = buffer;
+
     return () => {
-      pegHitPoolRef.current.forEach((a) => { a.pause(); a.src = ""; });
-      pegHitPoolRef.current = [];
+      try { ac.close(); } catch {}
+      audioContextRef.current = null;
+      clickBufferRef.current = null;
     };
   }, []);
-  const playPegSfx = () => {
+
+  const playPegSfx = useCallback(() => {
     if (pegSfxMuted.current) return;
-    // Pure time-based throttle — max ~16 sounds/sec. No counters, no
-    // modulo on hit-count, no allocations. O(1) and allocation-free.
+    const ac = audioContextRef.current;
+    const buf = clickBufferRef.current;
+    if (!ac || !buf) return;
     const now = performance.now();
-    if (now - lastPegSoundRef.current <= 60) return;
-    const pool = pegHitPoolRef.current;
-    if (!pool.length) return;
-    const audio = pool[pegHitIndexRef.current];
-    pegHitIndexRef.current = (pegHitIndexRef.current + 1) % pool.length;
-    audio.currentTime = 0;
-    audio.play().catch(() => {});
+    if (now - lastPegSoundRef.current < 80) return; // max ~12 pops/sec
+    // Resume context lazily on first play (iOS requires a user gesture
+    // to unlock, which the Drop button tap already provides)
+    if (ac.state === "suspended") { try { ac.resume(); } catch {} }
+    const source = ac.createBufferSource();
+    const gainNode = ac.createGain();
+    source.buffer = buf;
+    gainNode.gain.value = 0.15;
+    source.connect(gainNode);
+    gainNode.connect(ac.destination);
+    source.start(0);
     lastPegSoundRef.current = now;
-  };
+  }, []);
 
   useEffect(() => {
     ensureActiveTransaction().then((tx) => {
@@ -536,7 +556,7 @@ export default function LuckyDropPage() {
                 b.vx += (Math.random() - 0.5) * 2 * JITTER;
                 // Strong shine only on direct hit
                 peg.glow = 1;
-                // playPegSfx(); // TEMP DISABLED FOR TESTING
+                playPegSfx();
               }
             }
           }
