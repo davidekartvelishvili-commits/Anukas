@@ -492,45 +492,50 @@ export default function LuckyDropPage() {
         if (!b.alive) { s.balls.splice(i, 1); continue; }
 
         if (!b.settled) {
-          // Real circle-circle collisions with pegs for visual bounce feel.
-          // The `path` array is still used as a weak horizontal guide so the
-          // ball arrives at the server-determined slot — at the bottom,
-          // guidance ramps up + a hard lerp locks the final position.
+          // Plinko physics: ball falls under real gravity, bounces off pegs
+          // with energy-retained reflection + random scatter. The generated
+          // `path`'s FINAL waypoint is the server-determined slot, used only
+          // as a gentle attractor in the bottom approach zone so the ball
+          // eventually arrives where it has to — but across most of its
+          // flight it's free to bounce chaotically like a real Plinko ball.
           const GRAVITY = 0.4;
           const MAX_VY = 12;
-          const RESTITUTION = 0.6;   // energy retained after peg bounce
-          const X_DAMPING = 0.94;    // vx decay per frame (keeps energy longer)
-          const JITTER = 0.8;        // random horizontal kick per collision
+          const RESTITUTION = 0.6;
+          const AIR = 0.995;          // very light air resistance (was 0.94 aggressive damping)
+          const WALL_BOUNCE = 0.45;
+          const JITTER_X = 1.5;       // horizontal scatter per collision
+          const JITTER_Y = 0.3;       // tiny vertical randomness
+          const lastWp = b.path[b.path.length - 1]; // server-determined slot center
 
-          // Vertical: gravity accumulates, clamped to terminal velocity
+          // Vertical gravity
           b.vy = Math.min(MAX_VY, b.vy + GRAVITY);
 
-          // Which path segment we're in, based on Y
-          let segIdx = b.segIdx;
-          while (segIdx < b.path.length - 1 && b.y > b.path[segIdx + 1].y) {
-            segIdx++;
-          }
-          b.segIdx = segIdx;
+          // Gentle air resistance — lets bounces preserve most of their energy
+          b.vx *= AIR;
 
-          // Horizontal guidance toward upcoming waypoint — ramps up as we
-          // fall so true collisions dominate at the top and guidance takes
-          // over near the bottom to guarantee the correct slot.
+          // Guidance is QUADRATICALLY ramped so the top ~60% of the fall
+          // is essentially pure physics (guidance < 0.005) and only the
+          // bottom approach tightens toward the target slot.
           const topY = s.startY;
           const bottomY = s.startY + ROWS * s.gapY;
           const fallFrac = Math.max(0, Math.min(1, (b.y - topY) / (bottomY - topY)));
-          const guidance = 0.004 + fallFrac * 0.022; // 0.004 at top → 0.026 at bottom
-          const targetWp = b.path[Math.min(segIdx + 1, b.path.length - 1)];
-          b.vx += (targetWp.x - b.x) * guidance;
-          b.vx *= X_DAMPING;
+          const guidance = fallFrac * fallFrac * 0.028; // 0 at top → 0.028 at bottom
+          b.vx += (lastWp.x - b.x) * guidance;
 
           // Integrate velocity
           b.x += b.vx;
           b.y += b.vy;
 
+          // Canvas-edge wall bounces (keeps wild bounces on-screen)
+          if (b.x < b.r) {
+            b.x = b.r;
+            b.vx = Math.abs(b.vx) * WALL_BOUNCE;
+          } else if (b.x > s.W - b.r) {
+            b.x = s.W - b.r;
+            b.vx = -Math.abs(b.vx) * WALL_BOUNCE;
+          }
+
           // ── Peg collisions (circle vs circle) ──
-          // Compare squared distances first so sqrt only runs on an
-          // actual collision (60 pegs × N balls × 60 fps would be a lot
-          // of sqrt calls otherwise).
           for (const peg of s.pegs) {
             const dx = b.x - peg.x;
             const dy = b.y - peg.y;
@@ -539,25 +544,22 @@ export default function LuckyDropPage() {
             const minDistSq = minDist * minDist;
             if (distSq >= minDistSq || distSq < 0.00000001) continue;
             const dist = Math.sqrt(distSq);
-            {
-              // Collision normal (peg → ball)
-              const nx = dx / dist;
-              const ny = dy / dist;
-              // Push ball outside the peg so they don't overlap
-              const overlap = minDist - dist;
-              b.x += nx * overlap;
-              b.y += ny * overlap;
-              // Reflect velocity along the normal, only if approaching
-              const vDotN = b.vx * nx + b.vy * ny;
-              if (vDotN < 0) {
-                b.vx -= (1 + RESTITUTION) * vDotN * nx;
-                b.vy -= (1 + RESTITUTION) * vDotN * ny;
-                // Small random horizontal nudge for organic Plinko feel
-                b.vx += (Math.random() - 0.5) * 2 * JITTER;
-                // Strong shine only on direct hit
-                peg.glow = 1;
-                playPegSfx();
-              }
+            const nx = dx / dist;
+            const ny = dy / dist;
+            // Push ball outside the peg with a tiny cushion so it can't re-collide next frame
+            const overlap = minDist - dist + 0.5;
+            b.x += nx * overlap;
+            b.y += ny * overlap;
+            const vDotN = b.vx * nx + b.vy * ny;
+            if (vDotN < 0) {
+              // Reflect with restitution (energy loss) — real Plinko feel
+              b.vx -= (1 + RESTITUTION) * vDotN * nx;
+              b.vy -= (1 + RESTITUTION) * vDotN * ny;
+              // Scatter — organic left/right randomness + minor vertical
+              b.vx += (Math.random() - 0.5) * 2 * JITTER_X;
+              b.vy += (Math.random() - 0.5) * 2 * JITTER_Y;
+              peg.glow = 1;
+              playPegSfx();
             }
           }
 
