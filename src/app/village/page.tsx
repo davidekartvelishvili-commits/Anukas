@@ -291,6 +291,38 @@ export default function VillagePage() {
     return () => clearTimeout(t);
   }, []);
 
+  // Background music — loops while the user is on the village page,
+  // stops on navigation away. Browsers block autoplay without a prior
+  // user gesture, so if the initial play() is rejected we queue a
+  // one-shot listener that starts playback on the first tap/click.
+  useEffect(() => {
+    const audio = new Audio("/audio/village-theme.mp3");
+    audio.loop = true;
+    audio.volume = 0.5;
+    let unlocked = false;
+    const unlockAndPlay = () => {
+      if (unlocked) return;
+      unlocked = true;
+      audio.play().catch(() => {});
+      window.removeEventListener("pointerdown", unlockAndPlay);
+      window.removeEventListener("keydown", unlockAndPlay);
+      window.removeEventListener("touchstart", unlockAndPlay);
+    };
+    audio.play().catch(() => {
+      // Autoplay blocked — wait for first user interaction
+      window.addEventListener("pointerdown", unlockAndPlay, { once: true });
+      window.addEventListener("keydown", unlockAndPlay, { once: true });
+      window.addEventListener("touchstart", unlockAndPlay, { once: true });
+    });
+    return () => {
+      audio.pause();
+      audio.src = "";
+      window.removeEventListener("pointerdown", unlockAndPlay);
+      window.removeEventListener("keydown", unlockAndPlay);
+      window.removeEventListener("touchstart", unlockAndPlay);
+    };
+  }, []);
+
   // Fetch village data
   useEffect(() => {
     setCoinBalanceState(getCoinBalance());
