@@ -267,10 +267,8 @@ export default function LuckyDropPage() {
         ctx.fillRect(sl.x + 2, sl.y, sl.w - 4, 2.5);
         ctx.font = `${sl.mult >= 10 ? "900" : "700"} ${Math.min(sl.w * 0.38, 18)}px sans-serif`;
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.shadowColor = sl.color; ctx.shadowBlur = 8 + sl.glow * 20;
         ctx.fillStyle = sl.mult === 0 ? "rgba(255,255,255,0.2)" : sl.color;
         ctx.fillText(sl.mult === 0 ? "0" : "WIN", sl.x + sl.w / 2, sl.y + sl.h / 2);
-        ctx.shadowBlur = 0;
         ctx.fillStyle = "rgba(255,255,255,0.04)";
         ctx.fillRect(sl.x + sl.w - 0.5, sl.y, 1, sl.h);
       }
