@@ -12,17 +12,19 @@ interface Peg { x: number; y: number; r: number; glow: number }
 interface Slot { x: number; y: number; w: number; h: number; mult: number; color: string; glow: number }
 interface TrailPoint { x: number; y: number; a: number }
 
-// Path-based ball: follows pre-calculated waypoints
+// Physics-based ball that tracks a path (path guarantees the predetermined slot)
 interface Ball {
   x: number; y: number;
+  vx: number; vy: number;
+  segIdx: number; // which path segment we're currently traversing
   r: number; alive: boolean; settled: boolean;
   trail: TrailPoint[];
   targetSlot: number;
   data: DropResult;
-  // Path animation
+  // Path is used only as a spine of waypoints so the ball reaches the
+  // correct slot. Vertical motion is real gravity; horizontal is a damped
+  // spring pulling toward the next waypoint's X.
   path: { x: number; y: number }[];
-  pathProgress: number; // 0 to 1
-  pathSpeed: number;
 }
 
 // Generate a natural path from top to target slot
@@ -292,52 +294,74 @@ export default function LuckyDropPage() {
         if (!b.alive) { s.balls.splice(i, 1); continue; }
 
         if (!b.settled) {
-          // Advance along path
-          b.pathProgress += b.pathSpeed;
+          // Physics constants — real weight-and-bounce feel. The `path`
+          // array is the spine that guarantees we land in the server-
+          // determined slot; these just govern HOW we traverse it.
+          const GRAVITY = 0.4;
+          const MAX_VY = 12;
+          const RESTITUTION = 0.6;  // vy dampening on peg hit
+          const X_SPRING = 0.018;   // pull strength toward next waypoint X
+          const X_DAMPING = 0.88;   // vx decay per frame
+          const JITTER = 1.2;       // horizontal spread on each peg hit
 
-          if (b.pathProgress >= 1) {
-            // Reached end of path — settle
-            b.pathProgress = 1;
-            b.settled = true;
-            const last = b.path[b.path.length - 1];
-            b.x = last.x;
-            b.y = last.y;
+          // Vertical: gravity accumulates, clamped to terminal velocity
+          b.vy = Math.min(MAX_VY, b.vy + GRAVITY);
 
-            // Glow the landing slot
-            for (const sl of s.slots) {
-              if (b.x >= sl.x && b.x <= sl.x + sl.w) { sl.glow = 1; break; }
-            }
-            if (typeof (b as any)._onSettle === "function") (b as any)._onSettle();
-            setTimeout(() => { b.alive = false; }, 500);
-          } else {
-            // Interpolate position along path with easing
-            const totalLen = b.path.length - 1;
-            const rawIdx = b.pathProgress * totalLen;
-            const idx = Math.floor(rawIdx);
-            const frac = rawIdx - idx;
+          // Determine which path segment we're in based on Y
+          let segIdx = b.segIdx;
+          while (segIdx < b.path.length - 1 && b.y > b.path[segIdx + 1].y) {
+            segIdx++;
+          }
 
-            const p0 = b.path[Math.min(idx, totalLen)];
-            const p1 = b.path[Math.min(idx + 1, totalLen)];
+          // Horizontal: spring-pull toward the upcoming waypoint's X
+          const targetWp = b.path[Math.min(segIdx + 1, b.path.length - 1)];
+          b.vx += (targetWp.x - b.x) * X_SPRING;
+          b.vx *= X_DAMPING;
 
-            // Ease-in for Y (gravity feel), smooth for X
-            const easedFrac = frac;
-            b.x = p0.x + (p1.x - p0.x) * easedFrac;
-            b.y = p0.y + (p1.y - p0.y) * easedFrac;
+          // Apply velocities
+          b.x += b.vx;
+          b.y += b.vy;
 
-            // Speed up as ball falls (gravity acceleration)
-            b.pathSpeed = Math.min(0.022, b.pathSpeed + 0.00010);
-
-            // Light up nearby pegs
-            for (const peg of s.pegs) {
-              const dx = b.x - peg.x, dy = b.y - peg.y;
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < s.gapY * 0.4) {
-                peg.glow = Math.max(peg.glow, 1 - dist / (s.gapY * 0.4));
-              }
+          // Peg bounce: when we cross a new waypoint (even segments are
+          // peg-level bounce points; odd are wobble-above-peg) apply
+          // realistic energy loss + horizontal jitter so it looks organic
+          if (segIdx !== b.segIdx) {
+            const entered = segIdx;
+            b.segIdx = segIdx;
+            if (entered > 0 && entered % 2 === 0) {
+              b.vy *= RESTITUTION;
+              b.vx += (Math.random() - 0.5) * JITTER;
             }
           }
 
-          // Trail
+          // Settle: once Y reaches the final waypoint, smoothly lerp X to
+          // the exact slot center so it drops in cleanly instead of snapping
+          const last = b.path[b.path.length - 1];
+          if (b.y >= last.y) {
+            b.y = last.y;
+            b.vy = 0;
+            b.x += (last.x - b.x) * 0.28;
+            if (Math.abs(b.x - last.x) < 1.2) {
+              b.x = last.x;
+              b.settled = true;
+              for (const sl of s.slots) {
+                if (b.x >= sl.x && b.x <= sl.x + sl.w) { sl.glow = 1; break; }
+              }
+              if (typeof (b as any)._onSettle === "function") (b as any)._onSettle();
+              setTimeout(() => { b.alive = false; }, 500);
+            }
+          }
+
+          // Light up nearby pegs
+          for (const peg of s.pegs) {
+            const dx = b.x - peg.x, dy = b.y - peg.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < s.gapY * 0.4) {
+              peg.glow = Math.max(peg.glow, 1 - dist / (s.gapY * 0.4));
+            }
+          }
+
+          // Trail (motion-blur feel)
           b.trail.push({ x: b.x, y: b.y, a: 1 });
           if (b.trail.length > 14) b.trail.shift();
           b.trail.forEach((t) => (t.a *= 0.88));
@@ -465,13 +489,14 @@ export default function LuckyDropPage() {
       const ball: Ball = {
         x: startX,
         y: s.startY - 30,
+        vx: 0,
+        vy: 2 + Math.random() * 1, // small initial drop velocity
+        segIdx: 0,
         r: ballR,
         alive: true, settled: false,
         trail: [], targetSlot: data.slotIndex,
         data,
         path,
-        pathProgress: 0,
-        pathSpeed: 0.007 + Math.random() * 0.003,
       };
 
       (ball as any)._onSettle = () => {
