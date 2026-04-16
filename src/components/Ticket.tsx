@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 
 const Y = "#F9E741";
 
@@ -61,9 +62,33 @@ export interface TicketData {
 
 const TICKET_HEIGHT = 420;
 
-export default function Ticket({ data, onActivate }: { data: TicketData; onActivate?: () => void }) {
-  const [back, setBack] = useState(false);
-  const [activated, setActivated] = useState(false);
+export default function Ticket({
+  data,
+  qrCode,
+  used,
+  onActivate,
+}: {
+  data: TicketData;
+  /** Real QR payload to encode. Supplied by the backend after activation. */
+  qrCode?: string;
+  /** True when the merchant has redeemed this ticket — renders the
+   *  bent/torn used-state visual. */
+  used?: boolean;
+  onActivate?: () => void;
+}) {
+  const [back, setBack] = useState(!!used); // used tickets default to back
+  const [activated, setActivated] = useState(!!qrCode || !!used);
+  const [qrDataUrl, setQrDataUrl] = useState<string>("");
+
+  // Generate real QR image from the payload whenever it changes
+  useEffect(() => {
+    if (!qrCode) { setQrDataUrl(""); return; }
+    let cancelled = false;
+    QRCode.toDataURL(qrCode, { margin: 0, width: 200, color: { dark: "#111111", light: "#ffffff" } })
+      .then((url) => { if (!cancelled) setQrDataUrl(url); })
+      .catch(() => { if (!cancelled) setQrDataUrl(""); });
+    return () => { cancelled = true; };
+  }, [qrCode]);
 
   const handleActivate = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -280,13 +305,15 @@ export default function Ticket({ data, onActivate }: { data: TicketData; onActiv
                     {activated ? data.serial : "••••••••••••"}
                   </div>
                 </div>
-                <div style={{ width: 54, height: 54, background: "#fff", borderRadius: 8, padding: 6, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 2px 6px rgba(0,0,0,0.1)" }}>
-                  {activated ? (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 1.5, width: "100%" }}>
-                      {[1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,0,1,0,1,0,1,1,0,0,1,0,0,1,1,0,1,0,1,0,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1].map((v, i) => (
-                        <div key={i} style={{ aspectRatio: "1", borderRadius: 1, background: v ? "#111" : "transparent" }} />
-                      ))}
-                    </div>
+                <div style={{ width: 54, height: 54, background: "#fff", borderRadius: 8, padding: 4, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 2px 6px rgba(0,0,0,0.1)" }}>
+                  {activated && qrDataUrl ? (
+                    // Real QR code — decoded by the merchant scanner
+                    <img
+                      src={qrDataUrl}
+                      alt="QR"
+                      style={{ width: "100%", height: "100%", display: "block", imageRendering: "pixelated" as const }}
+                      draggable={false}
+                    />
                   ) : (
                     // Generic placeholder pattern — NOT the real QR
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 1.5, width: "100%" }}>
@@ -351,24 +378,86 @@ export default function Ticket({ data, onActivate }: { data: TicketData; onActiv
             )}
           </div>
         )}
+
+        {/* USED state overlay — bottom stub appears torn off with a
+            skewed perforation line + "USED" stamp. Visual only, does
+            not change layout height. */}
+        {used && (
+          <>
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 120, // covers the yellow stub area
+                pointerEvents: "none",
+                overflow: "hidden",
+                transform: "rotate(-1.5deg) translateY(6px)",
+                transformOrigin: "left top",
+                filter: "grayscale(0.55) brightness(0.85)",
+              }}
+            >
+              {/* Faux-torn top edge */}
+              <svg
+                width="100%"
+                height="10"
+                viewBox="0 0 290 10"
+                preserveAspectRatio="none"
+                style={{ display: "block" }}
+              >
+                <path
+                  d="M0,2 L8,6 L16,1 L24,7 L32,3 L40,8 L48,2 L56,6 L64,1 L72,7 L80,3 L88,8 L96,2 L104,6 L112,1 L120,7 L128,3 L136,8 L144,2 L152,6 L160,1 L168,7 L176,3 L184,8 L192,2 L200,6 L208,1 L216,7 L224,3 L232,8 L240,2 L248,6 L256,1 L264,7 L272,3 L280,8 L290,2 L290,10 L0,10 Z"
+                  fill="#e6e6e6"
+                />
+              </svg>
+              {/* Diagonal "USED" stamp */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: 30,
+                  left: "50%",
+                  transform: "translate(-50%, 0) rotate(-14deg)",
+                  color: "#b11e1e",
+                  border: "3px solid #b11e1e",
+                  padding: "4px 18px",
+                  borderRadius: 6,
+                  fontSize: 24,
+                  fontWeight: 900,
+                  letterSpacing: "0.22em",
+                  fontFamily: "'DM Mono', monospace",
+                  opacity: 0.85,
+                  background: "rgba(255,255,255,0.35)",
+                  textShadow: "0 0 2px rgba(255,255,255,0.4)",
+                }}
+              >
+                USED
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Activate button */}
+      {/* Activate button — hidden once the ticket has been redeemed */}
       <div className="mt-4 flex justify-center">
         <button
           onClick={handleActivate}
-          disabled={activated}
+          disabled={activated || !!used}
           className="w-[170px] h-[58px] rounded-[29px] text-[16px] font-bold active:scale-[0.96] transition-transform duration-150"
           style={{
-            background: activated ? "#22C55E" : "#FFE500",
-            color: "#1A1A1A",
+            background: used ? "#6B7280" : activated ? "#22C55E" : "#FFE500",
+            color: used ? "#E5E7EB" : "#1A1A1A",
             fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif",
-            boxShadow: activated ? "0 4px 20px rgba(34,197,94,0.35)" : "0 4px 20px rgba(255,229,0,0.35)",
-            opacity: activated ? 0.9 : 1,
-            cursor: activated ? "default" : "pointer",
+            boxShadow: used
+              ? "none"
+              : activated
+              ? "0 4px 20px rgba(34,197,94,0.35)"
+              : "0 4px 20px rgba(255,229,0,0.35)",
+            opacity: used ? 0.65 : activated ? 0.9 : 1,
+            cursor: activated || used ? "default" : "pointer",
           }}
         >
-          {activated ? "Activated ✓" : "Activate"}
+          {used ? "Used" : activated ? "Activated ✓" : "Activate"}
         </button>
       </div>
     </div>

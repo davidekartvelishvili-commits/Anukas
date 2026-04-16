@@ -52,6 +52,19 @@ async function runStartupMigrations() {
     sql`ALTER TABLE referral_config ADD COLUMN share_image_url TEXT`,
     sql`ALTER TABLE tickets ADD COLUMN logo_url TEXT`,
     sql`ALTER TABLE tickets ADD COLUMN merchant_id TEXT`,
+    sql`CREATE TABLE IF NOT EXISTS user_tickets (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      ticket_id TEXT NOT NULL REFERENCES tickets(id),
+      qr_code TEXT NOT NULL UNIQUE,
+      activated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      redeemed_at TEXT,
+      redeemed_by_merchant_id TEXT REFERENCES merchants(id),
+      expires_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    sql`CREATE INDEX IF NOT EXISTS idx_user_tickets_user ON user_tickets(user_id)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_user_tickets_qr ON user_tickets(qr_code)`,
     sql`CREATE TABLE IF NOT EXISTS tickets (
       id TEXT PRIMARY KEY,
       emoji TEXT NOT NULL,

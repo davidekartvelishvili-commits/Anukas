@@ -218,6 +218,22 @@ export const tickets = sqliteTable("tickets", {
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
 });
 
+// User-owned ticket instances. Each row is a single user's claim of a
+// ticket template. Carries the unique QR code that the merchant scans
+// to redeem. One row per (userId, ticketId) — a user can only hold one
+// active claim of a given ticket template at a time.
+export const userTickets = sqliteTable("user_tickets", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  ticketId: text("ticket_id").notNull().references(() => tickets.id),
+  qrCode: text("qr_code").notNull().unique(), // payload scanned by merchant
+  activatedAt: text("activated_at").default(sql`(datetime('now'))`).notNull(),
+  redeemedAt: text("redeemed_at"),
+  redeemedByMerchantId: text("redeemed_by_merchant_id").references(() => merchants.id),
+  expiresAt: text("expires_at"), // redeemedAt + 5h — ticket vanishes from user list after this
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
 export const pendingPayments = sqliteTable("pending_payments", {
   id: text("id").primaryKey(),
   merchantId: text("merchant_id").notNull().references(() => merchants.id),

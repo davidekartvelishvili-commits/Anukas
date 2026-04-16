@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import {
   isMerchantAuthenticated,
   getMerchantTransactions,
+  getMerchantTicketHistory,
 } from "@/services/merchant";
 
 export default function MerchantTransactionsPage() {
   const router = useRouter();
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [ticketHistory, setTicketHistory] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -21,6 +23,10 @@ export default function MerchantTransactionsPage() {
       return;
     }
     loadTransactions(1);
+    // Load ticket redemption history in parallel — doesn't block main list
+    getMerchantTicketHistory(1).then((res: any) => {
+      if (res?.success && Array.isArray(res.redemptions)) setTicketHistory(res.redemptions);
+    }).catch(() => {});
   }, []);
 
   async function loadTransactions(p: number) {
@@ -64,6 +70,44 @@ export default function MerchantTransactionsPage() {
             ტრანზაქციები
           </h1>
         </div>
+
+        {/* Activated Tickets — merchant's ticket redemption history */}
+        {ticketHistory.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-[15px] font-semibold mb-3" style={{ color: "#F1F5F9", fontFamily: "var(--font-outfit)" }}>
+              გააქტიურებული ტიკეტები
+            </h2>
+            <div className="flex flex-col gap-2">
+              {ticketHistory.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-xl p-3 flex items-center gap-3"
+                  style={{ background: "#1C1C1E", border: "1px solid rgba(255,215,0,0.12)" }}
+                >
+                  {r.ticket?.logoUrl ? (
+                    <img src={r.ticket.logoUrl} alt="" style={{ width: 36, height: 36, borderRadius: 6, objectFit: "cover", background: "#fff" }} />
+                  ) : (
+                    <div style={{ width: 36, height: 36, borderRadius: 6, background: "rgba(255,215,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="2" strokeLinecap="round"><path d="M2 7h20v4a2 2 0 000 4v4H2v-4a2 2 0 000-4V7z"/></svg>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold truncate" style={{ color: "#F1F5F9", fontFamily: "var(--font-outfit)" }}>
+                      {r.ticket?.title || "Ticket"}
+                    </p>
+                    <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,0.35)" }}>
+                      {r.ticket?.serial || "—"}
+                      {r.user?.phone ? ` • ${r.user.phone}` : ""}
+                    </p>
+                  </div>
+                  <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.4)" }}>
+                    {r.redeemedAt ? new Date(r.redeemedAt.replace(" ", "T") + "Z").toLocaleString("ka-GE", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Transaction List */}
         {loading ? (
@@ -180,6 +224,17 @@ function MerchantNav({ active }: { active: string }) {
           <line x1="21" y1="14" x2="21" y2="14.01" />
           <line x1="21" y1="21" x2="21" y2="21.01" />
           <line x1="17" y1="21" x2="17" y2="21.01" />
+        </svg>
+      ),
+    },
+    {
+      key: "tickets",
+      label: "ტიკეტი",
+      href: "/merchant/scan-ticket",
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 7h20v4a2 2 0 000 4v4H2v-4a2 2 0 000-4V7z" />
+          <line x1="10" y1="7" x2="10" y2="19" strokeDasharray="1 2" />
         </svg>
       ),
     },

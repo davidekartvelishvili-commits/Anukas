@@ -78,3 +78,22 @@ export function getStoredMerchant(): any {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
 }
+
+// ── Tickets (merchant-side) ──
+export async function verifyTicketQR(qrCode: string) {
+  return merchantFetch("/merchant/tickets/verify", {
+    method: "POST",
+    body: JSON.stringify({ qr_code: qrCode }),
+  });
+}
+
+export async function redeemTicket(userTicketId: string) {
+  return merchantFetch("/merchant/tickets/redeem", {
+    method: "POST",
+    body: JSON.stringify({ user_ticket_id: userTicketId }),
+  });
+}
+
+export async function getMerchantTicketHistory(page = 1) {
+  return merchantFetch(`/merchant/tickets/history?page=${page}`);
+}

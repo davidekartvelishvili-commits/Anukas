@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { MerchantEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { merchants, paymentTransactions, pendingPayments, users, transactions, systemConfig, gameConfig } from "../db/schema.js";
+import { merchants, paymentTransactions, pendingPayments, users, transactions, systemConfig, gameConfig, tickets, userTickets } from "../db/schema.js";
 import { merchantMiddleware } from "../middleware/merchant.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError } from "../utils/errors.js";
@@ -295,6 +295,125 @@ merchant.patch("/change-pin", merchantMiddleware, async (c) => {
   await db.update(merchants).set({ pinHash: newHash }).where(eq(merchants.id, merchantId));
 
   return c.json({ success: true, message: "PIN შეცვლილია" });
+});
+
+// ══════════════════════════════════════════════════════════════════
+//   TICKETS (merchant-side) — scan + redeem + history
+// ══════════════════════════════════════════════════════════════════
+
+// POST /merchant/tickets/verify — merchant scans a user's ticket QR.
+// Validates: QR exists, not already redeemed, and CRITICALLY that the
+// ticket's merchant_id matches the authenticated merchant (Cinepark
+// can only scan Cinepark tickets, etc.). Returns ticket details so the
+// merchant can see what the user is trying to redeem before approving.
+merchant.post("/tickets/verify", merchantMiddleware, async (c) => {
+  const merchantId = c.get("merchantId") as string;
+  const body = await c.req.json();
+  const qrCode: string = (body?.qr_code || body?.qrCode || "").trim();
+  if (!qrCode) return c.json({ success: false, message: "Missing QR code" }, 400);
+
+  const db = getDb();
+  const [ut] = await db.select().from(userTickets).where(eq(userTickets.qrCode, qrCode)).limit(1);
+  if (!ut) return c.json({ success: false, code: "NOT_FOUND", message: "არასწორი ტიკეტი" }, 404);
+
+  const [tpl] = await db.select().from(tickets).where(eq(tickets.id, ut.ticketId)).limit(1);
+  if (!tpl) return c.json({ success: false, code: "NOT_FOUND", message: "ტიკეტი არ მოიძებნა" }, 404);
+
+  // Ownership check — the ticket template must belong to this merchant.
+  // Allows null merchantId tickets (pre-link legacy data) to be redeemable
+  // by any merchant; otherwise strict match.
+  if (tpl.merchantId && tpl.merchantId !== merchantId) {
+    return c.json({ success: false, code: "WRONG_MERCHANT", message: "ეს ტიკეტი სხვა მერჩანტისაა" }, 403);
+  }
+
+  if (ut.redeemedAt) {
+    return c.json({
+      success: false,
+      code: "ALREADY_USED",
+      message: "ტიკეტი უკვე გამოყენებულია",
+      redeemedAt: ut.redeemedAt,
+    }, 409);
+  }
+
+  // Pull user's display name for context
+  const [u] = await db.select({ id: users.id, name: users.name, phone: users.phone }).from(users).where(eq(users.id, ut.userId)).limit(1);
+
+  let termsArr: string[] = [];
+  try { termsArr = JSON.parse((tpl as any).termsJson || "[]"); } catch {}
+
+  return c.json({
+    success: true,
+    userTicket: { id: ut.id, qrCode: ut.qrCode, activatedAt: ut.activatedAt },
+    ticket: {
+      ...tpl,
+      terms: termsArr,
+      row: (tpl as any).rowLabel,
+    },
+    user: u || null,
+  });
+});
+
+// POST /merchant/tickets/redeem — merchant confirms activation. Marks
+// redeemed_at, expires_at = now + 5h, records this merchant as redeemer.
+merchant.post("/tickets/redeem", merchantMiddleware, async (c) => {
+  const merchantId = c.get("merchantId") as string;
+  const body = await c.req.json();
+  const userTicketId: string = body?.user_ticket_id || body?.userTicketId;
+  if (!userTicketId) return c.json({ success: false, message: "Missing user_ticket_id" }, 400);
+
+  const db = getDb();
+  const [ut] = await db.select().from(userTickets).where(eq(userTickets.id, userTicketId)).limit(1);
+  if (!ut) return c.json({ success: false, code: "NOT_FOUND", message: "Ticket not found" }, 404);
+  if (ut.redeemedAt) {
+    return c.json({ success: false, code: "ALREADY_USED", message: "ტიკეტი უკვე გამოყენებულია" }, 409);
+  }
+  const [tpl] = await db.select().from(tickets).where(eq(tickets.id, ut.ticketId)).limit(1);
+  if (tpl?.merchantId && tpl.merchantId !== merchantId) {
+    return c.json({ success: false, code: "WRONG_MERCHANT", message: "სხვა მერჩანტის ტიკეტი" }, 403);
+  }
+
+  const now = new Date();
+  const fiveHoursLater = new Date(now.getTime() + 5 * 60 * 60 * 1000);
+  const fmt = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
+
+  // Atomic conditional update: only succeed if redeemed_at is still NULL.
+  // Blocks double-redeem under concurrent requests (the read-check-write
+  // path above has a race; this second gate closes it).
+  const result: any = await (db as any).run(
+    sql`UPDATE user_tickets
+        SET redeemed_at = ${fmt(now)},
+            expires_at = ${fmt(fiveHoursLater)},
+            redeemed_by_merchant_id = ${merchantId}
+        WHERE id = ${userTicketId} AND redeemed_at IS NULL`
+  );
+  const affected = result?.rowsAffected ?? result?.changes ?? 0;
+  if (!affected) {
+    return c.json({ success: false, code: "ALREADY_USED", message: "ტიკეტი უკვე გამოყენებულია" }, 409);
+  }
+
+  return c.json({ success: true, redeemedAt: fmt(now), expiresAt: fmt(fiveHoursLater) });
+});
+
+// GET /merchant/tickets/history — paginated list of this merchant's
+// redeemed tickets. Used in the merchant transaction history view.
+merchant.get("/tickets/history", merchantMiddleware, async (c) => {
+  const merchantId = c.get("merchantId") as string;
+  const page = parseInt(c.req.query("page") || "1");
+  const limit = Math.min(parseInt(c.req.query("limit") || "30"), 100);
+  const offset = (page - 1) * limit;
+
+  const db = getDb();
+  const rows = await db.select().from(userTickets)
+    .where(eq(userTickets.redeemedByMerchantId, merchantId))
+    .orderBy(desc(userTickets.redeemedAt))
+    .limit(limit)
+    .offset(offset);
+  const enriched = await Promise.all(rows.map(async (ut) => {
+    const [t] = await db.select({ id: tickets.id, title: tickets.title, titleKa: tickets.titleKa, price: tickets.price, bonus: tickets.bonus, serial: tickets.serial, logoUrl: tickets.logoUrl, category: tickets.category }).from(tickets).where(eq(tickets.id, ut.ticketId)).limit(1);
+    const [u] = await db.select({ id: users.id, name: users.name, phone: users.phone }).from(users).where(eq(users.id, ut.userId)).limit(1);
+    return { ...ut, ticket: t || null, user: u || null };
+  }));
+  return c.json({ success: true, redemptions: enriched });
 });
 
 export default merchant;

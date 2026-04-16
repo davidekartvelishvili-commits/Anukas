@@ -212,6 +212,17 @@ function MerchantNav({ active }: { active: string }) {
       ),
     },
     {
+      key: "tickets",
+      label: "ტიკეტი",
+      href: "/merchant/scan-ticket",
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 7h20v4a2 2 0 000 4v4H2v-4a2 2 0 000-4V7z" />
+          <line x1="10" y1="7" x2="10" y2="19" strokeDasharray="1 2" />
+        </svg>
+      ),
+    },
+    {
       key: "transactions",
       label: "ტრანზაქციები",
       href: "/merchant/transactions",

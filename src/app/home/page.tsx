@@ -149,12 +149,29 @@ export default function HomePage() {
       }
     }).catch(() => {});
 
-    // Fetch live tickets from backend
-    apiFetch("/public/tickets").then((data: any) => {
-      if (data?.success && Array.isArray(data.tickets)) {
-        setLiveTickets(data.tickets);
-      }
-    }).catch(() => {});
+    // Fetch live tickets from backend + user's claimed ticket state
+    // so we can show real QR codes + "used" state for redeemed ones.
+    Promise.all([
+      apiFetch("/public/tickets").catch(() => null),
+      apiFetch("/user/tickets/my").catch(() => null),
+    ]).then(([pub, my]: any[]) => {
+      const templates: any[] = (pub?.success && Array.isArray(pub.tickets)) ? pub.tickets : [];
+      const mine: any[] = (my?.success && Array.isArray(my.tickets)) ? my.tickets : [];
+      // Index user's claims by ticket template id
+      const claimByTemplate = new Map<string, any>();
+      for (const ut of mine) claimByTemplate.set(ut.ticketId, ut);
+      // Merge: attach claim info onto each template (qrCode + redeemed)
+      const merged = templates.map((t) => {
+        const claim = claimByTemplate.get(t.id);
+        return {
+          ...t,
+          _userTicketId: claim?.id || null,
+          _qrCode: claim?.qrCode || null,
+          _used: !!claim?.redeemedAt,
+        };
+      });
+      setLiveTickets(merged);
+    });
 
     // Check if user has already visited /promos today — hide badge if so
     try {
@@ -320,7 +337,28 @@ export default function HomePage() {
                       flexShrink: 0,
                     }}
                   >
-                    <Ticket data={t} />
+                    <Ticket
+                      data={t}
+                      qrCode={(t as any)._qrCode || undefined}
+                      used={!!(t as any)._used}
+                      onActivate={async () => {
+                        try {
+                          const res: any = await apiFetch(`/user/tickets/${t.id}/activate`, { method: "POST" });
+                          if (res?.success && res.userTicket?.qrCode) {
+                            // Patch this ticket in-place so the next render
+                            // shows a real QR (instead of placeholder). No
+                            // full refetch needed.
+                            setLiveTickets((prev) =>
+                              prev.map((x) =>
+                                x.id === t.id
+                                  ? { ...x, _qrCode: res.userTicket.qrCode, _userTicketId: res.userTicket.id }
+                                  : x
+                              )
+                            );
+                          }
+                        } catch {}
+                      }}
+                    />
                   </div>
                 ))}
               </div>

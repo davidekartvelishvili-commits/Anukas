@@ -3,7 +3,7 @@ import { z } from "zod";
 import { eq, and, or, desc, sql } from "drizzle-orm";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { users, transactions, referrals, referralConfig, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, gameConfig, gameHistory, promoCodeUses, promoCodes } from "../db/schema.js";
+import { users, transactions, referrals, referralConfig, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, gameConfig, gameHistory, promoCodeUses, promoCodes, tickets, userTickets } from "../db/schema.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { BadRequestError } from "../utils/errors.js";
 import { nanoid } from "nanoid";
@@ -413,6 +413,66 @@ user.get("/activity", async (c) => {
   activities.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return c.json({ success: true, activities: activities.slice(0, limit) });
+});
+
+// ══════════════════════════════════════════════════════════════════
+//   TICKETS (user-side)
+// ══════════════════════════════════════════════════════════════════
+
+// POST /user/tickets/:id/activate — user claims a ticket template, gets
+// back a unique QR code payload to show at the merchant. Idempotent:
+// if the user already has an unredeemed claim of this ticket, returns
+// the same record so the QR stays stable.
+user.post("/tickets/:id/activate", async (c) => {
+  const userId = c.get("userId") as string;
+  const ticketId = c.req.param("id");
+  const db = getDb();
+
+  const [tpl] = await db.select().from(tickets).where(eq(tickets.id, ticketId)).limit(1);
+  if (!tpl || !tpl.isActive) {
+    return c.json({ success: false, message: "Ticket not found or inactive" }, 404);
+  }
+
+  // Reuse existing active claim if present (not yet redeemed)
+  const [existing] = await db.select().from(userTickets)
+    .where(and(eq(userTickets.userId, userId), eq(userTickets.ticketId, ticketId), sql`${userTickets.redeemedAt} IS NULL`))
+    .limit(1);
+
+  if (existing) {
+    return c.json({ success: true, userTicket: existing });
+  }
+
+  const id = nanoid();
+  const qrCode = `SHTKT-${nanoid(12)}`;
+  await db.insert(userTickets).values({ id, userId, ticketId, qrCode } as any);
+  const [created] = await db.select().from(userTickets).where(eq(userTickets.id, id)).limit(1);
+  return c.json({ success: true, userTicket: created });
+});
+
+// GET /user/tickets/my — returns the user's active tickets (claimed but
+// not expired). Each row is joined with its ticket template so the
+// client has everything it needs to render.
+user.get("/tickets/my", async (c) => {
+  const userId = c.get("userId") as string;
+  const db = getDb();
+  const nowIso = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const rows = await db.select().from(userTickets)
+    .where(and(
+      eq(userTickets.userId, userId),
+      or(sql`${userTickets.expiresAt} IS NULL`, sql`${userTickets.expiresAt} > ${nowIso}`),
+    ))
+    .orderBy(desc(userTickets.activatedAt));
+  const enriched = await Promise.all(rows.map(async (ut) => {
+    const [t] = await db.select().from(tickets).where(eq(tickets.id, ut.ticketId)).limit(1);
+    let termsArr: string[] = [];
+    try { termsArr = JSON.parse((t as any)?.termsJson || "[]"); } catch {}
+    return {
+      ...ut,
+      ticket: t ? { ...t, terms: termsArr, row: (t as any).rowLabel } : null,
+      redeemed: !!ut.redeemedAt,
+    };
+  }));
+  return c.json({ success: true, tickets: enriched });
 });
 
 export default user;
