@@ -31,7 +31,6 @@ const MAX_PADDLE_VEL = 0.5;    // clamp client-sent paddle velocity
 
 export interface PuckState {
   x: number; y: number; vx: number; vy: number; r: number;
-  lastCollisionTick?: number; // collision cooldown — skip if < 3 ticks ago
 }
 
 export interface PaddleState {
@@ -129,32 +128,30 @@ function checkGoal(puck: PuckState): "bottom" | "top" | null {
   return null;
 }
 
-// ── Paddle-puck collision with 3-point swept check + cooldown ──
+// ── Paddle-puck collision with swept check ──
 
-function resolvePaddleCollision(puck: PuckState, paddle: PaddleState, currentTick: number): void {
+function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
   const minDist = puck.r + paddle.r;
 
-  // Collision cooldown — prevent double-bounce within 1 tick
-  if (puck.lastCollisionTick !== undefined && currentTick - puck.lastCollisionTick < 1) return;
-
-  // Helper: try resolving collision at a specific position
+  // Core collision response at a given paddle position
   const tryResolve = (px: number, py: number): boolean => {
     const dx = puck.x - px;
     const dy = puck.y - py;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist >= minDist || dist <= 0) return false;
 
-    // Push out
     const nx = dx / dist;
     const ny = dy / dist;
-    puck.x += nx * (minDist - dist);
-    puck.y += ny * (minDist - dist);
+
+    // Push puck fully outside paddle
+    puck.x = px + nx * minDist;
+    puck.y = py + ny * minDist;
 
     const pvx = paddle.deltaVx ?? 0;
     const pvy = paddle.deltaVy ?? 0;
 
     const relVN = (puck.vx - pvx) * nx + (puck.vy - pvy) * ny;
-    if (relVN >= 0) return true;
+    if (relVN >= 0) return true; // already separating
 
     puck.vx += -(1 + PADDLE_RESTITUTION) * relVN * nx;
     puck.vy += -(1 + PADDLE_RESTITUTION) * relVN * ny;
@@ -169,28 +166,34 @@ function resolvePaddleCollision(puck: PuckState, paddle: PaddleState, currentTic
       puck.vy *= s;
     }
 
-    puck.lastCollisionTick = currentTick;
+    // Guarantee full separation after resolve
+    const adx = puck.x - px;
+    const ady = puck.y - py;
+    const ad = Math.sqrt(adx * adx + ady * ady);
+    if (ad < minDist && ad > 0) {
+      puck.x = px + (adx / ad) * minDist;
+      puck.y = py + (ady / ad) * minDist;
+    }
+
     return true;
   };
 
-  // 1. Check current position
+  // 1. Check current paddle position
   if (tryResolve(paddle.x, paddle.y)) return;
 
-  // 2. Swept check — 3 interpolated points along paddle path this tick
+  // 2. Swept check — 4 evenly spaced points along paddle movement path
   if (paddle.prevX !== undefined && paddle.prevY !== undefined) {
     const prevX = paddle.prevX;
     const prevY = paddle.prevY;
     const sweepDist = Math.sqrt((paddle.x - prevX) ** 2 + (paddle.y - prevY) ** 2);
     if (sweepDist > 0.003) {
-      for (const t of [0.25, 0.5, 0.75]) {
-        const checkX = prevX + (paddle.x - prevX) * t;
-        const checkY = prevY + (paddle.y - prevY) * t;
-        if (tryResolve(checkX, checkY)) return;
+      for (let i = 1; i <= 4; i++) {
+        const t = i / 4;
+        const sx = prevX + (paddle.x - prevX) * t;
+        const sy = prevY + (paddle.y - prevY) * t;
+        if (tryResolve(sx, sy)) break; // one collision per tick max
       }
     }
-
-    // 3. Check previous position — catches puck already overlapping at tick start
-    tryResolve(prevX, prevY);
   }
 }
 
@@ -275,27 +278,21 @@ function tick(
   state.puck.vx *= FRICTION;
   state.puck.vy *= FRICTION;
 
-  // Stuck-puck rescue: if nearly stopped mid-field, give a tiny nudge
-  // so it never freezes. If completely stopped away from center, unstick.
+  // Maintain minimum drift speed if puck is still moving (prevents
+  // invisible micro-drift). No random nudge — puck is allowed to stop.
   const pspeed = Math.sqrt(state.puck.vx ** 2 + state.puck.vy ** 2);
   if (pspeed > 0 && pspeed < 0.002) {
     const s = 0.002 / pspeed;
     state.puck.vx *= s;
     state.puck.vy *= s;
-  } else if (pspeed === 0) {
-    const atCenter = Math.abs(state.puck.x - FIELD_W / 2) < 0.05 && Math.abs(state.puck.y - FIELD_H / 2) < 0.05;
-    if (!atCenter) {
-      state.puck.vx = (Math.random() - 0.5) * 0.003;
-      state.puck.vy = 0.004;
-    }
   }
 
   state.puck.x += state.puck.vx;
   state.puck.y += state.puck.vy;
 
   resolveWallBounce(state.puck);
-  resolvePaddleCollision(state.puck, state.paddles.bottom, game.tickCount);
-  resolvePaddleCollision(state.puck, state.paddles.top, game.tickCount);
+  resolvePaddleCollision(state.puck, state.paddles.bottom);
+  resolvePaddleCollision(state.puck, state.paddles.top);
 
   // Goals
   const goalScoredOn = checkGoal(state.puck);
