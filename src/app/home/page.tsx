@@ -105,6 +105,7 @@ export default function HomePage() {
   const [promoCount, setPromoCount] = useState(0);
   const [mysteryBoxEnabled, setMysteryBoxEnabled] = useState(true);
   const [liveTickets, setLiveTickets] = useState<TicketData[]>([]);
+  const [recentWins, setRecentWins] = useState<{ id: string; name: string; coins: number; game: string; createdAt: string }[]>([]);
   const countdown = useCountdown(15.58);
 
   // "Seen" tracking — hide badge after user visits /promos on a given day
@@ -188,6 +189,21 @@ export default function HomePage() {
     if (saved) setGender(saved);
     const t = setTimeout(() => setMounted(true), 50);
     return () => clearTimeout(t);
+  }, []);
+
+  // Live Recent Wins — polls every 8 seconds, no page refresh needed.
+  useEffect(() => {
+    let alive = true;
+    const fetchWins = () => {
+      apiFetch("/public/recent-wins").then((data: any) => {
+        if (alive && data?.success && Array.isArray(data.wins)) {
+          setRecentWins(data.wins);
+        }
+      }).catch(() => {});
+    };
+    fetchWins();
+    const interval = setInterval(fetchWins, 8000);
+    return () => { alive = false; clearInterval(interval); };
   }, []);
 
   const avatarSrc = gender === "Female" ? "/images/profile-avatar-female.png" : gender === "Other" ? "/images/profile-avatar-other.png" : "/images/profile-avatar.png";
@@ -315,6 +331,63 @@ export default function HomePage() {
               </div>
             )}
           </div>
+
+          {/* ── Live Recent Wins ── */}
+          {recentWins.length > 0 && (
+            <div className="mt-5" style={stagger(2)}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#22C55E" }} />
+                <h3 className="text-[14px] font-bold" style={{ color: "#F1F5F9", fontFamily: "var(--font-outfit)" }}>
+                  Live Wins
+                </h3>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {recentWins.map((win) => {
+                  // Time ago
+                  let ago = "";
+                  try {
+                    const d = new Date(win.createdAt.includes("T") ? win.createdAt : win.createdAt.replace(" ", "T") + "Z");
+                    const sec = Math.floor((Date.now() - d.getTime()) / 1000);
+                    if (sec < 60) ago = "ახლა";
+                    else if (sec < 3600) ago = `${Math.floor(sec / 60)} წთ`;
+                    else if (sec < 86400) ago = `${Math.floor(sec / 3600)} სთ`;
+                    else ago = `${Math.floor(sec / 86400)} დღე`;
+                  } catch { ago = ""; }
+                  return (
+                    <div
+                      key={win.id}
+                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-[12px]"
+                      style={{ background: "#141B2D" }}
+                    >
+                      <div
+                        className="w-[26px] h-[26px] rounded-full flex items-center justify-center shrink-0"
+                        style={{ background: "#1C2539" }}
+                      >
+                        <span className="text-[11px] font-bold" style={{ color: "#F1F5F9", fontFamily: "var(--font-outfit)" }}>
+                          {win.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[13px]" style={{ fontFamily: "var(--font-dm-sans)" }}>
+                          <span style={{ color: "#F1F5F9", fontWeight: 600 }}>{win.name}</span>
+                          <span style={{ color: "#64748B" }}> — {win.game}</span>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <img src="/images/coin-icon.png" alt="" width={14} height={14} style={{ objectFit: "contain" }} />
+                        <span className="text-[13px] font-bold" style={{ color: "#FFE500", fontFamily: "var(--font-outfit)" }}>
+                          +{win.coins.toLocaleString()}
+                        </span>
+                      </div>
+                      <span className="text-[10px] shrink-0" style={{ color: "#475569", fontFamily: "var(--font-dm-sans)" }}>
+                        {ago}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* ── Shansi Drops (admin-managed via /admin/tickets) ── */}
           {liveTickets.length > 0 && (
