@@ -184,10 +184,50 @@ function handlePaddleCollision(puck: PuckState, paddle: PaddleState): void {
   const sweepDist = Math.sqrt((paddle.x - prevX) ** 2 + (paddle.y - prevY) ** 2);
 
   if (sweepDist > 0.005) {
+    const minDist = puck.r + paddle.r;
     for (const t of [0.25, 0.5, 0.75]) {
       const sx = prevX + (paddle.x - prevX) * t;
       const sy = prevY + (paddle.y - prevY) * t;
-      if (checkAndResolveAt(puck, paddle, sx, sy)) break;
+      const sdx = puck.x - sx;
+      const sdy = puck.y - sy;
+      const sDist = Math.sqrt(sdx * sdx + sdy * sdy);
+
+      if (sDist < minDist && sDist > 0) {
+        // Use ACTUAL paddle position for normal, not sweep point
+        const adx = puck.x - paddle.x;
+        const ady = puck.y - paddle.y;
+        const ad = Math.sqrt(adx * adx + ady * ady);
+
+        const nx = ad > 0 ? adx / ad : sdx / sDist;
+        const ny = ad > 0 ? ady / ad : sdy / sDist;
+
+        // Push out from ACTUAL paddle position
+        puck.x = paddle.x + nx * minDist * 1.15;
+        puck.y = paddle.y + ny * minDist * 1.15;
+
+        // Resolve velocity
+        const pvx = paddle.deltaVx ?? 0;
+        const pvy = paddle.deltaVy ?? 0;
+        const relVN = (puck.vx - pvx) * nx + (puck.vy - pvy) * ny;
+        if (relVN < 0) {
+          const impulse = -(1 + 0.75) * relVN;
+          puck.vx += impulse * nx + pvx * PADDLE_TRANSFER;
+          puck.vy += impulse * ny + pvy * PADDLE_TRANSFER;
+          const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+          if (speed > MAX_PUCK_SPEED) {
+            puck.vx = (puck.vx / speed) * MAX_PUCK_SPEED;
+            puck.vy = (puck.vy / speed) * MAX_PUCK_SPEED;
+          }
+        }
+
+        // Verify exit direction
+        const movingAway = (puck.vx * nx + puck.vy * ny) > 0;
+        if (!movingAway) {
+          puck.vx += nx * 0.008;
+          puck.vy += ny * 0.008;
+        }
+        break;
+      }
     }
   }
 }
