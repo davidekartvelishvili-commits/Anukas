@@ -9,13 +9,14 @@ const PADDLE_RADIUS = 0.065;
 const CENTER_LINE = FIELD_H / 2;
 const GOAL_WIDTH = 0.28;
 
-// ── Identical to bot mode (AirHockeyEngine.ts) — both run at 60fps ──
-const MAX_PUCK_SPEED = 0.06;    // bot: PUCK_MAX_SPEED = 0.06
-const FRICTION = 0.997;          // bot: PUCK_FRICTION = 0.997
-const WALL_RESTITUTION = 0.85;   // bot: WALL_RESTITUTION = 0.85
-const PADDLE_RESTITUTION = 0.85; // bot: implicit in collision reflect
-const PADDLE_TRANSFER = 1.4;     // bot: PADDLE_INFLUENCE = 1.4
-const MIN_HIT_SPEED = 0.0003;    // bot: PUCK_MIN_SPEED = 0.0003
+const MAX_PUCK_SPEED = 0.06;
+const FRICTION = 0.997;
+const WALL_RESTITUTION = 0.85;
+const PADDLE_RESTITUTION = 0.85;
+// Paddle velocity is now a raw position delta (~0.01 per update), not
+// velocity per second. Transfer is scaled up to compensate.
+const PADDLE_TRANSFER = 3.0;
+const MAX_PADDLE_DELTA = 0.04; // clamp paddle velocity delta
 
 const TICK_MS = 1000 / 60;     // 60fps — matches bot mode for reliable collision
 const GOAL_PAUSE_FRAMES = 60;  // 1s at 60fps
@@ -37,8 +38,8 @@ export interface PuckState {
 export interface PaddleState {
   x: number; y: number; r: number;
   prevX?: number; prevY?: number;
-  // Client-sent velocity (clamped)
-  clientVx?: number; clientVy?: number;
+  // Server-computed position delta (smoothed over 2 updates)
+  deltaVx?: number; deltaVy?: number;
 }
 
 export interface ServerGameState {
@@ -147,9 +148,9 @@ function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
     puck.x += nx * (minDist - dist);
     puck.y += ny * (minDist - dist);
 
-    // Paddle velocity — prefer client-sent, fallback to server delta
-    const pvx = paddle.clientVx ?? ((paddle.prevX !== undefined) ? (paddle.x - paddle.prevX) : 0);
-    const pvy = paddle.clientVy ?? ((paddle.prevY !== undefined) ? (paddle.y - paddle.prevY) : 0);
+    // Server-computed paddle velocity (position delta, clamped)
+    const pvx = paddle.deltaVx ?? 0;
+    const pvy = paddle.deltaVy ?? 0;
 
     // Relative velocity along collision normal
     const relVN = (puck.vx - pvx) * nx + (puck.vy - pvy) * ny;
@@ -159,11 +160,11 @@ function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
     puck.vx += -(1 + PADDLE_RESTITUTION) * relVN * nx;
     puck.vy += -(1 + PADDLE_RESTITUTION) * relVN * ny;
 
-    // Paddle transfer
+    // Paddle transfer (pvx/pvy are raw deltas ~0.01, scale up)
     puck.vx += pvx * PADDLE_TRANSFER;
     puck.vy += pvy * PADDLE_TRANSFER;
 
-    // Clamp speed
+    // Clamp speed — runs AFTER paddle transfer
     const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
     if (speed > MAX_PUCK_SPEED) {
       const s = MAX_PUCK_SPEED / speed;
@@ -171,13 +172,8 @@ function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
       puck.vy *= s;
     }
 
-    // Min speed
-    const ns = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
-    if (ns > 0 && ns < MIN_HIT_SPEED) {
-      const s = MIN_HIT_SPEED / ns;
-      puck.vx *= s;
-      puck.vy *= s;
-    }
+    // No MIN_HIT_SPEED boost — let puck move naturally at whatever
+    // speed results. Prevents jitter from forced speed-ups.
 
     return true;
   };
@@ -279,9 +275,19 @@ function tick(
   state.puck.vx *= FRICTION;
   state.puck.vy *= FRICTION;
 
-  if (Math.sqrt(state.puck.vx ** 2 + state.puck.vy ** 2) < 0.0003) {
-    state.puck.vx = 0;
-    state.puck.vy = 0;
+  // Stuck-puck rescue: if nearly stopped mid-field, give a tiny nudge
+  // so it never freezes. If completely stopped away from center, unstick.
+  const pspeed = Math.sqrt(state.puck.vx ** 2 + state.puck.vy ** 2);
+  if (pspeed > 0 && pspeed < 0.002) {
+    const s = 0.002 / pspeed;
+    state.puck.vx *= s;
+    state.puck.vy *= s;
+  } else if (pspeed === 0) {
+    const atCenter = Math.abs(state.puck.x - FIELD_W / 2) < 0.05 && Math.abs(state.puck.y - FIELD_H / 2) < 0.05;
+    if (!atCenter) {
+      state.puck.vx = (Math.random() - 0.5) * 0.003;
+      state.puck.vy = 0.004;
+    }
   }
 
   state.puck.x += state.puck.vx;
@@ -343,27 +349,31 @@ export function updatePaddle(
   roomId: string,
   side: "bottom" | "top",
   x: number,
-  y: number,
-  vx?: number,
-  vy?: number
+  y: number
 ): void {
   const game = activeGames.get(roomId);
   if (!game) return;
   const paddle = game.state.paddles[side];
 
-  paddle.prevX = paddle.x;
-  paddle.prevY = paddle.y;
-
-  paddle.x = clamp(x, PADDLE_RADIUS, FIELD_W - PADDLE_RADIUS);
-  paddle.y = side === "bottom"
+  const newX = clamp(x, PADDLE_RADIUS, FIELD_W - PADDLE_RADIUS);
+  const newY = side === "bottom"
     ? clamp(y, CENTER_LINE + PADDLE_RADIUS, FIELD_H - PADDLE_RADIUS)
     : clamp(y, PADDLE_RADIUS, CENTER_LINE - PADDLE_RADIUS);
 
-  // Use client-sent velocity if provided (clamped for anti-cheat)
-  if (vx !== undefined && vy !== undefined) {
-    paddle.clientVx = clamp(vx, -MAX_PADDLE_VEL, MAX_PADDLE_VEL);
-    paddle.clientVy = clamp(vy, -MAX_PADDLE_VEL, MAX_PADDLE_VEL);
-  }
+  // Server-side velocity: average of current + previous delta for smoothing.
+  // Uses raw position delta (not time-based) to avoid network timing issues.
+  const prevDx = paddle.prevX !== undefined ? paddle.x - paddle.prevX : 0;
+  const prevDy = paddle.prevY !== undefined ? paddle.y - paddle.prevY : 0;
+  const curDx = newX - paddle.x;
+  const curDy = newY - paddle.y;
+
+  paddle.deltaVx = clamp((curDx + prevDx) * 0.5, -MAX_PADDLE_DELTA, MAX_PADDLE_DELTA);
+  paddle.deltaVy = clamp((curDy + prevDy) * 0.5, -MAX_PADDLE_DELTA, MAX_PADDLE_DELTA);
+
+  paddle.prevX = paddle.x;
+  paddle.prevY = paddle.y;
+  paddle.x = newX;
+  paddle.y = newY;
 }
 
 export function setRobotPlayer(roomId: string, side: "bottom" | "top"): void {

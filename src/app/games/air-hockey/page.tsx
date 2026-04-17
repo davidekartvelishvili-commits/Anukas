@@ -165,9 +165,8 @@ export default function AirHockeyPage() {
 
   // ── Single player: Player input ─────────────────────────────────────────────
 
-  // Track paddle velocity on the client for accurate collision on server
+  // Throttle paddle sends to ~30/sec
   const lastPaddleSendRef = useRef(0);
-  const prevPaddleRef = useRef({ x: 0.5, y: 1.2, t: performance.now() });
 
   const handlePlayerMove = useCallback((x: number, y: number) => {
     if (multiplayer) {
@@ -179,21 +178,14 @@ export default function AirHockeyPage() {
 
       // Convert to engine coords for the server
       const isTop = mpConfig?.yourSide === "top";
-      const engineX = x;
       const engineY = isTop ? MP_FIELD_H - y : y;
 
-      // Send with client-computed velocity (throttled to ~30/sec)
+      // Send position only — server computes velocity from deltas
       const now = performance.now();
       if (now - lastPaddleSendRef.current > 33) {
-        const prev = prevPaddleRef.current;
-        const dt = Math.max((now - prev.t) / 1000, 0.001);
-        const vx = (engineX - prev.x) / dt;
-        const vy = (engineY - prev.y) / dt;
-        prevPaddleRef.current = { x: engineX, y: engineY, t: now };
         lastPaddleSendRef.current = now;
-
         import("@/services/socket").then(({ getSocket }) => {
-          getSocket().emit("paddleMove", { x: engineX, y: engineY, vx, vy });
+          getSocket().emit("paddleMove", { x, y: engineY });
         });
       }
       return;
