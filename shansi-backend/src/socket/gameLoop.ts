@@ -5,7 +5,7 @@ import type { Server as IOServer } from "socket.io";
 const FIELD_W = 1.0;
 const FIELD_H = 1.5;
 const PUCK_RADIUS = 0.04;
-const PADDLE_RADIUS = 0.075;
+const PADDLE_RADIUS = 0.085;
 const CENTER_LINE = FIELD_H / 2;
 const GOAL_WIDTH = 0.28;
 
@@ -183,7 +183,7 @@ function handlePaddleCollision(puck: PuckState, paddle: PaddleState): void {
   const prevY = paddle.prevY ?? paddle.y;
   const sweepDist = Math.sqrt((paddle.x - prevX) ** 2 + (paddle.y - prevY) ** 2);
 
-  if (sweepDist > 0.015) {
+  if (sweepDist > 0.005) {
     const mx = (prevX + paddle.x) / 2;
     const my = (prevY + paddle.y) / 2;
     checkAndResolveAt(puck, paddle, mx, my);
