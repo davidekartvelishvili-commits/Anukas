@@ -172,12 +172,33 @@ function handleDisconnect(socket: Socket, io: IOServer): void {
     const player = room.players.find((p) => p.socketId === socket.id);
     if (player) player.disconnectedAt = Date.now();
 
-    // 5-second warning
+    // Check if BOTH players are now disconnected — if so, end the game
+    // immediately instead of waiting for robot timers.
+    const allDisconnected = room.players.every((p) => p.disconnectedAt !== null);
+    if (allDisconnected) {
+      // Cancel any pending timers for the other player
+      for (const p of room.players) {
+        const timers = disconnectTimers.get(p.socketId);
+        if (timers) {
+          clearTimeout(timers.warningTimer);
+          clearTimeout(timers.robotTimer);
+          disconnectTimers.delete(p.socketId);
+        }
+        userToRoom.delete(p.userId);
+      }
+      stopGameLoop(room.id);
+      room.status = "finished";
+      // Delete the room after a short delay
+      setTimeout(() => deleteRoom(room.id), 5000);
+      socketToUser.delete(socket.id);
+      return;
+    }
+
+    // Only one player disconnected — start the warning → robot flow
     const warningTimer = setTimeout(() => {
       io.to(room.id).emit("playerDisconnecting", { side, timeLeft: 10 });
     }, 5000);
 
-    // 15-second robot takeover
     const robotTimer = setTimeout(() => {
       setRobotPlayer(room.id, side);
       if (player) player.isRobot = true;
@@ -185,6 +206,11 @@ function handleDisconnect(socket: Socket, io: IOServer): void {
     }, 15000);
 
     disconnectTimers.set(socket.id, { warningTimer, robotTimer });
+  }
+
+  // Also handle finished rooms — clean up user mapping
+  if (room.status === "finished") {
+    userToRoom.delete(userData.userId);
   }
 
   socketToUser.delete(socket.id);

@@ -46,6 +46,11 @@ export default function AirHockeyPage() {
   const engineRef = useRef<typeof import("@/components/air-hockey/AirHockeyEngine") | null>(null);
   const gameLoopRef = useRef<number>(0);
   const stateRef = useRef<GameState | null>(null);
+  // For multiplayer: store latest server state in a ref so the canvas
+  // rAF loop can read it without triggering React re-renders 30×/sec.
+  // Only update React state for the score display (much less frequent).
+  const mpStateRef = useRef<GameState | null>(null);
+  const lastScoreRef = useRef("");
 
   // Multiplayer state
   const [mpConfig, setMpConfig] = useState<MultiplayerState | null>(null);
@@ -235,6 +240,9 @@ export default function AirHockeyPage() {
           _goalPauseFrames: serverState.goalPauseFrames || 0,
           _lastScoredOn: null,
         };
+        // Server now ticks at 30fps (not 60) so this is 30 setState/sec
+        // which is manageable. The canvas rAF loop interpolates visually.
+        mpStateRef.current = transformed;
         setGameState(transformed);
       });
 

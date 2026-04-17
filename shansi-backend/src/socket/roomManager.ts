@@ -135,8 +135,27 @@ export function removePlayer(socketId: string): void {
 export function cleanupFinished(): void {
   const now = Date.now();
   for (const [id, room] of rooms) {
+    let shouldDelete = false;
+
+    // Finished rooms older than 30 seconds
     if (room.status === "finished" && now - room.createdAt > 30_000) {
-      // Remove user→room mappings
+      shouldDelete = true;
+    }
+
+    // Abandoned rooms: both players disconnected for > 30 seconds
+    if (room.status === "playing" && room.players.length >= 2) {
+      const allGone = room.players.every(
+        (p) => p.disconnectedAt !== null && now - p.disconnectedAt > 30_000
+      );
+      if (allGone) shouldDelete = true;
+    }
+
+    // Waiting rooms older than 5 minutes (nobody joined)
+    if (room.status === "waiting" && now - room.createdAt > 5 * 60_000) {
+      shouldDelete = true;
+    }
+
+    if (shouldDelete) {
       for (const p of room.players) {
         if (userToRoom.get(p.userId) === id) {
           userToRoom.delete(p.userId);

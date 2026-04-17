@@ -11,7 +11,10 @@ const PUCK_MAX_SPEED = 0.06;
 const WALL_RESTITUTION = 0.85;
 const PADDLE_INFLUENCE = 1.4;
 const GOAL_WIDTH = 0.22;
-const TICK_MS = 1000 / 60;
+// 30fps server tick — 60fps was flooding mobile sockets with 60 state
+// messages/sec causing severe stutter. 30fps is smooth enough; the
+// client interpolates visually between received states.
+const TICK_MS = 1000 / 30;
 
 // Robot AI (medium difficulty)
 const ROBOT_REACTION_SPEED = 0.04;
