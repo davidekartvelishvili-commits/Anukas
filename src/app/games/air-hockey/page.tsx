@@ -27,7 +27,6 @@ export default function AirHockeyPage() {
   const engineRef = useRef<typeof import("@/components/air-hockey/AirHockeyEngine") | null>(null);
   const gameLoopRef = useRef<number>(0);
   const stateRef = useRef<GameState | null>(null);
-  const goalPauseRef = useRef(false);
 
   // Measure available space for the canvas
   useEffect(() => {
@@ -54,7 +53,6 @@ export default function AirHockeyPage() {
     stateRef.current = initial;
     setGameState(initial);
     setPhase("playing");
-    goalPauseRef.current = false;
   }, [goalTarget, difficulty]);
 
   // Game loop
@@ -69,20 +67,10 @@ export default function AirHockeyPage() {
 
       let s = stateRef.current;
 
-      if (s.status === "playing" && !goalPauseRef.current) {
-        s = engineRef.current.updateGame(s, dt);
-      }
-
-      if (s.status === "goal" && !goalPauseRef.current) {
-        goalPauseRef.current = true;
-        setTimeout(() => {
-          if (!engineRef.current || !stateRef.current) return;
-          const reset = engineRef.current.resetAfterGoal(stateRef.current);
-          stateRef.current = reset;
-          setGameState(reset);
-          goalPauseRef.current = false;
-        }, 1200);
-      }
+      // Engine handles goal-pause internally (_goalPauseFrames counts
+      // down 60 frames then auto-resets). All we do is call updateGame
+      // every frame — it returns unchanged state during the pause.
+      s = engineRef.current.updateGame(s, dt);
 
       if (s.status === "finished") {
         stateRef.current = s;

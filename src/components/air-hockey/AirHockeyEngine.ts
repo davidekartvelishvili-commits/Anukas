@@ -372,8 +372,8 @@ function updateRobot(state: GameState): Paddle {
     // Apply jitter (sloppiness)
     targetX += (robotRandom() - 0.5) * config.jitter;
 
-    // Intentional miss
-    if (robotRandom() < config.missRate * 0.05) {
+    // Intentional miss — probability scales with difficulty
+    if (robotRandom() < config.missRate) {
       // Offset target to miss
       targetX += (robotRandom() > 0.5 ? 1 : -1) * GOAL_WIDTH * 0.4;
     }
