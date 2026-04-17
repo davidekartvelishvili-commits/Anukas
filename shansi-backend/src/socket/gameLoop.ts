@@ -9,14 +9,12 @@ const PADDLE_RADIUS = 0.065;
 const CENTER_LINE = FIELD_H / 2;
 const GOAL_WIDTH = 0.28;
 
-const MAX_PUCK_SPEED = 0.06;
+const MAX_PUCK_SPEED = 0.04;
 const FRICTION = 0.997;
 const WALL_RESTITUTION = 0.85;
 const PADDLE_RESTITUTION = 0.85;
-// Paddle velocity is now a raw position delta (~0.01 per update), not
-// velocity per second. Transfer is scaled up to compensate.
-const PADDLE_TRANSFER = 0.5;
-const MAX_PADDLE_DELTA = 0.015;
+const PADDLE_TRANSFER = 0.3;
+const MAX_PADDLE_DELTA = 0.012;
 
 const TICK_MS = 1000 / 60;     // 60fps — matches bot mode for reliable collision
 const GOAL_PAUSE_FRAMES = 60;  // 1s at 60fps
@@ -33,6 +31,7 @@ const MAX_PADDLE_VEL = 0.5;    // clamp client-sent paddle velocity
 
 export interface PuckState {
   x: number; y: number; vx: number; vy: number; r: number;
+  lastCollisionTick?: number; // collision cooldown — skip if < 3 ticks ago
 }
 
 export interface PaddleState {
@@ -130,12 +129,15 @@ function checkGoal(puck: PuckState): "bottom" | "top" | null {
   return null;
 }
 
-// ── Paddle-puck collision with swept check ──
+// ── Paddle-puck collision with 3-point swept check + cooldown ──
 
-function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
+function resolvePaddleCollision(puck: PuckState, paddle: PaddleState, currentTick: number): void {
   const minDist = puck.r + paddle.r;
 
-  // Helper: try resolving collision at a specific paddle position
+  // Collision cooldown — prevent double-bounce / sticking within 3 ticks
+  if (puck.lastCollisionTick !== undefined && currentTick - puck.lastCollisionTick < 3) return;
+
+  // Helper: try resolving collision at a specific position
   const tryResolve = (px: number, py: number): boolean => {
     const dx = puck.x - px;
     const dy = puck.y - py;
@@ -148,23 +150,18 @@ function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
     puck.x += nx * (minDist - dist);
     puck.y += ny * (minDist - dist);
 
-    // Server-computed paddle velocity (position delta, clamped)
     const pvx = paddle.deltaVx ?? 0;
     const pvy = paddle.deltaVy ?? 0;
 
-    // Relative velocity along collision normal
     const relVN = (puck.vx - pvx) * nx + (puck.vy - pvy) * ny;
-    if (relVN >= 0) return true; // already moving apart
+    if (relVN >= 0) return true;
 
-    // Impulse
     puck.vx += -(1 + PADDLE_RESTITUTION) * relVN * nx;
     puck.vy += -(1 + PADDLE_RESTITUTION) * relVN * ny;
 
-    // Paddle transfer (pvx/pvy are raw deltas ~0.01, scale up)
     puck.vx += pvx * PADDLE_TRANSFER;
     puck.vy += pvy * PADDLE_TRANSFER;
 
-    // Clamp speed — runs AFTER paddle transfer
     const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
     if (speed > MAX_PUCK_SPEED) {
       const s = MAX_PUCK_SPEED / speed;
@@ -172,24 +169,24 @@ function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
       puck.vy *= s;
     }
 
-    // No MIN_HIT_SPEED boost — let puck move naturally at whatever
-    // speed results. Prevents jitter from forced speed-ups.
-
+    puck.lastCollisionTick = currentTick;
     return true;
   };
 
   // 1. Check current position
   if (tryResolve(paddle.x, paddle.y)) return;
 
-  // 2. Swept check — midpoint between prev and current paddle position
+  // 2. Swept check — 3 interpolated points along paddle path this tick
   if (paddle.prevX !== undefined && paddle.prevY !== undefined) {
-    const sweepDist = Math.sqrt(
-      (paddle.x - paddle.prevX) ** 2 + (paddle.y - paddle.prevY) ** 2
-    );
-    if (sweepDist > 0.005) {
-      const midX = (paddle.x + paddle.prevX) / 2;
-      const midY = (paddle.y + paddle.prevY) / 2;
-      tryResolve(midX, midY);
+    const prevX = paddle.prevX;
+    const prevY = paddle.prevY;
+    const sweepDist = Math.sqrt((paddle.x - prevX) ** 2 + (paddle.y - prevY) ** 2);
+    if (sweepDist > 0.008) {
+      for (const t of [0.25, 0.5, 0.75]) {
+        const checkX = prevX + (paddle.x - prevX) * t;
+        const checkY = prevY + (paddle.y - prevY) * t;
+        if (tryResolve(checkX, checkY)) break; // only resolve once
+      }
     }
   }
 }
@@ -294,8 +291,8 @@ function tick(
   state.puck.y += state.puck.vy;
 
   resolveWallBounce(state.puck);
-  resolvePaddleCollision(state.puck, state.paddles.bottom);
-  resolvePaddleCollision(state.puck, state.paddles.top);
+  resolvePaddleCollision(state.puck, state.paddles.bottom, game.tickCount);
+  resolvePaddleCollision(state.puck, state.paddles.top, game.tickCount);
 
   // Goals
   const goalScoredOn = checkGoal(state.puck);
