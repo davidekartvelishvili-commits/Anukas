@@ -52,8 +52,13 @@ export default function LobbyScreen({ onGameStart }: LobbyScreenProps) {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
 
-  // Listen for socket events
+  // Ensure socket is connected + listen for events
   useEffect(() => {
+    // Connect if not already (e.g., first time entering lobby)
+    import("@/services/socket").then(({ connectSocket }) => {
+      const token = typeof window !== "undefined" ? localStorage.getItem("shansi_token") || "" : "";
+      connectSocket(token);
+    });
     const socket = getSocket();
 
     const handleRoomList = (list: RoomInfo[]) => {

@@ -43,8 +43,11 @@ function generatePin(): string {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
+const ROOM_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // uppercase only, no confusing I/O
 function generateRoomId(): string {
-  return nanoid(6);
+  let id = "";
+  for (let i = 0; i < 6; i++) id += ROOM_CHARS[Math.floor(Math.random() * ROOM_CHARS.length)];
+  return id;
 }
 
 // ── Room operations ──

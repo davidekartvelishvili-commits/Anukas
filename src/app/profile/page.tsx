@@ -56,7 +56,7 @@ export default function ProfilePage() {
     // Load cached data first for instant render
     const stored = getStoredUser() as any;
     if (stored) {
-      setUsername(stored.name || "");
+      setUsername(stored.name || stored.stageName || "");
       setUserPhone(stored.phone || "");
       if (stored.referralCode) setReferralCode(stored.referralCode);
       if (stored.coinBalance !== undefined) setCoinBalanceState(stored.coinBalance);
@@ -66,7 +66,7 @@ export default function ProfilePage() {
     getMe().then((data: any) => {
       if (data.success && data.user) {
         const u = data.user;
-        setUsername(u.name || "");
+        setUsername(u.name || u.stageName || "");
         setUserPhone(u.phone || "");
         setCoinBalanceState(u.coinBalance || 0);
         setCashBalanceState(u.balance || 0);
