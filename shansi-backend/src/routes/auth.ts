@@ -269,7 +269,8 @@ auth.post("/verify-otp", async (c) => {
     user: {
       id: user.id,
       phone: user.phone,
-      name: user.name,\n      stageName: (user as any).stageName || null,
+      name: user.name,
+      stageName: (user as any).stageName || null,
       balance: user.balance,
       coinBalance,
       referralCode: user.referralCode,
@@ -383,7 +384,8 @@ auth.post("/pin/login", async (c) => {
     user: {
       id: user.id,
       phone: user.phone,
-      name: user.name,\n      stageName: (user as any).stageName || null,
+      name: user.name,
+      stageName: (user as any).stageName || null,
       balance: user.balance,
       coinBalance,
       referralCode: userReferralCode,
@@ -438,7 +440,8 @@ auth.post("/biometric/verify", authMiddleware, async (c) => {
     user: {
       id: user.id,
       phone: user.phone,
-      name: user.name,\n      stageName: (user as any).stageName || null,
+      name: user.name,
+      stageName: (user as any).stageName || null,
       balance: user.balance,
       coinBalance,
       referralCode: user.referralCode,
@@ -470,7 +473,7 @@ auth.get("/me", authMiddleware, async (c) => {
     user: {
       id: user.id,
       phone: user.phone,
-      name: user.name,\n      stageName: (user as any).stageName || null,
+      name: user.name,
       stageName,
       balance: user.balance,
       coinBalance,
