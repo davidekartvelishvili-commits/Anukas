@@ -14,6 +14,7 @@ const ALL_GAMES = [
   { id: "coverd-21", gameType: null, name: "Coverd 21", gradient: "linear-gradient(135deg, #B45309, #D97706)", media: "/images/onboarding/coverd21.mp4", type: "video" as const },
   { id: "chicken-rush", gameType: "chicken_rush", name: "Lucky Step", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)", media: "/images/lucky-step-cover.png", type: "image" as const },
   { id: "lucky-drop", gameType: "plinko", name: "Lucky Drop", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)", media: "/images/lucky-drop-cover.png", type: "image" as const },
+  { id: "air-hockey", gameType: null, name: "Air Hockey", gradient: "linear-gradient(135deg, #0A0F1C, #1C2539)", media: "", type: "gradient" as const },
   { id: "wonder-wheel", name: "Wonder Wheel", gradient: "linear-gradient(135deg, #7C3AED, #A855F7)", media: "", type: "gradient" as const },
   { id: "suns-n-moons", name: "Suns N Moons", gradient: "linear-gradient(135deg, #6B7280, #9CA3AF)", media: "", type: "gradient" as const },
   { id: "cctv-game", name: "CCTV Game", gradient: "linear-gradient(135deg, #1E40AF, #3B82F6)", media: "", type: "gradient" as const },
@@ -25,8 +26,8 @@ const ALL_GAMES = [
   { id: "treasure-hunt", name: "Treasure Hunt", gradient: "linear-gradient(135deg, #0E7490, #06B6D4)", media: "", type: "gradient" as const },
 ];
 
-const NEWLY_ADDED = ["lucky-drop", "chicken-rush"];
-const FAN_FAVORITES = ["midnight-machine", "lucky-drop", "chicken-rush"];
+const NEWLY_ADDED = ["air-hockey", "lucky-drop", "chicken-rush"];
+const FAN_FAVORITES = ["midnight-machine", "lucky-drop", "chicken-rush", "air-hockey"];
 const COVERD_FAVORITES = ["midnight-machine"];
 
 function getGame(id: string) {
@@ -186,6 +187,7 @@ export default function GamesPage() {
     setPlayedGames(getPlayedGames());
     if (id === "midnight-machine") router.push("/games/midnight-machine");
     if (id === "lucky-drop") router.push("/games/lucky-drop");
+    if (id === "air-hockey") router.push("/games/air-hockey");
     if (id === "chicken-rush") router.push("/games/chicken-rush");
   };
 
