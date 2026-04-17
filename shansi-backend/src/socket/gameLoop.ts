@@ -288,21 +288,24 @@ function tick(
   state.puck.vx *= FRICTION;
   state.puck.vy *= FRICTION;
 
-  // Maintain minimum drift speed if puck is still moving (prevents
-  // invisible micro-drift). No random nudge — puck is allowed to stop.
+  // Stop puck if nearly zero (matches bot mode PUCK_MIN_SPEED cutoff)
   const pspeed = Math.sqrt(state.puck.vx ** 2 + state.puck.vy ** 2);
-  if (pspeed > 0 && pspeed < 0.002) {
-    const s = 0.002 / pspeed;
-    state.puck.vx *= s;
-    state.puck.vy *= s;
+  if (pspeed < 0.0003) {
+    state.puck.vx = 0;
+    state.puck.vy = 0;
   }
 
   state.puck.x += state.puck.vx;
   state.puck.y += state.puck.vy;
 
   resolveWallBounce(state.puck);
-  resolvePaddleCollision(state.puck, state.paddles.bottom);
-  resolvePaddleCollision(state.puck, state.paddles.top);
+  // Only check collision with a paddle if puck is on that paddle's half
+  if (state.puck.y >= CENTER_LINE - PUCK_RADIUS) {
+    resolvePaddleCollision(state.puck, state.paddles.bottom);
+  }
+  if (state.puck.y <= CENTER_LINE + PUCK_RADIUS) {
+    resolvePaddleCollision(state.puck, state.paddles.top);
+  }
 
   // Goals
   const goalScoredOn = checkGoal(state.puck);
