@@ -15,8 +15,8 @@ const WALL_RESTITUTION = 0.85;
 const PADDLE_RESTITUTION = 0.85;
 // Paddle velocity is now a raw position delta (~0.01 per update), not
 // velocity per second. Transfer is scaled up to compensate.
-const PADDLE_TRANSFER = 3.0;
-const MAX_PADDLE_DELTA = 0.04; // clamp paddle velocity delta
+const PADDLE_TRANSFER = 0.8;
+const MAX_PADDLE_DELTA = 0.02;
 
 const TICK_MS = 1000 / 60;     // 60fps — matches bot mode for reliable collision
 const GOAL_PAUSE_FRAMES = 60;  // 1s at 60fps
