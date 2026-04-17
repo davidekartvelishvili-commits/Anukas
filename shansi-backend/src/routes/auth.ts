@@ -8,6 +8,7 @@ import { users, sessions, otpRateLimits, transactions, referrals, referralConfig
 import { sendOtp, verifyOtp } from "../services/otp.js";
 import { signToken } from "../services/token.js";
 import { hashPin, verifyPin } from "../services/pin.js";
+import { randomStageName } from "../utils/stageNames.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { BadRequestError, RateLimitError, UnauthorizedError } from "../utils/errors.js";
 
@@ -160,7 +161,8 @@ auth.post("/verify-otp", async (c) => {
       phone,
       balance: 0,
       referralCode: newReferralCode,
-    });
+      stageName: randomStageName(),
+    } as any);
     [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
     // Handle referral if code provided

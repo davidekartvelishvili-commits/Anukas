@@ -5,6 +5,7 @@ export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   phone: text("phone").unique().notNull(),
   name: text("name"),
+  stageName: text("stage_name"), // auto-assigned display name (e.g. "Blaze Shadow")
   pinHash: text("pin_hash"),
   balance: real("balance").default(0).notNull(),
   isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),

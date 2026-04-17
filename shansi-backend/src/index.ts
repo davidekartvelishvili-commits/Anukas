@@ -51,6 +51,7 @@ async function runStartupMigrations() {
     sql`ALTER TABLE referral_config ADD COLUMN share_message_template TEXT`,
     sql`ALTER TABLE referral_config ADD COLUMN share_image_url TEXT`,
     sql`ALTER TABLE tickets ADD COLUMN logo_url TEXT`,
+    sql`ALTER TABLE users ADD COLUMN stage_name TEXT`,
     sql`ALTER TABLE tickets ADD COLUMN merchant_id TEXT`,
     sql`ALTER TABLE user_village_profile ADD COLUMN balls_dropped INTEGER NOT NULL DEFAULT 0`,
     sql`CREATE TABLE IF NOT EXISTS user_tickets (
@@ -320,6 +321,23 @@ async function runStartupMigrations() {
     }
   } catch (e: any) {
     console.error("[startup seed]", e.message);
+  }
+
+  // Backfill stage names for existing users who don't have one and
+  // haven't set a custom username. Runs on every startup but is
+  // idempotent — only touches rows where stage_name IS NULL.
+  try {
+    const { randomStageName } = await import("./utils/stageNames.js");
+    const missing = await (db as any).all(sql`SELECT id FROM users WHERE stage_name IS NULL`);
+    const rows = missing?.rows || missing || [];
+    for (const row of rows) {
+      const uid = row.id || (row as any)[0];
+      if (!uid) continue;
+      await (db as any).run(sql`UPDATE users SET stage_name = ${randomStageName()} WHERE id = ${uid} AND stage_name IS NULL`);
+    }
+    if (rows.length) console.log(`[startup] backfilled stage names for ${rows.length} users`);
+  } catch (e: any) {
+    console.error("[startup stage-name backfill]", e.message);
   }
 
   console.log("[startup] migrations applied");

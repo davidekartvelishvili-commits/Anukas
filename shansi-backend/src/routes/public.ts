@@ -95,11 +95,12 @@ publicRoute.get("/recent-wins", async (c) => {
     .limit(5);
 
   const wins = await Promise.all(rows.map(async (r) => {
-    const [u] = await db.select({ name: users.name, phone: users.phone })
+    const [u] = await db.select({ name: users.name, phone: users.phone, stageName: users.stageName })
       .from(users).where(eq(users.id, r.userId)).limit(1);
-    const rawName = u?.name?.trim() || (u?.phone ? `****${u.phone.slice(-4)}` : "User");
-    // Display name — first name only, or phone last 4 digits
-    const displayName = rawName.split(" ")[0] || rawName;
+    // Priority: stageName > custom name > phone last 4
+    const displayName = (u as any)?.stageName
+      || u?.name?.trim()
+      || (u?.phone ? `****${u.phone.slice(-4)}` : "User");
 
     // Convert cash win to coin equivalent
     const coinAmount = Math.round(r.winAmount * COINS_PER_LARI);

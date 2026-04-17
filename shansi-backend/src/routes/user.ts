@@ -35,6 +35,7 @@ user.get("/profile", async (c) => {
       id: u.id,
       phone: u.phone,
       name: u.name,
+      stageName: (u as any).stageName || null,
       balance: u.balance,
       coinBalance: profileCoinBalance,
       hasPin: !!u.pinHash,
