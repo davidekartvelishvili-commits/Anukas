@@ -169,26 +169,34 @@ export default function AirHockeyPage() {
 
   const handlePlayerMove = useCallback((x: number, y: number) => {
     if (multiplayer) {
-      // LOCAL PREDICTION: update the player paddle position in the
-      // ref INSTANTLY so the canvas draws it without waiting for the
-      // server roundtrip. The server state will reconcile on next tick.
+      // LOCAL PREDICTION: store position in SCREEN space so the canvas
+      // draws the paddle exactly where the finger is. No flip needed —
+      // the canvas renders player.y directly as a screen coordinate.
       const cur = mpStateRef.current;
       if (cur) {
         mpStateRef.current = { ...cur, player: { ...cur.player, x, y } };
       }
-      // Send to server (throttled)
+
+      // For the SERVER: convert to engine coords. If this player is
+      // "top" side, their screen-space bottom (y ≈ 1.3) maps to engine
+      // top-half (FIELD_H - 1.3 ≈ 0.3). The server's updatePaddle
+      // will clamp to the correct half regardless, but sending the
+      // right value reduces jitter.
+      const isTop = mpConfig?.yourSide === "top";
+      const engineY = isTop ? FIELD_H - y : y;
+
       const now = performance.now();
-      if (now - lastPaddleSendRef.current > 33) { // ~30 sends/sec max
+      if (now - lastPaddleSendRef.current > 33) {
         lastPaddleSendRef.current = now;
         import("@/services/socket").then(({ getSocket }) => {
-          getSocket().emit("paddleMove", { x, y });
+          getSocket().emit("paddleMove", { x, y: engineY });
         });
       }
       return;
     }
     if (!engineRef.current || !stateRef.current) return;
     stateRef.current = engineRef.current.movePlayer(stateRef.current, x, y);
-  }, [multiplayer]);
+  }, [multiplayer, mpConfig]);
 
   // ── Multiplayer: handle lobby → game start ──────────────────────────────────
 
@@ -225,32 +233,31 @@ export default function AirHockeyPage() {
         const yourSide = config.yourSide;
         const isBottom = yourSide === "bottom";
         const px = d.p[0], py = d.p[1], pvx = d.p[2], pvy = d.p[3];
-        const bx = d.b[0], by = d.b[1];
-        const tx = d.t[0], ty = d.t[1];
 
-        // Player's own paddle: keep LOCAL prediction position instead
-        // of overwriting with the server's (laggy) version. Only use
-        // server position for the OPPONENT's paddle.
-        const localPaddle = mpStateRef.current?.player;
-        const myX = localPaddle?.x ?? (isBottom ? bx : tx);
-        const myY = localPaddle?.y ?? (isBottom ? by : ty);
-        const theirX = isBottom ? tx : bx;
-        const theirY = isBottom ? ty : by;
+        // Server sends engine coords: bottom paddle in bottom half,
+        // top paddle in top half. For the TOP player's view, we flip
+        // ONLY the puck and opponent — the local paddle is kept as-is
+        // because it was captured in screen-space by touch.
+
+        // Opponent's paddle (from server)
+        const oppX = isBottom ? d.t[0] : d.b[0];
+        const oppEngineY = isBottom ? d.t[1] : d.b[1];
+        // Flip opponent Y for top-side view so they appear at the top
+        const oppY = isBottom ? oppEngineY : FIELD_H - oppEngineY;
+
+        // Player's paddle: prefer LOCAL prediction (instant feel).
+        // Falls back to server position if local isn't available yet.
+        const local = mpStateRef.current?.player;
+        const myX = local?.x ?? (isBottom ? d.b[0] : d.t[0]);
+        // Local Y is already in SCREEN space — do NOT flip it.
+        const myY = local?.y ?? (isBottom ? d.b[1] : FIELD_H - d.t[1]);
 
         const transformed: GameState = {
           puck: isBottom
             ? { x: px, y: py, vx: pvx, vy: pvy, r: 0.025 }
             : { x: px, y: FIELD_H - py, vx: pvx, vy: -pvy, r: 0.025 },
-          player: {
-            x: myX,
-            y: isBottom ? myY : FIELD_H - myY,
-            r: 0.045,
-          },
-          opponent: {
-            x: theirX,
-            y: isBottom ? theirY : FIELD_H - theirY,
-            r: 0.045,
-          },
+          player: { x: myX, y: myY, r: 0.045 },
+          opponent: { x: oppX, y: oppY, r: 0.045 },
           score: {
             player: isBottom ? (d.s[0] ?? 0) : (d.s[1] ?? 0),
             opponent: isBottom ? (d.s[1] ?? 0) : (d.s[0] ?? 0),
