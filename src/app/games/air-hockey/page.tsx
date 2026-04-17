@@ -7,6 +7,7 @@ import AuthGuard from "@/components/AuthGuard";
 import type { GameState } from "@/components/air-hockey/AirHockeyEngine";
 import type { MultiplayerGameConfig } from "@/components/air-hockey/LobbyScreen";
 import { FIELD_W, FIELD_H } from "@/components/air-hockey/AirHockeyEngine";
+import { FIELD_H as MP_FIELD_H } from "@/shared/gameConstants";
 
 type Difficulty = "easy" | "medium" | "hard";
 type GoalTarget = 5 | 10 | 15 | 20;
@@ -183,7 +184,7 @@ export default function AirHockeyPage() {
       // will clamp to the correct half regardless, but sending the
       // right value reduces jitter.
       const isTop = mpConfig?.yourSide === "top";
-      const engineY = isTop ? FIELD_H - y : y;
+      const engineY = isTop ? MP_FIELD_H - y : y;
 
       const now = performance.now();
       if (now - lastPaddleSendRef.current > 33) {
@@ -243,21 +244,21 @@ export default function AirHockeyPage() {
         const oppX = isBottom ? d.t[0] : d.b[0];
         const oppEngineY = isBottom ? d.t[1] : d.b[1];
         // Flip opponent Y for top-side view so they appear at the top
-        const oppY = isBottom ? oppEngineY : FIELD_H - oppEngineY;
+        const oppY = isBottom ? oppEngineY : MP_FIELD_H - oppEngineY;
 
         // Player's paddle: prefer LOCAL prediction (instant feel).
         // Falls back to server position if local isn't available yet.
         const local = mpStateRef.current?.player;
         const myX = local?.x ?? (isBottom ? d.b[0] : d.t[0]);
         // Local Y is already in SCREEN space — do NOT flip it.
-        const myY = local?.y ?? (isBottom ? d.b[1] : FIELD_H - d.t[1]);
+        const myY = local?.y ?? (isBottom ? d.b[1] : MP_FIELD_H - d.t[1]);
 
         const transformed: GameState = {
           puck: isBottom
-            ? { x: px, y: py, vx: pvx, vy: pvy, r: 0.025 }
-            : { x: px, y: FIELD_H - py, vx: pvx, vy: -pvy, r: 0.025 },
-          player: { x: myX, y: myY, r: 0.045 },
-          opponent: { x: oppX, y: oppY, r: 0.045 },
+            ? { x: px, y: py, vx: pvx, vy: pvy, r: 0.04 }
+            : { x: px, y: MP_FIELD_H - py, vx: pvx, vy: -pvy, r: 0.04 },
+          player: { x: myX, y: myY, r: 0.065 },
+          opponent: { x: oppX, y: oppY, r: 0.065 },
           score: {
             player: isBottom ? (d.s[0] ?? 0) : (d.s[1] ?? 0),
             opponent: isBottom ? (d.s[1] ?? 0) : (d.s[0] ?? 0),

@@ -12,7 +12,7 @@
 export const FIELD_W = 1.0;
 
 /** Normalized field height (portrait — taller than wide) */
-export const FIELD_H = 1.6;
+export const FIELD_H = 1.5;
 
 // ─── Physics Constants ─────────────────────────────────────────────────────────
 
@@ -29,13 +29,13 @@ const PUCK_MIN_SPEED = 0.0003;
 const WALL_RESTITUTION = 0.85;
 
 /** Puck radius */
-const PUCK_RADIUS = 0.025;
+const PUCK_RADIUS = 0.04;
 
 /** Paddle radius */
-const PADDLE_RADIUS = 0.045;
+const PADDLE_RADIUS = 0.065;
 
 /** Goal width (centered on each short edge) */
-const GOAL_WIDTH = 0.22;
+const GOAL_WIDTH = 0.28;
 
 /** How much paddle velocity transfers to puck on hit (0–1) */
 const PADDLE_INFLUENCE = 1.4;

@@ -3,6 +3,8 @@
 import React, { useRef, useEffect, useCallback } from "react";
 import type { GameState } from "./AirHockeyEngine";
 import { FIELD_W, FIELD_H } from "./AirHockeyEngine";
+// Multiplayer constants (used for input clamping when liveStateRef is present)
+import { FIELD_W as MP_FW, FIELD_H as MP_FH, PADDLE_RADIUS as MP_PR } from "@/shared/gameConstants";
 
 interface GameCanvasProps {
   gameState: GameState;
@@ -32,11 +34,11 @@ const OVERLAY_BG = "rgba(0,0,0,0.7)";
 // ── Dimensions (relative to canvas) ────────────────────────────────
 const FIELD_PADDING = 8;
 const CORNER_RADIUS = 16;
-const GOAL_WIDTH_RATIO = 0.22; // must match engine's GOAL_WIDTH
+const GOAL_WIDTH_RATIO = 0.28; // must match engine's GOAL_WIDTH
 const GOAL_HEIGHT = 12;
 const CENTER_CIRCLE_RATIO = 0.15;
-const PUCK_RADIUS_RATIO = 0.035;
-const PADDLE_RADIUS_RATIO = 0.055;
+const PUCK_RADIUS_RATIO = 0.055;    // matches PUCK_RADIUS/FIELD_W visually
+const PADDLE_RADIUS_RATIO = 0.085;   // matches PADDLE_RADIUS/FIELD_W visually
 
 // ── Goal animation state (module-level to survive re-renders) ──────
 let goalFlashStart = 0;
@@ -75,16 +77,27 @@ export default function GameCanvas({
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
-      const nx = (clientX - rect.left) / rect.width;   // 0-1 canvas proportion
-      const rawNy = (clientY - rect.top) / rect.height; // 0-1 canvas proportion
+      const nx = (clientX - rect.left) / rect.width;
+      const rawNy = (clientY - rect.top) / rect.height;
       const ny = rawNy - FINGER_OFFSET_Y;
-      // Convert from canvas proportion (0-1) to engine coords (0-FIELD_W, 0-FIELD_H)
-      onPlayerMove(
-        Math.max(0, Math.min(FIELD_W, nx * FIELD_W)),
-        Math.max(0, Math.min(FIELD_H, ny * FIELD_H))
-      );
+
+      // Use whichever field dimensions the current mode needs
+      const fw = liveStateRef ? MP_FW : FIELD_W;
+      const fh = liveStateRef ? MP_FH : FIELD_H;
+      const pr = liveStateRef ? MP_PR : 0.065;
+      const cl = fh / 2;
+
+      let x = Math.max(pr, Math.min(fw - pr, nx * fw));
+      let y = ny * fh;
+
+      // Clamp to bottom half (player's side in screen space).
+      // In multiplayer the gs decoder already handles perspective —
+      // the player always "is" at the bottom of their screen.
+      y = Math.max(cl + pr, Math.min(fh - pr, y));
+
+      onPlayerMove(x, y);
     },
-    [onPlayerMove]
+    [onPlayerMove, liveStateRef]
   );
 
   useEffect(() => {
