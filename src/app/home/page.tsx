@@ -436,11 +436,11 @@ export default function HomePage() {
           <div
             className="flex items-center px-2 py-1.5 rounded-full gap-0"
             style={{
-              background: "rgba(50, 50, 50, 0.08)",
-              backdropFilter: "blur(5px) saturate(200%)",
-              WebkitBackdropFilter: "blur(5px) saturate(200%)",
-              border: "0.5px solid rgba(255,255,255,0.15)",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+              background: "rgba(30, 30, 30, 0.75)",
+              backdropFilter: "blur(24px) saturate(180%)",
+              WebkitBackdropFilter: "blur(24px) saturate(180%)",
+              border: "0.5px solid rgba(255,255,255,0.12)",
+              boxShadow: "0 4px 24px rgba(0,0,0,0.35)",
             }}
           >
             {[
