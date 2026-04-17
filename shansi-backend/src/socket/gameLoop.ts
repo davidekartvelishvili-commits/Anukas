@@ -188,23 +188,23 @@ function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
     return true;
   };
 
-  // 1. Check current paddle position
-  if (tryResolve(paddle.x, paddle.y)) return;
+  // Direct distance check only — sweep DISABLED for ghost collision testing
+  tryResolve(paddle.x, paddle.y);
 
-  // 2. Swept check — only if paddle actually moved this tick
-  if (paddle.prevX !== undefined && paddle.prevY !== undefined) {
-    const prevX = paddle.prevX;
-    const prevY = paddle.prevY;
-    const actuallyMoved = Math.abs(paddle.x - prevX) > 0.0001 || Math.abs(paddle.y - prevY) > 0.0001;
-    if (actuallyMoved) {
-      for (let i = 1; i <= 8; i++) {
-        const t = i / 8;
-        const sx = prevX + (paddle.x - prevX) * t;
-        const sy = prevY + (paddle.y - prevY) * t;
-        if (tryResolve(sx, sy)) break;
-      }
-    }
-  }
+  // SWEEP DISABLED — uncomment to re-enable after ghost collision is confirmed fixed
+  // if (paddle.prevX !== undefined && paddle.prevY !== undefined) {
+  //   const prevX = paddle.prevX;
+  //   const prevY = paddle.prevY;
+  //   const actuallyMoved = Math.abs(paddle.x - prevX) > 0.0001 || Math.abs(paddle.y - prevY) > 0.0001;
+  //   if (actuallyMoved) {
+  //     for (let i = 1; i <= 8; i++) {
+  //       const t = i / 8;
+  //       const sx = prevX + (paddle.x - prevX) * t;
+  //       const sy = prevY + (paddle.y - prevY) * t;
+  //       if (tryResolve(sx, sy)) break;
+  //     }
+  //   }
+  // }
 }
 
 // ── Robot AI ──
