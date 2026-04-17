@@ -288,21 +288,21 @@ const ROBOT_CONFIGS: Record<Difficulty, RobotConfig> = {
     missRate: 0.20,
     jitter: 0.08,
     predictive: false,
-    maxY: FIELD_H * 0.48, // stays well in own half
+    maxY: FIELD_H / 2 - PADDLE_RADIUS * 3, // stays well in own half
   },
   medium: {
     reactionSpeed: 0.04,
     missRate: 0.08,
     jitter: 0.03,
     predictive: false,
-    maxY: FIELD_H * 0.55, // occasionally crosses midline
+    maxY: FIELD_H / 2 - PADDLE_RADIUS * 2, // close to center but stays in own half
   },
   hard: {
     reactionSpeed: 0.07,
     missRate: 0.02,
     jitter: 0.01,
     predictive: true,
-    maxY: FIELD_H * 0.58, // aggressive
+    maxY: FIELD_H / 2 - PADDLE_RADIUS, // aggressive but body stays in own half
   },
 };
 
@@ -528,8 +528,8 @@ export function updateGame(state: GameState, dt: number): GameState {
   puck = resolvePaddleCollision(puck, state.player);
   puck = resolvePaddleCollision(puck, state.opponent);
 
-  // Update robot AI
-  const opponent = updateRobot({ ...state, puck });
+  // Update robot AI — then hard-constrain to own half as a safety net
+  const opponent = constrainOpponent(updateRobot({ ...state, puck }));
 
   return {
     ...state,

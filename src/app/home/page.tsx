@@ -64,6 +64,7 @@ const ALL_GAMES = [
   { id: 1, name: "Midnight Machine", gameType: "slot", color: "#4338CA", gradient: "linear-gradient(135deg, #4338CA, #6366F1)" },
   { id: 3, name: "Lucky Step", gameType: "chicken_rush", color: "#1a237e", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)" },
   { id: 4, name: "Lucky Drop", gameType: "plinko", color: "#1a237e", gradient: "linear-gradient(135deg, #1a237e, #7c4dff)" },
+  { id: 5, name: "Air Hockey", gameType: "air_hockey", color: "#0A0F1C", gradient: "linear-gradient(135deg, #0A0F1C, #1C2539)" },
 ];
 
 /* ───────── COUNTDOWN HOOK ───────── */
@@ -100,7 +101,7 @@ export default function HomePage() {
   const [cashBalance, setCashBalanceState] = useState(0);
   const [coinBalance, setCoinBalanceState] = useState(0);
   const [gender, setGender] = useState("Male");
-  const [activeGameTypes, setActiveGameTypes] = useState<string[]>(["slot", "plinko", "chicken_rush"]);
+  const [activeGameTypes, setActiveGameTypes] = useState<string[]>(["slot", "plinko", "chicken_rush", "air_hockey"]);
   const [promoCount, setPromoCount] = useState(0);
   const [mysteryBoxEnabled, setMysteryBoxEnabled] = useState(true);
   const [liveTickets, setLiveTickets] = useState<TicketData[]>([]);
@@ -243,7 +244,7 @@ export default function HomePage() {
                   key={game.id}
                   className="shrink-0 w-[130px] h-[130px] rounded-[36px] relative overflow-hidden cursor-pointer active:scale-[0.97] transition-transform"
                   style={{ background: game.gradient }}
-                  onClick={() => { if (game.id === 1) router.push("/games/midnight-machine"); if (game.id === 3) router.push("/games/chicken-rush"); if (game.id === 4) router.push("/games/lucky-drop"); }}
+                  onClick={() => { if (game.id === 1) router.push("/games/midnight-machine"); if (game.id === 3) router.push("/games/chicken-rush"); if (game.id === 4) router.push("/games/lucky-drop"); if (game.id === 5) router.push("/games/air-hockey"); }}
                 >
                   {/* Video cover for Midnight Machine */}
                   {(game.id === 1 || game.id === 2) ? (

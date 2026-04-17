@@ -11,10 +11,13 @@ type Difficulty = "easy" | "medium" | "hard";
 type GoalTarget = 5 | 10 | 15 | 20;
 
 const GOAL_OPTIONS: GoalTarget[] = [5, 10, 15, 20];
-const DIFFICULTY_OPTIONS: { value: Difficulty; label: string; labelKa: string; color: string }[] = [
-  { value: "easy", label: "Easy", labelKa: "მარტივი", color: "#22C55E" },
-  { value: "medium", label: "Medium", labelKa: "საშუალო", color: "#F59E0B" },
-  { value: "hard", label: "Hard", labelKa: "რთული", color: "#EF4444" },
+const SELECTOR_ACTIVE = "#A8E06C"; // matches Today's Promos card on home
+const SELECTOR_ACTIVE_TEXT = "#0A0F1C";
+
+const DIFFICULTY_OPTIONS: { value: Difficulty; label: string; labelKa: string }[] = [
+  { value: "easy", label: "Easy", labelKa: "მარტივი" },
+  { value: "medium", label: "Medium", labelKa: "საშუალო" },
+  { value: "hard", label: "Hard", labelKa: "რთული" },
 ];
 
 export default function AirHockeyPage() {
@@ -142,9 +145,9 @@ export default function AirHockeyPage() {
                     onClick={() => setDifficulty(d.value)}
                     className="flex-1 py-3 rounded-[12px] text-[14px] font-bold transition-all active:scale-[0.97]"
                     style={{
-                      background: difficulty === d.value ? d.color : "#1C2539",
-                      border: `1.5px solid ${difficulty === d.value ? d.color : "#1C2539"}`,
-                      color: difficulty === d.value ? "#0A0F1C" : "#94A3B8",
+                      background: difficulty === d.value ? SELECTOR_ACTIVE : "#1C2539",
+                      border: `1.5px solid ${difficulty === d.value ? SELECTOR_ACTIVE : "#1C2539"}`,
+                      color: difficulty === d.value ? SELECTOR_ACTIVE_TEXT : "#94A3B8",
                       fontFamily: "var(--font-outfit)",
                     }}
                   >
@@ -166,9 +169,9 @@ export default function AirHockeyPage() {
                     onClick={() => setGoalTarget(g)}
                     className="flex-1 py-3 rounded-[12px] text-[16px] font-bold transition-all active:scale-[0.97]"
                     style={{
-                      background: goalTarget === g ? "#FFE500" : "#1C2539",
-                      border: `1.5px solid ${goalTarget === g ? "#FFE500" : "#1C2539"}`,
-                      color: goalTarget === g ? "#0A0F1C" : "#94A3B8",
+                      background: goalTarget === g ? SELECTOR_ACTIVE : "#1C2539",
+                      border: `1.5px solid ${goalTarget === g ? SELECTOR_ACTIVE : "#1C2539"}`,
+                      color: goalTarget === g ? SELECTOR_ACTIVE_TEXT : "#94A3B8",
                       fontFamily: "var(--font-outfit)",
                     }}
                   >
@@ -178,17 +181,17 @@ export default function AirHockeyPage() {
               </div>
             </div>
 
-            {/* Play button */}
+            {/* Start button — pill shape matching activate/signup buttons */}
             <button
               onClick={startGame}
-              className="w-full py-4 rounded-[12px] text-[18px] font-bold active:scale-[0.97] transition-transform"
+              className="w-[200px] h-[58px] rounded-[29px] text-[17px] font-bold active:scale-[0.96] transition-transform"
               style={{
                 background: "#FFE500",
                 color: "#0A0F1C",
                 fontFamily: "var(--font-outfit)",
               }}
             >
-              თამაში
+              დაწყება
             </button>
 
           </div>
