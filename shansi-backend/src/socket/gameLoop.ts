@@ -151,25 +151,24 @@ function checkAndResolveAt(puck: PuckState, paddle: PaddleState, px: number, py:
   // Resolve velocity
   const pvx = paddle.deltaVx ?? 0;
   const pvy = paddle.deltaVy ?? 0;
+  const clampedPvx = clamp(pvx, -MAX_PADDLE_DELTA, MAX_PADDLE_DELTA);
+  const clampedPvy = clamp(pvy, -MAX_PADDLE_DELTA, MAX_PADDLE_DELTA);
   const relVN = (puck.vx - pvx) * nx + (puck.vy - pvy) * ny;
 
-  if (relVN < 0) {
-    const impulse = -(1 + 0.75) * relVN;
-    puck.vx += impulse * nx + pvx * PADDLE_TRANSFER;
-    puck.vy += impulse * ny + pvy * PADDLE_TRANSFER;
-
-    const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
-    if (speed > MAX_PUCK_SPEED) {
-      puck.vx = (puck.vx / speed) * MAX_PUCK_SPEED;
-      puck.vy = (puck.vy / speed) * MAX_PUCK_SPEED;
-    }
+  if (relVN >= 0) {
+    puck.vx += nx * 0.01;
+    puck.vy += ny * 0.01;
+  } else {
+    const RESTITUTION = 0.75;
+    const impulse = -(1 + RESTITUTION) * relVN;
+    puck.vx += impulse * nx + clampedPvx * PADDLE_TRANSFER;
+    puck.vy += impulse * ny + clampedPvy * PADDLE_TRANSFER;
   }
 
-  // Confirm puck is moving away — if not, force minimum exit velocity
-  const movingAway = (puck.vx * nx + puck.vy * ny) > 0;
-  if (!movingAway) {
-    puck.vx += nx * 0.005;
-    puck.vy += ny * 0.005;
+  const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+  if (speed > MAX_PUCK_SPEED) {
+    puck.vx = (puck.vx / speed) * MAX_PUCK_SPEED;
+    puck.vy = (puck.vy / speed) * MAX_PUCK_SPEED;
   }
 
   return true;
@@ -211,23 +210,24 @@ function handlePaddleCollision(puck: PuckState, paddle: PaddleState): void {
         // Resolve velocity
         const pvx = paddle.deltaVx ?? 0;
         const pvy = paddle.deltaVy ?? 0;
+        const clampedPvx = clamp(pvx, -MAX_PADDLE_DELTA, MAX_PADDLE_DELTA);
+        const clampedPvy = clamp(pvy, -MAX_PADDLE_DELTA, MAX_PADDLE_DELTA);
         const relVN = (puck.vx - pvx) * nx + (puck.vy - pvy) * ny;
-        if (relVN < 0) {
-          const impulse = -(1 + 0.75) * relVN;
-          puck.vx += impulse * nx + pvx * PADDLE_TRANSFER;
-          puck.vy += impulse * ny + pvy * PADDLE_TRANSFER;
-          const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
-          if (speed > MAX_PUCK_SPEED) {
-            puck.vx = (puck.vx / speed) * MAX_PUCK_SPEED;
-            puck.vy = (puck.vy / speed) * MAX_PUCK_SPEED;
-          }
+
+        if (relVN >= 0) {
+          puck.vx += nx * 0.01;
+          puck.vy += ny * 0.01;
+        } else {
+          const RESTITUTION = 0.75;
+          const impulse = -(1 + RESTITUTION) * relVN;
+          puck.vx += impulse * nx + clampedPvx * PADDLE_TRANSFER;
+          puck.vy += impulse * ny + clampedPvy * PADDLE_TRANSFER;
         }
 
-        // Verify exit direction
-        const movingAway = (puck.vx * nx + puck.vy * ny) > 0;
-        if (!movingAway) {
-          puck.vx += nx * 0.008;
-          puck.vy += ny * 0.008;
+        const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+        if (speed > MAX_PUCK_SPEED) {
+          puck.vx = (puck.vx / speed) * MAX_PUCK_SPEED;
+          puck.vy = (puck.vy / speed) * MAX_PUCK_SPEED;
         }
         break;
       }
