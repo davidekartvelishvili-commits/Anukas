@@ -352,39 +352,10 @@ export default function AirHockeyPage() {
   // When yourSide === "top", we need to flip the y-axis so the player
   // always sees themselves at the bottom of the screen.
 
-  const displayState = (() => {
-    if (!gameState) return null;
-    if (!multiplayer || !mpConfig || mpConfig.yourSide === "bottom") return gameState;
-
-    // Flip: invert all y coordinates, swap player/opponent
-    return {
-      ...gameState,
-      puck: {
-        ...gameState.puck,
-        x: gameState.puck.x,
-        y: FIELD_H - gameState.puck.y,
-        vx: gameState.puck.vx,
-        vy: -gameState.puck.vy,
-      },
-      player: {
-        ...gameState.opponent, // server's "opponent" is actually us when flipped
-        y: FIELD_H - gameState.opponent.y,
-      },
-      opponent: {
-        ...gameState.player, // server's "player" (bottom) is our opponent
-        y: FIELD_H - gameState.player.y,
-      },
-      score: {
-        player: gameState.score.opponent,
-        opponent: gameState.score.player,
-      },
-      winner: gameState.winner === "player"
-        ? "opponent" as const
-        : gameState.winner === "opponent"
-          ? "player" as const
-          : null,
-    };
-  })();
+  // The "gs" socket decoder already transforms coordinates for the
+  // player's perspective (flips Y for top-side, maps player/opponent
+  // correctly). No additional flip needed here — just pass through.
+  const displayState = gameState;
 
   return (
     <AuthGuard>
