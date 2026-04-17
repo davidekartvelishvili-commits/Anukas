@@ -17,10 +17,10 @@ export const FIELD_H = 1.6;
 // ─── Physics Constants ─────────────────────────────────────────────────────────
 
 /** Puck friction multiplier applied every frame (1 = no friction) */
-const PUCK_FRICTION = 0.998;
+const PUCK_FRICTION = 0.997;
 
 /** Maximum puck speed (normalized units per frame) */
-const PUCK_MAX_SPEED = 0.025;
+const PUCK_MAX_SPEED = 0.06;
 
 /** Minimum speed below which puck is considered stopped */
 const PUCK_MIN_SPEED = 0.0003;
@@ -38,7 +38,7 @@ const PADDLE_RADIUS = 0.045;
 const GOAL_WIDTH = 0.22;
 
 /** How much paddle velocity transfers to puck on hit (0–1) */
-const PADDLE_INFLUENCE = 0.6;
+const PADDLE_INFLUENCE = 1.4;
 
 /** Collision push-apart factor to prevent overlap */
 const COLLISION_PUSH = 1.01;
