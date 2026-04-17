@@ -1,6 +1,7 @@
 import { io, Socket } from "socket.io-client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+// Must match the backend URL (same as REST API — Socket.io runs on the same port)
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 let socket: Socket | null = null;
 
 export function getSocket(): Socket {

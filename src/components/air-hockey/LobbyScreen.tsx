@@ -76,16 +76,21 @@ export default function LobbyScreen({ onGameStart }: LobbyScreenProps) {
     };
 
     socket.on("roomList", handleRoomList);
-    socket.on("matchFound", handleMatchFound);
+    // Backend emits "gameStart" when a match is found (queue or room join)
+    socket.on("gameStart", handleMatchFound);
     socket.on("queueCancelled", handleQueueCancelled);
 
     // Request room list on mount
     socket.emit("getRooms");
 
+    // Refresh room list periodically
+    const pollRooms = setInterval(() => socket.emit("getRooms"), 5000);
+
     return () => {
       socket.off("roomList", handleRoomList);
-      socket.off("matchFound", handleMatchFound);
+      socket.off("gameStart", handleMatchFound);
       socket.off("queueCancelled", handleQueueCancelled);
+      clearInterval(pollRooms);
     };
   }, [onGameStart]);
 
@@ -107,7 +112,7 @@ export default function LobbyScreen({ onGameStart }: LobbyScreenProps) {
       if (room.status === "waiting") {
         socket.emit("joinRoom", { roomId: room.id });
       } else if (room.status === "playing") {
-        socket.emit("spectateRoom", { roomId: room.id });
+        socket.emit("spectate", { roomId: room.id });
       }
     },
     []

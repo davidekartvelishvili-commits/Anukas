@@ -72,11 +72,30 @@ export default function CreateRoomModal({
   }, [wager, goalTarget, isPrivate]);
 
   const handleCopyCode = useCallback(() => {
-    if (createdRoom) {
-      const text = createdRoom.pin
-        ? `${createdRoom.roomId} (PIN: ${createdRoom.pin})`
-        : createdRoom.roomId;
-      navigator.clipboard.writeText(text).catch(() => {});
+    if (!createdRoom) return;
+    // Build a shareable link — clicking it auto-fills room code + PIN
+    const base = typeof window !== "undefined" ? window.location.origin : "";
+    const params = new URLSearchParams({ room: createdRoom.roomId });
+    if (createdRoom.pin) params.set("pin", createdRoom.pin);
+    const link = `${base}/games/air-hockey?${params}`;
+    navigator.clipboard.writeText(link).catch(() => {});
+  }, [createdRoom]);
+
+  // Share via Web Share API if available (native share sheet on mobile)
+  const handleShare = useCallback(() => {
+    if (!createdRoom) return;
+    const base = typeof window !== "undefined" ? window.location.origin : "";
+    const params = new URLSearchParams({ room: createdRoom.roomId });
+    if (createdRoom.pin) params.set("pin", createdRoom.pin);
+    const link = `${base}/games/air-hockey?${params}`;
+    if (typeof navigator !== "undefined" && navigator.share) {
+      navigator.share({
+        title: "Air Hockey — Shansi",
+        text: `Play Air Hockey with me on Shansi!`,
+        url: link,
+      }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(link).catch(() => {});
     }
   }, [createdRoom]);
 
@@ -216,18 +235,23 @@ export default function CreateRoomModal({
               )}
             </div>
 
-            {/* Copy button */}
-            <button
-              onClick={handleCopyCode}
-              className="w-full py-3 rounded-[12px] text-[13px] font-bold mb-4 transition-all active:scale-[0.97]"
-              style={{
-                background: CARD,
-                color: TEXT_PRIMARY,
-                fontFamily: "var(--font-outfit)",
-              }}
-            >
-              კოპირება
-            </button>
+            {/* Copy + Share buttons */}
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={handleCopyCode}
+                className="flex-1 py-3 rounded-[12px] text-[13px] font-bold transition-all active:scale-[0.97]"
+                style={{ background: CARD, color: TEXT_PRIMARY, fontFamily: "var(--font-outfit)" }}
+              >
+                ლინკის კოპირება
+              </button>
+              <button
+                onClick={handleShare}
+                className="flex-1 py-3 rounded-[12px] text-[13px] font-bold transition-all active:scale-[0.97]"
+                style={{ background: ACCENT, color: "#0A0F1C", fontFamily: "var(--font-outfit)" }}
+              >
+                გაზიარება
+              </button>
+            </div>
 
             {/* Waiting indicator */}
             {waiting && (

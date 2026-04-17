@@ -56,6 +56,33 @@ export default function AirHockeyPage() {
     opponentWasRobot: boolean;
   } | null>(null);
 
+  // Auto-join from shared link: ?room=XXXX&pin=1234
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const roomCode = params.get("room");
+    const pin = params.get("pin");
+    if (roomCode) {
+      // Go straight to lobby, then auto-join once socket connects
+      setMode("lobby");
+      setTimeout(async () => {
+        const { connectSocket, getSocket } = await import("@/services/socket");
+        const token = localStorage.getItem("shansi_token") || "";
+        connectSocket(token);
+        const socket = getSocket();
+        // Wait briefly for socket to connect, then join
+        const tryJoin = () => {
+          if (socket.connected) {
+            socket.emit("joinRoom", { roomId: roomCode.toUpperCase(), pin: pin || undefined });
+          } else {
+            setTimeout(tryJoin, 300);
+          }
+        };
+        setTimeout(tryJoin, 500);
+      }, 100);
+    }
+  }, []);
+
   // Measure available space for the canvas
   useEffect(() => {
     function measure() {

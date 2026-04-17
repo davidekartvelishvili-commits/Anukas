@@ -1,8 +1,10 @@
 import { Server as IOServer } from "socket.io";
 import type { Socket } from "socket.io";
 import { eq } from "drizzle-orm";
+import jwt from "jsonwebtoken";
 import { getDb } from "../db/client.js";
 import { users } from "../db/schema.js";
+import { getEnv } from "../utils/env.js";
 import {
   createRoom,
   joinRoom,
@@ -27,7 +29,6 @@ import {
 } from "./gameLoop.js";
 
 // ── Disconnect timers ──
-// socketId → { warningTimer, robotTimer }
 interface DisconnectTimers {
   warningTimer: ReturnType<typeof setTimeout>;
   robotTimer: ReturnType<typeof setTimeout>;
@@ -51,7 +52,7 @@ async function fetchDisplayName(userId: string): Promise<string> {
       .where(eq(users.id, userId))
       .limit(1);
     if (result.length > 0) {
-      return result[0].stageName || result[0].name || "Player";
+      return (result[0] as any).stageName || result[0].name || "Player";
     }
   } catch (e) {
     console.error("[socket] failed to fetch display name", e);
@@ -68,21 +69,32 @@ function getOpponent(room: Room, socketId: string): RoomPlayer | null {
   return room.players.find((p) => p.socketId !== socketId) ?? null;
 }
 
+/** Get userId from the socket's auth data (set during connection middleware). */
+function getUserId(socket: Socket): string {
+  return (socket.data as any)?.userId || "";
+}
+
+function getDisplayName(socket: Socket): string {
+  return socketToUser.get(socket.id)?.displayName || "Player";
+}
+
 function beginGame(room: Room, io: IOServer): void {
   if (room.players.length < 2) return;
-
   room.status = "playing";
 
   const [p1, p2] = room.players;
 
-  // Notify both players
+  // Notify both players — the frontend listens for "gameStart" and
+  // uses it to transition from lobby to playing mode.
   io.to(p1.socketId).emit("gameStart", {
+    roomId: room.id,
     yourSide: p1.side,
     opponentName: p2.displayName,
     wager: room.wager,
     goalTarget: room.goalTarget,
   });
   io.to(p2.socketId).emit("gameStart", {
+    roomId: room.id,
     yourSide: p2.side,
     opponentName: p1.displayName,
     wager: room.wager,
@@ -95,16 +107,13 @@ function beginGame(room: Room, io: IOServer): void {
   s1?.join(room.id);
   s2?.join(room.id);
 
-  // Start server-authoritative game loop
   startGameLoop(
     room.id,
     room.goalTarget,
     io,
-    // onGoal
     (roomId, scorer, score) => {
       io.to(roomId).emit("goalScored", { scorer, score });
     },
-    // onGameOver
     (roomId, winner) => {
       const r = rooms.get(roomId);
       if (!r) return;
@@ -112,40 +121,73 @@ function beginGame(room: Room, io: IOServer): void {
 
       const winnerPlayer = r.players.find((p) => p.side === winner);
       const loserPlayer = r.players.find((p) => p.side !== winner);
-      const coinsWon = r.wager * 2; // winner takes both wagers
+      const coinsWon = r.wager * 2;
 
-      // Emit to winner
       if (winnerPlayer) {
         io.to(winnerPlayer.socketId).emit("gameOver", {
           winner,
-          yourResult: "win" as const,
+          yourResult: "win",
           coinsWon,
-        });
-        io.to(winnerPlayer.socketId).emit("coinsResult", {
-          delta: r.wager, // net gain
-          reason: "air_hockey_win",
+          score: getGameState(roomId)?.score,
+          opponentWasRobot: loserPlayer?.isRobot ?? false,
         });
       }
-
-      // Emit to loser
       if (loserPlayer) {
         io.to(loserPlayer.socketId).emit("gameOver", {
           winner,
-          yourResult: "lose" as const,
+          yourResult: "lose",
           coinsWon: 0,
-        });
-        io.to(loserPlayer.socketId).emit("coinsResult", {
-          delta: -r.wager,
-          reason: "air_hockey_loss",
+          score: getGameState(roomId)?.score,
+          opponentWasRobot: winnerPlayer?.isRobot ?? false,
         });
       }
 
-      // Clean up game loop after a short delay
-      setTimeout(() => {
-        stopGameLoop(roomId);
-      }, 2000);
+      setTimeout(() => stopGameLoop(roomId), 2000);
     }
   );
+}
+
+function handleDisconnect(socket: Socket, io: IOServer): void {
+  const userData = socketToUser.get(socket.id);
+  if (!userData) return;
+
+  const room = findRoomByUser(userData.userId);
+  if (!room) {
+    removeFromQueue(socket.id);
+    socketToUser.delete(socket.id);
+    return;
+  }
+
+  if (room.status === "waiting") {
+    stopGameLoop(room.id);
+    deleteRoom(room.id);
+    socketToUser.delete(socket.id);
+    return;
+  }
+
+  if (room.status === "playing") {
+    const side = getPlayerSide(room, socket.id);
+    if (!side) return;
+
+    const player = room.players.find((p) => p.socketId === socket.id);
+    if (player) player.disconnectedAt = Date.now();
+
+    // 5-second warning
+    const warningTimer = setTimeout(() => {
+      io.to(room.id).emit("playerDisconnecting", { side, timeLeft: 10 });
+    }, 5000);
+
+    // 15-second robot takeover
+    const robotTimer = setTimeout(() => {
+      setRobotPlayer(room.id, side);
+      if (player) player.isRobot = true;
+      io.to(room.id).emit("robotTakeover", { side });
+    }, 15000);
+
+    disconnectTimers.set(socket.id, { warningTimer, robotTimer });
+  }
+
+  socketToUser.delete(socket.id);
 }
 
 // ── Main setup ──
@@ -154,7 +196,6 @@ export function setupSocketServer(httpServer: any): void {
   const io = new IOServer(httpServer, {
     cors: {
       origin: (origin, callback) => {
-        // Same policy as Hono CORS
         if (!origin) return callback(null, true);
         if (origin.endsWith(".vercel.app")) return callback(null, true);
         const allowed = [
@@ -163,45 +204,109 @@ export function setupSocketServer(httpServer: any): void {
           process.env.FRONTEND_URL,
         ].filter(Boolean) as string[];
         if (allowed.includes(origin)) return callback(null, true);
-        return callback(null, true); // permissive for dev
+        return callback(null, true);
       },
       methods: ["GET", "POST"],
       credentials: true,
     },
     path: "/socket.io",
+    pingTimeout: 20000,
+    pingInterval: 10000,
   });
 
-  // Periodic cleanup of finished rooms
-  cleanupInterval = setInterval(() => {
-    cleanupFinished();
-  }, 10_000);
+  // ── Auth middleware — extract userId from JWT token ──
+  io.use(async (socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) {
+      // Allow anonymous connections for now (spectators etc.)
+      (socket.data as any).userId = null;
+      return next();
+    }
+    try {
+      const env = getEnv();
+      const decoded = jwt.verify(token, env.JWT_SECRET) as any;
+      (socket.data as any).userId = decoded.userId || decoded.id || decoded.sub;
+      return next();
+    } catch {
+      // Invalid token — still allow connection but no userId
+      (socket.data as any).userId = null;
+      return next();
+    }
+  });
 
-  io.on("connection", (socket: Socket) => {
-    console.log(`[socket.io] connected: ${socket.id}`);
+  cleanupInterval = setInterval(() => cleanupFinished(), 10_000);
+
+  io.on("connection", async (socket: Socket) => {
+    const userId = getUserId(socket);
+    console.log(`[socket.io] connected: ${socket.id} userId=${userId || "anon"}`);
+
+    // Pre-fetch display name if authenticated
+    if (userId) {
+      const displayName = await fetchDisplayName(userId);
+      socketToUser.set(socket.id, { userId, displayName });
+
+      // Check for reconnection to an existing room
+      const existingRoom = findRoomByUser(userId);
+      if (existingRoom) {
+        const player = existingRoom.players.find((p) => p.userId === userId);
+        if (player) {
+          // Cancel disconnect timers
+          const timers = disconnectTimers.get(player.socketId);
+          if (timers) {
+            clearTimeout(timers.warningTimer);
+            clearTimeout(timers.robotTimer);
+            disconnectTimers.delete(player.socketId);
+          }
+
+          // Reassign socket
+          const oldSocketId = player.socketId;
+          player.socketId = socket.id;
+          player.disconnectedAt = null;
+          socketToUser.delete(oldSocketId);
+          socketToUser.set(socket.id, { userId, displayName });
+
+          socket.join(existingRoom.id);
+
+          if (player.isRobot) {
+            clearRobotPlayer(existingRoom.id, player.side);
+            player.isRobot = false;
+            io.to(existingRoom.id).emit("robotHandoff", { side: player.side });
+          }
+
+          // Send current game state to reconnected player
+          const state = getGameState(existingRoom.id);
+          const opponent = getOpponent(existingRoom, socket.id);
+          socket.emit("gameStart", {
+            roomId: existingRoom.id,
+            yourSide: player.side,
+            opponentName: opponent?.displayName || "Player",
+            wager: existingRoom.wager,
+            goalTarget: existingRoom.goalTarget,
+          });
+          if (state) socket.emit("gameState", state);
+        }
+      }
+    }
 
     // ── createRoom ──
     socket.on("createRoom", async (data: {
-      userId: string;
       wager: number;
       goalTarget: number;
       isPrivate: boolean;
     }) => {
-      try {
-        const displayName = await fetchDisplayName(data.userId);
-        socketToUser.set(socket.id, { userId: data.userId, displayName });
+      const uid = getUserId(socket);
+      if (!uid) { socket.emit("error", { message: "Not authenticated" }); return; }
 
+      try {
+        const displayName = getDisplayName(socket);
         const room = createRoom(
-          { socketId: socket.id, userId: data.userId, displayName },
+          { socketId: socket.id, userId: uid, displayName },
           data.wager,
           data.goalTarget,
           data.isPrivate
         );
-
         socket.join(room.id);
-        socket.emit("roomCreated", {
-          roomId: room.id,
-          pin: room.pin,
-        });
+        socket.emit("roomCreated", { roomId: room.id, pin: room.pin });
       } catch (e: any) {
         socket.emit("error", { message: e.message || "Failed to create room" });
       }
@@ -209,79 +314,82 @@ export function setupSocketServer(httpServer: any): void {
 
     // ── joinRoom ──
     socket.on("joinRoom", async (data: {
-      userId: string;
       roomId: string;
       pin?: string;
     }) => {
-      try {
-        const displayName = await fetchDisplayName(data.userId);
-        socketToUser.set(socket.id, { userId: data.userId, displayName });
+      const uid = getUserId(socket);
+      if (!uid) { socket.emit("error", { message: "Not authenticated" }); return; }
 
+      try {
+        const displayName = getDisplayName(socket);
         const room = joinRoom(
-          { socketId: socket.id, userId: data.userId, displayName },
+          { socketId: socket.id, userId: uid, displayName },
           data.roomId,
           data.pin
         );
 
         if (!room) {
-          socket.emit("error", { message: "Cannot join room. Check room ID and PIN." });
+          socket.emit("joinError", { message: "Cannot join room. Check room ID and PIN." });
           return;
         }
 
         socket.join(room.id);
-
         const opponent = getOpponent(room, socket.id);
         socket.emit("roomJoined", {
           roomId: room.id,
-          side: "top" as const,
+          side: "top",
           opponentName: opponent?.displayName ?? "Player",
           wager: room.wager,
           goalTarget: room.goalTarget,
         });
 
-        // Room is full — start the game
         if (room.players.length === 2) {
           beginGame(room, io);
         }
       } catch (e: any) {
-        socket.emit("error", { message: e.message || "Failed to join room" });
+        socket.emit("joinError", { message: e.message || "Failed to join room" });
       }
     });
 
     // ── joinQueue ──
     socket.on("joinQueue", async (data: {
-      userId: string;
       wager: number;
       goalTarget: number;
     }) => {
+      const uid = getUserId(socket);
+      if (!uid) { socket.emit("error", { message: "Not authenticated" }); return; }
+
       try {
-        const displayName = await fetchDisplayName(data.userId);
-        socketToUser.set(socket.id, { userId: data.userId, displayName });
+        const displayName = getDisplayName(socket);
+        socketToUser.set(socket.id, { userId: uid, displayName });
 
         const matchedRoom = addToQueue({
           socketId: socket.id,
-          userId: data.userId,
+          userId: uid,
           displayName,
           wager: data.wager,
           goalTarget: data.goalTarget,
         });
 
         if (matchedRoom) {
-          // Both players matched — start game
           beginGame(matchedRoom, io);
         }
-        // If no match yet, player stays in queue silently
       } catch (e: any) {
         socket.emit("error", { message: e.message || "Failed to join queue" });
       }
     });
 
+    // ── leaveQueue ──
+    socket.on("leaveQueue", () => {
+      removeFromQueue(socket.id);
+    });
+
     // ── paddleMove ──
     socket.on("paddleMove", (data: { x: number; y: number }) => {
-      const userData = socketToUser.get(socket.id);
-      if (!userData) return;
+      const uid = getUserId(socket);
+      if (!uid) return;
 
-      const room = findRoomByUser(userData.userId);
+      const room = findRoomByUser(uid);
       if (!room || room.status !== "playing") return;
 
       const side = getPlayerSide(room, socket.id);
@@ -298,37 +406,30 @@ export function setupSocketServer(httpServer: any): void {
     // ── spectate ──
     socket.on("spectate", (data: { roomId: string }) => {
       const room = rooms.get(data.roomId);
-      if (!room) {
-        socket.emit("error", { message: "Room not found" });
-        return;
-      }
+      if (!room) { socket.emit("error", { message: "Room not found" }); return; }
 
       room.spectators.push(socket.id);
       socket.join(room.id);
-
-      // Send current game state if game is running
       const state = getGameState(room.id);
-      if (state) {
-        socket.emit("gameState", state);
-      }
+      if (state) socket.emit("gameState", state);
     });
 
-    // ── getRoomList ──
-    socket.on("getRoomList", () => {
+    // ── getRoomList (also aliased as "getRooms" for frontend compat) ──
+    const sendRoomList = () => {
       const publicRooms = getPublicRooms();
-      socket.emit("roomList", publicRooms.map((r) => ({
+      const list = publicRooms.map((r) => ({
         id: r.id,
-        isPrivate: r.isPrivate,
-        players: r.players.map((p) => ({
-          displayName: p.displayName,
-          side: p.side,
-        })),
+        players: r.players.map((p) => ({ displayName: p.displayName, side: p.side })),
         wager: r.wager,
         goalTarget: r.goalTarget,
         status: r.status,
-        createdAt: r.createdAt,
-      })));
-    });
+        spectatorCount: r.spectators.length,
+        score: getGameState(r.id)?.score,
+      }));
+      socket.emit("roomList", list);
+    };
+    socket.on("getRoomList", sendRoomList);
+    socket.on("getRooms", sendRoomList); // alias
 
     // ── disconnect ──
     socket.on("disconnect", () => {
@@ -336,89 +437,4 @@ export function setupSocketServer(httpServer: any): void {
       handleDisconnect(socket, io);
     });
   });
-
-  console.log("[socket.io] server initialized");
 }
-
-// ── Disconnect handling ──
-
-function handleDisconnect(socket: Socket, io: IOServer): void {
-  const userData = socketToUser.get(socket.id);
-
-  // Remove from matchmaking queue
-  removeFromQueue(socket.id);
-
-  if (!userData) {
-    removePlayer(socket.id);
-    socketToUser.delete(socket.id);
-    return;
-  }
-
-  const room = findRoomByUser(userData.userId);
-  if (!room) {
-    socketToUser.delete(socket.id);
-    return;
-  }
-
-  const side = getPlayerSide(room, socket.id);
-
-  // If room is waiting (not yet started), just delete it
-  if (room.status === "waiting") {
-    stopGameLoop(room.id);
-    deleteRoom(room.id);
-    // Notify other player if present
-    const other = getOpponent(room, socket.id);
-    if (other) {
-      io.to(other.socketId).emit("error", { message: "Opponent left the room" });
-    }
-    socketToUser.delete(socket.id);
-    return;
-  }
-
-  // If room is finished, just clean up
-  if (room.status === "finished") {
-    socketToUser.delete(socket.id);
-    return;
-  }
-
-  // Game is in progress — start disconnect timer
-  removePlayer(socket.id);
-
-  if (!side) {
-    socketToUser.delete(socket.id);
-    return;
-  }
-
-  // Cancel any existing timers for this socket
-  const existing = disconnectTimers.get(socket.id);
-  if (existing) {
-    clearTimeout(existing.warningTimer);
-    clearTimeout(existing.robotTimer);
-  }
-
-  // After 5 seconds: warn other player
-  const warningTimer = setTimeout(() => {
-    io.to(room.id).emit("playerDisconnecting", { side, timeLeft: 10 });
-  }, 5_000);
-
-  // After 15 seconds: robot takes over
-  const robotTimer = setTimeout(() => {
-    setRobotPlayer(room.id, side);
-    io.to(room.id).emit("robotTakeover", { side });
-    disconnectTimers.delete(socket.id);
-  }, 15_000);
-
-  disconnectTimers.set(socket.id, { warningTimer, robotTimer });
-  socketToUser.delete(socket.id);
-}
-
-// Handle reconnection: when a player reconnects, they send joinRoom
-// with their userId. If findRoomByUser finds an active room, we
-// restore them. This is handled naturally by the joinRoom flow +
-// the reconnect logic below.
-
-// Note: Socket.io's built-in reconnection will create a new socket.id.
-// The client should re-emit a "reconnect" event with their userId.
-// We can add this as an extension:
-// socket.on("reconnect", ...) — but Socket.io "reconnect" is client-side.
-// Instead, we handle it via a custom "rejoinGame" event.
