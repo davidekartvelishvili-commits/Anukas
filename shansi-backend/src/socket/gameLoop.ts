@@ -131,7 +131,7 @@ function checkGoal(puck: PuckState): "bottom" | "top" | null {
 // ── Paddle-puck collision with swept check ──
 
 function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
-  const minDist = puck.r + paddle.r;
+  const minDist = (puck.r + paddle.r) * 1.2; // 20% larger for network-delay compensation
 
   // Core collision response at a given paddle position
   const tryResolve = (px: number, py: number): boolean => {
@@ -186,9 +186,9 @@ function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
     const prevX = paddle.prevX;
     const prevY = paddle.prevY;
     const sweepDist = Math.sqrt((paddle.x - prevX) ** 2 + (paddle.y - prevY) ** 2);
-    if (sweepDist > 0.003) {
-      for (let i = 1; i <= 4; i++) {
-        const t = i / 4;
+    if (sweepDist > 0) {
+      for (let i = 1; i <= 8; i++) {
+        const t = i / 8;
         const sx = prevX + (paddle.x - prevX) * t;
         const sy = prevY + (paddle.y - prevY) * t;
         if (tryResolve(sx, sy)) break; // one collision per tick max
