@@ -9,12 +9,15 @@ const PUCK_RADIUS = 0.04;
 const PADDLE_RADIUS = 0.065;
 const CENTER_LINE = FIELD_H / 2; // 0.75
 const GOAL_WIDTH = 0.28;
-const MAX_PUCK_SPEED = 2.0;
-const FRICTION = 0.995;
-const WALL_RESTITUTION = 0.9;
-const PADDLE_RESTITUTION = 0.85;
-const PADDLE_TRANSFER = 0.7;
-const MIN_HIT_SPEED = 0.2;
+// Velocities are PER-TICK at 20fps. Bot mode runs at 60fps with
+// per-frame velocities ~3× smaller. These are calibrated so the puck
+// feels the same speed as bot mode to the player.
+const MAX_PUCK_SPEED = 0.12;   // bot is 0.06 at 60fps → ×2 for 20fps
+const FRICTION = 0.985;        // stronger per-tick friction (fewer ticks = less decay otherwise)
+const WALL_RESTITUTION = 0.85;
+const PADDLE_RESTITUTION = 0.7;
+const PADDLE_TRANSFER = 0.4;   // gentler transfer — was 0.7 causing rocket launches
+const MIN_HIT_SPEED = 0.015;   // bot is 0.005-ish
 
 const TICK_MS = 1000 / 20; // 20fps server tick
 const GOAL_PAUSE_FRAMES = 40; // ~2s at 20fps
@@ -63,8 +66,8 @@ function createInitialState(goalTarget: number): ServerGameState {
     puck: {
       x: FIELD_W / 2,
       y: FIELD_H / 2,
-      vx: (Math.random() - 0.5) * 0.3,
-      vy: (Math.random() > 0.5 ? 1 : -1) * 0.15,
+      vx: (Math.random() - 0.5) * 0.01,
+      vy: (Math.random() > 0.5 ? 1 : -1) * 0.012,
       r: PUCK_RADIUS,
     },
     paddles: {
@@ -82,8 +85,8 @@ function createInitialState(goalTarget: number): ServerGameState {
 function resetPuckAfterGoal(state: ServerGameState, scoredOn: "bottom" | "top"): void {
   state.puck.x = FIELD_W / 2;
   state.puck.y = FIELD_H / 2;
-  state.puck.vx = (Math.random() - 0.5) * 0.2;
-  state.puck.vy = scoredOn === "bottom" ? 0.15 : -0.15;
+  state.puck.vx = (Math.random() - 0.5) * 0.01;
+  state.puck.vy = scoredOn === "bottom" ? 0.012 : -0.012;
 }
 
 // ── Wall bounce ──
@@ -143,9 +146,9 @@ function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
   puck.x += nx * overlap;
   puck.y += ny * overlap;
 
-  // 2. Get paddle velocity from tracked movement
-  const pvx = (paddle.prevX !== undefined) ? (paddle.x - paddle.prevX) * 20 : 0; // ×20 to scale per-tick delta to velocity
-  const pvy = (paddle.prevY !== undefined) ? (paddle.y - paddle.prevY) * 20 : 0;
+  // 2. Get paddle velocity from tracked movement (per-tick delta, no scaling)
+  const pvx = (paddle.prevX !== undefined) ? (paddle.x - paddle.prevX) : 0;
+  const pvy = (paddle.prevY !== undefined) ? (paddle.y - paddle.prevY) : 0;
 
   // 3. Relative velocity along collision normal
   const relVx = puck.vx - pvx;
@@ -266,7 +269,7 @@ function tick(
   state.puck.vy *= FRICTION;
 
   // Stop micro-movements
-  if (Math.sqrt(state.puck.vx * state.puck.vx + state.puck.vy * state.puck.vy) < 0.005) {
+  if (Math.sqrt(state.puck.vx * state.puck.vx + state.puck.vy * state.puck.vy) < 0.001) {
     state.puck.vx = 0;
     state.puck.vy = 0;
   }
@@ -313,6 +316,11 @@ export function startGameLoop(
   onGoal: (roomId: string, scorer: "bottom" | "top", score: { bottom: number; top: number }) => void,
   onGameOver: (roomId: string, winner: "bottom" | "top") => void
 ): void {
+  // Guard: never start two loops for the same room
+  if (activeGames.has(roomId)) {
+    console.warn(`[startGameLoop] loop already running for ${roomId} — skipping`);
+    return;
+  }
   const state = createInitialState(goalTarget);
   const game: ActiveGame = {
     interval: setInterval(() => tick(roomId, io, onGoal, onGameOver), TICK_MS),

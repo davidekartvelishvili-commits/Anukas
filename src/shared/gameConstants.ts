@@ -8,9 +8,9 @@ export const PADDLE_RADIUS = 0.065;
 export const CENTER_LINE = FIELD_H / 2; // 0.75
 export const GOAL_WIDTH = 0.28;
 
-export const MAX_PUCK_SPEED = 2.0;
-export const FRICTION = 0.995;
-export const WALL_RESTITUTION = 0.9;
-export const PADDLE_RESTITUTION = 0.85;
-export const PADDLE_TRANSFER = 0.7;
-export const MIN_HIT_SPEED = 0.2;
+export const MAX_PUCK_SPEED = 0.12;
+export const FRICTION = 0.985;
+export const WALL_RESTITUTION = 0.85;
+export const PADDLE_RESTITUTION = 0.7;
+export const PADDLE_TRANSFER = 0.4;
+export const MIN_HIT_SPEED = 0.015;
