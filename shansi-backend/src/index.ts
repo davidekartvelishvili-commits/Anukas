@@ -415,7 +415,12 @@ const port = parseInt(env.PORT);
 runStartupMigrations()
   .catch((e) => console.error("[startup migration fatal]", e))
   .finally(() => {
-    serve({ fetch: app.fetch, port }, () => {
+    const httpServer = serve({ fetch: app.fetch, port }, () => {
       console.log(`Shansi backend running on http://localhost:${port}`);
     });
+    // Attach Socket.io for multiplayer Air Hockey
+    import("./socket/index.js").then(({ setupSocketServer }) => {
+      setupSocketServer(httpServer);
+      console.log("[socket.io] Air Hockey multiplayer ready");
+    }).catch((e) => console.error("[socket.io setup]", e));
   });

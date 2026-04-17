@@ -4,14 +4,16 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 
-// Lazy-loaded after the engine + canvas are ready
 import type { GameState } from "@/components/air-hockey/AirHockeyEngine";
+import type { MultiplayerGameConfig } from "@/components/air-hockey/LobbyScreen";
+import { FIELD_W, FIELD_H } from "@/components/air-hockey/AirHockeyEngine";
 
 type Difficulty = "easy" | "medium" | "hard";
 type GoalTarget = 5 | 10 | 15 | 20;
+type Mode = "menu" | "lobby" | "playing" | "finished";
 
 const GOAL_OPTIONS: GoalTarget[] = [5, 10, 15, 20];
-const SELECTOR_ACTIVE = "#A8E06C"; // matches Today's Promos card on home
+const SELECTOR_ACTIVE = "#A8E06C";
 const SELECTOR_ACTIVE_TEXT = "#0A0F1C";
 
 const DIFFICULTY_OPTIONS: { value: Difficulty; label: string; labelKa: string }[] = [
@@ -20,9 +22,23 @@ const DIFFICULTY_OPTIONS: { value: Difficulty; label: string; labelKa: string }[
   { value: "hard", label: "Hard", labelKa: "რთული" },
 ];
 
+// ── Multiplayer state held outside React for socket handler access ────────────
+
+interface MultiplayerState {
+  roomId: string;
+  yourSide: "bottom" | "top";
+  wager: number;
+  goalTarget: number;
+  opponentName: string;
+  opponentDisconnected: boolean;
+  robotActive: boolean;
+  disconnectCountdown: number;
+}
+
 export default function AirHockeyPage() {
   const router = useRouter();
-  const [phase, setPhase] = useState<"menu" | "playing" | "finished">("menu");
+  const [mode, setMode] = useState<Mode>("menu");
+  const [multiplayer, setMultiplayer] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [goalTarget, setGoalTarget] = useState<GoalTarget>(5);
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -31,12 +47,20 @@ export default function AirHockeyPage() {
   const gameLoopRef = useRef<number>(0);
   const stateRef = useRef<GameState | null>(null);
 
+  // Multiplayer state
+  const [mpConfig, setMpConfig] = useState<MultiplayerState | null>(null);
+  const [mpGameOver, setMpGameOver] = useState<{
+    won: boolean;
+    scorePlayer: number;
+    scoreOpponent: number;
+    opponentWasRobot: boolean;
+  } | null>(null);
+
   // Measure available space for the canvas
   useEffect(() => {
     function measure() {
       const maxW = Math.min(window.innerWidth - 16, 420);
-      const maxH = window.innerHeight - 180; // leave room for header + bottom
-      // Field is portrait: aspect ratio ~1:1.6
+      const maxH = window.innerHeight - 180;
       const fieldAspect = 1.6;
       let w = maxW;
       let h = w * fieldAspect;
@@ -48,37 +72,52 @@ export default function AirHockeyPage() {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  // Start game
-  const startGame = useCallback(async () => {
+  // Connect socket when entering lobby
+  useEffect(() => {
+    if (mode !== "lobby") return;
+
+    let socket: ReturnType<typeof import("@/services/socket").getSocket> | null = null;
+
+    import("@/services/socket").then(({ connectSocket }) => {
+      const token = localStorage.getItem("shansi_token") || "";
+      socket = connectSocket(token);
+    });
+
+    return () => {
+      // Don't disconnect when transitioning to playing — only on full exit
+    };
+  }, [mode]);
+
+  // ── Single player: Start game ───────────────────────────────────────────────
+
+  const startSinglePlayer = useCallback(async () => {
     const engine = await import("@/components/air-hockey/AirHockeyEngine");
     engineRef.current = engine;
     const initial = engine.createInitialState(goalTarget, difficulty);
     stateRef.current = initial;
     setGameState(initial);
-    setPhase("playing");
+    setMultiplayer(false);
+    setMode("playing");
   }, [goalTarget, difficulty]);
 
-  // Game loop
+  // ── Single player: Game loop ────────────────────────────────────────────────
+
   useEffect(() => {
-    if (phase !== "playing" || !engineRef.current) return;
+    if (mode !== "playing" || multiplayer || !engineRef.current) return;
     let lastTime = 0;
 
     function tick(time: number) {
       if (!engineRef.current || !stateRef.current) return;
-      const dt = lastTime ? Math.min((time - lastTime) / 16.667, 3) : 1; // normalized to 60fps
+      const dt = lastTime ? Math.min((time - lastTime) / 16.667, 3) : 1;
       lastTime = time;
 
       let s = stateRef.current;
-
-      // Engine handles goal-pause internally (_goalPauseFrames counts
-      // down 60 frames then auto-resets). All we do is call updateGame
-      // every frame — it returns unchanged state during the pause.
       s = engineRef.current.updateGame(s, dt);
 
       if (s.status === "finished") {
         stateRef.current = s;
         setGameState(s);
-        setPhase("finished");
+        setMode("finished");
         return;
       }
 
@@ -89,20 +128,162 @@ export default function AirHockeyPage() {
 
     gameLoopRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(gameLoopRef.current);
-  }, [phase]);
+  }, [mode, multiplayer]);
 
-  // Player input
+  // ── Single player: Player input ─────────────────────────────────────────────
+
   const handlePlayerMove = useCallback((x: number, y: number) => {
+    if (multiplayer) {
+      // In multiplayer, send paddle position to server
+      import("@/services/socket").then(({ getSocket }) => {
+        const socket = getSocket();
+        socket.emit("paddleMove", { x, y });
+      });
+      return;
+    }
     if (!engineRef.current || !stateRef.current) return;
     stateRef.current = engineRef.current.movePlayer(stateRef.current, x, y);
+  }, [multiplayer]);
+
+  // ── Multiplayer: handle lobby → game start ──────────────────────────────────
+
+  const handleMultiplayerGameStart = useCallback((config: MultiplayerGameConfig) => {
+    setMpConfig({
+      roomId: config.roomId,
+      yourSide: config.yourSide,
+      wager: config.wager,
+      goalTarget: config.goalTarget,
+      opponentName: config.opponentName,
+      opponentDisconnected: false,
+      robotActive: false,
+      disconnectCountdown: 15,
+    });
+    setMultiplayer(true);
+    setMpGameOver(null);
+    setMode("playing");
+
+    // Listen for multiplayer game events
+    import("@/services/socket").then(({ getSocket }) => {
+      const socket = getSocket();
+
+      // Remove any old listeners to avoid duplication
+      socket.off("gameState");
+      socket.off("gameOver");
+      socket.off("opponentDisconnected");
+      socket.off("robotTakeover");
+
+      socket.on("gameState", (serverState: GameState) => {
+        // If we are "top" side, flip the state for display
+        setGameState(serverState);
+      });
+
+      socket.on("gameOver", (data: {
+        winner: "bottom" | "top";
+        score: { bottom: number; top: number };
+        opponentWasRobot: boolean;
+      }) => {
+        const yourSide = config.yourSide;
+        const won = data.winner === yourSide;
+        const scorePlayer = yourSide === "bottom" ? data.score.bottom : data.score.top;
+        const scoreOpponent = yourSide === "bottom" ? data.score.top : data.score.bottom;
+
+        setMpGameOver({
+          won,
+          scorePlayer,
+          scoreOpponent,
+          opponentWasRobot: data.opponentWasRobot,
+        });
+        setMode("finished");
+      });
+
+      socket.on("opponentDisconnected", (data: { countdown: number }) => {
+        setMpConfig((prev) =>
+          prev ? { ...prev, opponentDisconnected: true, disconnectCountdown: data.countdown } : prev
+        );
+      });
+
+      socket.on("robotTakeover", () => {
+        setMpConfig((prev) =>
+          prev ? { ...prev, robotActive: true } : prev
+        );
+      });
+    });
   }, []);
 
-  // Restart
+  // ── Multiplayer: handle rematch ─────────────────────────────────────────────
+
+  const handleMultiplayerRematch = useCallback(() => {
+    if (!mpConfig) return;
+    import("@/services/socket").then(({ getSocket }) => {
+      const socket = getSocket();
+      socket.emit("rematch", { roomId: mpConfig.roomId });
+    });
+    setMpGameOver(null);
+    setMode("playing");
+  }, [mpConfig]);
+
+  // ── Navigation helpers ──────────────────────────────────────────────────────
+
   const handleRestart = () => {
-    setPhase("menu");
+    setMode("menu");
     setGameState(null);
     stateRef.current = null;
+    setMultiplayer(false);
+    setMpConfig(null);
+    setMpGameOver(null);
   };
+
+  const handleBackToMenu = () => {
+    if (multiplayer && mpConfig) {
+      import("@/services/socket").then(({ getSocket }) => {
+        const socket = getSocket();
+        socket.emit("leaveRoom", { roomId: mpConfig.roomId });
+        socket.off("gameState");
+        socket.off("gameOver");
+        socket.off("opponentDisconnected");
+        socket.off("robotTakeover");
+      });
+    }
+    handleRestart();
+  };
+
+  // ── Flip helper for top-side multiplayer ────────────────────────────────────
+  // When yourSide === "top", we need to flip the y-axis so the player
+  // always sees themselves at the bottom of the screen.
+
+  const displayState = (() => {
+    if (!gameState) return null;
+    if (!multiplayer || !mpConfig || mpConfig.yourSide === "bottom") return gameState;
+
+    // Flip: invert all y coordinates, swap player/opponent
+    return {
+      ...gameState,
+      puck: {
+        ...gameState.puck,
+        x: gameState.puck.x,
+        y: FIELD_H - gameState.puck.y,
+        vx: gameState.puck.vx,
+        vy: -gameState.puck.vy,
+      },
+      player: {
+        ...gameState.opponent, // server's "opponent" is actually us when flipped
+        y: FIELD_H - gameState.opponent.y,
+      },
+      opponent: {
+        ...gameState.player, // server's "player" (bottom) is our opponent
+        y: FIELD_H - gameState.player.y,
+      },
+      score: {
+        player: gameState.score.opponent,
+        opponent: gameState.score.player,
+      },
+      winner: gameState.winner === "player"
+        ? "opponent" as const
+        : gameState.winner === "opponent"
+          ? "player" as const
+          : null,
+    };
+  })();
 
   return (
     <AuthGuard>
@@ -113,7 +294,16 @@ export default function AirHockeyPage() {
           style={{ height: 56, paddingTop: "env(safe-area-inset-top, 0px)" }}
         >
           <button
-            onClick={() => router.back()}
+            onClick={() => {
+              if (mode === "lobby") {
+                setMode("menu");
+                setMultiplayer(false);
+              } else if (mode === "playing" || mode === "finished") {
+                handleBackToMenu();
+              } else {
+                router.back();
+              }
+            }}
             className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
             style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
           >
@@ -130,8 +320,8 @@ export default function AirHockeyPage() {
           <div className="w-10" />
         </div>
 
-        {/* Menu */}
-        {phase === "menu" && (
+        {/* ── Menu ─────────────────────────────────────────────────── */}
+        {mode === "menu" && (
           <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6 max-w-[380px] w-full">
             {/* Difficulty */}
             <div className="w-full">
@@ -181,45 +371,70 @@ export default function AirHockeyPage() {
               </div>
             </div>
 
-            {/* Start button — pill shape matching activate/signup buttons */}
-            <button
-              onClick={startGame}
-              className="w-[200px] h-[58px] rounded-[29px] text-[17px] font-bold active:scale-[0.96] transition-transform"
-              style={{
-                background: "#FFE500",
-                color: "#0A0F1C",
-                fontFamily: "var(--font-outfit)",
-              }}
-            >
-              დაწყება
-            </button>
-
+            {/* Mode buttons */}
+            <div className="flex flex-col gap-3 items-center w-full">
+              <button
+                onClick={startSinglePlayer}
+                className="w-[200px] h-[58px] rounded-[29px] text-[17px] font-bold active:scale-[0.96] transition-transform"
+                style={{
+                  background: "#1C2539",
+                  color: "#F1F5F9",
+                  fontFamily: "var(--font-outfit)",
+                }}
+              >
+                vs Robot
+              </button>
+              <button
+                onClick={() => setMode("lobby")}
+                className="w-[200px] h-[58px] rounded-[29px] text-[17px] font-bold active:scale-[0.96] transition-transform"
+                style={{
+                  background: "#FFE500",
+                  color: "#0A0F1C",
+                  fontFamily: "var(--font-outfit)",
+                }}
+              >
+                Multiplayer
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Game */}
-        {phase === "playing" && gameState && canvasSize.w > 0 && (
+        {/* ── Lobby ────────────────────────────────────────────────── */}
+        {mode === "lobby" && (
+          <LobbyScreenLazy onGameStart={handleMultiplayerGameStart} />
+        )}
+
+        {/* ── Playing ──────────────────────────────────────────────── */}
+        {mode === "playing" && displayState && canvasSize.w > 0 && (
           <div className="flex-1 flex flex-col items-center justify-center gap-3">
             {/* Score bar */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full" style={{ background: "#F97316" }} />
                 <span className="text-[24px] font-bold" style={{ color: "#F1F5F9", fontFamily: "var(--font-outfit)" }}>
-                  {gameState.score.opponent}
+                  {displayState.score.opponent}
                 </span>
               </div>
               <span className="text-[16px]" style={{ color: "#475569" }}>—</span>
               <div className="flex items-center gap-2">
                 <span className="text-[24px] font-bold" style={{ color: "#F1F5F9", fontFamily: "var(--font-outfit)" }}>
-                  {gameState.score.player}
+                  {displayState.score.player}
                 </span>
                 <div className="w-3 h-3 rounded-full" style={{ background: "#FFE500" }} />
               </div>
             </div>
 
+            {/* Multiplayer opponent name */}
+            {multiplayer && mpConfig && (
+              <p className="text-[11px]" style={{ color: "#64748B", fontFamily: "var(--font-dm-sans)" }}>
+                vs {mpConfig.opponentName}
+                {mpConfig.robotActive && " (Robot)"}
+              </p>
+            )}
+
             {/* Canvas */}
             <GameCanvasLazy
-              gameState={gameState}
+              gameState={displayState}
               onPlayerMove={handlePlayerMove}
               width={canvasSize.w}
               height={canvasSize.h}
@@ -227,13 +442,13 @@ export default function AirHockeyPage() {
 
             {/* Goal target info */}
             <p className="text-[11px]" style={{ color: "#64748B", fontFamily: "var(--font-dm-sans)" }}>
-              პირველი {goalTarget} გოლამდე
+              პირველი {multiplayer && mpConfig ? mpConfig.goalTarget : goalTarget} გოლამდე
             </p>
           </div>
         )}
 
-        {/* Finished */}
-        {phase === "finished" && gameState && (
+        {/* ── Finished (single player) ─────────────────────────────── */}
+        {mode === "finished" && !multiplayer && gameState && (
           <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6">
             <div
               className="w-20 h-20 rounded-full flex items-center justify-center"
@@ -273,7 +488,7 @@ export default function AirHockeyPage() {
                 მენიუ
               </button>
               <button
-                onClick={startGame}
+                onClick={startSinglePlayer}
                 className="flex-1 py-3 rounded-[12px] text-[14px] font-bold active:scale-[0.97] transition-transform"
                 style={{
                   background: "#FFE500",
@@ -286,22 +501,45 @@ export default function AirHockeyPage() {
             </div>
           </div>
         )}
+
+        {/* ── Finished (multiplayer) ───────────────────────────────── */}
+        {mode === "finished" && multiplayer && mpGameOver && (
+          <GameOverModalLazy
+            won={mpGameOver.won}
+            scorePlayer={mpGameOver.scorePlayer}
+            scoreOpponent={mpGameOver.scoreOpponent}
+            wager={mpConfig?.wager ?? 0}
+            opponentWasRobot={mpGameOver.opponentWasRobot}
+            onMenu={handleBackToMenu}
+            onRematch={handleMultiplayerRematch}
+          />
+        )}
+
+        {/* ── Disconnect overlay ───────────────────────────────────── */}
+        {mode === "playing" && multiplayer && mpConfig?.opponentDisconnected && (
+          <DisconnectOverlayLazy
+            countdownTotal={mpConfig.disconnectCountdown}
+            robotActive={mpConfig.robotActive}
+          />
+        )}
       </div>
     </AuthGuard>
   );
 }
 
-// Lazy wrapper for GameCanvas (imported dynamically since the engine
-// is loaded asynchronously on game start)
+// ── Lazy wrappers ─────────────────────────────────────────────────────────────
+
+import { useState as useStateLazy, useEffect as useEffectLazy } from "react";
+
 function GameCanvasLazy(props: {
   gameState: GameState;
   onPlayerMove: (x: number, y: number) => void;
   width: number;
   height: number;
 }) {
-  const [Canvas, setCanvas] = useState<React.ComponentType<typeof props> | null>(null);
+  const [Canvas, setCanvas] = useStateLazy<React.ComponentType<typeof props> | null>(null);
 
-  useEffect(() => {
+  useEffectLazy(() => {
     import("@/components/air-hockey/GameCanvas").then((mod) => {
       setCanvas(() => mod.default);
     });
@@ -309,4 +547,65 @@ function GameCanvasLazy(props: {
 
   if (!Canvas) return <div style={{ width: props.width, height: props.height, background: "#141B2D", borderRadius: 16 }} />;
   return <Canvas {...props} />;
+}
+
+function LobbyScreenLazy(props: {
+  onGameStart: (config: MultiplayerGameConfig) => void;
+}) {
+  const [Lobby, setLobby] = useStateLazy<React.ComponentType<typeof props> | null>(null);
+
+  useEffectLazy(() => {
+    import("@/components/air-hockey/LobbyScreen").then((mod) => {
+      setLobby(() => mod.default);
+    });
+  }, []);
+
+  if (!Lobby) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div
+          className="w-8 h-8 rounded-full border-[3px] border-t-transparent animate-spin"
+          style={{ borderColor: "#FFE500 transparent #FFE500 #FFE500" }}
+        />
+      </div>
+    );
+  }
+  return <Lobby {...props} />;
+}
+
+function GameOverModalLazy(props: {
+  won: boolean;
+  scorePlayer: number;
+  scoreOpponent: number;
+  wager: number;
+  opponentWasRobot: boolean;
+  onMenu: () => void;
+  onRematch: () => void;
+}) {
+  const [Modal, setModal] = useStateLazy<React.ComponentType<typeof props> | null>(null);
+
+  useEffectLazy(() => {
+    import("@/components/air-hockey/GameOverModal").then((mod) => {
+      setModal(() => mod.default);
+    });
+  }, []);
+
+  if (!Modal) return null;
+  return <Modal {...props} />;
+}
+
+function DisconnectOverlayLazy(props: {
+  countdownTotal: number;
+  robotActive: boolean;
+}) {
+  const [Overlay, setOverlay] = useStateLazy<React.ComponentType<typeof props> | null>(null);
+
+  useEffectLazy(() => {
+    import("@/components/air-hockey/DisconnectOverlay").then((mod) => {
+      setOverlay(() => mod.default);
+    });
+  }, []);
+
+  if (!Overlay) return null;
+  return <Overlay {...props} />;
 }
