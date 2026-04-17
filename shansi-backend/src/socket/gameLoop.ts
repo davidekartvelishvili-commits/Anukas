@@ -9,12 +9,13 @@ const PADDLE_RADIUS = 0.065;
 const CENTER_LINE = FIELD_H / 2;
 const GOAL_WIDTH = 0.28;
 
-const MAX_PUCK_SPEED = 0.04;
-const FRICTION = 0.998;
-const WALL_RESTITUTION = 0.85;
-const PADDLE_RESTITUTION = 0.85;
-const PADDLE_TRANSFER = 0.25;
-const MIN_HIT_SPEED = 0.005;
+// ── Identical to bot mode (AirHockeyEngine.ts) — both run at 60fps ──
+const MAX_PUCK_SPEED = 0.06;    // bot: PUCK_MAX_SPEED = 0.06
+const FRICTION = 0.997;          // bot: PUCK_FRICTION = 0.997
+const WALL_RESTITUTION = 0.85;   // bot: WALL_RESTITUTION = 0.85
+const PADDLE_RESTITUTION = 0.85; // bot: implicit in collision reflect
+const PADDLE_TRANSFER = 1.4;     // bot: PADDLE_INFLUENCE = 1.4
+const MIN_HIT_SPEED = 0.0003;    // bot: PUCK_MIN_SPEED = 0.0003
 
 const TICK_MS = 1000 / 60;     // 60fps — matches bot mode for reliable collision
 const GOAL_PAUSE_FRAMES = 60;  // 1s at 60fps
@@ -70,8 +71,8 @@ function createInitialState(goalTarget: number): ServerGameState {
     puck: {
       x: FIELD_W / 2,
       y: FIELD_H / 2,
-      vx: (Math.random() - 0.5) * 0.002,
-      vy: (Math.random() > 0.5 ? 1 : -1) * 0.003,
+      vx: (Math.random() - 0.5) * 0.003,         // bot: same
+      vy: 0.004 + Math.random() * 0.002,          // bot: same (0.004-0.006)
       r: PUCK_RADIUS,
     },
     paddles: {
@@ -89,8 +90,8 @@ function createInitialState(goalTarget: number): ServerGameState {
 function resetPuckAfterGoal(state: ServerGameState, scoredOn: "bottom" | "top"): void {
   state.puck.x = FIELD_W / 2;
   state.puck.y = FIELD_H / 2;
-  state.puck.vx = (Math.random() - 0.5) * 0.002;
-  state.puck.vy = scoredOn === "bottom" ? 0.003 : -0.003;
+  state.puck.vx = (Math.random() - 0.5) * 0.003;  // bot: same
+  state.puck.vy = scoredOn === "bottom" ? 0.005 : -0.005; // bot: same
 }
 
 // ── Wall bounce ──
