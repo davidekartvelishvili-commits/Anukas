@@ -5,7 +5,7 @@ import type { Server as IOServer } from "socket.io";
 const FIELD_W = 1.0;
 const FIELD_H = 1.5;
 const PUCK_RADIUS = 0.04;
-const PADDLE_RADIUS = 0.09;
+const PADDLE_RADIUS = 0.075;
 const CENTER_LINE = FIELD_H / 2;
 const GOAL_WIDTH = 0.28;
 
@@ -75,8 +75,8 @@ function createInitialState(goalTarget: number): ServerGameState {
       r: PUCK_RADIUS,
     },
     paddles: {
-      bottom: { x: FIELD_W / 2, y: FIELD_H - 0.12, r: PADDLE_RADIUS },
-      top: { x: FIELD_W / 2, y: 0.12, r: PADDLE_RADIUS },
+      bottom: { x: FIELD_W / 2, y: FIELD_H - 0.12, r: PADDLE_RADIUS, prevX: FIELD_W / 2, prevY: FIELD_H - 0.12 },
+      top: { x: FIELD_W / 2, y: 0.12, r: PADDLE_RADIUS, prevX: FIELD_W / 2, prevY: 0.12 },
     },
     score: { bottom: 0, top: 0 },
     goalTarget,
@@ -191,17 +191,17 @@ function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
   // 1. Check current paddle position
   if (tryResolve(paddle.x, paddle.y)) return;
 
-  // 2. Swept check — 4 evenly spaced points along paddle movement path
+  // 2. Swept check — only if paddle actually moved this tick
   if (paddle.prevX !== undefined && paddle.prevY !== undefined) {
     const prevX = paddle.prevX;
     const prevY = paddle.prevY;
-    const sweepDist = Math.sqrt((paddle.x - prevX) ** 2 + (paddle.y - prevY) ** 2);
-    if (sweepDist > 0) {
+    const actuallyMoved = Math.abs(paddle.x - prevX) > 0.0001 || Math.abs(paddle.y - prevY) > 0.0001;
+    if (actuallyMoved) {
       for (let i = 1; i <= 8; i++) {
         const t = i / 8;
         const sx = prevX + (paddle.x - prevX) * t;
         const sy = prevY + (paddle.y - prevY) * t;
-        if (tryResolve(sx, sy)) break; // one collision per tick max
+        if (tryResolve(sx, sy)) break;
       }
     }
   }
