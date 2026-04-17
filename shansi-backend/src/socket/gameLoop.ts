@@ -9,11 +9,11 @@ const PADDLE_RADIUS = 0.065;
 const CENTER_LINE = FIELD_H / 2;
 const GOAL_WIDTH = 0.28;
 
-const MAX_PUCK_SPEED = 0.06;   // same as bot
-const FRICTION = 0.997;         // same as bot
+const MAX_PUCK_SPEED = 0.04;
+const FRICTION = 0.998;
 const WALL_RESTITUTION = 0.85;
 const PADDLE_RESTITUTION = 0.85;
-const PADDLE_TRANSFER = 0.4;
+const PADDLE_TRANSFER = 0.25;
 const MIN_HIT_SPEED = 0.005;
 
 const TICK_MS = 1000 / 60;     // 60fps — matches bot mode for reliable collision
@@ -70,8 +70,8 @@ function createInitialState(goalTarget: number): ServerGameState {
     puck: {
       x: FIELD_W / 2,
       y: FIELD_H / 2,
-      vx: (Math.random() - 0.5) * 0.003,
-      vy: (Math.random() > 0.5 ? 1 : -1) * 0.005,
+      vx: (Math.random() - 0.5) * 0.002,
+      vy: (Math.random() > 0.5 ? 1 : -1) * 0.003,
       r: PUCK_RADIUS,
     },
     paddles: {
@@ -89,8 +89,8 @@ function createInitialState(goalTarget: number): ServerGameState {
 function resetPuckAfterGoal(state: ServerGameState, scoredOn: "bottom" | "top"): void {
   state.puck.x = FIELD_W / 2;
   state.puck.y = FIELD_H / 2;
-  state.puck.vx = (Math.random() - 0.5) * 0.003;
-  state.puck.vy = scoredOn === "bottom" ? 0.005 : -0.005;
+  state.puck.vx = (Math.random() - 0.5) * 0.002;
+  state.puck.vy = scoredOn === "bottom" ? 0.003 : -0.003;
 }
 
 // ── Wall bounce ──
