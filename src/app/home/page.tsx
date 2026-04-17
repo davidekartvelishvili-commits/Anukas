@@ -131,7 +131,11 @@ export default function HomePage() {
       // Fetch active games
       apiFetch("/games/config").then((data: any) => {
         if (data?.games) {
-          setActiveGameTypes(data.games.filter((g: any) => g.isActive).map((g: any) => g.gameType));
+          // Merge server-enabled game types with always-on games (Air Hockey
+          // is standalone — no game_config row, always available).
+          const serverTypes = data.games.filter((g: any) => g.isActive).map((g: any) => g.gameType);
+          const alwaysOn = ["air_hockey"];
+          setActiveGameTypes([...new Set([...serverTypes, ...alwaysOn])]);
         }
       }).catch(() => {});
     }
