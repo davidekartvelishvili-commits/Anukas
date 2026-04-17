@@ -133,8 +133,8 @@ function checkGoal(puck: PuckState): "bottom" | "top" | null {
 function resolvePaddleCollision(puck: PuckState, paddle: PaddleState, currentTick: number): void {
   const minDist = puck.r + paddle.r;
 
-  // Per-paddle cooldown — prevent re-catch within 4 ticks
-  if (paddle.lastHitTick !== undefined && currentTick - paddle.lastHitTick < 4) return;
+  // Per-paddle cooldown — prevent re-catch within 6 ticks
+  if (paddle.lastHitTick !== undefined && currentTick - paddle.lastHitTick < 6) return;
 
   const dx = puck.x - paddle.x;
   const dy = puck.y - paddle.y;
@@ -146,9 +146,9 @@ function resolvePaddleCollision(puck: PuckState, paddle: PaddleState, currentTic
   if (dist === 0) { nx = 0; ny = -1; }
   else { nx = dx / dist; ny = dy / dist; }
 
-  // Push puck to 110% of minDist to prevent re-catch next tick
-  puck.x = paddle.x + nx * (minDist * 1.1);
-  puck.y = paddle.y + ny * (minDist * 1.1);
+  // Push puck to 125% of minDist to prevent re-catch next tick
+  puck.x = paddle.x + nx * (minDist * 1.25);
+  puck.y = paddle.y + ny * (minDist * 1.25);
 
   const pvx = paddle.deltaVx ?? 0;
   const pvy = paddle.deltaVy ?? 0;
