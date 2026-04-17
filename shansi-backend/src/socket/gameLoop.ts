@@ -134,8 +134,8 @@ function checkGoal(puck: PuckState): "bottom" | "top" | null {
 function resolvePaddleCollision(puck: PuckState, paddle: PaddleState, currentTick: number): void {
   const minDist = puck.r + paddle.r;
 
-  // Collision cooldown — prevent double-bounce / sticking within 3 ticks
-  if (puck.lastCollisionTick !== undefined && currentTick - puck.lastCollisionTick < 3) return;
+  // Collision cooldown — prevent double-bounce within 1 tick
+  if (puck.lastCollisionTick !== undefined && currentTick - puck.lastCollisionTick < 1) return;
 
   // Helper: try resolving collision at a specific position
   const tryResolve = (px: number, py: number): boolean => {
@@ -181,13 +181,16 @@ function resolvePaddleCollision(puck: PuckState, paddle: PaddleState, currentTic
     const prevX = paddle.prevX;
     const prevY = paddle.prevY;
     const sweepDist = Math.sqrt((paddle.x - prevX) ** 2 + (paddle.y - prevY) ** 2);
-    if (sweepDist > 0.008) {
+    if (sweepDist > 0.003) {
       for (const t of [0.25, 0.5, 0.75]) {
         const checkX = prevX + (paddle.x - prevX) * t;
         const checkY = prevY + (paddle.y - prevY) * t;
-        if (tryResolve(checkX, checkY)) break; // only resolve once
+        if (tryResolve(checkX, checkY)) return;
       }
     }
+
+    // 3. Check previous position — catches puck already overlapping at tick start
+    tryResolve(prevX, prevY);
   }
 }
 
