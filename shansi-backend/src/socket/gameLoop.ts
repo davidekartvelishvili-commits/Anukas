@@ -5,7 +5,7 @@ import type { Server as IOServer } from "socket.io";
 const FIELD_W = 1.0;
 const FIELD_H = 1.5;
 const PUCK_RADIUS = 0.04;
-const PADDLE_RADIUS = 0.065;
+const PADDLE_RADIUS = 0.09;
 const CENTER_LINE = FIELD_H / 2;
 const GOAL_WIDTH = 0.28;
 
@@ -131,19 +131,24 @@ function checkGoal(puck: PuckState): "bottom" | "top" | null {
 // ── Paddle-puck collision with swept check ──
 
 function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
-  const minDist = (puck.r + paddle.r) * 1.2; // 20% larger for network-delay compensation
+  const minDist = puck.r + paddle.r;
 
   // Core collision response at a given paddle position
   const tryResolve = (px: number, py: number): boolean => {
     const dx = puck.x - px;
     const dy = puck.y - py;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist >= minDist || dist <= 0) return false;
+    if (dist >= minDist) return false;
 
-    const nx = dx / dist;
-    const ny = dy / dist;
+    // Handle puck exactly at paddle center — push straight up
+    let nx: number, ny: number;
+    if (dist === 0) {
+      nx = 0; ny = 1;
+    } else {
+      nx = dx / dist; ny = dy / dist;
+    }
 
-    // Push puck fully outside paddle
+    // Place puck exactly at minDist from paddle center
     puck.x = px + nx * minDist;
     puck.y = py + ny * minDist;
 
@@ -166,13 +171,18 @@ function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
       puck.vy *= s;
     }
 
-    // Guarantee full separation after resolve
+    // Final guarantee: exact placement at minDist
     const adx = puck.x - px;
     const ady = puck.y - py;
     const ad = Math.sqrt(adx * adx + ady * ady);
-    if (ad < minDist && ad > 0) {
-      puck.x = px + (adx / ad) * minDist;
-      puck.y = py + (ady / ad) * minDist;
+    if (ad < minDist) {
+      if (ad > 0) {
+        puck.x = px + (adx / ad) * minDist;
+        puck.y = py + (ady / ad) * minDist;
+      } else {
+        puck.x = px;
+        puck.y = py + minDist;
+      }
     }
 
     return true;
