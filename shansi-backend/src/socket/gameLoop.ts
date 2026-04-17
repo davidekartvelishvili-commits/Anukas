@@ -9,11 +9,11 @@ const PADDLE_RADIUS = 0.075;
 const CENTER_LINE = FIELD_H / 2;
 const GOAL_WIDTH = 0.28;
 
-const MAX_PUCK_SPEED = 0.04;
+const MAX_PUCK_SPEED = 0.025;
 const FRICTION = 0.997;
 const WALL_RESTITUTION = 0.85;
 const PADDLE_RESTITUTION = 0.85;
-const PADDLE_TRANSFER = 0.3;
+const PADDLE_TRANSFER = 0.2;
 const MAX_PADDLE_DELTA = 0.012;
 
 const TICK_MS = 1000 / 60;     // 60fps — matches bot mode for reliable collision
@@ -36,8 +36,8 @@ export interface PuckState {
 export interface PaddleState {
   x: number; y: number; r: number;
   prevX?: number; prevY?: number;
-  // Server-computed position delta (smoothed over 2 updates)
   deltaVx?: number; deltaVy?: number;
+  lastHitTick?: number; // prevents re-catch within 4 ticks
 }
 
 export interface ServerGameState {
@@ -70,8 +70,8 @@ function createInitialState(goalTarget: number): ServerGameState {
     puck: {
       x: FIELD_W / 2,
       y: FIELD_H / 2,
-      vx: (Math.random() - 0.5) * 0.003,         // bot: same
-      vy: 0.004 + Math.random() * 0.002,          // bot: same (0.004-0.006)
+      vx: (Math.random() - 0.5) * 0.002,
+      vy: (Math.random() > 0.5 ? 1 : -1) * 0.003,
       r: PUCK_RADIUS,
     },
     paddles: {
@@ -89,8 +89,8 @@ function createInitialState(goalTarget: number): ServerGameState {
 function resetPuckAfterGoal(state: ServerGameState, scoredOn: "bottom" | "top"): void {
   state.puck.x = FIELD_W / 2;
   state.puck.y = FIELD_H / 2;
-  state.puck.vx = (Math.random() - 0.5) * 0.003;  // bot: same
-  state.puck.vy = scoredOn === "bottom" ? 0.005 : -0.005; // bot: same
+  state.puck.vx = (Math.random() - 0.5) * 0.002;
+  state.puck.vy = scoredOn === "bottom" ? 0.003 : -0.003;
 }
 
 // ── Wall bounce ──
@@ -128,83 +128,55 @@ function checkGoal(puck: PuckState): "bottom" | "top" | null {
   return null;
 }
 
-// ── Paddle-puck collision with swept check ──
+// ── Paddle-puck collision — direct check only (sweep disabled) ──
 
-function resolvePaddleCollision(puck: PuckState, paddle: PaddleState): void {
+function resolvePaddleCollision(puck: PuckState, paddle: PaddleState, currentTick: number): void {
   const minDist = puck.r + paddle.r;
 
-  // Core collision response at a given paddle position
-  const tryResolve = (px: number, py: number): boolean => {
-    const dx = puck.x - px;
-    const dy = puck.y - py;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist >= minDist) return false;
+  // Per-paddle cooldown — prevent re-catch within 4 ticks
+  if (paddle.lastHitTick !== undefined && currentTick - paddle.lastHitTick < 4) return;
 
-    // Handle puck exactly at paddle center — push straight up
-    let nx: number, ny: number;
-    if (dist === 0) {
-      nx = 0; ny = 1;
-    } else {
-      nx = dx / dist; ny = dy / dist;
-    }
+  const dx = puck.x - paddle.x;
+  const dy = puck.y - paddle.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist >= minDist) return;
 
-    // Place puck exactly at minDist from paddle center
-    puck.x = px + nx * minDist;
-    puck.y = py + ny * minDist;
+  // Normal vector
+  let nx: number, ny: number;
+  if (dist === 0) { nx = 0; ny = -1; }
+  else { nx = dx / dist; ny = dy / dist; }
 
-    const pvx = paddle.deltaVx ?? 0;
-    const pvy = paddle.deltaVy ?? 0;
+  // Push puck to 110% of minDist to prevent re-catch next tick
+  puck.x = paddle.x + nx * (minDist * 1.1);
+  puck.y = paddle.y + ny * (minDist * 1.1);
 
-    const relVN = (puck.vx - pvx) * nx + (puck.vy - pvy) * ny;
-    if (relVN >= 0) return true; // already separating
+  const pvx = paddle.deltaVx ?? 0;
+  const pvy = paddle.deltaVy ?? 0;
 
-    puck.vx += -(1 + PADDLE_RESTITUTION) * relVN * nx;
-    puck.vy += -(1 + PADDLE_RESTITUTION) * relVN * ny;
+  const relVN = (puck.vx - pvx) * nx + (puck.vy - pvy) * ny;
+  if (relVN >= 0) {
+    paddle.lastHitTick = currentTick;
+    return; // already separating
+  }
 
-    puck.vx += pvx * PADDLE_TRANSFER;
-    puck.vy += pvy * PADDLE_TRANSFER;
+  // Impulse
+  puck.vx += -(1 + PADDLE_RESTITUTION) * relVN * nx;
+  puck.vy += -(1 + PADDLE_RESTITUTION) * relVN * ny;
 
-    const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
-    if (speed > MAX_PUCK_SPEED) {
-      const s = MAX_PUCK_SPEED / speed;
-      puck.vx *= s;
-      puck.vy *= s;
-    }
+  // Paddle transfer
+  puck.vx += pvx * PADDLE_TRANSFER;
+  puck.vy += pvy * PADDLE_TRANSFER;
 
-    // Final guarantee: exact placement at minDist
-    const adx = puck.x - px;
-    const ady = puck.y - py;
-    const ad = Math.sqrt(adx * adx + ady * ady);
-    if (ad < minDist) {
-      if (ad > 0) {
-        puck.x = px + (adx / ad) * minDist;
-        puck.y = py + (ady / ad) * minDist;
-      } else {
-        puck.x = px;
-        puck.y = py + minDist;
-      }
-    }
+  // Speed cap
+  const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+  if (speed > MAX_PUCK_SPEED) {
+    const s = MAX_PUCK_SPEED / speed;
+    puck.vx *= s;
+    puck.vy *= s;
+  }
 
-    return true;
-  };
-
-  // Direct distance check only — sweep DISABLED for ghost collision testing
-  tryResolve(paddle.x, paddle.y);
-
-  // SWEEP DISABLED — uncomment to re-enable after ghost collision is confirmed fixed
-  // if (paddle.prevX !== undefined && paddle.prevY !== undefined) {
-  //   const prevX = paddle.prevX;
-  //   const prevY = paddle.prevY;
-  //   const actuallyMoved = Math.abs(paddle.x - prevX) > 0.0001 || Math.abs(paddle.y - prevY) > 0.0001;
-  //   if (actuallyMoved) {
-  //     for (let i = 1; i <= 8; i++) {
-  //       const t = i / 8;
-  //       const sx = prevX + (paddle.x - prevX) * t;
-  //       const sy = prevY + (paddle.y - prevY) * t;
-  //       if (tryResolve(sx, sy)) break;
-  //     }
-  //   }
-  // }
+  // Record hit tick
+  paddle.lastHitTick = currentTick;
 }
 
 // ── Robot AI ──
@@ -301,10 +273,10 @@ function tick(
   resolveWallBounce(state.puck);
   // Only check collision with a paddle if puck is on that paddle's half
   if (state.puck.y >= CENTER_LINE - PUCK_RADIUS) {
-    resolvePaddleCollision(state.puck, state.paddles.bottom);
+    resolvePaddleCollision(state.puck, state.paddles.bottom, game.tickCount);
   }
   if (state.puck.y <= CENTER_LINE + PUCK_RADIUS) {
-    resolvePaddleCollision(state.puck, state.paddles.top);
+    resolvePaddleCollision(state.puck, state.paddles.top, game.tickCount);
   }
 
   // Goals
