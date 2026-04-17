@@ -11,10 +11,9 @@ const PUCK_MAX_SPEED = 0.06;
 const WALL_RESTITUTION = 0.85;
 const PADDLE_INFLUENCE = 1.4;
 const GOAL_WIDTH = 0.22;
-// 30fps server tick — 60fps was flooding mobile sockets with 60 state
-// messages/sec causing severe stutter. 30fps is smooth enough; the
-// client interpolates visually between received states.
-const TICK_MS = 1000 / 30;
+// 20fps server tick — keeps network lean while still feeling responsive.
+// Client does local paddle prediction at 60fps for instant feel.
+const TICK_MS = 1000 / 20;
 
 // Robot AI (medium difficulty)
 const ROBOT_REACTION_SPEED = 0.04;
@@ -251,7 +250,16 @@ function tick(
     if (state.goalPauseFrames <= 0) {
       state.status = "playing";
     }
-    io.to(roomId).emit("gameState", state);
+    // Send minimal payload — only fields the client needs to render.
+    // Avoids serializing the full state object every tick.
+    io.to(roomId).emit("gs", {
+      p: [state.puck.x, state.puck.y, state.puck.vx, state.puck.vy],
+      b: [state.paddles.bottom.x, state.paddles.bottom.y],
+      t: [state.paddles.top.x, state.paddles.top.y],
+      s: [state.score.bottom, state.score.top],
+      st: (state.status as string) === "playing" ? 1 : (state.status as string) === "goal" ? 2 : (state.status as string) === "finished" ? 3 : 0,
+      w: (state.winner as string) === "bottom" ? 1 : (state.winner as string) === "top" ? 2 : 0,
+    });
     return;
   }
 
@@ -290,7 +298,16 @@ function tick(
     if (state.score[scorer] >= state.goalTarget) {
       state.status = "finished";
       state.winner = scorer;
-      io.to(roomId).emit("gameState", state);
+      // Send minimal payload — only fields the client needs to render.
+    // Avoids serializing the full state object every tick.
+    io.to(roomId).emit("gs", {
+      p: [state.puck.x, state.puck.y, state.puck.vx, state.puck.vy],
+      b: [state.paddles.bottom.x, state.paddles.bottom.y],
+      t: [state.paddles.top.x, state.paddles.top.y],
+      s: [state.score.bottom, state.score.top],
+      st: (state.status as string) === "playing" ? 1 : (state.status as string) === "goal" ? 2 : (state.status as string) === "finished" ? 3 : 0,
+      w: (state.winner as string) === "bottom" ? 1 : (state.winner as string) === "top" ? 2 : 0,
+    });
       onGameOver(roomId, scorer);
       return;
     }
@@ -301,7 +318,16 @@ function tick(
     onGoal(roomId, scorer, { ...state.score });
   }
 
-  io.to(roomId).emit("gameState", state);
+  // Send minimal payload — only fields the client needs to render.
+    // Avoids serializing the full state object every tick.
+    io.to(roomId).emit("gs", {
+      p: [state.puck.x, state.puck.y, state.puck.vx, state.puck.vy],
+      b: [state.paddles.bottom.x, state.paddles.bottom.y],
+      t: [state.paddles.top.x, state.paddles.top.y],
+      s: [state.score.bottom, state.score.top],
+      st: (state.status as string) === "playing" ? 1 : (state.status as string) === "goal" ? 2 : (state.status as string) === "finished" ? 3 : 0,
+      w: (state.winner as string) === "bottom" ? 1 : (state.winner as string) === "top" ? 2 : 0,
+    });
 }
 
 export function updatePaddle(

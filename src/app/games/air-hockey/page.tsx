@@ -164,13 +164,26 @@ export default function AirHockeyPage() {
 
   // ── Single player: Player input ─────────────────────────────────────────────
 
+  // Throttle paddle sends to ~30/sec max to avoid flooding the socket
+  const lastPaddleSendRef = useRef(0);
+
   const handlePlayerMove = useCallback((x: number, y: number) => {
     if (multiplayer) {
-      // In multiplayer, send paddle position to server
-      import("@/services/socket").then(({ getSocket }) => {
-        const socket = getSocket();
-        socket.emit("paddleMove", { x, y });
-      });
+      // LOCAL PREDICTION: update the player paddle position in the
+      // ref INSTANTLY so the canvas draws it without waiting for the
+      // server roundtrip. The server state will reconcile on next tick.
+      const cur = mpStateRef.current;
+      if (cur) {
+        mpStateRef.current = { ...cur, player: { ...cur.player, x, y } };
+      }
+      // Send to server (throttled)
+      const now = performance.now();
+      if (now - lastPaddleSendRef.current > 33) { // ~30 sends/sec max
+        lastPaddleSendRef.current = now;
+        import("@/services/socket").then(({ getSocket }) => {
+          getSocket().emit("paddleMove", { x, y });
+        });
+      }
       return;
     }
     if (!engineRef.current || !stateRef.current) return;
@@ -199,45 +212,54 @@ export default function AirHockeyPage() {
       const socket = getSocket();
 
       // Remove any old listeners to avoid duplication
-      socket.off("gameState");
+      socket.off("gs");
       socket.off("gameOver");
       socket.off("opponentDisconnected");
       socket.off("robotTakeover");
 
-      socket.on("gameState", (serverState: any) => {
-        // Transform server state shape (paddles.bottom/top, score.bottom/top)
-        // into the GameState shape the canvas expects (player/opponent, score.player/opponent).
-        // If we are "top" side, swap player/opponent so we always see ourselves at the bottom.
+      // Decode minimal "gs" packets from server:
+      // { p:[x,y,vx,vy], b:[x,y], t:[x,y], s:[bottom,top], st:0-3, w:0-2 }
+      const STATUS_MAP: Record<number, "ready"|"playing"|"goal"|"finished"> = { 0: "ready", 1: "playing", 2: "goal", 3: "finished" };
+
+      socket.on("gs", (d: any) => {
         const yourSide = config.yourSide;
         const isBottom = yourSide === "bottom";
-        const myPaddle = isBottom ? serverState.paddles?.bottom : serverState.paddles?.top;
-        const theirPaddle = isBottom ? serverState.paddles?.top : serverState.paddles?.bottom;
+        const px = d.p[0], py = d.p[1], pvx = d.p[2], pvy = d.p[3];
+        const bx = d.b[0], by = d.b[1];
+        const tx = d.t[0], ty = d.t[1];
+
+        // Player's own paddle: keep LOCAL prediction position instead
+        // of overwriting with the server's (laggy) version. Only use
+        // server position for the OPPONENT's paddle.
+        const localPaddle = mpStateRef.current?.player;
+        const myX = localPaddle?.x ?? (isBottom ? bx : tx);
+        const myY = localPaddle?.y ?? (isBottom ? by : ty);
+        const theirX = isBottom ? tx : bx;
+        const theirY = isBottom ? ty : by;
 
         const transformed: GameState = {
           puck: isBottom
-            ? serverState.puck
-            : { ...serverState.puck, y: FIELD_H - serverState.puck.y, vy: -(serverState.puck.vy || 0) },
-          player: myPaddle
-            ? (isBottom
-              ? { x: myPaddle.x, y: myPaddle.y, r: myPaddle.r || 0.045 }
-              : { x: myPaddle.x, y: FIELD_H - myPaddle.y, r: myPaddle.r || 0.045 })
-            : { x: 0.5, y: FIELD_H * 0.82, r: 0.045 },
-          opponent: theirPaddle
-            ? (isBottom
-              ? { x: theirPaddle.x, y: theirPaddle.y, r: theirPaddle.r || 0.045 }
-              : { x: theirPaddle.x, y: FIELD_H - theirPaddle.y, r: theirPaddle.r || 0.045 })
-            : { x: 0.5, y: FIELD_H * 0.18, r: 0.045 },
-          score: {
-            player: isBottom ? (serverState.score?.bottom ?? 0) : (serverState.score?.top ?? 0),
-            opponent: isBottom ? (serverState.score?.top ?? 0) : (serverState.score?.bottom ?? 0),
+            ? { x: px, y: py, vx: pvx, vy: pvy, r: 0.025 }
+            : { x: px, y: FIELD_H - py, vx: pvx, vy: -pvy, r: 0.025 },
+          player: {
+            x: myX,
+            y: isBottom ? myY : FIELD_H - myY,
+            r: 0.045,
           },
-          goalTarget: serverState.goalTarget || config.goalTarget,
-          status: serverState.status || "playing",
-          winner: serverState.winner
-            ? (serverState.winner === yourSide ? "player" : "opponent")
-            : null,
+          opponent: {
+            x: theirX,
+            y: isBottom ? theirY : FIELD_H - theirY,
+            r: 0.045,
+          },
+          score: {
+            player: isBottom ? (d.s[0] ?? 0) : (d.s[1] ?? 0),
+            opponent: isBottom ? (d.s[1] ?? 0) : (d.s[0] ?? 0),
+          },
+          goalTarget: config.goalTarget,
+          status: STATUS_MAP[d.st] || "playing",
+          winner: d.w === 0 ? null : (d.w === 1 ? (isBottom ? "player" : "opponent") : (isBottom ? "opponent" : "player")),
           robotDifficulty: "medium",
-          _goalPauseFrames: serverState.goalPauseFrames || 0,
+          _goalPauseFrames: 0,
           _lastScoredOn: null,
         };
         // Write to ref — the canvas reads stateRef.current on every draw
