@@ -199,20 +199,51 @@ export default function AirHockeyPage() {
       socket.off("opponentDisconnected");
       socket.off("robotTakeover");
 
-      socket.on("gameState", (serverState: GameState) => {
-        // If we are "top" side, flip the state for display
-        setGameState(serverState);
+      socket.on("gameState", (serverState: any) => {
+        // Transform server state shape (paddles.bottom/top, score.bottom/top)
+        // into the GameState shape the canvas expects (player/opponent, score.player/opponent).
+        // If we are "top" side, swap player/opponent so we always see ourselves at the bottom.
+        const yourSide = config.yourSide;
+        const isBottom = yourSide === "bottom";
+        const myPaddle = isBottom ? serverState.paddles?.bottom : serverState.paddles?.top;
+        const theirPaddle = isBottom ? serverState.paddles?.top : serverState.paddles?.bottom;
+
+        const transformed: GameState = {
+          puck: isBottom
+            ? serverState.puck
+            : { ...serverState.puck, y: FIELD_H - serverState.puck.y, vy: -(serverState.puck.vy || 0) },
+          player: myPaddle
+            ? (isBottom
+              ? { x: myPaddle.x, y: myPaddle.y, r: myPaddle.r || 0.045 }
+              : { x: myPaddle.x, y: FIELD_H - myPaddle.y, r: myPaddle.r || 0.045 })
+            : { x: 0.5, y: FIELD_H * 0.82, r: 0.045 },
+          opponent: theirPaddle
+            ? (isBottom
+              ? { x: theirPaddle.x, y: theirPaddle.y, r: theirPaddle.r || 0.045 }
+              : { x: theirPaddle.x, y: FIELD_H - theirPaddle.y, r: theirPaddle.r || 0.045 })
+            : { x: 0.5, y: FIELD_H * 0.18, r: 0.045 },
+          score: {
+            player: isBottom ? (serverState.score?.bottom ?? 0) : (serverState.score?.top ?? 0),
+            opponent: isBottom ? (serverState.score?.top ?? 0) : (serverState.score?.bottom ?? 0),
+          },
+          goalTarget: serverState.goalTarget || config.goalTarget,
+          status: serverState.status || "playing",
+          winner: serverState.winner
+            ? (serverState.winner === yourSide ? "player" : "opponent")
+            : null,
+          robotDifficulty: "medium",
+          _goalPauseFrames: serverState.goalPauseFrames || 0,
+          _lastScoredOn: null,
+        };
+        setGameState(transformed);
       });
 
-      socket.on("gameOver", (data: {
-        winner: "bottom" | "top";
-        score: { bottom: number; top: number };
-        opponentWasRobot: boolean;
-      }) => {
+      socket.on("gameOver", (data: any) => {
         const yourSide = config.yourSide;
         const won = data.winner === yourSide;
-        const scorePlayer = yourSide === "bottom" ? data.score.bottom : data.score.top;
-        const scoreOpponent = yourSide === "bottom" ? data.score.top : data.score.bottom;
+        const score = data.score || { bottom: 0, top: 0 };
+        const scorePlayer = yourSide === "bottom" ? (score.bottom ?? 0) : (score.top ?? 0);
+        const scoreOpponent = yourSide === "bottom" ? (score.top ?? 0) : (score.bottom ?? 0);
 
         setMpGameOver({
           won,
