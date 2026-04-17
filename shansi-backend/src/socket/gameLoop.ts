@@ -128,55 +128,68 @@ function checkGoal(puck: PuckState): "bottom" | "top" | null {
   return null;
 }
 
-// ── Paddle-puck collision — direct check only (sweep disabled) ──
+// ── Paddle-puck collision ──
 
-function resolvePaddleCollision(puck: PuckState, paddle: PaddleState, currentTick: number): void {
+/** Resolve velocity only — assumes puck is already pushed out. */
+function resolveVelocity(puck: PuckState, paddle: PaddleState, nx: number, ny: number): void {
+  const pvx = paddle.deltaVx ?? 0;
+  const pvy = paddle.deltaVy ?? 0;
+  const relVN = (puck.vx - pvx) * nx + (puck.vy - pvy) * ny;
+  if (relVN >= 0) return; // already separating
+
+  const impulse = -(1 + 0.75) * relVN; // restitution 0.75
+  puck.vx += impulse * nx + pvx * PADDLE_TRANSFER;
+  puck.vy += impulse * ny + pvy * PADDLE_TRANSFER;
+
+  const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+  if (speed > MAX_PUCK_SPEED) {
+    puck.vx = (puck.vx / speed) * MAX_PUCK_SPEED;
+    puck.vy = (puck.vy / speed) * MAX_PUCK_SPEED;
+  }
+}
+
+/** Full collision check at a specific point (px, py). Push-out first, then velocity. */
+function checkAndResolveAt(
+  puck: PuckState, paddle: PaddleState, px: number, py: number, currentTick: number
+): boolean {
+  const dx = puck.x - px;
+  const dy = puck.y - py;
+  const dist = Math.sqrt(dx * dx + dy * dy);
   const minDist = puck.r + paddle.r;
 
-  // Per-paddle cooldown — prevent re-catch within 6 ticks
-  if (paddle.lastHitTick !== undefined && currentTick - paddle.lastHitTick < 6) return;
+  if (dist >= minDist) return false;
 
-  const dx = puck.x - paddle.x;
-  const dy = puck.y - paddle.y;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist >= minDist) return;
-
-  // Normal vector
+  // STEP 1: Push out FIRST — always, even during cooldown
   let nx: number, ny: number;
   if (dist === 0) { nx = 0; ny = -1; }
   else { nx = dx / dist; ny = dy / dist; }
+  puck.x = px + nx * minDist * 1.05;
+  puck.y = py + ny * minDist * 1.05;
 
-  // Push puck to 125% of minDist to prevent re-catch next tick
-  puck.x = paddle.x + nx * (minDist * 1.25);
-  puck.y = paddle.y + ny * (minDist * 1.25);
-
-  const pvx = paddle.deltaVx ?? 0;
-  const pvy = paddle.deltaVy ?? 0;
-
-  const relVN = (puck.vx - pvx) * nx + (puck.vy - pvy) * ny;
-  if (relVN >= 0) {
+  // STEP 2: Velocity resolve only if cooldown has expired
+  if (paddle.lastHitTick === undefined || currentTick - paddle.lastHitTick >= 6) {
+    resolveVelocity(puck, paddle, nx, ny);
     paddle.lastHitTick = currentTick;
-    return; // already separating
   }
 
-  // Impulse
-  puck.vx += -(1 + PADDLE_RESTITUTION) * relVN * nx;
-  puck.vy += -(1 + PADDLE_RESTITUTION) * relVN * ny;
+  return true;
+}
 
-  // Paddle transfer
-  puck.vx += pvx * PADDLE_TRANSFER;
-  puck.vy += pvy * PADDLE_TRANSFER;
+/** Main collision entry — direct check + fast-swipe midpoint sweep. */
+function handlePaddleCollision(puck: PuckState, paddle: PaddleState, currentTick: number): void {
+  // 1. Direct position check
+  if (checkAndResolveAt(puck, paddle, paddle.x, paddle.y, currentTick)) return;
 
-  // Speed cap
-  const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
-  if (speed > MAX_PUCK_SPEED) {
-    const s = MAX_PUCK_SPEED / speed;
-    puck.vx *= s;
-    puck.vy *= s;
+  // 2. Fast-swipe midpoint sweep (only for genuinely fast moves)
+  const prevX = paddle.prevX ?? paddle.x;
+  const prevY = paddle.prevY ?? paddle.y;
+  const sweepDist = Math.sqrt((paddle.x - prevX) ** 2 + (paddle.y - prevY) ** 2);
+
+  if (sweepDist > 0.015) {
+    const mx = (prevX + paddle.x) / 2;
+    const my = (prevY + paddle.y) / 2;
+    checkAndResolveAt(puck, paddle, mx, my, currentTick);
   }
-
-  // Record hit tick
-  paddle.lastHitTick = currentTick;
 }
 
 // ── Robot AI ──
@@ -273,10 +286,10 @@ function tick(
   resolveWallBounce(state.puck);
   // Only check collision with a paddle if puck is on that paddle's half
   if (state.puck.y >= CENTER_LINE - PUCK_RADIUS) {
-    resolvePaddleCollision(state.puck, state.paddles.bottom, game.tickCount);
+    handlePaddleCollision(state.puck, state.paddles.bottom, game.tickCount);
   }
   if (state.puck.y <= CENTER_LINE + PUCK_RADIUS) {
-    resolvePaddleCollision(state.puck, state.paddles.top, game.tickCount);
+    handlePaddleCollision(state.puck, state.paddles.top, game.tickCount);
   }
 
   // Goals
