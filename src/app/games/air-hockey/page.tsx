@@ -240,10 +240,16 @@ export default function AirHockeyPage() {
           _goalPauseFrames: serverState.goalPauseFrames || 0,
           _lastScoredOn: null,
         };
-        // Server now ticks at 30fps (not 60) so this is 30 setState/sec
-        // which is manageable. The canvas rAF loop interpolates visually.
+        // Write to ref — the canvas reads stateRef.current on every draw
+        // frame (60fps) WITHOUT triggering React re-renders. We only call
+        // setGameState when the score changes so the React-rendered score
+        // bar updates. This eliminates 30 React reconciliation cycles/sec.
         mpStateRef.current = transformed;
-        setGameState(transformed);
+        const scoreKey = `${transformed.score.player}-${transformed.score.opponent}-${transformed.status}`;
+        if (scoreKey !== lastScoreRef.current) {
+          lastScoreRef.current = scoreKey;
+          setGameState(transformed);
+        }
       });
 
       socket.on("gameOver", (data: any) => {
@@ -501,6 +507,7 @@ export default function AirHockeyPage() {
             {/* Canvas */}
             <GameCanvasLazy
               gameState={displayState}
+              liveStateRef={multiplayer ? mpStateRef : undefined}
               onPlayerMove={handlePlayerMove}
               width={canvasSize.w}
               height={canvasSize.h}
@@ -599,11 +606,12 @@ import { useState as useStateLazy, useEffect as useEffectLazy } from "react";
 
 function GameCanvasLazy(props: {
   gameState: GameState;
+  liveStateRef?: React.RefObject<GameState | null>;
   onPlayerMove: (x: number, y: number) => void;
   width: number;
   height: number;
 }) {
-  const [Canvas, setCanvas] = useStateLazy<React.ComponentType<typeof props> | null>(null);
+  const [Canvas, setCanvas] = useStateLazy<React.ComponentType<any> | null>(null);
 
   useEffectLazy(() => {
     import("@/components/air-hockey/GameCanvas").then((mod) => {

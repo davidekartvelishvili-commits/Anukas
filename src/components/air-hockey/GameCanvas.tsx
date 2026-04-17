@@ -6,6 +6,10 @@ import { FIELD_W, FIELD_H } from "./AirHockeyEngine";
 
 interface GameCanvasProps {
   gameState: GameState;
+  /** Optional external ref — in multiplayer, the parent writes server
+   *  state to this ref 30x/sec WITHOUT re-rendering. The canvas rAF
+   *  loop reads from it directly for zero-latency rendering. */
+  liveStateRef?: React.RefObject<GameState | null>;
   onPlayerMove: (x: number, y: number) => void;
   width: number;
   height: number;
@@ -41,6 +45,7 @@ let plusOneAnim: { startTime: number; x: number; y: number; label: string } | nu
 
 export default function GameCanvas({
   gameState,
+  liveStateRef,
   onPlayerMove,
   width,
   height,
@@ -49,8 +54,14 @@ export default function GameCanvas({
   const rafRef = useRef<number>(0);
   const prevStatusRef = useRef<string>(gameState.status);
   const lastScoreRef = useRef({ player: 0, opponent: 0 });
-  // Cache score string so we only re-measure when it changes
   const scoreCacheRef = useRef<string>("");
+
+  // The rAF draw loop reads from this ref — NOT from the gameState
+  // prop closure (which only updates on React re-render). This lets
+  // the parent push 30+ state updates/sec via ref without triggering
+  // React reconciliation for each one.
+  const stateRef = useRef<GameState>(gameState);
+  stateRef.current = gameState; // sync on every render
 
   // ── Touch / mouse handling ──────────────────────────────────────
   // Finger offset: shift the paddle slightly UP from the touch point so
@@ -155,7 +166,9 @@ export default function GameCanvas({
     const draw = (now: number) => {
       const w = width;
       const h = height;
-      const state = gameState;
+      // Prefer liveStateRef (multiplayer — updated 30x/sec by parent
+      // without React re-render) over stateRef (synced from prop on render)
+      const state = (liveStateRef?.current) || stateRef.current;
 
       // Field bounds
       const fx = FIELD_PADDING;
