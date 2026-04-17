@@ -262,6 +262,9 @@ export default function HomePage() {
                   ) : game.id === 4 ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img src="/images/lucky-drop-cover.png" alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  ) : game.id === 5 ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src="/images/air-hockey-cover.png" alt="" className="absolute inset-0 w-full h-full object-cover" />
                   ) : (
                     <div className="absolute inset-0 opacity-20">
                       <div className="absolute top-[20%] left-[10%] w-[60px] h-[60px] rounded-full" style={{ background: "rgba(255,255,255,0.3)" }} />
