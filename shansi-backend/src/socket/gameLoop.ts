@@ -184,9 +184,11 @@ function handlePaddleCollision(puck: PuckState, paddle: PaddleState): void {
   const sweepDist = Math.sqrt((paddle.x - prevX) ** 2 + (paddle.y - prevY) ** 2);
 
   if (sweepDist > 0.005) {
-    const mx = (prevX + paddle.x) / 2;
-    const my = (prevY + paddle.y) / 2;
-    checkAndResolveAt(puck, paddle, mx, my);
+    for (const t of [0.25, 0.5, 0.75]) {
+      const sx = prevX + (paddle.x - prevX) * t;
+      const sy = prevY + (paddle.y - prevY) * t;
+      if (checkAndResolveAt(puck, paddle, sx, sy)) break;
+    }
   }
 }
 

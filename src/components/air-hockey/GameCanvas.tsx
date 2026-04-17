@@ -37,7 +37,7 @@ const CORNER_RADIUS = 16;
 const GOAL_WIDTH_RATIO = 0.28; // must match engine's GOAL_WIDTH
 const GOAL_HEIGHT = 12;
 const CENTER_CIRCLE_RATIO = 0.15;
-const PUCK_RADIUS_RATIO = 0.055;    // matches PUCK_RADIUS/FIELD_W visually
+const PUCK_RADIUS_RATIO = 0.044;    // 20% smaller visual than physics radius
 const PADDLE_RADIUS_RATIO = 0.085;   // matches PADDLE_RADIUS/FIELD_W visually
 
 // ── Goal animation state (module-level to survive re-renders) ──────
