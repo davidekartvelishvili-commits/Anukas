@@ -410,8 +410,8 @@ export function setupSocketServer(httpServer: any): void {
       removeFromQueue(socket.id);
     });
 
-    // ── paddleMove ──
-    socket.on("paddleMove", (data: { x: number; y: number }) => {
+    // ── paddleMove — includes client-computed velocity for better collision ──
+    socket.on("paddleMove", (data: { x: number; y: number; vx?: number; vy?: number }) => {
       const uid = getUserId(socket);
       if (!uid) return;
 
@@ -421,7 +421,7 @@ export function setupSocketServer(httpServer: any): void {
       const side = getPlayerSide(room, socket.id);
       if (!side) return;
 
-      updatePaddle(room.id, side, data.x, data.y);
+      updatePaddle(room.id, side, data.x, data.y, data.vx, data.vy);
     });
 
     // ── leaveRoom ──

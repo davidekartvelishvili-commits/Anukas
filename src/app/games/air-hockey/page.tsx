@@ -165,32 +165,35 @@ export default function AirHockeyPage() {
 
   // ── Single player: Player input ─────────────────────────────────────────────
 
-  // Throttle paddle sends to ~30/sec max to avoid flooding the socket
+  // Track paddle velocity on the client for accurate collision on server
   const lastPaddleSendRef = useRef(0);
+  const prevPaddleRef = useRef({ x: 0.5, y: 1.2, t: performance.now() });
 
   const handlePlayerMove = useCallback((x: number, y: number) => {
     if (multiplayer) {
-      // LOCAL PREDICTION: store position in SCREEN space so the canvas
-      // draws the paddle exactly where the finger is. No flip needed —
-      // the canvas renders player.y directly as a screen coordinate.
+      // LOCAL PREDICTION: instant visual feedback
       const cur = mpStateRef.current;
       if (cur) {
         mpStateRef.current = { ...cur, player: { ...cur.player, x, y } };
       }
 
-      // For the SERVER: convert to engine coords. If this player is
-      // "top" side, their screen-space bottom (y ≈ 1.3) maps to engine
-      // top-half (FIELD_H - 1.3 ≈ 0.3). The server's updatePaddle
-      // will clamp to the correct half regardless, but sending the
-      // right value reduces jitter.
+      // Convert to engine coords for the server
       const isTop = mpConfig?.yourSide === "top";
+      const engineX = x;
       const engineY = isTop ? MP_FIELD_H - y : y;
 
+      // Send with client-computed velocity (throttled to ~30/sec)
       const now = performance.now();
       if (now - lastPaddleSendRef.current > 33) {
+        const prev = prevPaddleRef.current;
+        const dt = Math.max((now - prev.t) / 1000, 0.001);
+        const vx = (engineX - prev.x) / dt;
+        const vy = (engineY - prev.y) / dt;
+        prevPaddleRef.current = { x: engineX, y: engineY, t: now };
         lastPaddleSendRef.current = now;
+
         import("@/services/socket").then(({ getSocket }) => {
-          getSocket().emit("paddleMove", { x, y: engineY });
+          getSocket().emit("paddleMove", { x: engineX, y: engineY, vx, vy });
         });
       }
       return;
