@@ -114,8 +114,10 @@ export function createInitialState(
     puck: {
       x: FIELD_W / 2,
       y: FIELD_H / 2,
-      vx: 0,
-      vy: 0,
+      // Small random initial velocity so the puck isn't dead at start —
+      // drifts toward the player's half for a natural "your serve" feel.
+      vx: (Math.random() - 0.5) * 0.003,
+      vy: 0.004 + Math.random() * 0.002,
       r: PUCK_RADIUS,
     },
     player: {
@@ -410,10 +412,14 @@ function updateRobot(state: GameState): Paddle {
 
 /** Constrain player paddle to bottom half and within field bounds */
 function constrainPlayer(paddle: Paddle): Paddle {
+  // Allow paddle to cross slightly past the center line so the player
+  // can actually reach and strike a puck sitting on the center. The
+  // paddle body (radius) extends past its center, so we let the center
+  // go up to FIELD_H/2 - r so the paddle's edge touches center.
   return {
     ...paddle,
     x: clamp(paddle.x, paddle.r, FIELD_W - paddle.r),
-    y: clamp(paddle.y, FIELD_H / 2, FIELD_H - paddle.r),
+    y: clamp(paddle.y, FIELD_H / 2 - paddle.r * 1.5, FIELD_H - paddle.r),
   };
 }
 

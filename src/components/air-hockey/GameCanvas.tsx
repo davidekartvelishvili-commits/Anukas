@@ -52,18 +52,23 @@ export default function GameCanvas({
   const scoreCacheRef = useRef<string>("");
 
   // ── Touch / mouse handling ──────────────────────────────────────
+  // Finger offset: shift the paddle slightly UP from the touch point so
+  // the user can see the paddle above their finger. ~5% of field height
+  // in normalized coords — enough to be visible, not so much that aim
+  // feels disconnected.
+  const FINGER_OFFSET_Y = 0.05;
+
   const toNormalized = useCallback(
     (clientX: number, clientY: number) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
       const x = (clientX - rect.left) / rect.width;
-      const y = (clientY - rect.top) / rect.height;
-      // Constrain to bottom half (player side)
-      if (y < 0.5) return;
+      const rawY = (clientY - rect.top) / rect.height;
+      const y = rawY - FINGER_OFFSET_Y; // paddle sits above finger
       onPlayerMove(
         Math.max(0, Math.min(1, x)),
-        Math.max(0.5, Math.min(1, y))
+        Math.max(0, Math.min(1, y)) // engine's constrainPlayer clamps to valid zone
       );
     },
     [onPlayerMove]

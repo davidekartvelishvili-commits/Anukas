@@ -142,9 +142,9 @@ export default function AirHockeyPage() {
                     onClick={() => setDifficulty(d.value)}
                     className="flex-1 py-3 rounded-[12px] text-[14px] font-bold transition-all active:scale-[0.97]"
                     style={{
-                      background: difficulty === d.value ? d.color + "20" : "rgba(255,255,255,0.04)",
-                      border: `1.5px solid ${difficulty === d.value ? d.color : "rgba(255,255,255,0.08)"}`,
-                      color: difficulty === d.value ? d.color : "#94A3B8",
+                      background: difficulty === d.value ? d.color : "#1C2539",
+                      border: `1.5px solid ${difficulty === d.value ? d.color : "#1C2539"}`,
+                      color: difficulty === d.value ? "#0A0F1C" : "#94A3B8",
                       fontFamily: "var(--font-outfit)",
                     }}
                   >
@@ -166,9 +166,9 @@ export default function AirHockeyPage() {
                     onClick={() => setGoalTarget(g)}
                     className="flex-1 py-3 rounded-[12px] text-[16px] font-bold transition-all active:scale-[0.97]"
                     style={{
-                      background: goalTarget === g ? "#FFE500" + "20" : "rgba(255,255,255,0.04)",
-                      border: `1.5px solid ${goalTarget === g ? "#FFE500" : "rgba(255,255,255,0.08)"}`,
-                      color: goalTarget === g ? "#FFE500" : "#94A3B8",
+                      background: goalTarget === g ? "#FFE500" : "#1C2539",
+                      border: `1.5px solid ${goalTarget === g ? "#FFE500" : "#1C2539"}`,
+                      color: goalTarget === g ? "#0A0F1C" : "#94A3B8",
                       fontFamily: "var(--font-outfit)",
                     }}
                   >
@@ -191,10 +191,6 @@ export default function AirHockeyPage() {
               თამაში
             </button>
 
-            {/* Robot indicator */}
-            <p className="text-[12px]" style={{ color: "#64748B", fontFamily: "var(--font-dm-sans)" }}>
-              🤖 vs Robot ({DIFFICULTY_OPTIONS.find((d) => d.value === difficulty)?.label})
-            </p>
           </div>
         )}
 
@@ -239,10 +235,14 @@ export default function AirHockeyPage() {
             <div
               className="w-20 h-20 rounded-full flex items-center justify-center"
               style={{
-                background: gameState.winner === "player" ? "#FFE50015" : "#EF444415",
+                background: gameState.winner === "player" ? "#FFE500" : "#EF4444",
               }}
             >
-              <span className="text-[40px]">{gameState.winner === "player" ? "🏆" : "😔"}</span>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0A0F1C" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                {gameState.winner === "player"
+                  ? <polyline points="8,12 11,15 16,9" />
+                  : <><line x1="8" y1="8" x2="16" y2="16" /><line x1="16" y1="8" x2="8" y2="16" /></>}
+              </svg>
             </div>
             <h2
               className="text-[28px] font-bold"
