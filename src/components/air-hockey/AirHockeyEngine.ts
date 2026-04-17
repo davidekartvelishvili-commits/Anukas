@@ -35,7 +35,7 @@ const PUCK_RADIUS = 0.025;
 const PADDLE_RADIUS = 0.045;
 
 /** Goal width (centered on each short edge) */
-const GOAL_WIDTH = 0.30;
+const GOAL_WIDTH = 0.22;
 
 /** How much paddle velocity transfers to puck on hit (0–1) */
 const PADDLE_INFLUENCE = 0.6;
@@ -423,13 +423,12 @@ function constrainPlayer(paddle: Paddle): Paddle {
   };
 }
 
-/** Constrain opponent paddle to top half and within field bounds */
+/** Constrain opponent paddle to top half — body must not cross center line */
 function constrainOpponent(paddle: Paddle): Paddle {
-  const config = ROBOT_CONFIGS['hard']; // use widest range; robot logic self-constrains
   return {
     ...paddle,
     x: clamp(paddle.x, paddle.r, FIELD_W - paddle.r),
-    y: clamp(paddle.y, paddle.r, FIELD_H / 2),
+    y: clamp(paddle.y, paddle.r, FIELD_H / 2 - paddle.r),
   };
 }
 

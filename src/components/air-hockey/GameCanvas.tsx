@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect, useCallback } from "react";
 import type { GameState } from "./AirHockeyEngine";
+import { FIELD_W, FIELD_H } from "./AirHockeyEngine";
 
 interface GameCanvasProps {
   gameState: GameState;
@@ -27,7 +28,7 @@ const OVERLAY_BG = "rgba(0,0,0,0.7)";
 // ── Dimensions (relative to canvas) ────────────────────────────────
 const FIELD_PADDING = 8;
 const CORNER_RADIUS = 16;
-const GOAL_WIDTH_RATIO = 0.4;
+const GOAL_WIDTH_RATIO = 0.22; // must match engine's GOAL_WIDTH
 const GOAL_HEIGHT = 12;
 const CENTER_CIRCLE_RATIO = 0.15;
 const PUCK_RADIUS_RATIO = 0.035;
@@ -63,12 +64,13 @@ export default function GameCanvas({
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
-      const x = (clientX - rect.left) / rect.width;
-      const rawY = (clientY - rect.top) / rect.height;
-      const y = rawY - FINGER_OFFSET_Y; // paddle sits above finger
+      const nx = (clientX - rect.left) / rect.width;   // 0-1 canvas proportion
+      const rawNy = (clientY - rect.top) / rect.height; // 0-1 canvas proportion
+      const ny = rawNy - FINGER_OFFSET_Y;
+      // Convert from canvas proportion (0-1) to engine coords (0-FIELD_W, 0-FIELD_H)
       onPlayerMove(
-        Math.max(0, Math.min(1, x)),
-        Math.max(0, Math.min(1, y)) // engine's constrainPlayer clamps to valid zone
+        Math.max(0, Math.min(FIELD_W, nx * FIELD_W)),
+        Math.max(0, Math.min(FIELD_H, ny * FIELD_H))
       );
     },
     [onPlayerMove]
@@ -231,8 +233,8 @@ export default function GameCanvas({
 
       // ── 7. Puck ───────────────────────────────────────────────
       const puckR = fw * PUCK_RADIUS_RATIO;
-      const puckX = fx + state.puck.x * fw;
-      const puckY = fy + state.puck.y * fh;
+      const puckX = fx + (state.puck.x / FIELD_W) * fw;
+      const puckY = fy + (state.puck.y / FIELD_H) * fh;
       ctx.fillStyle = PUCK_COLOR;
       ctx.beginPath();
       ctx.arc(puckX, puckY, puckR, 0, Math.PI * 2);
@@ -242,8 +244,8 @@ export default function GameCanvas({
       const paddleR = fw * PADDLE_RADIUS_RATIO;
 
       // Player paddle (bottom)
-      const ppX = fx + state.player.x * fw;
-      const ppY = fy + state.player.y * fh;
+      const ppX = fx + (state.player.x / FIELD_W) * fw;
+      const ppY = fy + (state.player.y / FIELD_H) * fh;
       ctx.fillStyle = PLAYER_COLOR;
       ctx.beginPath();
       ctx.arc(ppX, ppY, paddleR, 0, Math.PI * 2);
@@ -256,8 +258,8 @@ export default function GameCanvas({
       ctx.stroke();
 
       // Opponent paddle (top)
-      const opX = fx + state.opponent.x * fw;
-      const opY = fy + state.opponent.y * fh;
+      const opX = fx + (state.opponent.x / FIELD_W) * fw;
+      const opY = fy + (state.opponent.y / FIELD_H) * fh;
       ctx.fillStyle = OPPONENT_COLOR;
       ctx.beginPath();
       ctx.arc(opX, opY, paddleR, 0, Math.PI * 2);
