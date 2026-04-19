@@ -37,7 +37,6 @@ interface MultiplayerState {
 }
 
 export default function AirHockeyPage() {
-  console.log("[render]");
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("menu");
   const [multiplayer, setMultiplayer] = useState(false);
@@ -259,8 +258,6 @@ export default function AirHockeyPage() {
       const STATUS_MAP: Record<number, "ready"|"playing"|"goal"|"finished"> = { 0: "ready", 1: "playing", 2: "goal", 3: "finished" };
 
       socket.on("gs", (d: any) => {
-        if (d.ts) console.log("[latency]", Date.now() - d.ts, "ms");
-
         const yourSide = config.yourSide;
         const isBottom = yourSide === "bottom";
         const px = d.p[0], py = d.p[1], pvx = d.p[2], pvy = d.p[3];

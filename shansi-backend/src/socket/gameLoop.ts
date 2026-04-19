@@ -53,6 +53,7 @@ interface ActiveGame {
   state: ServerGameState;
   robotSides: Set<"bottom" | "top">;
   tickCount: number; // for broadcast throttling
+  lastTickTime: number;
 }
 
 export const activeGames: Map<string, ActiveGame> = new Map();
@@ -223,7 +224,6 @@ function emitState(io: IOServer, roomId: string, state: ServerGameState): void {
     t: [state.paddles.top.x, state.paddles.top.y],
     s: [state.score.bottom, state.score.top],
     st, w,
-    ts: Date.now(),
   });
 }
 
@@ -237,6 +237,17 @@ function tick(
 ): void {
   const game = activeGames.get(roomId);
   if (!game) return;
+
+  // Skip physics if container was paused >33ms (2 frames) to prevent teleporting
+  const now = Date.now();
+  const elapsed = now - game.lastTickTime;
+  game.lastTickTime = now;
+  if (elapsed > 33) {
+    // Just broadcast current state without advancing physics
+    emitState(io, roomId, game.state);
+    return;
+  }
+
   const { state } = game;
   game.tickCount++;
 
@@ -319,6 +330,7 @@ export function startGameLoop(
     state,
     robotSides: new Set(),
     tickCount: 0,
+    lastTickTime: Date.now(),
   };
   activeGames.set(roomId, game);
 
