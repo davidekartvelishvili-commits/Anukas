@@ -9,7 +9,7 @@ const PADDLE_RADIUS = 0.09;
 const CENTER_LINE = FIELD_H / 2;
 const GOAL_WIDTH = 0.28;
 
-const MAX_PUCK_SPEED = 0.03;
+const MAX_PUCK_SPEED = 0.036;
 const FRICTION = 0.997;
 const WALL_RESTITUTION = 0.85;
 const PADDLE_RESTITUTION = 0.85;
@@ -89,7 +89,7 @@ function resetPuckAfterGoal(state: ServerGameState, scoredOn: "bottom" | "top"):
   state.puck.x = FIELD_W / 2;
   state.puck.y = FIELD_H / 2;
   state.puck.vx = (Math.random() - 0.5) * 0.002;
-  state.puck.vy = scoredOn === "bottom" ? 0.0036 : -0.0036;
+  state.puck.vy = scoredOn === "bottom" ? 0.00432 : -0.00432;
 }
 
 // ── Wall bounce ──
