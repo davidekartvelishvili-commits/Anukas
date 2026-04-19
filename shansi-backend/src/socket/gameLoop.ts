@@ -16,10 +16,10 @@ const PADDLE_RESTITUTION = 0.85;
 const PADDLE_TRANSFER = 0.2;
 const MAX_PADDLE_DELTA = 0.012;
 
-const TICK_MS = 1000 / 30;     // 30fps server physics — halves CPU load
-const GOAL_PAUSE_FRAMES = 30;  // 1s at 30fps
+const TICK_MS = 1000 / 60;     // 60fps physics
+const GOAL_PAUSE_FRAMES = 60;  // 1s at 60fps
 
-// Broadcast every tick (30fps network updates).
+// Broadcast every tick (60fps network updates).
 const BROADCAST_EVERY = 1;
 
 const ROBOT_REACTION_SPEED = 0.04;
@@ -49,7 +49,7 @@ export interface ServerGameState {
 }
 
 interface ActiveGame {
-  interval: ReturnType<typeof setInterval>;
+  timeout: ReturnType<typeof setTimeout>;
   state: ServerGameState;
   robotSides: Set<"bottom" | "top">;
   tickCount: number; // for broadcast throttling
@@ -314,12 +314,21 @@ export function startGameLoop(
   if (activeGames.has(roomId)) return;
   const state = createInitialState(goalTarget);
   const game: ActiveGame = {
-    interval: setInterval(() => tick(roomId, io, onGoal, onGameOver), TICK_MS),
+    timeout: null as any,
     state,
     robotSides: new Set(),
     tickCount: 0,
   };
   activeGames.set(roomId, game);
+
+  function scheduleTick() {
+    const start = Date.now();
+    tick(roomId, io, onGoal, onGameOver);
+    const elapsed = Date.now() - start;
+    const delay = Math.max(0, TICK_MS - elapsed);
+    game.timeout = setTimeout(scheduleTick, delay);
+  }
+  game.timeout = setTimeout(scheduleTick, TICK_MS);
 }
 
 export function updatePaddle(
@@ -366,7 +375,7 @@ export function clearRobotPlayer(roomId: string, side: "bottom" | "top"): void {
 export function stopGameLoop(roomId: string): void {
   const game = activeGames.get(roomId);
   if (game) {
-    clearInterval(game.interval);
+    clearTimeout(game.timeout);
     activeGames.delete(roomId);
   }
 }
