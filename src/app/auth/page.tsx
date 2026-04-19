@@ -93,7 +93,9 @@ function AuthContent() {
     if (clean.length === 6) {
       try {
         await pinLogin(phone || prefillPhone, clean);
-        router.push("/home");
+        const cb = localStorage.getItem("auth_callback_url");
+        localStorage.removeItem("auth_callback_url");
+        router.push(cb || "/home");
       } catch (err: any) {
         setPinError(err.message || "Invalid PIN");
         setPinInput("");

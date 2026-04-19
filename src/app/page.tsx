@@ -77,6 +77,7 @@ export default function WelcomePage() {
   const userTapped = useRef(false);
 
   // Capture ?ref=CODE from share link → store for the signup flow
+  // Capture ?callbackUrl= from AuthGuard redirect → persist for post-login
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -84,6 +85,10 @@ export default function WelcomePage() {
       const ref = params.get("ref");
       if (ref && ref.trim()) {
         localStorage.setItem("pending_referral_code", ref.trim().toUpperCase());
+      }
+      const cb = params.get("callbackUrl");
+      if (cb) {
+        localStorage.setItem("auth_callback_url", cb);
       }
     } catch {}
   }, []);

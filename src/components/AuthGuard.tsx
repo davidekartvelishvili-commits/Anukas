@@ -11,7 +11,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const token = getStoredToken();
     if (!token) {
-      router.replace("/");
+      // Preserve current URL so user returns here after login
+      const currentPath = window.location.pathname + window.location.search;
+      const callbackParam = encodeURIComponent(currentPath);
+      router.replace(`/?callbackUrl=${callbackParam}`);
       return;
     }
     setAuthorized(true);

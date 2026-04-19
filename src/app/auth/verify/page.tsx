@@ -101,7 +101,9 @@ function VerifyContent() {
         setTimeout(() => pinRefs.current[0]?.focus(), 300);
         return;
       }
-      router.push("/home");
+      const cb = localStorage.getItem("auth_callback_url");
+      localStorage.removeItem("auth_callback_url");
+      router.push(cb || "/home");
     } catch (err: any) {
       setVerifyError(err.message || "Invalid code");
       setVerifying(false);
@@ -177,7 +179,9 @@ function VerifyContent() {
           user.hasPin = true;
           localStorage.setItem("shansi_user", JSON.stringify(user));
         }
-        router.push("/home");
+        const cb2 = localStorage.getItem("auth_callback_url");
+        localStorage.removeItem("auth_callback_url");
+        router.push(cb2 || "/home");
       } catch (err: any) {
         setPinError(err.message || "PIN setup failed");
         setVerifying(false);
