@@ -65,6 +65,11 @@ export default function GameCanvas({
   const stateRef = useRef<GameState>(gameState);
   stateRef.current = gameState; // sync on every render
 
+  const widthRef = useRef(width);
+  const heightRef = useRef(height);
+  widthRef.current = width;
+  heightRef.current = height;
+
   // ── Touch / mouse handling ──────────────────────────────────────
   // Finger offset: shift the paddle slightly UP from the touch point so
   // the user can see the paddle above their finger. ~5% of field height
@@ -163,22 +168,28 @@ export default function GameCanvas({
     };
   }, [gameState]);
 
-  // ── Render loop ─────────────────────────────────────────────────
+  // ── Canvas setup (only re-runs on resize) ───────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // Set up DPR scaling
     const dpr = window.devicePixelRatio || 1;
     canvas.width = width * dpr;
     canvas.height = height * dpr;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     ctx.scale(dpr, dpr);
+  }, [width, height]);
+
+  // ── Render loop (runs once, reads from refs) ───────────────────
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
     const draw = (now: number) => {
-      const w = width;
-      const h = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { rafRef.current = requestAnimationFrame(draw); return; }
+      const w = widthRef.current;
+      const h = heightRef.current;
       // Prefer liveStateRef (multiplayer — updated 30x/sec by parent
       // without React re-render) over stateRef (synced from prop on render)
       const state = (liveStateRef?.current) || stateRef.current;
@@ -359,7 +370,7 @@ export default function GameCanvas({
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [width, height, gameState]);
+  }, []);
 
   return (
     <canvas
