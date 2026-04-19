@@ -16,12 +16,11 @@ const PADDLE_RESTITUTION = 0.85;
 const PADDLE_TRANSFER = 0.2;
 const MAX_PADDLE_DELTA = 0.012;
 
-const TICK_MS = 1000 / 60;     // 60fps — matches bot mode for reliable collision
-const GOAL_PAUSE_FRAMES = 60;  // 1s at 60fps
+const TICK_MS = 1000 / 30;     // 30fps server physics — halves CPU load
+const GOAL_PAUSE_FRAMES = 30;  // 1s at 30fps
 
-// Broadcast every 3rd tick (20fps network) to save bandwidth.
-// Collision still runs at 60fps but we only send state 20×/sec.
-const BROADCAST_EVERY = 3;
+// Broadcast every tick (30fps network updates).
+const BROADCAST_EVERY = 1;
 
 const ROBOT_REACTION_SPEED = 0.04;
 const ROBOT_MISS_RATE = 0.08;
@@ -235,7 +234,6 @@ function tick(
   onGoal: (roomId: string, scorer: "bottom" | "top", score: { bottom: number; top: number }) => void,
   onGameOver: (roomId: string, winner: "bottom" | "top") => void
 ): void {
-  console.log(`[tick] ${Date.now()}`);
   const game = activeGames.get(roomId);
   if (!game) return;
   const { state } = game;
