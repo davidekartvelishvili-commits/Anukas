@@ -174,6 +174,7 @@ function beginGame(room: Room, io: IOServer): void {
       const r = rooms.get(roomId);
       if (!r) return;
       r.status = "finished";
+      r.finishedAt = Date.now();
 
       const winnerPlayer = r.players.find((p) => p.side === winner);
       const loserPlayer = r.players.find((p) => p.side !== winner);
@@ -263,6 +264,7 @@ function handleDisconnect(socket: Socket, io: IOServer): void {
       }
       stopGameLoop(room.id);
       room.status = "finished";
+      room.finishedAt = Date.now();
       // Delete the room after a short delay
       setTimeout(() => deleteRoom(room.id), 5000);
       socketToUser.delete(socket.id);
@@ -568,6 +570,7 @@ export function setupSocketServer(httpServer: any): void {
         // Reset room for new game
         room.rematchReady.clear();
         room.status = "playing";
+        room.finishedAt = null;
         for (const p of room.players) {
           p.isRobot = false;
           p.disconnectedAt = null;

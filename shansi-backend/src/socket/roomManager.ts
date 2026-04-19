@@ -22,6 +22,7 @@ export interface Room {
   goalTarget: number; // 5, 10, 15, or 20
   status: "waiting" | "playing" | "finished";
   createdAt: number;
+  finishedAt: number | null;
   rematchReady: Set<string>; // userIds who clicked Play Again
   rematchTimer: ReturnType<typeof setTimeout> | null;
 }
@@ -81,6 +82,7 @@ export function createRoom(
     goalTarget,
     status: "waiting",
     createdAt: Date.now(),
+    finishedAt: null,
     rematchReady: new Set(),
     rematchTimer: null,
   };
@@ -144,8 +146,8 @@ export function cleanupFinished(): void {
   for (const [id, room] of rooms) {
     let shouldDelete = false;
 
-    // Finished rooms older than 30 seconds
-    if (room.status === "finished" && now - room.createdAt > 30_000) {
+    // Finished rooms — 60 seconds after game ended (not created)
+    if (room.status === "finished" && room.finishedAt && now - room.finishedAt > 60_000) {
       shouldDelete = true;
     }
 
