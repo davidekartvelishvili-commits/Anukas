@@ -9,6 +9,7 @@ export interface RoomPlayer {
   side: "bottom" | "top"; // bottom = host, top = joiner
   isRobot: boolean;
   disconnectedAt: number | null;
+  lastHitTime: number;
 }
 
 export interface Room {
@@ -70,6 +71,7 @@ export function createRoom(
         side: "bottom",
         isRobot: false,
         disconnectedAt: null,
+        lastHitTime: 0,
       },
     ],
     spectators: [],
@@ -105,6 +107,7 @@ export function joinRoom(
     side: "top",
     isRobot: false,
     disconnectedAt: null,
+    lastHitTime: 0,
   });
 
   userToRoom.set(player.userId, room.id);

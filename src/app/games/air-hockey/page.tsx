@@ -168,6 +168,12 @@ export default function AirHockeyPage() {
   // Throttle paddle sends to ~30/sec
   const lastPaddleSendRef = useRef(0);
 
+  // Client-side hit detection refs (persist across renders)
+  const lastServerPuckPosRef = useRef({ x: 0.5, y: 0.75 });
+  const prevPaddleEnginePosRef = useRef({ x: 0, y: 0 });
+  const hitCooldownRef = useRef(false);
+  const CLIENT_HIT_MIN_DIST = 0.04 + 0.09; // PUCK_RADIUS + PADDLE_RADIUS (server values)
+
   const handlePlayerMove = useCallback((x: number, y: number) => {
     if (multiplayer) {
       // LOCAL PREDICTION: instant visual feedback
@@ -178,7 +184,33 @@ export default function AirHockeyPage() {
 
       // Convert to engine coords for the server
       const isTop = mpConfig?.yourSide === "top";
+      const engineX = x;
       const engineY = isTop ? MP_FIELD_H - y : y;
+
+      // Client-side hit detection — catches fast swipes that server misses
+      const puck = lastServerPuckPosRef.current;
+      const dx = puck.x - engineX;
+      const dy = puck.y - engineY;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist < CLIENT_HIT_MIN_DIST && dist > 0 && !hitCooldownRef.current) {
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const pvx = engineX - prevPaddleEnginePosRef.current.x;
+        const pvy = engineY - prevPaddleEnginePosRef.current.y;
+
+        import("@/services/socket").then(({ getSocket }) => {
+          getSocket().emit("hit", {
+            nx, ny, pvx, pvy,
+            puckX: puck.x, puckY: puck.y,
+          });
+        });
+
+        hitCooldownRef.current = true;
+        setTimeout(() => { hitCooldownRef.current = false; }, 80);
+      }
+
+      prevPaddleEnginePosRef.current = { x: engineX, y: engineY };
 
       // Send position only — server computes velocity from deltas
       const now = performance.now();
@@ -229,6 +261,9 @@ export default function AirHockeyPage() {
         const yourSide = config.yourSide;
         const isBottom = yourSide === "bottom";
         const px = d.p[0], py = d.p[1], pvx = d.p[2], pvy = d.p[3];
+
+        // Track server puck position in engine coords for client-side hit detection
+        lastServerPuckPosRef.current = { x: px, y: py };
 
         // Server sends engine coords: bottom paddle in bottom half,
         // top paddle in top half. For the TOP player's view, we flip

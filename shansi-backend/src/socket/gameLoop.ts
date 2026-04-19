@@ -174,65 +174,10 @@ function checkAndResolveAt(puck: PuckState, paddle: PaddleState, px: number, py:
   return true;
 }
 
-/** Main collision entry — direct check + fast-swipe midpoint. */
+/** Main collision entry — direct distance check only.
+ *  Fast swipes are handled by client-reported 'hit' events. */
 function handlePaddleCollision(puck: PuckState, paddle: PaddleState): void {
-  // 1. Direct position check
-  if (checkAndResolveAt(puck, paddle, paddle.x, paddle.y)) return;
-
-  // 2. Fast-swipe midpoint sweep
-  const prevX = paddle.prevX ?? paddle.x;
-  const prevY = paddle.prevY ?? paddle.y;
-  const sweepDist = Math.sqrt((paddle.x - prevX) ** 2 + (paddle.y - prevY) ** 2);
-
-  if (sweepDist > 0.001) {
-    const minDist = puck.r + paddle.r;
-    for (const t of [0.25, 0.5, 0.75]) {
-      const sx = prevX + (paddle.x - prevX) * t;
-      const sy = prevY + (paddle.y - prevY) * t;
-      const sdx = puck.x - sx;
-      const sdy = puck.y - sy;
-      const sDist = Math.sqrt(sdx * sdx + sdy * sdy);
-
-      if (sDist < minDist && sDist > 0) {
-        console.log(`[SWEEP HIT] t=${t} sweepDist=${sweepDist.toFixed(4)} sDist=${sDist.toFixed(4)}`);
-        // Use ACTUAL paddle position for normal, not sweep point
-        const adx = puck.x - paddle.x;
-        const ady = puck.y - paddle.y;
-        const ad = Math.sqrt(adx * adx + ady * ady);
-
-        const nx = ad > 0 ? adx / ad : sdx / sDist;
-        const ny = ad > 0 ? ady / ad : sdy / sDist;
-
-        // Push out from ACTUAL paddle position
-        puck.x = paddle.x + nx * minDist * 1.15;
-        puck.y = paddle.y + ny * minDist * 1.15;
-
-        // Resolve velocity
-        const pvx = paddle.deltaVx ?? 0;
-        const pvy = paddle.deltaVy ?? 0;
-        const clampedPvx = clamp(pvx, -MAX_PADDLE_DELTA, MAX_PADDLE_DELTA);
-        const clampedPvy = clamp(pvy, -MAX_PADDLE_DELTA, MAX_PADDLE_DELTA);
-        const relVN = (puck.vx - pvx) * nx + (puck.vy - pvy) * ny;
-
-        if (relVN >= 0) {
-          puck.vx += nx * 0.01;
-          puck.vy += ny * 0.01;
-        } else {
-          const RESTITUTION = 0.75;
-          const impulse = -(1 + RESTITUTION) * relVN;
-          puck.vx += impulse * nx + clampedPvx * PADDLE_TRANSFER;
-          puck.vy += impulse * ny + clampedPvy * PADDLE_TRANSFER;
-        }
-
-        const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
-        if (speed > MAX_PUCK_SPEED) {
-          puck.vx = (puck.vx / speed) * MAX_PUCK_SPEED;
-          puck.vy = (puck.vy / speed) * MAX_PUCK_SPEED;
-        }
-        break;
-      }
-    }
-  }
+  checkAndResolveAt(puck, paddle, paddle.x, paddle.y);
 }
 
 // ── Robot AI ──
@@ -445,6 +390,46 @@ export function stopGameLoop(roomId: string): void {
   if (game) {
     clearInterval(game.interval);
     activeGames.delete(roomId);
+  }
+}
+
+export function handleClientHit(
+  roomId: string,
+  nx: number, ny: number,
+  pvx: number, pvy: number,
+  puckX: number, puckY: number
+): void {
+  const game = activeGames.get(roomId);
+  if (!game || game.state.status !== "playing") return;
+  const puck = game.state.puck;
+
+  // Validate: server puck must be near where client reports
+  const reportedDist = Math.hypot(puck.x - puckX, puck.y - puckY);
+  if (reportedDist > 0.2) return;
+
+  // Push puck out
+  const minDist = PUCK_RADIUS + PADDLE_RADIUS;
+  puck.x = puckX + nx * minDist * 1.15;
+  puck.y = puckY + ny * minDist * 1.15;
+
+  // Apply collision response
+  const cpvx = clamp(pvx, -MAX_PADDLE_DELTA, MAX_PADDLE_DELTA);
+  const cpvy = clamp(pvy, -MAX_PADDLE_DELTA, MAX_PADDLE_DELTA);
+  const relVN = (puck.vx - cpvx) * nx + (puck.vy - cpvy) * ny;
+
+  if (relVN < 0) {
+    const impulse = -(1 + 0.75) * relVN;
+    puck.vx += impulse * nx + cpvx * 0.3;
+    puck.vy += impulse * ny + cpvy * 0.3;
+  } else {
+    puck.vx += nx * 0.01;
+    puck.vy += ny * 0.01;
+  }
+
+  const speed = Math.hypot(puck.vx, puck.vy);
+  if (speed > MAX_PUCK_SPEED) {
+    puck.vx = (puck.vx / speed) * MAX_PUCK_SPEED;
+    puck.vy = (puck.vy / speed) * MAX_PUCK_SPEED;
   }
 }
 

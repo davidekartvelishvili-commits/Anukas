@@ -26,6 +26,7 @@ import {
   clearRobotPlayer,
   stopGameLoop,
   getGameState,
+  handleClientHit,
 } from "./gameLoop.js";
 
 // ── Disconnect timers ──
@@ -422,6 +423,25 @@ export function setupSocketServer(httpServer: any): void {
       if (!side) return;
 
       updatePaddle(room.id, side, data.x, data.y);
+    });
+
+    // ── hit — client-reported collision for fast swipes ──
+    socket.on("hit", (data: { nx: number; ny: number; pvx: number; pvy: number; puckX: number; puckY: number }) => {
+      const uid = getUserId(socket);
+      if (!uid) return;
+
+      const room = findRoomByUser(uid);
+      if (!room || room.status !== "playing") return;
+
+      const player = room.players.find((p) => p.socketId === socket.id);
+      if (!player) return;
+
+      // Per-player cooldown 80ms
+      const now = Date.now();
+      if (player.lastHitTime && now - player.lastHitTime < 80) return;
+      player.lastHitTime = now;
+
+      handleClientHit(room.id, data.nx, data.ny, data.pvx, data.pvy, data.puckX, data.puckY);
     });
 
     // ── leaveRoom ──
