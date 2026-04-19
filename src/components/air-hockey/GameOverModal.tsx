@@ -78,7 +78,7 @@ export default function GameOverModal({
           fontFamily: "var(--font-outfit)",
         }}
       >
-        {won ? "გაიმარჯვე!" : "წააგე"}
+        {won ? "You Won!" : "You Lost"}
       </h2>
 
       {/* Score */}
@@ -123,7 +123,7 @@ export default function GameOverModal({
             fontFamily: "var(--font-outfit)",
           }}
         >
-          მენიუ
+          Menu
         </button>
         <button
           onClick={onRematch}
@@ -134,7 +134,7 @@ export default function GameOverModal({
             fontFamily: "var(--font-outfit)",
           }}
         >
-          თავიდან
+          Play Again
         </button>
       </div>
     </div>

@@ -72,13 +72,13 @@ export default function DisconnectOverlay({
             className="text-[18px] font-bold"
             style={{ color: TEXT_PRIMARY, fontFamily: "var(--font-outfit)" }}
           >
-            რობოტი თამაშობს
+            Robot is playing
           </p>
           <p
             className="text-[13px] mt-2"
             style={{ color: TEXT_SECONDARY, fontFamily: "var(--font-dm-sans)" }}
           >
-            მოწინააღმდეგე გათიშულია
+            Opponent disconnected
           </p>
         </>
       ) : (
@@ -87,7 +87,7 @@ export default function DisconnectOverlay({
             className="text-[18px] font-bold mb-4"
             style={{ color: TEXT_PRIMARY, fontFamily: "var(--font-outfit)" }}
           >
-            მოთამაშე გათიშულია
+            Player disconnected
           </p>
           <p
             className="text-[48px] font-bold mb-3"
@@ -99,7 +99,7 @@ export default function DisconnectOverlay({
             className="text-[13px]"
             style={{ color: TEXT_SECONDARY, fontFamily: "var(--font-dm-sans)" }}
           >
-            რობოტი ითამაშებს {secondsLeft} წამში
+            Robot takes over in {secondsLeft} seconds
           </p>
         </>
       )}

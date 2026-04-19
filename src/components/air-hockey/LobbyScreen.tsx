@@ -137,7 +137,7 @@ export default function LobbyScreen({ onGameStart }: LobbyScreenProps) {
           className="text-[13px] mt-1"
           style={{ color: TEXT_MUTED, fontFamily: "var(--font-dm-sans)" }}
         >
-          მრავალმოთამაშე
+          Multiplayer
         </p>
       </div>
 
@@ -147,7 +147,7 @@ export default function LobbyScreen({ onGameStart }: LobbyScreenProps) {
           className="text-[12px] font-semibold mb-2 uppercase tracking-wider"
           style={{ color: TEXT_SECONDARY, fontFamily: "var(--font-dm-sans)" }}
         >
-          ფსონი
+          Wager
         </p>
         <div className="flex gap-2">
           {WAGER_OPTIONS.map((w) => (
@@ -180,7 +180,7 @@ export default function LobbyScreen({ onGameStart }: LobbyScreenProps) {
           className="text-[12px] font-semibold mb-2 uppercase tracking-wider"
           style={{ color: TEXT_SECONDARY, fontFamily: "var(--font-dm-sans)" }}
         >
-          გოლები გასამარჯვებლად
+          Goals to Win
         </p>
         <div className="flex gap-2">
           {GOAL_OPTIONS.map((g) => (
@@ -211,7 +211,7 @@ export default function LobbyScreen({ onGameStart }: LobbyScreenProps) {
             fontFamily: "var(--font-outfit)",
           }}
         >
-          ონლაინ თამაში
+          Play Online
         </button>
         <button
           onClick={() => setShowCreateModal(true)}
@@ -222,7 +222,7 @@ export default function LobbyScreen({ onGameStart }: LobbyScreenProps) {
             fontFamily: "var(--font-outfit)",
           }}
         >
-          ოთახის შექმნა
+          Create Room
         </button>
         <button
           onClick={() => setShowJoinModal(true)}
@@ -233,7 +233,7 @@ export default function LobbyScreen({ onGameStart }: LobbyScreenProps) {
             fontFamily: "var(--font-outfit)",
           }}
         >
-          კოდით შესვლა
+          Join by Code
         </button>
       </div>
 
@@ -248,7 +248,7 @@ export default function LobbyScreen({ onGameStart }: LobbyScreenProps) {
             className="text-[13px] font-semibold"
             style={{ color: TEXT_SECONDARY, fontFamily: "var(--font-dm-sans)" }}
           >
-            ლაივ თამაშები
+            Live Games
           </p>
         </div>
 
@@ -257,7 +257,7 @@ export default function LobbyScreen({ onGameStart }: LobbyScreenProps) {
             className="text-[12px] text-center py-6"
             style={{ color: TEXT_MUTED, fontFamily: "var(--font-dm-sans)" }}
           >
-            აქტიური თამაშები არ არის
+            No active games
           </p>
         )}
 
@@ -336,7 +336,7 @@ export default function LobbyScreen({ onGameStart }: LobbyScreenProps) {
             className="text-[16px] font-semibold mb-1"
             style={{ color: TEXT_PRIMARY, fontFamily: "var(--font-outfit)" }}
           >
-            მოთამაშის ძებნა...
+            Finding player...
           </p>
           <p
             className="text-[12px] mb-6"
@@ -353,7 +353,7 @@ export default function LobbyScreen({ onGameStart }: LobbyScreenProps) {
               fontFamily: "var(--font-outfit)",
             }}
           >
-            გაუქმება
+            Cancel
           </button>
         </div>
       )}

@@ -47,7 +47,7 @@ export default function JoinRoomModal({ onClose, onGameStart }: JoinRoomModalPro
 
     const handleJoinError = (data: { message: string }) => {
       setJoining(false);
-      setError(data.message || "ოთახი ვერ მოიძებნა");
+      setError(data.message || "Room not found");
     };
 
     socket.on("matchFound", handleMatchFound);
@@ -61,7 +61,7 @@ export default function JoinRoomModal({ onClose, onGameStart }: JoinRoomModalPro
 
   const handleJoin = useCallback(() => {
     if (roomCode.length < 1) {
-      setError("შეიყვანეთ ოთახის კოდი");
+      setError("Enter room code");
       return;
     }
     setError("");
@@ -113,7 +113,7 @@ export default function JoinRoomModal({ onClose, onGameStart }: JoinRoomModalPro
           className="text-[18px] font-bold mb-6"
           style={{ color: TEXT_PRIMARY, fontFamily: "var(--font-outfit)" }}
         >
-          კოდით შესვლა
+          Join by Code
         </h3>
 
         {/* Room code input */}
@@ -122,7 +122,7 @@ export default function JoinRoomModal({ onClose, onGameStart }: JoinRoomModalPro
             className="block text-[12px] font-semibold mb-2 uppercase tracking-wider"
             style={{ color: TEXT_SECONDARY, fontFamily: "var(--font-dm-sans)" }}
           >
-            ოთახის კოდი
+            Room Code
           </label>
           <input
             ref={codeInputRef}
@@ -149,7 +149,7 @@ export default function JoinRoomModal({ onClose, onGameStart }: JoinRoomModalPro
             className="block text-[12px] font-semibold mb-2 uppercase tracking-wider"
             style={{ color: TEXT_SECONDARY, fontFamily: "var(--font-dm-sans)" }}
           >
-            PIN (პრივატული ოთახისთვის)
+            PIN (for private rooms)
           </label>
           <input
             type="text"
@@ -190,7 +190,7 @@ export default function JoinRoomModal({ onClose, onGameStart }: JoinRoomModalPro
             fontFamily: "var(--font-outfit)",
           }}
         >
-          {joining ? "..." : "შესვლა"}
+          {joining ? "..." : "Join"}
         </button>
       </div>
     </div>

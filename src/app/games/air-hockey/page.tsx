@@ -17,10 +17,10 @@ const GOAL_OPTIONS: GoalTarget[] = [5, 10, 15, 20];
 const SELECTOR_ACTIVE = "#A8E06C";
 const SELECTOR_ACTIVE_TEXT = "#0A0F1C";
 
-const DIFFICULTY_OPTIONS: { value: Difficulty; label: string; labelKa: string }[] = [
-  { value: "easy", label: "Easy", labelKa: "მარტივი" },
-  { value: "medium", label: "Medium", labelKa: "საშუალო" },
-  { value: "hard", label: "Hard", labelKa: "რთული" },
+const DIFFICULTY_OPTIONS: { value: Difficulty; label: string }[] = [
+  { value: "easy", label: "Easy" },
+  { value: "medium", label: "Medium" },
+  { value: "hard", label: "Hard" },
 ];
 
 // ── Multiplayer state held outside React for socket handler access ────────────
@@ -252,10 +252,24 @@ export default function AirHockeyPage() {
       socket.off("gameOver");
       socket.off("opponentDisconnected");
       socket.off("robotTakeover");
+      socket.off("opponentLeftGame");
+      socket.off("rematchWaiting");
+      socket.off("rematchError");
+      socket.off("rematchTimeout");
+      socket.off("opponentRematchReady");
+      socket.off("gameStart");
 
       // Decode minimal "gs" packets from server:
       // { p:[x,y,vx,vy], b:[x,y], t:[x,y], s:[bottom,top], st:0-3, w:0-2 }
       const STATUS_MAP: Record<number, "ready"|"playing"|"goal"|"finished"> = { 0: "ready", 1: "playing", 2: "goal", 3: "finished" };
+
+      // Handle rematch — server emits gameStart when both players ready
+      socket.on("gameStart", () => {
+        setMpGameOver(null);
+        setMode("playing");
+        mpStateRef.current = null;
+        lastScoreRef.current = "";
+      });
 
       socket.on("gs", (d: any) => {
         const yourSide = config.yourSide;
@@ -339,6 +353,26 @@ export default function AirHockeyPage() {
           prev ? { ...prev, robotActive: true } : prev
         );
       });
+
+      socket.on("opponentLeftGame", () => {
+        setMpGameOver((prev) => prev ? { ...prev, opponentLeft: true } as any : prev);
+      });
+
+      socket.on("rematchWaiting", () => {
+        setMpGameOver((prev) => prev ? { ...prev, waitingForRematch: true } as any : prev);
+      });
+
+      socket.on("rematchError", (data: { message: string }) => {
+        setMpGameOver((prev) => prev ? { ...prev, rematchError: data.message } as any : prev);
+      });
+
+      socket.on("rematchTimeout", () => {
+        setMpGameOver((prev) => prev ? { ...prev, rematchTimedOut: true, waitingForRematch: false } as any : prev);
+      });
+
+      socket.on("opponentRematchReady", () => {
+        setMpGameOver((prev) => prev ? { ...prev, opponentWantsRematch: true } as any : prev);
+      });
     });
   }, []);
 
@@ -348,10 +382,8 @@ export default function AirHockeyPage() {
     if (!mpConfig) return;
     import("@/services/socket").then(({ getSocket }) => {
       const socket = getSocket();
-      socket.emit("rematch", { roomId: mpConfig.roomId });
+      socket.emit("rematch");
     });
-    setMpGameOver(null);
-    setMode("playing");
   }, [mpConfig]);
 
   // ── Navigation helpers ──────────────────────────────────────────────────────
@@ -370,10 +402,16 @@ export default function AirHockeyPage() {
       import("@/services/socket").then(({ getSocket }) => {
         const socket = getSocket();
         socket.emit("leaveRoom", { roomId: mpConfig.roomId });
-        socket.off("gameState");
+        socket.off("gs");
+        socket.off("gameStart");
         socket.off("gameOver");
         socket.off("opponentDisconnected");
         socket.off("robotTakeover");
+        socket.off("opponentLeftGame");
+        socket.off("rematchWaiting");
+        socket.off("rematchError");
+        socket.off("rematchTimeout");
+        socket.off("opponentRematchReady");
       });
     }
     handleRestart();
@@ -429,7 +467,7 @@ export default function AirHockeyPage() {
             {/* Difficulty */}
             <div className="w-full">
               <p className="text-[12px] font-semibold mb-2 uppercase tracking-wider" style={{ color: "#94A3B8", fontFamily: "var(--font-dm-sans)" }}>
-                სირთულე
+                Difficulty
               </p>
               <div className="flex gap-2">
                 {DIFFICULTY_OPTIONS.map((d) => (
@@ -444,7 +482,7 @@ export default function AirHockeyPage() {
                       fontFamily: "var(--font-outfit)",
                     }}
                   >
-                    {d.labelKa}
+                    {d.label}
                   </button>
                 ))}
               </div>
@@ -453,7 +491,7 @@ export default function AirHockeyPage() {
             {/* Goal target */}
             <div className="w-full">
               <p className="text-[12px] font-semibold mb-2 uppercase tracking-wider" style={{ color: "#94A3B8", fontFamily: "var(--font-dm-sans)" }}>
-                გოლები გასამარჯვებლად
+                Goals to Win
               </p>
               <div className="flex gap-2">
                 {GOAL_OPTIONS.map((g) => (
@@ -546,7 +584,7 @@ export default function AirHockeyPage() {
 
             {/* Goal target info */}
             <p className="text-[11px]" style={{ color: "#64748B", fontFamily: "var(--font-dm-sans)" }}>
-              პირველი {multiplayer && mpConfig ? mpConfig.goalTarget : goalTarget} გოლამდე
+              First to {multiplayer && mpConfig ? mpConfig.goalTarget : goalTarget} goals
             </p>
           </div>
         )}
@@ -573,7 +611,7 @@ export default function AirHockeyPage() {
                 fontFamily: "var(--font-outfit)",
               }}
             >
-              {gameState.winner === "player" ? "გაიმარჯვე!" : "წააგე"}
+              {gameState.winner === "player" ? "You Won!" : "You Lost"}
             </h2>
             <p className="text-[16px]" style={{ color: "#94A3B8", fontFamily: "var(--font-dm-sans)" }}>
               {gameState.score.player} — {gameState.score.opponent}
@@ -589,7 +627,7 @@ export default function AirHockeyPage() {
                   fontFamily: "var(--font-outfit)",
                 }}
               >
-                მენიუ
+                Menu
               </button>
               <button
                 onClick={startSinglePlayer}
@@ -600,7 +638,7 @@ export default function AirHockeyPage() {
                   fontFamily: "var(--font-outfit)",
                 }}
               >
-                თავიდან
+                Play Again
               </button>
             </div>
           </div>

@@ -1,9 +1,9 @@
 import { Server as IOServer } from "socket.io";
 import type { Socket } from "socket.io";
-import { eq } from "drizzle-orm";
+import { eq, sql, and, or } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import { getDb } from "../db/client.js";
-import { users } from "../db/schema.js";
+import { users, transactions } from "../db/schema.js";
 import { getEnv } from "../utils/env.js";
 import {
   createRoom,
@@ -79,6 +79,61 @@ function getDisplayName(socket: Socket): string {
   return socketToUser.get(socket.id)?.displayName || "Player";
 }
 
+/** Get a user's total coin balance across active transactions. */
+async function getCoinBalance(userId: string): Promise<number> {
+  const db = getDb();
+  const activeTxs = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))));
+  return activeTxs.reduce((sum, t) => sum + (t.coinsRemaining || 0), 0);
+}
+
+/** Deduct coins from a user's oldest active transaction. Returns true if successful. */
+async function deductCoins(userId: string, amount: number): Promise<boolean> {
+  const db = getDb();
+  const activeTxs = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))));
+  const total = activeTxs.reduce((sum, t) => sum + (t.coinsRemaining || 0), 0);
+  if (total < amount) return false;
+
+  let remaining = amount;
+  for (const tx of activeTxs) {
+    if (remaining <= 0) break;
+    const deduct = Math.min(tx.coinsRemaining || 0, remaining);
+    if (deduct > 0) {
+      await db.update(transactions).set({
+        coinsRemaining: (tx.coinsRemaining || 0) - deduct,
+      }).where(eq(transactions.id, tx.id));
+      remaining -= deduct;
+    }
+  }
+  return true;
+}
+
+/** Add coins to a user — creates a new active transaction if none exists. */
+async function addCoins(userId: string, amount: number): Promise<void> {
+  const db = getDb();
+  const activeTxs = await db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))));
+
+  if (activeTxs.length > 0) {
+    await db.update(transactions).set({
+      coinsRemaining: (activeTxs[0].coinsRemaining || 0) + amount,
+    }).where(eq(transactions.id, activeTxs[0].id));
+  } else {
+    const { nanoid } = await import("nanoid");
+    await db.insert(transactions).values({
+      id: nanoid(),
+      userId,
+      paymentAmount: 0,
+      coinsReceived: amount,
+      coinsRemaining: amount,
+      totalCashWon: 0,
+      guaranteedMinimum: 0,
+      status: "active",
+    });
+  }
+}
+
 function beginGame(room: Room, io: IOServer): void {
   if (room.players.length < 2) return;
   room.status = "playing";
@@ -115,7 +170,7 @@ function beginGame(room: Room, io: IOServer): void {
     (roomId, scorer, score) => {
       io.to(roomId).emit("goalScored", { scorer, score });
     },
-    (roomId, winner) => {
+    async (roomId, winner) => {
       const r = rooms.get(roomId);
       if (!r) return;
       r.status = "finished";
@@ -123,6 +178,15 @@ function beginGame(room: Room, io: IOServer): void {
       const winnerPlayer = r.players.find((p) => p.side === winner);
       const loserPlayer = r.players.find((p) => p.side !== winner);
       const coinsWon = r.wager * 2;
+
+      // Award coins to winner
+      if (winnerPlayer && coinsWon > 0) {
+        try {
+          await addCoins(winnerPlayer.userId, coinsWon);
+        } catch (e) {
+          console.error("[gameOver] failed to award coins", e);
+        }
+      }
 
       if (winnerPlayer) {
         io.to(winnerPlayer.socketId).emit("gameOver", {
@@ -209,8 +273,18 @@ function handleDisconnect(socket: Socket, io: IOServer): void {
     disconnectTimers.set(socket.id, { warningTimer, robotTimer });
   }
 
-  // Also handle finished rooms — clean up user mapping
+  // Handle finished rooms — notify remaining player and clean up
   if (room.status === "finished") {
+    // Cancel any pending rematch timer
+    if (room.rematchTimer) {
+      clearTimeout(room.rematchTimer);
+      room.rematchTimer = null;
+    }
+    // Notify remaining player that opponent left
+    const remaining = room.players.find((p) => p.socketId !== socket.id);
+    if (remaining) {
+      io.to(remaining.socketId).emit("opponentLeftGame");
+    }
     userToRoom.delete(userData.userId);
   }
 
@@ -442,6 +516,80 @@ export function setupSocketServer(httpServer: any): void {
       player.lastHitTime = now;
 
       handleClientHit(room.id, data.nx, data.ny, data.pvx, data.pvy, data.puckX, data.puckY);
+    });
+
+    // ── rematch — both players must click Play Again and pay wager ──
+    socket.on("rematch", async () => {
+      const uid = getUserId(socket);
+      if (!uid) return;
+
+      const room = findRoomByUser(uid);
+      if (!room || room.status !== "finished") return;
+
+      // Already marked ready
+      if (room.rematchReady.has(uid)) return;
+
+      // Deduct wager coins
+      if (room.wager > 0) {
+        const success = await deductCoins(uid, room.wager);
+        if (!success) {
+          socket.emit("rematchError", { message: "Not enough coins" });
+          return;
+        }
+      }
+
+      room.rematchReady.add(uid);
+      socket.emit("rematchWaiting");
+
+      // Notify opponent that this player is ready
+      const opponent = room.players.find((p) => p.userId !== uid);
+      if (opponent) {
+        io.to(opponent.socketId).emit("opponentRematchReady");
+      }
+
+      // Check if both players are ready
+      const allReady = room.players.every((p) => room.rematchReady.has(p.userId));
+      if (allReady) {
+        // Cancel timeout
+        if (room.rematchTimer) {
+          clearTimeout(room.rematchTimer);
+          room.rematchTimer = null;
+        }
+        // Reset room for new game
+        room.rematchReady.clear();
+        room.status = "playing";
+        for (const p of room.players) {
+          p.isRobot = false;
+          p.disconnectedAt = null;
+          p.lastHitTime = 0;
+        }
+        // Start new game loop
+        beginGame(room, io);
+        return;
+      }
+
+      // Start 30s timeout — if opponent doesn't join, refund and notify
+      if (!room.rematchTimer) {
+        room.rematchTimer = setTimeout(async () => {
+          room.rematchTimer = null;
+          // Refund coins to players who were ready
+          for (const readyUid of room.rematchReady) {
+            if (room.wager > 0) {
+              try { await addCoins(readyUid, room.wager); } catch {}
+            }
+            const p = room.players.find((pl) => pl.userId === readyUid);
+            if (p) {
+              io.to(p.socketId).emit("rematchTimeout", { message: "Opponent did not respond" });
+            }
+          }
+          room.rematchReady.clear();
+          // Clean up room
+          for (const p of room.players) {
+            userToRoom.delete(p.userId);
+          }
+          deleteRoom(room.id);
+        }, 30000);
+      }
     });
 
     // ── leaveRoom ──

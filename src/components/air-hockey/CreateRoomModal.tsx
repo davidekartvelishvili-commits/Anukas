@@ -137,7 +137,7 @@ export default function CreateRoomModal({
               className="text-[18px] font-bold mb-6"
               style={{ color: TEXT_PRIMARY, fontFamily: "var(--font-outfit)" }}
             >
-              ოთახის შექმნა
+              Create Room
             </h3>
 
             {/* Private toggle */}
@@ -146,7 +146,7 @@ export default function CreateRoomModal({
                 className="text-[14px]"
                 style={{ color: TEXT_PRIMARY, fontFamily: "var(--font-dm-sans)" }}
               >
-                პრივატული ოთახი
+                Private Room
               </span>
               <button
                 onClick={() => setIsPrivate(!isPrivate)}
@@ -183,7 +183,7 @@ export default function CreateRoomModal({
                 className="text-[12px]"
                 style={{ color: TEXT_MUTED, fontFamily: "var(--font-dm-sans)" }}
               >
-                ფსონი: {wager} / გოლები: {goalTarget}
+                Wager: {wager} / Goals: {goalTarget}
               </span>
             </div>
 
@@ -197,7 +197,7 @@ export default function CreateRoomModal({
                 fontFamily: "var(--font-outfit)",
               }}
             >
-              შექმნა
+              Create
             </button>
           </>
         ) : (
@@ -207,13 +207,13 @@ export default function CreateRoomModal({
               className="text-[18px] font-bold mb-2"
               style={{ color: TEXT_PRIMARY, fontFamily: "var(--font-outfit)" }}
             >
-              ოთახი შეიქმნა
+              Room Created
             </h3>
             <p
               className="text-[12px] mb-6"
               style={{ color: TEXT_MUTED, fontFamily: "var(--font-dm-sans)" }}
             >
-              გაუზიარე კოდი მეგობარს
+              Share code with a friend
             </p>
 
             {/* Room code */}
@@ -242,14 +242,14 @@ export default function CreateRoomModal({
                 className="flex-1 py-3 rounded-[12px] text-[13px] font-bold transition-all active:scale-[0.97]"
                 style={{ background: CARD, color: TEXT_PRIMARY, fontFamily: "var(--font-outfit)" }}
               >
-                ლინკის კოპირება
+                Copy Link
               </button>
               <button
                 onClick={handleShare}
                 className="flex-1 py-3 rounded-[12px] text-[13px] font-bold transition-all active:scale-[0.97]"
                 style={{ background: ACCENT, color: "#0A0F1C", fontFamily: "var(--font-outfit)" }}
               >
-                გაზიარება
+                Share
               </button>
             </div>
 
@@ -264,7 +264,7 @@ export default function CreateRoomModal({
                   className="text-[12px]"
                   style={{ color: TEXT_MUTED, fontFamily: "var(--font-dm-sans)" }}
                 >
-                  მოთამაშის მოლოდინში...
+                  Waiting for player...
                 </p>
               </div>
             )}

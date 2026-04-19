@@ -22,6 +22,8 @@ export interface Room {
   goalTarget: number; // 5, 10, 15, or 20
   status: "waiting" | "playing" | "finished";
   createdAt: number;
+  rematchReady: Set<string>; // userIds who clicked Play Again
+  rematchTimer: ReturnType<typeof setTimeout> | null;
 }
 
 export interface QueueEntry {
@@ -79,6 +81,8 @@ export function createRoom(
     goalTarget,
     status: "waiting",
     createdAt: Date.now(),
+    rematchReady: new Set(),
+    rematchTimer: null,
   };
 
   rooms.set(room.id, room);
