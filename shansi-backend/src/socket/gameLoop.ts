@@ -238,15 +238,10 @@ function tick(
   const game = activeGames.get(roomId);
   if (!game) return;
 
-  // Skip physics if container was paused >33ms (2 frames) to prevent teleporting
+  // Track elapsed time — cap at 50ms so container pauses don't cause jumps
   const now = Date.now();
-  const elapsed = now - game.lastTickTime;
+  const elapsed = Math.min(now - game.lastTickTime, 50);
   game.lastTickTime = now;
-  if (elapsed > 33) {
-    // Just broadcast current state without advancing physics
-    emitState(io, roomId, game.state);
-    return;
-  }
 
   const { state } = game;
   game.tickCount++;
