@@ -390,6 +390,9 @@ app.get("/health", (c) => {
   return c.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// ── Ping (latency measurement) ──
+app.get("/ping", (c) => c.json({ pong: true, time: Date.now() }));
+
 // ── Global error handler ──
 app.onError((err, c) => {
   console.error(`[ERROR] ${err.message}`);
