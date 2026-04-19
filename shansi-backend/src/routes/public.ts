@@ -110,6 +110,7 @@ publicRoute.get("/recent-wins", async (c) => {
       slot: "Midnight Machine",
       plinko: "Lucky Drop",
       chicken_rush: "Lucky Step",
+      air_hockey: "Air Hockey",
     };
 
     return {

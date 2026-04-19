@@ -3,7 +3,7 @@ import type { Socket } from "socket.io";
 import { eq, sql, and, or } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import { getDb } from "../db/client.js";
-import { users, transactions } from "../db/schema.js";
+import { users, transactions, gameHistory } from "../db/schema.js";
 import { getEnv } from "../utils/env.js";
 import {
   createRoom,
@@ -183,6 +183,16 @@ function beginGame(room: Room, io: IOServer): void {
       if (winnerPlayer && coinsWon > 0) {
         try {
           await addCoins(winnerPlayer.userId, coinsWon);
+          // Post to live wins feed (same as Lucky Drop / Midnight Machine)
+          const { nanoid } = await import("nanoid");
+          const db = getDb();
+          await db.insert(gameHistory).values({
+            id: nanoid(),
+            userId: winnerPlayer.userId,
+            gameType: "air_hockey",
+            betAmount: r.wager / 100, // coins → Lari
+            winAmount: coinsWon / 100, // coins → Lari
+          });
         } catch (e) {
           console.error("[gameOver] failed to award coins", e);
         }
