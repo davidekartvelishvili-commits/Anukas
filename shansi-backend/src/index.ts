@@ -391,7 +391,13 @@ app.get("/health", (c) => {
 });
 
 // ── Ping (latency measurement) ──
-app.get("/ping", (c) => c.json({ pong: true, time: Date.now() }));
+app.get("/ping", (c) => {
+  return c.json({
+    pong: true,
+    serverTime: Date.now(),
+    region: "eu-west",
+  });
+});
 
 // ── Global error handler ──
 app.onError((err, c) => {

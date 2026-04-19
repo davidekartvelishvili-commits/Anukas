@@ -223,6 +223,7 @@ function emitState(io: IOServer, roomId: string, state: ServerGameState): void {
     t: [state.paddles.top.x, state.paddles.top.y],
     s: [state.score.bottom, state.score.top],
     st, w,
+    ts: Date.now(),
   });
 }
 
