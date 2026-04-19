@@ -37,6 +37,7 @@ interface MultiplayerState {
 }
 
 export default function AirHockeyPage() {
+  console.log("[render]");
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("menu");
   const [multiplayer, setMultiplayer] = useState(false);
