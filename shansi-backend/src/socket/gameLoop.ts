@@ -138,8 +138,6 @@ function checkAndResolveAt(puck: PuckState, paddle: PaddleState, px: number, py:
 
   if (dist >= minDist) return false;
 
-  console.log(`[DIRECT HIT] dist=${dist.toFixed(4)} minDist=${minDist.toFixed(4)} puck=${puck.x.toFixed(3)},${puck.y.toFixed(3)} paddle=${px.toFixed(3)},${py.toFixed(3)}`);
-
   let nx: number, ny: number;
   if (dist === 0) { nx = 0; ny = -1; }
   else { nx = dx / dist; ny = dy / dist; }
@@ -273,27 +271,11 @@ function tick(
 
   resolveWallBounce(state.puck);
   // Only check collision with a paddle if puck is on that paddle's half
-  const minDistLog = PUCK_RADIUS + PADDLE_RADIUS;
   if (state.puck.y >= CENTER_LINE - PUCK_RADIUS) {
     handlePaddleCollision(state.puck, state.paddles.bottom);
-    const fd = Math.sqrt((state.puck.x - state.paddles.bottom.x) ** 2 + (state.puck.y - state.paddles.bottom.y) ** 2);
-    if (fd < minDistLog) {
-      const sd = Math.sqrt(((state.paddles.bottom.prevX ?? state.paddles.bottom.x) - state.paddles.bottom.x) ** 2 + ((state.paddles.bottom.prevY ?? state.paddles.bottom.y) - state.paddles.bottom.y) ** 2);
-      console.log(`[TUNNEL] side=bottom puck still inside! dist=${fd.toFixed(4)} sweepDist=${sd.toFixed(4)}`);
-    }
   }
   if (state.puck.y <= CENTER_LINE + PUCK_RADIUS) {
     handlePaddleCollision(state.puck, state.paddles.top);
-    const fd = Math.sqrt((state.puck.x - state.paddles.top.x) ** 2 + (state.puck.y - state.paddles.top.y) ** 2);
-    if (fd < minDistLog) {
-      const sd = Math.sqrt(((state.paddles.top.prevX ?? state.paddles.top.x) - state.paddles.top.x) ** 2 + ((state.paddles.top.prevY ?? state.paddles.top.y) - state.paddles.top.y) ** 2);
-      console.log(`[TUNNEL] side=top puck still inside! dist=${fd.toFixed(4)} sweepDist=${sd.toFixed(4)}`);
-    }
-  }
-
-  // LOG 4: speed every 60 ticks
-  if (game.tickCount % 60 === 0) {
-    console.log(`[SPEED] ${Math.sqrt(state.puck.vx ** 2 + state.puck.vy ** 2).toFixed(5)}`);
   }
 
   // Goals
@@ -330,10 +312,7 @@ export function startGameLoop(
   onGoal: (roomId: string, scorer: "bottom" | "top", score: { bottom: number; top: number }) => void,
   onGameOver: (roomId: string, winner: "bottom" | "top") => void
 ): void {
-  if (activeGames.has(roomId)) {
-    console.warn(`[startGameLoop] loop already running for ${roomId} — skipping`);
-    return;
-  }
+  if (activeGames.has(roomId)) return;
   const state = createInitialState(goalTarget);
   const game: ActiveGame = {
     interval: setInterval(() => tick(roomId, io, onGoal, onGameOver), TICK_MS),
