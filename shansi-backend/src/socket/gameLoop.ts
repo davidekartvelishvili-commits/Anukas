@@ -235,6 +235,7 @@ function tick(
   onGoal: (roomId: string, scorer: "bottom" | "top", score: { bottom: number; top: number }) => void,
   onGameOver: (roomId: string, winner: "bottom" | "top") => void
 ): void {
+  console.log(`[tick] ${Date.now()}`);
   const game = activeGames.get(roomId);
   if (!game) return;
   const { state } = game;
