@@ -42,7 +42,7 @@ const BUILDING_POSITIONS: Record<number, { x: number; y: number }> = {
   5: { x: 65, y: 44 },  // back-right
 };
 
-const BUILDING_SIZE = 80; // px, on the village scene (slightly bigger than the 50px card icon)
+const BUILDING_SIZE = 100; // px, on the village scene
 
 // ─────────────────────────────────────────────
 // Build animation — dust puffs, tools, sparkles, progress bar
