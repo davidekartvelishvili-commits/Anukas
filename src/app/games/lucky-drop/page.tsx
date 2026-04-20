@@ -940,7 +940,7 @@ export default function LuckyDropPage() {
 
       {/* Shield jackpot reveal animation */}
       {showShieldAnim && (
-        <ShieldJackpotReveal onDone={() => setShowShieldAnim(false)} />
+        <ShieldJackpotReveal onDone={() => setShowShieldAnim(false)} audioCtx={audioContextRef.current} />
       )}
 
       {/* Bonus round banner */}
