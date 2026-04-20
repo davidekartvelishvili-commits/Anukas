@@ -375,6 +375,12 @@ export default function VillagePage() {
 
     setUpgrading(building.id);
     setAnimatingBuildingPos(building.position);
+    // Play building construction sound
+    try {
+      const sfx = new Audio("/audio/building.mp3");
+      sfx.volume = 0.8;
+      sfx.play().catch(() => {});
+    } catch {}
     // Optimistic local coin deduction for snappy UI
     const cost = building.nextCost;
     const optimisticBalance = getCoinBalance() - cost;
