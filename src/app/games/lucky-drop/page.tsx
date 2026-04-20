@@ -963,14 +963,14 @@ export default function LuckyDropPage() {
           {/* Swords — 3 slots */}
           {[0, 1, 2].map((i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={`sw-${i}`} src="/images/sword.png" alt="" width={28} height={28}
+            <img key={`sw-${i}`} src="/images/sword.png" alt="" width={34} height={34}
               style={{ objectFit: "contain", opacity: i < attackCards ? 1 : 0.2 }} />
           ))}
           <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.15)", margin: "0 2px" }} />
           {/* Shields — 3 slots */}
           {[0, 1, 2].map((i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={`sh-${i}`} src="/images/shield.png" alt="" width={28} height={28}
+            <img key={`sh-${i}`} src="/images/shield.png" alt="" width={26} height={26}
               style={{ objectFit: "contain", opacity: i < shieldCount ? 1 : 0.2 }} />
           ))}
         </div>

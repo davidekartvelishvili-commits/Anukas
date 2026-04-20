@@ -859,22 +859,19 @@ export default function VillagePage() {
               </span>
             </div>
 
-            {/* Attack cards */}
-            <div className="flex items-center gap-2 pl-1 pr-4 py-1 rounded-full" style={{ background: "rgba(180,140,80,0.7)" }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/sword.png" alt="sword" width={32} height={32} style={{ objectFit: "contain" }} />
-              <span className="text-white text-[15px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
-                {profile?.cardCount ?? 0}
-              </span>
-            </div>
-
-            {/* Shields */}
-            <div className="flex items-center gap-2 pl-1 pr-4 py-1 rounded-full" style={{ background: "rgba(180,140,80,0.7)" }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/shield.png" alt="shield" width={32} height={32} style={{ objectFit: "contain", opacity: profile?.shieldActive ? 1 : 0.35 }} />
-              <span className="text-white text-[15px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
-                {profile?.shieldActive ? "1" : "0"}
-              </span>
+            {/* Swords + Shields — 3 slots each, same as Lucky Drop */}
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full" style={{ background: "rgba(180,140,80,0.7)" }}>
+              {[0, 1, 2].map((i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={`sw-${i}`} src="/images/sword.png" alt="" width={34} height={34}
+                  style={{ objectFit: "contain", opacity: i < (profile?.cardCount ?? 0) ? 1 : 0.2 }} />
+              ))}
+              <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.25)", margin: "0 2px" }} />
+              {[0, 1, 2].map((i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={`sh-${i}`} src="/images/shield.png" alt="" width={26} height={26}
+                  style={{ objectFit: "contain", opacity: i < (profile?.shieldActive ? 1 : 0) ? 1 : 0.2 }} />
+              ))}
             </div>
           </div>
         </div>
