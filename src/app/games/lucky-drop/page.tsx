@@ -7,6 +7,7 @@ import { setCoinBalance as storeCoin, setCashBalance as storeCash } from "@/serv
 import WinAnimation from "@/components/WinAnimation";
 import ShieldJackpotReveal from "@/components/ShieldJackpotReveal";
 import AttackCardReveal from "@/components/AttackCardReveal";
+import AttackSequence from "@/components/attack/AttackSequence";
 
 const ROWS = 12;
 
@@ -220,7 +221,7 @@ export default function LuckyDropPage() {
     import("@/services/api").then(({ apiFetch }) => {
       apiFetch("/village/profile").then((data: any) => {
         if (data?.success) {
-          setAttackCards(data.profile.cardCount || 0);
+          setAttackCards(data.profile.attackCharges ?? data.profile.cardCount ?? 0);
           setShieldCount(data.profile.shieldActive ? 1 : 0);
         }
       }).catch(() => {});
@@ -245,6 +246,7 @@ export default function LuckyDropPage() {
   const animPlayingRef = useRef(false);
   const [attackCards, setAttackCards] = useState(0);
   const [shieldCount, setShieldCount] = useState(0);
+  const [showAttackSequence, setShowAttackSequence] = useState(false);
   const dropCount = useRef(0);
 
   const playNextAnim = useCallback(() => {
@@ -826,7 +828,8 @@ export default function LuckyDropPage() {
           queueAnim("shield");
         }
         if (serverResult.rewards?.card) {
-          setAttackCards((c) => Math.min(c + 1, 3));
+          const charges = serverResult.rewards.card.attackCharges ?? 0;
+          setAttackCards(charges);
           queueAnim("card");
         }
         // Coalesced balance update — ONE setBalance per ball settle
@@ -991,7 +994,31 @@ export default function LuckyDropPage() {
       )}
 
       {showCardAnim && (
-        <AttackCardReveal onDone={() => { setShowCardAnim(false); playNextAnim(); }} />
+        <AttackCardReveal onDone={() => {
+          setShowCardAnim(false);
+          // If 3 swords collected → trigger attack sequence
+          if (attackCards >= 3) {
+            setShowAttackSequence(true);
+          } else {
+            playNextAnim();
+          }
+        }} />
+      )}
+
+      {/* Attack sequence — triggered when 3 swords collected */}
+      {showAttackSequence && (
+        <AttackSequence onComplete={() => {
+          setShowAttackSequence(false);
+          // Reset attack charges (backend already set to 0)
+          setAttackCards(0);
+          // Refresh coin balance
+          ensureActiveTransaction().then((tx) => {
+            setBalance(tx.coinsRemaining);
+            storeCoin(tx.coinsRemaining);
+          }).catch(() => {});
+          // Continue any remaining queued animations
+          playNextAnim();
+        }} />
       )}
 
       {/* Bonus round banner */}

@@ -290,7 +290,7 @@ export default function VillagePage() {
   const [animatingBuildingPos, setAnimatingBuildingPos] = useState<number | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
   const [showHand, setShowHand] = useState(true);
-  const [profile, setProfile] = useState<{ totalStars: number; shieldActive: boolean; currentLevel: number; cardCount: number } | null>(null);
+  const [profile, setProfile] = useState<{ totalStars: number; shieldActive: boolean; currentLevel: number; cardCount: number; attackCharges: number } | null>(null);
   // Intro cloud reveal — plays once per page entry then unmounts
   const [showReveal, setShowReveal] = useState(true);
   // Exit cloud-cover — when set, plays the reverse animation then navigates
@@ -933,19 +933,17 @@ export default function VillagePage() {
                 {[0, 1, 2].map((i) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img key={`sw-${i}`} src="/images/sword.png" alt="" width={24} height={24}
-                    style={{ objectFit: "contain", opacity: i < (profile?.cardCount ?? 0) ? 1 : 0.2 }} />
+                    style={{ objectFit: "contain", opacity: i < (profile?.attackCharges ?? profile?.cardCount ?? 0) ? 1 : 0.2 }} />
                 ))}
               </div>
             </div>
 
-            {/* DEV: Attack trigger — remove in production */}
-            <button
-              onClick={() => setShowAttackSequence(true)}
+            {/* Attack sequence triggered automatically via Lucky Drop 3-sword completion */}
+            {/* DEV trigger: uncomment below for manual testing
+            <button onClick={() => setShowAttackSequence(true)}
               className="px-2 py-1 rounded-full text-[10px] font-bold"
-              style={{ background: "rgba(239,68,68,0.6)", color: "#fff" }}
-            >
-              ⚔ DEV
-            </button>
+              style={{ background: "rgba(239,68,68,0.6)", color: "#fff" }}>⚔ DEV</button>
+            */}
           </div>
         </div>
 
