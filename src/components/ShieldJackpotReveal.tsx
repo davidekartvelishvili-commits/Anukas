@@ -54,17 +54,57 @@ interface Props {
 export default function ShieldJackpotReveal({ onDone }: Props) {
   const [particles] = useState(generateParticles);
 
+  // Auto-dismiss after 6.5s
   useEffect(() => {
-    const timer = setTimeout(onDone, 4500);
+    const timer = setTimeout(onDone, 6500);
     return () => clearTimeout(timer);
   }, [onDone]);
+
+  // Shield win sound — triumphant fanfare, different from coin win
+  useEffect(() => {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (ctx.state === "suspended") ctx.resume();
+      const t = ctx.currentTime;
+
+      // Rising chord: C5 → E5 → G5 (major triad, staggered)
+      const notes = [523, 659, 784];
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0, t + i * 0.12);
+        gain.gain.linearRampToValueAtTime(0.25, t + i * 0.12 + 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t + i * 0.12);
+        osc.stop(t + 2);
+      });
+
+      // Bright shimmer on top
+      const shimmer = ctx.createOscillator();
+      const sGain = ctx.createGain();
+      shimmer.type = "sine";
+      shimmer.frequency.setValueAtTime(1568, t + 0.4); // G6
+      shimmer.frequency.exponentialRampToValueAtTime(2093, t + 0.8); // C7
+      sGain.gain.setValueAtTime(0, t + 0.4);
+      sGain.gain.linearRampToValueAtTime(0.15, t + 0.5);
+      sGain.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
+      shimmer.connect(sGain);
+      sGain.connect(ctx.destination);
+      shimmer.start(t + 0.4);
+      shimmer.stop(t + 1.5);
+    } catch {}
+  }, []);
 
   const { sparks, sparks2, confetti, coins, glitter, streaks } = particles;
 
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center"
-      style={{ background: "transparent", pointerEvents: "auto" }}
+      style={{ background: "rgba(0,0,0,0.65)", pointerEvents: "auto" }}
       onClick={onDone}
     >
       <style>{css}</style>
@@ -206,12 +246,12 @@ const css = `
 .sjr-flash.sjr-play{animation:sjrFlash .6s ease-out .45s forwards}
 @keyframes sjrFlash{0%{opacity:0;transform:scale(.5)}20%{opacity:1;transform:scale(1.1)}100%{opacity:0;transform:scale(1.3)}}
 .sjr-rays{display:flex;align-items:center;justify-content:center;opacity:0;filter:blur(.5px)}
-.sjr-rays.sjr-play{animation:sjrRays 4.5s cubic-bezier(.16,1,.3,1) .35s forwards}
+.sjr-rays.sjr-play{animation:sjrRays 6.5s cubic-bezier(.16,1,.3,1) .35s forwards}
 @keyframes sjrRays{0%{opacity:0;transform:scale(.3) rotate(0)}15%{opacity:.95;transform:scale(1.05) rotate(10deg)}40%{opacity:.7;transform:scale(1) rotate(25deg)}100%{opacity:.45;transform:scale(1.05) rotate(60deg)}}
 .sjr-halo{display:flex;align-items:center;justify-content:center;opacity:0}
 .sjr-halo::before{content:'';border-radius:50%;border:3px solid transparent;background:conic-gradient(from 0deg,transparent 0deg,#FFD700 40deg,#FF2EC4 80deg,transparent 120deg,transparent 200deg,#00E5FF 240deg,#FFD700 280deg,transparent 320deg,transparent 360deg) border-box;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;filter:drop-shadow(0 0 14px #FFD700) drop-shadow(0 0 8px #FF2EC4)}
 .sjr-halo-outer::before{width:88%;height:88%}.sjr-halo-mid::before{width:70%;height:70%;border-width:2px}.sjr-halo-inner::before{width:55%;height:55%;border-width:2px}
-.sjr-halo-outer.sjr-play{animation:sjrHalo 4.5s ease-out .5s forwards}.sjr-halo-mid.sjr-play{animation:sjrHalo 4.5s ease-out .6s forwards}.sjr-halo-inner.sjr-play{animation:sjrHalo 4.5s ease-out .7s forwards}
+.sjr-halo-outer.sjr-play{animation:sjrHalo 6.5s ease-out .5s forwards}.sjr-halo-mid.sjr-play{animation:sjrHalo 6.5s ease-out .6s forwards}.sjr-halo-inner.sjr-play{animation:sjrHalo 6.5s ease-out .7s forwards}
 @keyframes sjrHalo{0%{opacity:0;transform:scale(.4)}20%{opacity:1;transform:scale(1.08)}40%{opacity:.9;transform:scale(1)}100%{opacity:.75;transform:scale(1)}}
 .sjr-halo-outer.sjr-play::before{animation:sjrSpinCW 7s linear .5s infinite}.sjr-halo-mid.sjr-play::before{animation:sjrSpinCCW 5s linear .6s infinite}.sjr-halo-inner.sjr-play::before{animation:sjrSpinCW 3.5s linear .7s infinite}
 @keyframes sjrSpinCW{to{transform:rotate(360deg)}}@keyframes sjrSpinCCW{to{transform:rotate(-360deg)}}
@@ -246,10 +286,10 @@ const css = `
 .sjr-shield-wrap.sjr-play{animation:sjrShieldEntry 1.3s cubic-bezier(.34,1.56,.64,1) forwards}
 @keyframes sjrShieldEntry{0%{opacity:0;transform:scale(.05) rotate(-25deg)}30%{opacity:1;transform:scale(1.35) rotate(12deg)}50%{transform:scale(.88) rotate(-6deg)}70%{transform:scale(1.08) rotate(3deg)}85%{transform:scale(.97) rotate(-1deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
 .sjr-shield-wrap.sjr-play .sjr-shield-float{animation:sjrShieldFloat 2.8s ease-in-out 1.4s infinite}
-@keyframes sjrShieldFloat{0%,100%{transform:translateY(0) scale(1) rotate(0)}50%{transform:translateY(-10px) scale(1.03) rotate(2deg)}}
-.sjr-label{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:6%;opacity:0;z-index:11}
-.sjr-label-small{font-size:clamp(10px,2.2vw,13px);font-weight:800;letter-spacing:.35em;background:linear-gradient(90deg,#FFD700,#FF2EC4,#00E5FF,#FFD700);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:6px;animation:sjrShimmer 3s linear infinite}
-.sjr-label-big{font-size:clamp(30px,7.5vw,48px);font-weight:900;letter-spacing:.14em;color:#FFF4A3;text-shadow:0 0 24px rgba(255,215,0,.9),0 0 12px rgba(255,46,196,.6),0 2px 0 rgba(0,0,0,.6),0 4px 16px rgba(0,0,0,.7)}
+@keyframes sjrShieldFloat{0%,100%{transform:translateY(0) scale(1) rotate(0)}50%{transform:translateY(-18px) scale(1.05) rotate(3deg)}}
+.sjr-label{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:2%;opacity:0;z-index:11}
+.sjr-label-small{font-size:clamp(12px,2.8vw,16px);font-weight:800;letter-spacing:.35em;color:#FFD700;text-shadow:0 0 20px rgba(255,215,0,.8),0 0 40px rgba(255,46,196,.5),0 2px 8px rgba(0,0,0,.9);margin-bottom:8px}
+.sjr-label-big{font-size:clamp(36px,9vw,56px);font-weight:900;letter-spacing:.14em;color:#FFFFFF;text-shadow:0 0 30px rgba(255,215,0,1),0 0 60px rgba(255,46,196,.7),0 0 12px rgba(0,229,255,.5),0 3px 0 rgba(0,0,0,.8),0 6px 20px rgba(0,0,0,.9)}
 @keyframes sjrShimmer{0%{background-position:0% 50%}100%{background-position:300% 50%}}
 .sjr-label.sjr-play{animation:sjrLabelIn .7s cubic-bezier(.34,1.56,.64,1) 1.1s forwards}
 @keyframes sjrLabelIn{0%{opacity:0;transform:translateY(24px) scale(.9)}100%{opacity:1;transform:translateY(0) scale(1)}}
