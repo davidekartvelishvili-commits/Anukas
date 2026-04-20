@@ -6,6 +6,7 @@ import { playGame, ensureActiveTransaction } from "@/services/games";
 import { setCoinBalance as storeCoin, setCashBalance as storeCash } from "@/services/balance";
 import WinAnimation from "@/components/WinAnimation";
 import ShieldJackpotReveal from "@/components/ShieldJackpotReveal";
+import AttackCardReveal from "@/components/AttackCardReveal";
 
 const ROWS = 12;
 
@@ -215,6 +216,15 @@ export default function LuckyDropPage() {
       setBalance(tx.coinsRemaining);
       storeCoin(tx.coinsRemaining);
     }).catch(() => {});
+    // Fetch village profile for attack cards + shield count
+    import("@/services/api").then(({ apiFetch }) => {
+      apiFetch("/village/profile").then((data: any) => {
+        if (data?.success) {
+          setAttackCards(data.profile.cardCount || 0);
+          setShieldCount(data.profile.shieldActive ? 1 : 0);
+        }
+      }).catch(() => {});
+    });
   }, []);
   // bigWinText: imperative DOM update via ref instead of useState, so
   // transient error text doesn't re-render the whole LuckyDropPage tree
@@ -230,7 +240,11 @@ export default function LuckyDropPage() {
   const [winAnimAmount, setWinAnimAmount] = useState(0);
   const [bonusRoundInfo, setBonusRoundInfo] = useState<{ coins: number; gamesLeft: number } | null>(null);
   const [showShieldAnim, setShowShieldAnim] = useState(false);
+  const [showCardAnim, setShowCardAnim] = useState(false);
   const pendingShieldRef = useRef(false);
+  const pendingCardRef = useRef(false);
+  const [attackCards, setAttackCards] = useState(0);
+  const [shieldCount, setShieldCount] = useState(0);
   const dropCount = useRef(0);
 
   // Canvas-rendered confetti particles. Replaces the old DOM-div-per-particle
@@ -789,18 +803,30 @@ export default function LuckyDropPage() {
         }
         // Shield milestone reward — queue for next settle if win is playing
         if (serverResult.rewards?.shield) {
+          setShieldCount((c) => c + 1);
           if (serverResult.won) {
-            // Win animation is playing — queue shield for later
             pendingShieldRef.current = true;
           } else {
-            // No win animation — show shield immediately
             setShowShieldAnim(true);
           }
         }
-        // Show queued shield animation if no win animation this time
+        // Attack card milestone reward — queue similarly
+        if (serverResult.rewards?.card) {
+          setAttackCards((c) => c + 1);
+          if (serverResult.won || serverResult.rewards?.shield) {
+            pendingCardRef.current = true;
+          } else {
+            setShowCardAnim(true);
+          }
+        }
+        // Show queued animations if no win animation this time
         if (!serverResult.won && pendingShieldRef.current) {
           pendingShieldRef.current = false;
           setShowShieldAnim(true);
+        }
+        if (!serverResult.won && !pendingShieldRef.current && pendingCardRef.current) {
+          pendingCardRef.current = false;
+          setShowCardAnim(true);
         }
         // Coalesced balance update — ONE setBalance per ball settle
         // instead of two. If parallel balls are still in flight, clamp to
@@ -938,7 +964,22 @@ export default function LuckyDropPage() {
           </div>
           <span className="text-[10px] text-white/[0.45] font-medium uppercase tracking-wider" style={{ fontFamily: "var(--font-dm-sans)" }}>Lucky Drop</span>
         </div>
-        <div className="w-9" />
+        <div className="flex items-center gap-1.5">
+          {/* Attack cards */}
+          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/10 border border-white/[0.08]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF6B6B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span className="text-white text-[12px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>{attackCards}</span>
+          </div>
+          {/* Shields */}
+          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/10 border border-white/[0.08]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/shield.png" alt="" width={14} height={14} style={{ objectFit: "contain" }} />
+            <span className="text-white text-[12px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>{shieldCount}</span>
+          </div>
+        </div>
       </div>
 
       {/* Risk selector removed — single mode */}
@@ -952,7 +993,18 @@ export default function LuckyDropPage() {
 
       {/* Shield jackpot reveal animation */}
       {showShieldAnim && (
-        <ShieldJackpotReveal onDone={() => setShowShieldAnim(false)} />
+        <ShieldJackpotReveal onDone={() => {
+          setShowShieldAnim(false);
+          // Show queued card animation after shield finishes
+          if (pendingCardRef.current) {
+            pendingCardRef.current = false;
+            setShowCardAnim(true);
+          }
+        }} />
+      )}
+
+      {showCardAnim && (
+        <AttackCardReveal onDone={() => setShowCardAnim(false)} />
       )}
 
       {/* Bonus round banner */}

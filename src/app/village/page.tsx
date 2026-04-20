@@ -286,7 +286,7 @@ export default function VillagePage() {
   const [animatingBuildingPos, setAnimatingBuildingPos] = useState<number | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
   const [showHand, setShowHand] = useState(true);
-  const [profile, setProfile] = useState<{ totalStars: number; shieldActive: boolean; currentLevel: number } | null>(null);
+  const [profile, setProfile] = useState<{ totalStars: number; shieldActive: boolean; currentLevel: number; cardCount: number } | null>(null);
   // Intro cloud reveal — plays once per page entry then unmounts
   const [showReveal, setShowReveal] = useState(true);
   // Exit cloud-cover — when set, plays the reverse animation then navigates
@@ -859,22 +859,35 @@ export default function VillagePage() {
               </span>
             </div>
 
-            {/* Shields — show shield image when active, empty circle placeholder when not */}
-            <div className="flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full" style={{ background: "rgba(150,200,240,0.5)" }}>
+            {/* Attack cards */}
+            <div className="flex items-center gap-1 pl-1.5 pr-2.5 py-1 rounded-full" style={{ background: "rgba(200,80,80,0.6)" }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="12" y1="12" x2="12" y2="18"/>
+                <line x1="9" y1="15" x2="15" y2="15"/>
+              </svg>
+              <span className="text-white text-[13px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
+                {profile?.cardCount ?? 0}
+              </span>
+            </div>
+
+            {/* Shields */}
+            <div className="flex items-center gap-1 pl-1 pr-2.5 py-1 rounded-full" style={{ background: "rgba(150,200,240,0.5)" }}>
               {profile?.shieldActive ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src="/images/shield.png"
                   alt="shield"
-                  width={28}
-                  height={28}
+                  width={24}
+                  height={24}
                   style={{ objectFit: "contain" }}
                 />
               ) : (
                 <div
                   style={{
-                    width: 24,
-                    height: 24,
+                    width: 22,
+                    height: 22,
                     borderRadius: "50%",
                     border: "2px dashed rgba(255,255,255,0.55)",
                     background: "rgba(255,255,255,0.08)",
