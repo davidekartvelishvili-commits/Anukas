@@ -839,8 +839,13 @@ export default function LuckyDropPage() {
           queueAnim("shield");
         }
         if (serverResult.rewards?.card) {
-          const charges = serverResult.rewards.card.attackCharges ?? 0;
-          setAttackCards(charges);
+          const serverCharges = serverResult.rewards.card.attackCharges;
+          if (serverCharges !== undefined && serverCharges !== null) {
+            setAttackCards(serverCharges);
+          } else {
+            // Backend didn't return count — increment optimistically
+            setAttackCards((c) => Math.min(c + 1, 3));
+          }
           queueAnim("card");
         }
         // Coalesced balance update — ONE setBalance per ball settle
