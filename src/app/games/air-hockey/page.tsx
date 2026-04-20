@@ -179,7 +179,7 @@ export default function AirHockeyPage() {
   // Throttle paddle sends to ~30/sec
   const lastPaddleSendRef = useRef(0);
 
-  // ── Hit sound (Web Audio API — synthesized puck hit) ──────────────────────
+  // ── Hit sound (Web Audio API — realistic air hockey "thock") ─────────────
   const audioCtxRef = useRef<AudioContext | null>(null);
   const playHitSound = useCallback(() => {
     try {
@@ -188,22 +188,41 @@ export default function AirHockeyPage() {
       }
       const ctx = audioCtxRef.current;
       if (ctx.state === "suspended") ctx.resume();
+      const t = ctx.currentTime;
 
-      // Short percussive "click" — sounds like puck hitting paddle
+      // Layer 1: White noise burst (plastic impact)
+      const bufferSize = ctx.sampleRate * 0.04; // 40ms
+      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBuffer;
+      const noiseFilter = ctx.createBiquadFilter();
+      noiseFilter.type = "bandpass";
+      noiseFilter.frequency.value = 3000;
+      noiseFilter.Q.value = 1.5;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.5, t);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(ctx.destination);
+      noise.start(t);
+
+      // Layer 2: Low thud (table resonance)
       const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.type = "square";
-      osc.frequency.setValueAtTime(800, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.05);
-
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.08);
+      const oscGain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(300, t);
+      osc.frequency.exponentialRampToValueAtTime(80, t + 0.06);
+      oscGain.gain.setValueAtTime(0.4, t);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+      osc.connect(oscGain);
+      oscGain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.06);
     } catch {}
   }, []);
 
