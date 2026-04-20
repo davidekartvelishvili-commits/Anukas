@@ -3,192 +3,125 @@
 import React, { useEffect, useState, memo } from "react";
 
 // ============================================================================
-// WORKER CREW — 5 tiny workers walk from house to build site and back
-// Pure CSS animations, no animation library required
+// WORKER CREW — 5 tiny workers walk in a LINE from bottom to build site
+// They walk single-file, build at the item, then walk back in line
 // ============================================================================
 
 const WORKER_IMG = "/images/worker.png";
 const WORKER_COUNT = 5;
-const STAGGER_MS = 150;
-const WALK_SPEED = 0.06; // percentage units per ms (~60px/s on 1000px screen)
-const EXIT_DURATION = 200;
-const ENTER_DURATION = 200;
-
-// Small offsets so workers surround the target, not stack
-const TARGET_OFFSETS = [
-  { dx: -10, dy: -6 },
-  { dx: 8, dy: -8 },
-  { dx: -6, dy: 8 },
-  { dx: 10, dy: 6 },
-  { dx: 0, dy: -10 },
-];
-
-// Per-worker speed variation (±10%)
-const SPEED_MULT = [1.0, 0.92, 1.08, 0.95, 1.05];
+const STAGGER_MS = 400; // big stagger = clear single-file line
+const WALK_DURATION = 2500; // 2.5s to walk to target (slow, visible)
+const BUILD_DURATION = 2000; // 2s building at the item
+const EXIT_MS = 300;
+const ENTER_MS = 300;
 
 interface Props {
-  houseX: number; // % position
-  houseY: number; // % position
-  targetX: number; // % position
-  targetY: number; // % position
+  houseX: number;
+  houseY: number;
+  targetX: number;
+  targetY: number;
   taskDurationMs: number;
   onComplete: () => void;
 }
 
-type WorkerPhase = "idle" | "exiting" | "walking-to" | "building" | "walking-home" | "entering" | "done";
-
-interface WorkerState {
-  phase: WorkerPhase;
-  x: number;
-  y: number;
-  flipX: boolean;
-  buildPhaseOffset: number;
-}
+type Phase = "idle" | "exiting" | "walk-to" | "building" | "walk-home" | "entering" | "done";
 
 function WorkerCrewInner({ houseX, houseY, targetX, targetY, taskDurationMs, onComplete }: Props) {
-  const [workers, setWorkers] = useState<WorkerState[]>(
-    Array.from({ length: WORKER_COUNT }, () => ({
-      phase: "idle" as WorkerPhase,
-      x: houseX,
-      y: houseY,
-      flipX: false,
-      buildPhaseOffset: Math.random() * 1000,
-    }))
+  const [phases, setPhases] = useState<Phase[]>(Array(WORKER_COUNT).fill("idle"));
+  const [positions, setPositions] = useState(
+    Array.from({ length: WORKER_COUNT }, () => ({ x: houseX, y: houseY }))
   );
   const [doneCount, setDoneCount] = useState(0);
+
+  const flipX = targetX < houseX;
+  const buildTime = taskDurationMs > 0 ? taskDurationMs : BUILD_DURATION;
 
   useEffect(() => {
     if (doneCount >= WORKER_COUNT) onComplete();
   }, [doneCount, onComplete]);
 
-  // Start the sequence
   useEffect(() => {
     const timeouts: ReturnType<typeof setTimeout>[] = [];
 
+    // Workers walk in a line to slightly offset positions around target
+    const offsets = [
+      { dx: -3, dy: 2 }, { dx: -1.5, dy: 1 }, { dx: 0, dy: 0 },
+      { dx: 1.5, dy: 1 }, { dx: 3, dy: 2 },
+    ];
+
     for (let i = 0; i < WORKER_COUNT; i++) {
-      const offset = TARGET_OFFSETS[i];
-      const tx = targetX + offset.dx * 0.3; // scale offsets to % units
-      const ty = targetY + offset.dy * 0.3;
-      const flipToTarget = tx < houseX;
-      const flipToHome = houseX < tx;
-      const speedMult = SPEED_MULT[i];
-
-      const dist = Math.sqrt((tx - houseX) ** 2 + (ty - houseY) ** 2);
-      const walkToMs = dist / (WALK_SPEED * speedMult);
-      const walkHomeMs = walkToMs;
-
       const stagger = i * STAGGER_MS;
+      const tx = targetX + offsets[i].dx;
+      const ty = targetY + offsets[i].dy;
 
-      // Phase 1: Exit house
+      // Appear at house
       timeouts.push(setTimeout(() => {
-        setWorkers(prev => {
-          const next = [...prev];
-          next[i] = { ...next[i], phase: "exiting", x: houseX, y: houseY };
-          return next;
-        });
+        setPhases(p => { const n = [...p]; n[i] = "exiting"; return n; });
       }, stagger));
 
-      // Phase 2: Walk to target
+      // Start walking to target
       timeouts.push(setTimeout(() => {
-        setWorkers(prev => {
-          const next = [...prev];
-          next[i] = { ...next[i], phase: "walking-to", x: tx, y: ty, flipX: flipToTarget };
-          return next;
-        });
-      }, stagger + EXIT_DURATION));
+        setPhases(p => { const n = [...p]; n[i] = "walk-to"; return n; });
+        setPositions(p => { const n = [...p]; n[i] = { x: tx, y: ty }; return n; });
+      }, stagger + EXIT_MS));
 
-      // Phase 3: Building
+      // Arrive — start building
       timeouts.push(setTimeout(() => {
-        setWorkers(prev => {
-          const next = [...prev];
-          next[i] = { ...next[i], phase: "building" };
-          return next;
-        });
-      }, stagger + EXIT_DURATION + walkToMs));
+        setPhases(p => { const n = [...p]; n[i] = "building"; return n; });
+      }, stagger + EXIT_MS + WALK_DURATION));
 
-      // Phase 4: Walk home
+      // Done building — walk home
       timeouts.push(setTimeout(() => {
-        setWorkers(prev => {
-          const next = [...prev];
-          next[i] = { ...next[i], phase: "walking-home", x: houseX, y: houseY, flipX: flipToHome };
-          return next;
-        });
-      }, stagger + EXIT_DURATION + walkToMs + taskDurationMs));
+        setPhases(p => { const n = [...p]; n[i] = "walk-home"; return n; });
+        setPositions(p => { const n = [...p]; n[i] = { x: houseX, y: houseY }; return n; });
+      }, stagger + EXIT_MS + WALK_DURATION + buildTime));
 
-      // Phase 5: Enter house
+      // Arrive home — enter
       timeouts.push(setTimeout(() => {
-        setWorkers(prev => {
-          const next = [...prev];
-          next[i] = { ...next[i], phase: "entering" };
-          return next;
-        });
-      }, stagger + EXIT_DURATION + walkToMs + taskDurationMs + walkHomeMs));
+        setPhases(p => { const n = [...p]; n[i] = "entering"; return n; });
+      }, stagger + EXIT_MS + WALK_DURATION + buildTime + WALK_DURATION));
 
-      // Phase 6: Done
+      // Done
       timeouts.push(setTimeout(() => {
-        setWorkers(prev => {
-          const next = [...prev];
-          next[i] = { ...next[i], phase: "done" };
-          return next;
-        });
+        setPhases(p => { const n = [...p]; n[i] = "done"; return n; });
         setDoneCount(c => c + 1);
-      }, stagger + EXIT_DURATION + walkToMs + taskDurationMs + walkHomeMs + ENTER_DURATION));
+      }, stagger + EXIT_MS + WALK_DURATION + buildTime + WALK_DURATION + ENTER_MS));
     }
 
     return () => timeouts.forEach(clearTimeout);
-  }, [houseX, houseY, targetX, targetY, taskDurationMs]);
+  }, [houseX, houseY, targetX, targetY, buildTime]);
 
   return (
     <>
       <style>{css}</style>
-      {workers.map((w, i) => {
-        if (w.phase === "idle" || w.phase === "done") return null;
+      {phases.map((phase, i) => {
+        if (phase === "idle" || phase === "done") return null;
 
-        const dist = Math.sqrt((w.x - houseX) ** 2 + (w.y - houseY) ** 2);
-        const walkMs = w.phase === "walking-to" || w.phase === "walking-home"
-          ? dist / (WALK_SPEED * SPEED_MULT[i])
-          : 0;
-
-        const style: React.CSSProperties = {
-          position: "absolute",
-          left: `${w.x}%`,
-          top: `${w.y}%`,
-          transform: "translate(-50%, -100%)",
-          width: 24,
-          height: 32,
-          zIndex: 15,
-          pointerEvents: "none" as const,
-          transition: (w.phase === "walking-to" || w.phase === "walking-home")
-            ? `left ${walkMs}ms linear, top ${walkMs}ms linear`
-            : "none",
-        };
-
-        let className = "vcw-worker";
-        if (w.phase === "exiting") className += " vcw-exit";
-        if (w.phase === "entering") className += " vcw-enter";
-        if (w.phase === "building") className += " vcw-building";
-        if (w.phase === "walking-to" || w.phase === "walking-home") className += " vcw-walking";
+        const pos = positions[i];
+        const isWalking = phase === "walk-to" || phase === "walk-home";
+        const goingLeft = phase === "walk-to" ? flipX : !flipX;
 
         return (
-          <div key={i} className={className} style={style}>
+          <div
+            key={i}
+            className={`vcw-w ${phase === "exiting" ? "vcw-appear" : ""} ${phase === "entering" ? "vcw-disappear" : ""} ${isWalking ? "vcw-bob" : ""} ${phase === "building" ? "vcw-hammer" : ""}`}
+            style={{
+              left: `${pos.x}%`,
+              top: `${pos.y}%`,
+              transition: isWalking ? `left ${WALK_DURATION}ms linear, top ${WALK_DURATION}ms linear` : "none",
+            }}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={WORKER_IMG}
-              alt=""
-              width={24}
-              height={32}
+              src={WORKER_IMG} alt="" draggable={false}
               style={{
-                objectFit: "contain",
-                width: "100%",
-                height: "100%",
-                transform: w.flipX ? "scaleX(-1)" : "none",
+                width: 24, height: 32, objectFit: "contain",
+                transform: goingLeft ? "scaleX(-1)" : "none",
                 filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.4))",
               }}
-              draggable={false}
             />
-            {/* Dust particles during building */}
-            {w.phase === "building" && (
-              <div className="vcw-dust" style={{ animationDelay: `${w.buildPhaseOffset}ms` }} />
+            {phase === "building" && (
+              <div className="vcw-dust" style={{ animationDelay: `${i * 200}ms` }} />
             )}
           </div>
         );
@@ -198,17 +131,17 @@ function WorkerCrewInner({ houseX, houseY, targetX, targetY, taskDurationMs, onC
 }
 
 const css = `
-.vcw-worker{will-change:transform,opacity,left,top}
-.vcw-exit{animation:vcwAppear .2s ease-out forwards}
-.vcw-enter{animation:vcwDisappear .2s ease-in forwards}
-.vcw-walking{animation:vcwBob .4s ease-in-out infinite}
-.vcw-building{animation:vcwHammer .5s ease-in-out infinite}
-@keyframes vcwAppear{0%{opacity:0;transform:translate(-50%,-100%) scale(.3)}100%{opacity:1;transform:translate(-50%,-100%) scale(1)}}
-@keyframes vcwDisappear{0%{opacity:1;transform:translate(-50%,-100%) scale(1)}100%{opacity:0;transform:translate(-50%,-100%) scale(.3)}}
+.vcw-w{position:absolute;transform:translate(-50%,-100%);z-index:15;pointer-events:none;will-change:left,top,transform,opacity}
+.vcw-appear{animation:vcwIn .3s ease-out forwards}
+.vcw-disappear{animation:vcwOut .3s ease-in forwards}
+.vcw-bob{animation:vcwBob .35s ease-in-out infinite}
+.vcw-hammer{animation:vcwHammer .45s ease-in-out infinite}
+@keyframes vcwIn{0%{opacity:0;transform:translate(-50%,-100%) scale(.2)}100%{opacity:1;transform:translate(-50%,-100%) scale(1)}}
+@keyframes vcwOut{0%{opacity:1;transform:translate(-50%,-100%) scale(1)}100%{opacity:0;transform:translate(-50%,-100%) scale(.2)}}
 @keyframes vcwBob{0%,100%{transform:translate(-50%,-100%) translateY(0)}50%{transform:translate(-50%,-100%) translateY(-2px)}}
-@keyframes vcwHammer{0%,100%{transform:translate(-50%,-100%) rotate(0deg)}25%{transform:translate(-50%,-100%) rotate(-12deg) translateY(-1px)}50%{transform:translate(-50%,-100%) rotate(8deg) translateY(1px)}75%{transform:translate(-50%,-100%) rotate(-5deg)}}
-.vcw-dust{position:absolute;bottom:-2px;left:50%;width:8px;height:8px;border-radius:50%;background:rgba(139,111,71,.4);transform:translateX(-50%);animation:vcwDust .6s ease-out infinite}
-@keyframes vcwDust{0%{opacity:.6;transform:translateX(-50%) scale(.5)}50%{opacity:.3;transform:translateX(-50%) scale(1.2) translateY(-4px)}100%{opacity:0;transform:translateX(-50%) scale(.8) translateY(-8px)}}
+@keyframes vcwHammer{0%,100%{transform:translate(-50%,-100%) rotate(0)}30%{transform:translate(-50%,-100%) rotate(-10deg) translateY(-1px)}60%{transform:translate(-50%,-100%) rotate(6deg) translateY(1px)}}
+.vcw-dust{position:absolute;bottom:-2px;left:50%;width:6px;height:6px;border-radius:50%;background:rgba(139,111,71,.35);transform:translateX(-50%);animation:vcwDust .5s ease-out infinite}
+@keyframes vcwDust{0%{opacity:.5;transform:translateX(-50%) scale(.4)}60%{opacity:.2;transform:translateX(-50%) scale(1) translateY(-3px)}100%{opacity:0;transform:translateX(-50%) scale(.6) translateY(-6px)}}
 `;
 
 export default memo(WorkerCrewInner);
