@@ -860,18 +860,18 @@ export default function VillagePage() {
             </div>
 
             {/* Attack cards */}
-            <div className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full" style={{ background: "rgba(200,80,80,0.6)" }}>
+            <div className="flex items-center gap-2 pl-1 pr-4 py-1 rounded-full" style={{ background: "rgba(180,140,80,0.7)" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/sword.png" alt="sword" width={28} height={28} style={{ objectFit: "contain" }} />
+              <img src="/images/sword.png" alt="sword" width={32} height={32} style={{ objectFit: "contain" }} />
               <span className="text-white text-[15px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
                 {profile?.cardCount ?? 0}
               </span>
             </div>
 
             {/* Shields */}
-            <div className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full" style={{ background: "rgba(150,200,240,0.5)" }}>
+            <div className="flex items-center gap-2 pl-1 pr-4 py-1 rounded-full" style={{ background: "rgba(180,140,80,0.7)" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/shield.png" alt="shield" width={28} height={28} style={{ objectFit: "contain", opacity: profile?.shieldActive ? 1 : 0.35 }} />
+              <img src="/images/shield.png" alt="shield" width={32} height={32} style={{ objectFit: "contain", opacity: profile?.shieldActive ? 1 : 0.35 }} />
               <span className="text-white text-[15px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
                 {profile?.shieldActive ? "1" : "0"}
               </span>

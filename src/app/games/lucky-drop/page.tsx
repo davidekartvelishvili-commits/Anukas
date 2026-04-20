@@ -959,18 +959,18 @@ export default function LuckyDropPage() {
           </svg>
         </button>
         {/* Swords + Shields — side by side */}
-        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-black/30 border border-white/[0.08]">
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/[0.12] backdrop-blur-lg">
           {/* Swords — 3 slots */}
           {[0, 1, 2].map((i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={`sw-${i}`} src="/images/sword.png" alt="" width={26} height={26}
+            <img key={`sw-${i}`} src="/images/sword.png" alt="" width={28} height={28}
               style={{ objectFit: "contain", opacity: i < attackCards ? 1 : 0.2 }} />
           ))}
-          <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)" }} />
+          <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.15)", margin: "0 2px" }} />
           {/* Shields — 3 slots */}
           {[0, 1, 2].map((i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={`sh-${i}`} src="/images/shield.png" alt="" width={26} height={26}
+            <img key={`sh-${i}`} src="/images/shield.png" alt="" width={28} height={28}
               style={{ objectFit: "contain", opacity: i < shieldCount ? 1 : 0.2 }} />
           ))}
         </div>
