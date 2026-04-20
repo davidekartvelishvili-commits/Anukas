@@ -247,7 +247,22 @@ export default function LuckyDropPage() {
   const [attackCards, setAttackCards] = useState(0);
   const [shieldCount, setShieldCount] = useState(0);
   const [showAttackSequence, setShowAttackSequence] = useState(false);
+  const attackTriggeredRef = useRef(false);
   const dropCount = useRef(0);
+
+  // Auto-trigger attack when charges reach 3 (from page load or card earn)
+  useEffect(() => {
+    if (attackCards >= 3 && !showAttackSequence && !attackTriggeredRef.current) {
+      // Delay slightly so UI renders the 3/3 glow first
+      const t = setTimeout(() => {
+        if (!attackTriggeredRef.current) {
+          attackTriggeredRef.current = true;
+          setShowAttackSequence(true);
+        }
+      }, 2000);
+      return () => clearTimeout(t);
+    }
+  }, [attackCards, showAttackSequence]);
 
   const animDelayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1036,8 +1051,8 @@ export default function LuckyDropPage() {
       {showCardAnim && (
         <AttackCardReveal onDone={() => {
           setShowCardAnim(false);
-          if (attackCards >= 3) {
-            // 3 swords → delay 3s then trigger attack sequence
+          if (attackCards >= 3 && !attackTriggeredRef.current) {
+            attackTriggeredRef.current = true;
             setTimeout(() => setShowAttackSequence(true), 3000);
           } else {
             playNextAnim();
@@ -1049,6 +1064,7 @@ export default function LuckyDropPage() {
       {showAttackSequence && (
         <AttackSequence onComplete={() => {
           setShowAttackSequence(false);
+          attackTriggeredRef.current = false;
           // Reset attack charges (backend already set to 0)
           setAttackCards(0);
           // Refresh coin balance
