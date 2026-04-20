@@ -222,6 +222,7 @@ async function runStartupMigrations() {
     )`,
     // ── Attack system v2 ──
     sql`ALTER TABLE user_village_profile ADD COLUMN attack_charges INTEGER NOT NULL DEFAULT 0`,
+    sql`ALTER TABLE user_village_profile ADD COLUMN shield_count INTEGER NOT NULL DEFAULT 0`,
     sql`ALTER TABLE users ADD COLUMN last_attack_seen_at TEXT`,
     sql`CREATE TABLE IF NOT EXISTS attack_sessions (
       id TEXT PRIMARY KEY,

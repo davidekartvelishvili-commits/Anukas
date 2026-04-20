@@ -222,7 +222,7 @@ export default function LuckyDropPage() {
       apiFetch("/village/profile").then((data: any) => {
         if (data?.success) {
           setAttackCards(data.profile.attackCharges ?? data.profile.cardCount ?? 0);
-          setShieldCount(data.profile.shieldActive ? 1 : 0);
+          setShieldCount(data.profile.shieldCount ?? (data.profile.shieldActive ? 1 : 0));
         }
       }).catch(() => {});
     });
@@ -835,7 +835,12 @@ export default function LuckyDropPage() {
         }
         // Queue reward animations — they play one at a time, after win anim
         if (serverResult.rewards?.shield) {
-          setShieldCount((c) => Math.min(c + 1, 3));
+          const sc = (serverResult.rewards.shield as any).shieldCount;
+          if (sc !== undefined && sc !== null) {
+            setShieldCount(sc);
+          } else {
+            setShieldCount((c) => Math.min(c + 1, 3));
+          }
           queueAnim("shield");
         }
         if (serverResult.rewards?.card) {

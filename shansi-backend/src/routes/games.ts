@@ -93,12 +93,12 @@ async function grantPlinkoMilestoneRewards(userId: string) {
   const out: any = {};
 
   if (ballsPerShield > 0 && count > 0 && count % ballsPerShield === 0) {
-    const untilDate = new Date(Date.now() + shieldHours * 3600 * 1000);
-    const untilIso = untilDate.toISOString();
-    await db.update(userVillageProfile)
-      .set({ shieldActiveUntil: untilIso, updatedAt: new Date().toISOString() } as any)
-      .where(eq(userVillageProfile.userId, userId));
-    out.shield = { until: untilIso, hours: shieldHours };
+    // Increment shield count (max 3)
+    await (db as any).run(
+      sql`UPDATE user_village_profile SET shield_count = MIN(shield_count + 1, 3), updated_at = datetime('now') WHERE user_id = ${userId}`
+    );
+    const [updatedForShield] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);
+    out.shield = { shieldCount: (updatedForShield as any)?.shieldCount ?? 0 };
   }
 
   if (ballsPerCard > 0 && count > 0 && count % ballsPerCard === 0) {

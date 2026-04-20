@@ -290,7 +290,7 @@ export default function VillagePage() {
   const [animatingBuildingPos, setAnimatingBuildingPos] = useState<number | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
   const [showHand, setShowHand] = useState(true);
-  const [profile, setProfile] = useState<{ totalStars: number; shieldActive: boolean; currentLevel: number; cardCount: number; attackCharges: number } | null>(null);
+  const [profile, setProfile] = useState<{ totalStars: number; shieldActive: boolean; shieldCount: number; currentLevel: number; cardCount: number; attackCharges: number } | null>(null);
   // Intro cloud reveal — plays once per page entry then unmounts
   const [showReveal, setShowReveal] = useState(true);
   // Exit cloud-cover — when set, plays the reverse animation then navigates
@@ -925,7 +925,7 @@ export default function VillagePage() {
                 {[0, 1, 2].map((i) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img key={`sh-${i}`} src="/images/shield.png" alt="" width={24} height={24}
-                    style={{ objectFit: "contain", opacity: i < (profile?.shieldActive ? 1 : 0) ? 1 : 0.2 }} />
+                    style={{ objectFit: "contain", opacity: i < (profile?.shieldCount ?? (profile?.shieldActive ? 1 : 0)) ? 1 : 0.2 }} />
                 ))}
               </div>
               {/* Swords row */}

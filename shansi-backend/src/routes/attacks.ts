@@ -141,13 +141,8 @@ attacks.post("/initialize", async (c) => {
 
   // Get defender info
   const [defenderUser] = await db.select().from(users).where(eq(users.id, defenderId)).limit(1);
-  const defenderShieldActive = attackerProfile.shieldActiveUntil
-    ? false // We check the defender's shield
-    : false;
   const [defenderProfileFull] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, defenderId)).limit(1);
-  const shieldActive = defenderProfileFull?.shieldActiveUntil
-    ? new Date(defenderProfileFull.shieldActiveUntil) > new Date()
-    : false;
+  const defenderShieldCount = (defenderProfileFull as any)?.shieldCount ?? 0;
 
   // Get village items for display
   let villageItems: Array<{ position: number; stars: number; name: string }> = [];
@@ -173,7 +168,8 @@ attacks.post("/initialize", async (c) => {
     attackSessionId: sessionId,
     defenderUsername: (defenderUser as any)?.stageName || defenderUser?.name || "Player",
     defenderVillageLevel: defenderProfileFull?.currentLevel || 1,
-    defenderShieldActive: shieldActive,
+    defenderShieldActive: defenderShieldCount > 0,
+    defenderShieldCount,
     villageItems,
   });
 });
@@ -200,11 +196,10 @@ attacks.post("/attempt", async (c) => {
   const attemptNumber = session.attacksUsed + 1;
   const defenderId = session.defenderId;
 
-  // Check defender shield
+  // Check defender shield (use shield_count, fallback to timestamp)
   const [defenderProfile] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, defenderId)).limit(1);
-  const shieldActive = defenderProfile?.shieldActiveUntil
-    ? new Date(defenderProfile.shieldActiveUntil) > new Date()
-    : false;
+  const defenderShieldCount = (defenderProfile as any)?.shieldCount ?? 0;
+  const shieldActive = defenderShieldCount > 0;
 
   let outcome: string;
   let coinsTransferred = 0;
@@ -213,9 +208,9 @@ attacks.post("/attempt", async (c) => {
   let newStarCount: number | null = null;
 
   if (shieldActive) {
-    // Break shield
+    // Consume 1 shield
     await (db as any).run(
-      sql`UPDATE user_village_profile SET shield_active_until = NULL, updated_at = datetime('now') WHERE user_id = ${defenderId}`
+      sql`UPDATE user_village_profile SET shield_count = MAX(shield_count - 1, 0), updated_at = datetime('now') WHERE user_id = ${defenderId}`
     );
     outcome = "shield_blocked";
     shieldConsumed = true;
@@ -391,7 +386,7 @@ attacks.get("/pending-notifications", async (c) => {
 // TEMP: Reset all users' attack_charges and shields to 0 for testing
 attacks.post("/reset-all", async (c) => {
   const db = getDb();
-  await (db as any).run(sql`UPDATE user_village_profile SET attack_charges = 0, shield_active_until = NULL, updated_at = datetime('now')`);
+  await (db as any).run(sql`UPDATE user_village_profile SET attack_charges = 0, shield_count = 0, shield_active_until = NULL, updated_at = datetime('now')`);
   await (db as any).run(sql`DELETE FROM user_cards`);
   return c.json({ success: true, message: "All attack charges and shields reset to 0" });
 });
