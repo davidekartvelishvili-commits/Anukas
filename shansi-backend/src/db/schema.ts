@@ -12,6 +12,7 @@ export const users = sqliteTable("users", {
   referralCode: text("referral_code").unique(),
   referredBy: text("referred_by"),
   totalReferrals: integer("total_referrals").default(0).notNull(),
+  lastAttackSeenAt: text("last_attack_seen_at"),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
   updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
 });
@@ -392,6 +393,8 @@ export const userVillageProfile = sqliteTable("user_village_profile", {
   currentLevel: integer("current_level").default(1).notNull(),
   totalStars: integer("total_stars").default(0).notNull(),
   shieldActiveUntil: text("shield_active_until"),
+  shieldCount: integer("shield_count").default(0).notNull(),
+  attackCharges: integer("attack_charges").default(0).notNull(),
   // Cumulative Lucky Drop balls — used for milestone rewards (every N
   // drops grants a shield; every M drops grants an attack card).
   ballsDropped: integer("balls_dropped").default(0).notNull(),

@@ -93,7 +93,7 @@ async function grantPlinkoMilestoneRewards(userId: string) {
     return {};
   }
   const count = profile.ballsDropped || 0;
-  console.log(`[milestone] userId=${userId} balls=${count} perShield=${ballsPerShield} perCard=${ballsPerCard} charges=${(profile as any).attackCharges ?? "?"} shields=${(profile as any).shieldCount ?? "?"}`);
+  console.log(`[milestone] userId=${userId} balls=${count} perShield=${ballsPerShield} perCard=${ballsPerCard} charges=${profile.attackCharges} shields=${profile.shieldCount}`);
 
   const out: any = {};
 
@@ -103,7 +103,7 @@ async function grantPlinkoMilestoneRewards(userId: string) {
       sql`UPDATE user_village_profile SET shield_count = MIN(shield_count + 1, 3), updated_at = datetime('now') WHERE user_id = ${userId}`
     );
     const [updatedForShield] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);
-    const newShields = (updatedForShield as any)?.shieldCount ?? 0;
+    const newShields = updatedForShield?.shieldCount ?? 0;
     console.log(`[shield-charge] userId=${userId} incremented to ${newShields}/3`);
     out.shield = { shieldCount: newShields };
   }
@@ -114,7 +114,7 @@ async function grantPlinkoMilestoneRewards(userId: string) {
       sql`UPDATE user_village_profile SET attack_charges = MIN(attack_charges + 1, 3), updated_at = datetime('now') WHERE user_id = ${userId}`
     );
     const [updatedProfile] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);
-    const newCharges = (updatedProfile as any)?.attackCharges ?? 0;
+    const newCharges = updatedProfile?.attackCharges ?? 0;
     console.log(`[attack-charge] userId=${userId} incremented to ${newCharges}/3`);
     out.card = { attackCharges: newCharges };
   }

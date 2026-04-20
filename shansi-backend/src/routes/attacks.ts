@@ -27,7 +27,7 @@ attacks.post("/initialize", async (c) => {
   // Validate attacker has >= 3 attack charges
   const [attackerProfile] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);
   if (!attackerProfile) throw new BadRequestError("Village profile not found");
-  const attackCharges = (attackerProfile as any).attackCharges ?? 0;
+  const attackCharges = attackerProfile.attackCharges ?? 0;
   console.log(`[attack] user=${userId} charges=${attackCharges} level=${attackerProfile.currentLevel}`);
   if (attackCharges < 3) throw new BadRequestError(`Not enough attack charges (have ${attackCharges}, need 3)`);
 
@@ -142,7 +142,7 @@ attacks.post("/initialize", async (c) => {
   // Get defender info
   const [defenderUser] = await db.select().from(users).where(eq(users.id, defenderId)).limit(1);
   const [defenderProfileFull] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, defenderId)).limit(1);
-  const defenderShieldCount = (defenderProfileFull as any)?.shieldCount ?? 0;
+  const defenderShieldCount = defenderProfileFull?.shieldCount ?? 0;
 
   // Get village items for display
   let villageItems: Array<{ position: number; stars: number; name: string }> = [];
@@ -166,7 +166,7 @@ attacks.post("/initialize", async (c) => {
   return c.json({
     success: true,
     attackSessionId: sessionId,
-    defenderUsername: (defenderUser as any)?.stageName || defenderUser?.name || "Player",
+    defenderUsername: defenderUser?.stageName || defenderUser?.name || "Player",
     defenderVillageLevel: defenderProfileFull?.currentLevel || 1,
     defenderShieldActive: defenderShieldCount > 0,
     defenderShieldCount,
@@ -346,7 +346,7 @@ attacks.get("/pending-notifications", async (c) => {
 
   // Get user's last_attack_seen_at
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  const lastSeen = (user as any)?.last_attack_seen_at || (user as any)?.lastAttackSeenAt || "1970-01-01T00:00:00.000Z";
+  const lastSeen = user?.lastAttackSeenAt || "1970-01-01T00:00:00.000Z";
 
   // Query attack attempts where defender = current user and created_at > lastSeen
   const results = await (db as any).all(
@@ -363,7 +363,7 @@ attacks.get("/pending-notifications", async (c) => {
     const attackerId = row.attacker_id;
     const [attacker] = await db.select().from(users).where(eq(users.id, attackerId)).limit(1);
     return {
-      attackerName: (attacker as any)?.stageName || attacker?.name || "Player",
+      attackerName: attacker?.stageName || attacker?.name || "Player",
       outcome: row.outcome,
       coinsLost: row.coins_transferred || 0,
       itemBurned: !!(row.item_burned),

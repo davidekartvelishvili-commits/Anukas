@@ -78,8 +78,8 @@ village.get("/profile", async (c) => {
       cardCount: Number(cardCountRow?.c) || 0,
       shieldActive,
       shieldActiveUntil: profile.shieldActiveUntil,
-      shieldCount: (profile as any).shieldCount ?? (shieldActive ? 1 : 0),
-      attackCharges: (profile as any).attackCharges ?? 0,
+      shieldCount: profile.shieldCount ?? (shieldActive ? 1 : 0),
+      attackCharges: profile.attackCharges ?? 0,
     },
   });
 });
