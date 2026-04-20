@@ -375,4 +375,12 @@ attacks.get("/pending-notifications", async (c) => {
   });
 });
 
+// TEMP: Reset all users' attack_charges and shields to 0 for testing
+attacks.post("/reset-all", async (c) => {
+  const db = getDb();
+  await (db as any).run(sql`UPDATE user_village_profile SET attack_charges = 0, shield_active_until = NULL, updated_at = datetime('now')`);
+  await (db as any).run(sql`DELETE FROM user_cards`);
+  return c.json({ success: true, message: "All attack charges and shields reset to 0" });
+});
+
 export default attacks;
