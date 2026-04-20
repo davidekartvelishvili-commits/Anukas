@@ -51,11 +51,11 @@ export default function AttackSequence({ onComplete }: Props) {
     apiFetch<AttackInitResponse>("/attacks/initialize", {
       method: "POST",
       body: JSON.stringify({}),
-    }).then((data) => {
+    }).then((data: any) => {
       if (cancelled) return;
-      if (!data.success) {
-        setError("No valid targets found");
-        setState("RETURNING");
+      if (!data?.success || !data?.attackSessionId) {
+        setError(data?.message || "No valid targets found");
+        setTimeout(() => { if (!cancelled) setState("RETURNING"); }, 2000);
         return;
       }
       setSessionId(data.attackSessionId);
@@ -67,10 +67,12 @@ export default function AttackSequence({ onComplete }: Props) {
       setTimeout(() => {
         if (!cancelled) setState("CLOUDS_OPENING");
       }, 800);
-    }).catch(() => {
+    }).catch((err: any) => {
       if (!cancelled) {
-        setError("Attack failed — no target found");
-        setState("RETURNING");
+        console.error("[attack init]", err?.message || err);
+        setError(err?.message || "Attack failed — no target found");
+        // Show error for 2s then return
+        setTimeout(() => { if (!cancelled) setState("RETURNING"); }, 2000);
       }
     });
 

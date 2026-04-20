@@ -28,7 +28,8 @@ attacks.post("/initialize", async (c) => {
   const [attackerProfile] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);
   if (!attackerProfile) throw new BadRequestError("Village profile not found");
   const attackCharges = (attackerProfile as any).attackCharges ?? 0;
-  if (attackCharges < 3) throw new BadRequestError("Not enough attack charges (need 3)");
+  console.log(`[attack] user=${userId} charges=${attackCharges} level=${attackerProfile.currentLevel}`);
+  if (attackCharges < 3) throw new BadRequestError(`Not enough attack charges (have ${attackCharges}, need 3)`);
 
   const attackerLevel = attackerProfile.currentLevel;
 
@@ -56,8 +57,20 @@ attacks.post("/initialize", async (c) => {
     validTargets.push({ userId: cand.userId, profile: cand });
   }
 
+  console.log(`[attack] candidates=${candidates.length} validTargets=${validTargets.length}`);
   if (validTargets.length === 0) {
-    throw new BadRequestError("No valid targets found");
+    // Fallback: find ANY other user with a village profile (ignore level/stars/coins)
+    const anyUser = candidates.find(c => c.userId !== userId);
+    console.log(`[attack] fallback anyUser=${!!anyUser}`);
+    if (anyUser) {
+      validTargets.push({ userId: anyUser.userId, profile: anyUser });
+    } else {
+      // No other users at all — refund charges and return error
+      await (db as any).run(
+        sql`UPDATE user_village_profile SET attack_charges = attack_charges + 3, updated_at = datetime('now') WHERE user_id = ${userId}`
+      );
+      throw new BadRequestError("No valid targets found");
+    }
   }
 
   // Pick random target
