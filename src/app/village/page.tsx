@@ -302,8 +302,10 @@ export default function VillagePage() {
   // stops on navigation away. Browsers block autoplay without a prior
   // user gesture, so if the initial play() is rejected we queue a
   // one-shot listener that starts playback on the first tap/click.
+  const villageMusicRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
     const audio = new Audio("/audio/village-theme.mp3");
+    villageMusicRef.current = audio;
     audio.loop = true;
     audio.volume = 0.5;
     let unlocked = false;
@@ -375,11 +377,15 @@ export default function VillagePage() {
 
     setUpgrading(building.id);
     setAnimatingBuildingPos(building.position);
-    // Play building construction sound
+    // Play building construction sound — duck music volume during build
     try {
+      if (villageMusicRef.current) villageMusicRef.current.volume = 0.15;
       const sfx = new Audio("/audio/building.mp3");
-      sfx.volume = 0.8;
+      sfx.volume = 1.0;
       sfx.play().catch(() => {});
+      sfx.onended = () => {
+        if (villageMusicRef.current) villageMusicRef.current.volume = 0.5;
+      };
     } catch {}
     // Optimistic local coin deduction for snappy UI
     const cost = building.nextCost;
