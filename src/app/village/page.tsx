@@ -290,6 +290,8 @@ export default function VillagePage() {
   const [showReveal, setShowReveal] = useState(true);
   // Exit cloud-cover — when set, plays the reverse animation then navigates
   const [exitTarget, setExitTarget] = useState<string | null>(null);
+  // Insufficient coins notification
+  const [showCoinAlert, setShowCoinAlert] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
@@ -365,7 +367,11 @@ export default function VillagePage() {
     setShowWelcome(false);
     setShowHand(false);
 
-    if (coinBalance < building.nextCost) return;
+    if (coinBalance < building.nextCost) {
+      setShowCoinAlert(true);
+      setTimeout(() => setShowCoinAlert(false), 4000);
+      return;
+    }
 
     setUpgrading(building.id);
     setAnimatingBuildingPos(building.position);
@@ -427,6 +433,25 @@ export default function VillagePage() {
           animMs={2200}
           onDone={() => router.push(exitTarget)}
         />
+      )}
+
+      {/* Insufficient coins notification */}
+      {showCoinAlert && (
+        <div
+          className="fixed top-12 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-[14px] shadow-lg"
+          style={{
+            background: "#1C2539",
+            border: "1px solid rgba(255,255,255,0.1)",
+            animation: "fade-in 0.2s ease-out",
+          }}
+        >
+          <p className="text-[14px] font-bold text-center" style={{ color: "#F1F5F9", fontFamily: "var(--font-outfit)" }}>
+            Not enough coins!
+          </p>
+          <p className="text-[12px] text-center mt-1" style={{ color: "#94A3B8", fontFamily: "var(--font-dm-sans)" }}>
+            Invite a friend to earn more coins
+          </p>
+        </div>
       )}
       <style>{`
         html, body { background: #87CEEB !important; }
