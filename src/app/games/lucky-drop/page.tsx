@@ -5,6 +5,7 @@ import { MULTIPLIERS, SLOT_COLORS, BET_COST, type RiskLevel, type DropResult } f
 import { playGame, ensureActiveTransaction } from "@/services/games";
 import { setCoinBalance as storeCoin, setCashBalance as storeCash } from "@/services/balance";
 import WinAnimation from "@/components/WinAnimation";
+import ShieldJackpotReveal from "@/components/ShieldJackpotReveal";
 
 const ROWS = 12;
 
@@ -228,6 +229,7 @@ export default function LuckyDropPage() {
   useEffect(() => { showWinAnimRef.current = showWinAnim; }, [showWinAnim]);
   const [winAnimAmount, setWinAnimAmount] = useState(0);
   const [bonusRoundInfo, setBonusRoundInfo] = useState<{ coins: number; gamesLeft: number } | null>(null);
+  const [showShieldAnim, setShowShieldAnim] = useState(false);
   const dropCount = useRef(0);
 
   // Canvas-rendered confetti particles. Replaces the old DOM-div-per-particle
@@ -784,6 +786,10 @@ export default function LuckyDropPage() {
           setShowWinAnim(true);
           playWinAudio();
         }
+        // Shield milestone reward — show jackpot reveal animation
+        if (serverResult.rewards?.shield) {
+          setTimeout(() => setShowShieldAnim(true), serverResult.won ? 2500 : 500);
+        }
         // Coalesced balance update — ONE setBalance per ball settle
         // instead of two. If parallel balls are still in flight, clamp to
         // the lowest known server value; if this is the last ball, snap
@@ -931,6 +937,11 @@ export default function LuckyDropPage() {
         amount={winAnimAmount}
         onDone={() => { setShowWinAnim(false); stopWinAudio(); }}
       />
+
+      {/* Shield jackpot reveal animation */}
+      {showShieldAnim && (
+        <ShieldJackpotReveal onDone={() => setShowShieldAnim(false)} />
+      )}
 
       {/* Bonus round banner */}
       {bonusRoundInfo && (

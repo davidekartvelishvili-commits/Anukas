@@ -13,6 +13,10 @@ export interface GameResult {
   freeCoins?: number;
   bonusGamesLeft: number;
   transactionComplete: boolean;
+  rewards?: {
+    shield?: { until: string; hours: number };
+    card?: { id: string; name: string };
+  };
 }
 
 export async function getActiveTransaction() {
