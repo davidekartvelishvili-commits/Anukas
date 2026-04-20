@@ -982,22 +982,37 @@ export default function LuckyDropPage() {
             <path d="M4 4l8 8M12 4L4 12" />
           </svg>
         </button>
-        {/* Swords + Shields — side by side */}
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/[0.12] backdrop-blur-lg">
-          {/* Swords — 3 slots */}
-          {[0, 1, 2].map((i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={`sw-${i}`} src="/images/sword.png" alt="" width={34} height={34}
-              style={{ objectFit: "contain", opacity: i < attackCards ? 1 : 0.2 }} />
-          ))}
-          <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.15)", margin: "0 2px" }} />
-          {/* Shields — 3 slots */}
-          {[0, 1, 2].map((i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={`sh-${i}`} src="/images/shield.png" alt="" width={26} height={26}
-              style={{ objectFit: "contain", opacity: i < shieldCount ? 1 : 0.2 }} />
-          ))}
+        {/* Swords + Shields with counters */}
+        <div className="flex items-center gap-2">
+          {/* Swords pill */}
+          <div
+            className="flex items-center gap-1.5 px-3 py-2 rounded-full backdrop-blur-lg border"
+            style={{
+              background: attackCards >= 3 ? "rgba(249,231,65,0.2)" : "rgba(255,255,255,0.1)",
+              borderColor: attackCards >= 3 ? "rgba(249,231,65,0.5)" : "rgba(255,255,255,0.12)",
+              boxShadow: attackCards >= 3 ? "0 0 12px rgba(249,231,65,0.4)" : "none",
+              animation: attackCards >= 3 ? "ld-pulse 1.5s ease-in-out infinite" : "none",
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/sword.png" alt="" width={24} height={24} style={{ objectFit: "contain" }} />
+            <span className="text-[14px] font-bold" style={{
+              color: attackCards >= 3 ? "#F9E741" : "#fff",
+              fontFamily: "var(--font-outfit)",
+            }}>
+              {attackCards}/3
+            </span>
+          </div>
+          {/* Shields pill */}
+          <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/10 border border-white/[0.12] backdrop-blur-lg">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/shield.png" alt="" width={22} height={22} style={{ objectFit: "contain" }} />
+            <span className="text-[14px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
+              {shieldCount}/3
+            </span>
+          </div>
         </div>
+        <style>{`@keyframes ld-pulse{0%,100%{box-shadow:0 0 12px rgba(249,231,65,0.4)}50%{box-shadow:0 0 24px rgba(249,231,65,0.7)}}`}</style>
       </div>
 
       {/* Risk selector removed — single mode */}

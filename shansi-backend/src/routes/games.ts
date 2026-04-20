@@ -33,14 +33,15 @@ games.post("/play", async (c) => {
     // Plinko milestone rewards: every N drops → shield; every M drops →
     // attack card. Thresholds are admin-configurable via village_config
     // keys `balls_per_shield` and `balls_per_attack_card` (0 = disabled).
-    const rewards: { shield?: { until: string; hours: number }; card?: { id: string; name: string } } = {};
+    const rewards: { shield?: any; card?: any } = {};
     if (gameType === "plinko") {
       try {
         const milestone = await grantPlinkoMilestoneRewards(userId);
+        console.log(`[plinko milestone] userId=${userId} result=`, JSON.stringify(milestone));
         if (milestone.shield) rewards.shield = milestone.shield;
         if (milestone.card) rewards.card = milestone.card;
       } catch (e: any) {
-        console.error("[plinko milestone]", e?.message);
+        console.error("[plinko milestone] ERROR:", e?.message, e?.stack?.split("\n")[1]);
       }
     }
 
@@ -87,26 +88,35 @@ async function grantPlinkoMilestoneRewards(userId: string) {
     sql`UPDATE user_village_profile SET balls_dropped = balls_dropped + 1, updated_at = datetime('now') WHERE user_id = ${userId}`
   );
   const [profile] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);
-  if (!profile) return {};
+  if (!profile) {
+    console.log(`[milestone] no profile found for ${userId} after insert`);
+    return {};
+  }
   const count = profile.ballsDropped || 0;
+  console.log(`[milestone] userId=${userId} balls=${count} perShield=${ballsPerShield} perCard=${ballsPerCard} charges=${(profile as any).attackCharges ?? "?"} shields=${(profile as any).shieldCount ?? "?"}`);
 
   const out: any = {};
 
   if (ballsPerShield > 0 && count > 0 && count % ballsPerShield === 0) {
-    // Increment shield count (max 3)
+    console.log(`[shield-charge] userId=${userId} milestone hit at ball ${count}, incrementing shield_count`);
     await (db as any).run(
       sql`UPDATE user_village_profile SET shield_count = MIN(shield_count + 1, 3), updated_at = datetime('now') WHERE user_id = ${userId}`
     );
     const [updatedForShield] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);
-    out.shield = { shieldCount: (updatedForShield as any)?.shieldCount ?? 0 };
+    const newShields = (updatedForShield as any)?.shieldCount ?? 0;
+    console.log(`[shield-charge] userId=${userId} incremented to ${newShields}/3`);
+    out.shield = { shieldCount: newShields };
   }
 
   if (ballsPerCard > 0 && count > 0 && count % ballsPerCard === 0) {
+    console.log(`[attack-charge] userId=${userId} milestone hit at ball ${count}, incrementing attack_charges`);
     await (db as any).run(
       sql`UPDATE user_village_profile SET attack_charges = MIN(attack_charges + 1, 3), updated_at = datetime('now') WHERE user_id = ${userId}`
     );
     const [updatedProfile] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);
-    out.card = { attackCharges: (updatedProfile as any)?.attackCharges ?? 0 };
+    const newCharges = (updatedProfile as any)?.attackCharges ?? 0;
+    console.log(`[attack-charge] userId=${userId} incremented to ${newCharges}/3`);
+    out.card = { attackCharges: newCharges };
   }
 
   return out;
