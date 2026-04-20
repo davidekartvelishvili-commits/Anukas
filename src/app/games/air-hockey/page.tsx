@@ -138,6 +138,7 @@ export default function AirHockeyPage() {
   useEffect(() => {
     if (mode !== "playing" || multiplayer || !engineRef.current) return;
     let lastTime = 0;
+    let prevPuckSpeed = 0;
 
     function tick(time: number) {
       if (!engineRef.current || !stateRef.current) return;
@@ -145,7 +146,16 @@ export default function AirHockeyPage() {
       lastTime = time;
 
       let s = stateRef.current;
+      const prevVx = s.puck.vx;
+      const prevVy = s.puck.vy;
       s = engineRef.current.updateGame(s, dt);
+
+      // Detect paddle hit: puck speed jumped significantly
+      const newSpeed = Math.hypot(s.puck.vx, s.puck.vy);
+      const oldSpeed = Math.hypot(prevVx, prevVy);
+      if (newSpeed > oldSpeed + 0.003) {
+        playHitSound();
+      }
 
       if (s.status === "finished") {
         stateRef.current = s;
@@ -156,6 +166,7 @@ export default function AirHockeyPage() {
 
       stateRef.current = s;
       setGameState(s);
+      prevPuckSpeed = newSpeed;
       gameLoopRef.current = requestAnimationFrame(tick);
     }
 
@@ -167,6 +178,34 @@ export default function AirHockeyPage() {
 
   // Throttle paddle sends to ~30/sec
   const lastPaddleSendRef = useRef(0);
+
+  // ── Hit sound (Web Audio API — synthesized puck hit) ──────────────────────
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const playHitSound = useCallback(() => {
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") ctx.resume();
+
+      // Short percussive "click" — sounds like puck hitting paddle
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.type = "square";
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.05);
+
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.08);
+    } catch {}
+  }, []);
 
   // Client-side hit detection refs (persist across renders)
   const lastServerPuckPosRef = useRef({ x: 0.5, y: 0.75 });
@@ -198,6 +237,8 @@ export default function AirHockeyPage() {
         const ny = dy / dist;
         const pvx = engineX - prevPaddleEnginePosRef.current.x;
         const pvy = engineY - prevPaddleEnginePosRef.current.y;
+
+        playHitSound();
 
         import("@/services/socket").then(({ getSocket }) => {
           getSocket().emit("hit", {
@@ -271,10 +312,19 @@ export default function AirHockeyPage() {
         lastScoreRef.current = "";
       });
 
+      let prevGsPuckSpeed = 0;
+
       socket.on("gs", (d: any) => {
         const yourSide = config.yourSide;
         const isBottom = yourSide === "bottom";
         const px = d.p[0], py = d.p[1], pvx = d.p[2], pvy = d.p[3];
+
+        // Detect server-side collision (opponent hit) by speed jump
+        const newSpeed = Math.hypot(pvx, pvy);
+        if (newSpeed > prevGsPuckSpeed + 0.005) {
+          playHitSound();
+        }
+        prevGsPuckSpeed = newSpeed;
 
         // Track server puck position in engine coords for client-side hit detection
         lastServerPuckPosRef.current = { x: px, y: py };
