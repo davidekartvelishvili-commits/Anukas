@@ -5,9 +5,10 @@ import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef, me
 const WORKER_IMG = "/images/worker.png";
 const COUNT = 5;
 const STAGGER = 500;
-const WALK_SPEED = 12;
+const WALK_SPEED = 14;     // % per second
 const APPEAR_MS = 400;
 const DISAPPEAR_MS = 400;
+const ROAD_Y = 68;         // Y level below all buildings — the "road"
 
 export interface WorkerCrewHandle {
   startReturn: () => void;
@@ -24,13 +25,52 @@ interface Props {
 
 type Phase = "hidden" | "appear" | "walk-to" | "waiting" | "walk-home" | "disappear" | "done";
 
+// A point on the path
+interface Pt { x: number; y: number }
+
 interface W {
   phase: Phase;
   x: number;
   y: number;
   phaseStart: number;
-  targetX: number;
-  targetY: number;
+  pathTo: Pt[];      // waypoints: house → road → target
+  pathHome: Pt[];    // waypoints: target → road → house
+  pathLen: number;   // total path length (for timing)
+  homeLen: number;
+}
+
+function pathLength(pts: Pt[]): number {
+  let len = 0;
+  for (let i = 1; i < pts.length; i++) {
+    len += Math.sqrt((pts[i].x - pts[i - 1].x) ** 2 + (pts[i].y - pts[i - 1].y) ** 2);
+  }
+  return len;
+}
+
+function posOnPath(pts: Pt[], t: number): Pt {
+  if (t <= 0) return pts[0];
+  if (t >= 1) return pts[pts.length - 1];
+  const total = pathLength(pts);
+  let target = total * t;
+  for (let i = 1; i < pts.length; i++) {
+    const segLen = Math.sqrt((pts[i].x - pts[i - 1].x) ** 2 + (pts[i].y - pts[i - 1].y) ** 2);
+    if (target <= segLen) {
+      const segT = target / segLen;
+      return {
+        x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * segT,
+        y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * segT,
+      };
+    }
+    target -= segLen;
+  }
+  return pts[pts.length - 1];
+}
+
+function dirOnPath(pts: Pt[], t: number): number {
+  // Returns dx direction at point t (positive = going right)
+  const a = posOnPath(pts, Math.max(0, t - 0.01));
+  const b = posOnPath(pts, Math.min(1, t + 0.01));
+  return b.x - a.x;
 }
 
 const WorkerCrewInner = forwardRef<WorkerCrewHandle, Props>(
@@ -43,13 +83,10 @@ const WorkerCrewInner = forwardRef<WorkerCrewHandle, Props>(
     const completedRef = useRef(false);
     const initedRef = useRef(false);
 
-    // Stable refs for callbacks so re-renders don't restart the effect
     const onArriveRef = useRef(onArrive);
     onArriveRef.current = onArrive;
     const onCompleteRef = useRef(onComplete);
     onCompleteRef.current = onComplete;
-
-    const goingLeft = targetX < houseX;
 
     const offsets = [
       { dx: -2.5, dy: 1.5 }, { dx: -1.2, dy: 0.8 }, { dx: 0, dy: 0 },
@@ -60,7 +97,6 @@ const WorkerCrewInner = forwardRef<WorkerCrewHandle, Props>(
       startReturn: () => { returnTriggeredRef.current = true; },
     }));
 
-    // Run ONCE on mount — never restart
     useEffect(() => {
       if (initedRef.current) return;
       initedRef.current = true;
@@ -70,14 +106,35 @@ const WorkerCrewInner = forwardRef<WorkerCrewHandle, Props>(
       returnTriggeredRef.current = false;
       completedRef.current = false;
 
-      workersRef.current = Array.from({ length: COUNT }, (_, i) => ({
-        phase: "hidden" as Phase,
-        x: houseX,
-        y: houseY,
-        phaseStart: now + i * STAGGER,
-        targetX: targetX + offsets[i].dx,
-        targetY: targetY + offsets[i].dy,
-      }));
+      workersRef.current = Array.from({ length: COUNT }, (_, i) => {
+        const tx = targetX + offsets[i].dx;
+        const ty = targetY + offsets[i].dy;
+
+        // Path: house → down to road → across to target X → up to target
+        const pathTo: Pt[] = [
+          { x: houseX, y: houseY },
+        ];
+        // If target is not directly below/above, go via the road
+        if (Math.abs(tx - houseX) > 3 || ty < ROAD_Y) {
+          pathTo.push({ x: houseX, y: ROAD_Y });  // down to road
+          pathTo.push({ x: tx, y: ROAD_Y });       // across on road
+        }
+        pathTo.push({ x: tx, y: ty });              // up to target
+
+        // Reverse path for going home
+        const pathHome = [...pathTo].reverse();
+
+        return {
+          phase: "hidden" as Phase,
+          x: houseX,
+          y: houseY,
+          phaseStart: now + i * STAGGER,
+          pathTo,
+          pathHome,
+          pathLen: pathLength(pathTo),
+          homeLen: pathLength(pathHome),
+        };
+      });
 
       function tick(time: number) {
         let anyActive = false;
@@ -95,14 +152,16 @@ const WorkerCrewInner = forwardRef<WorkerCrewHandle, Props>(
             if (elapsed >= APPEAR_MS) { w.phase = "walk-to"; w.phaseStart = time; }
             anyActive = true;
           } else if (w.phase === "walk-to") {
-            const dx = w.targetX - houseX;
-            const dy = w.targetY - houseY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const totalMs = (dist / WALK_SPEED) * 1000;
+            const totalMs = (w.pathLen / WALK_SPEED) * 1000;
             const t = Math.min(elapsed / totalMs, 1);
-            w.x = houseX + dx * t;
-            w.y = houseY + dy * t;
-            if (t >= 1) { w.phase = "waiting"; w.x = w.targetX; w.y = w.targetY; }
+            const pos = posOnPath(w.pathTo, t);
+            w.x = pos.x;
+            w.y = pos.y;
+            if (t >= 1) {
+              w.phase = "waiting";
+              const end = w.pathTo[w.pathTo.length - 1];
+              w.x = end.x; w.y = end.y;
+            }
             anyActive = true;
           } else if (w.phase === "waiting") {
             arrivedCount++;
@@ -114,14 +173,14 @@ const WorkerCrewInner = forwardRef<WorkerCrewHandle, Props>(
           } else if (w.phase === "walk-home") {
             if (time < w.phaseStart) { anyActive = true; continue; }
             const el = time - w.phaseStart;
-            const dx = houseX - w.targetX;
-            const dy = houseY - w.targetY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const totalMs = (dist / WALK_SPEED) * 1000;
+            const totalMs = (w.homeLen / WALK_SPEED) * 1000;
             const t = Math.min(el / totalMs, 1);
-            w.x = w.targetX + dx * t;
-            w.y = w.targetY + dy * t;
-            if (t >= 1) { w.phase = "disappear"; w.phaseStart = time; w.x = houseX; w.y = houseY; }
+            const pos = posOnPath(w.pathHome, t);
+            w.x = pos.x; w.y = pos.y;
+            if (t >= 1) {
+              w.phase = "disappear"; w.phaseStart = time;
+              w.x = houseX; w.y = houseY;
+            }
             anyActive = true;
           } else if (w.phase === "disappear") {
             if (elapsed >= DISAPPEAR_MS) { w.phase = "done"; }
@@ -151,7 +210,7 @@ const WorkerCrewInner = forwardRef<WorkerCrewHandle, Props>(
       rafRef.current = requestAnimationFrame(tick);
       return () => cancelAnimationFrame(rafRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // intentionally empty — run once, use refs for everything
+    }, []);
 
     const workers = workersRef.current;
 
@@ -171,9 +230,20 @@ const WorkerCrewInner = forwardRef<WorkerCrewHandle, Props>(
           }
 
           const isWalking = w.phase === "walk-to" || w.phase === "walk-home";
-          const flip = w.phase === "walk-home" ? !goingLeft : goingLeft;
           const bobY = isWalking ? Math.sin(elapsed * 0.012) * 2 : 0;
           const hammerRot = w.phase === "waiting" ? Math.sin(elapsed * 0.015 + i * 1.2) * 10 : 0;
+
+          // Determine flip based on current walk direction
+          let flip = false;
+          if (w.phase === "walk-to") {
+            const totalMs = (w.pathLen / WALK_SPEED) * 1000;
+            const t = Math.min(elapsed / totalMs, 1);
+            flip = dirOnPath(w.pathTo, t) < 0;
+          } else if (w.phase === "walk-home" && elapsed >= 0) {
+            const totalMs = (w.homeLen / WALK_SPEED) * 1000;
+            const t = Math.min(elapsed / totalMs, 1);
+            flip = dirOnPath(w.pathHome, t) < 0;
+          }
 
           return (
             <div key={i} style={{
