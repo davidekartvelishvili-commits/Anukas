@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import CloudReveal from "@/components/CloudReveal";
+import BattleAnimation from "@/components/BattleAnimation";
 import { apiFetch } from "@/services/api";
 import { getCoinBalance, setCoinBalance } from "@/services/balance";
 import { getMe } from "@/services/auth";
@@ -292,6 +293,8 @@ export default function VillagePage() {
   const [exitTarget, setExitTarget] = useState<string | null>(null);
   // Insufficient coins notification
   const [showCoinAlert, setShowCoinAlert] = useState(false);
+  // Battle animation — shown when user gets attacked
+  const [showBattleAnim, setShowBattleAnim] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
@@ -377,6 +380,8 @@ export default function VillagePage() {
 
     setUpgrading(building.id);
     setAnimatingBuildingPos(building.position);
+    // Don't allow building during battle animation
+    if (showBattleAnim) return;
     // Play building construction sound — duck music volume during build
     try {
       if (villageMusicRef.current) villageMusicRef.current.volume = 0.15;
@@ -445,6 +450,11 @@ export default function VillagePage() {
           animMs={2200}
           onDone={() => router.push(exitTarget)}
         />
+      )}
+
+      {/* Battle animation — when user gets attacked */}
+      {showBattleAnim && !animatingBuildingPos && (
+        <BattleAnimation onDone={() => setShowBattleAnim(false)} />
       )}
 
       {/* Insufficient coins notification */}
