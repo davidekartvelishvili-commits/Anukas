@@ -8,19 +8,19 @@ interface Props {
   defenderLevel: number;
   shieldActive: boolean;
   villageItems: VillageItem[];
-  attackNumber: number; // 1 or 2
-  pickedPositions: number[]; // positions already attacked
+  attackNumber: number;
+  pickedPositions: number[];
   onSelectItem: (position: number) => void;
   selectedPosition: number | null;
   onConfirmAttack: () => void;
 }
 
 const POSITIONS: Record<number, { x: number; y: number }> = {
-  1: { x: 20, y: 50 },
-  2: { x: 40, y: 55 },
-  3: { x: 60, y: 55 },
-  4: { x: 80, y: 50 },
-  5: { x: 50, y: 40 },
+  1: { x: 20, y: 48 },
+  2: { x: 42, y: 54 },
+  3: { x: 64, y: 54 },
+  4: { x: 82, y: 48 },
+  5: { x: 50, y: 38 },
 };
 
 export default function EnemyVillageView({
@@ -32,7 +32,7 @@ export default function EnemyVillageView({
     <div className="fixed inset-0 z-[200]" style={{ background: "#0a0008" }}>
       <style>{css}</style>
 
-      {/* Red/orange tint overlay */}
+      {/* Red tint */}
       <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(120,20,0,0.15) 0%, rgba(180,40,0,0.1) 50%, rgba(60,10,0,0.2) 100%)" }} />
 
       {/* Header */}
@@ -53,7 +53,6 @@ export default function EnemyVillageView({
             </span>
           </div>
 
-          {/* Shield indicator */}
           <div className="flex items-center gap-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/images/shield.png" alt="" width={20} height={20} style={{ opacity: shieldActive ? 1 : 0.2 }} />
@@ -64,11 +63,13 @@ export default function EnemyVillageView({
 
       {/* Village scene */}
       <div className="absolute inset-0" style={{ top: 80 }}>
-        {/* Ground */}
-        <div className="absolute bottom-0 left-0 right-0" style={{ height: "40%", background: "linear-gradient(180deg, #2a1508 0%, #1a0a04 100%)" }} />
+        {/* Ground gradient */}
+        <div className="absolute bottom-0 left-0 right-0" style={{ height: "45%", background: "linear-gradient(180deg, #2a1508 0%, #1a0a04 100%)" }} />
+        {/* Sky */}
+        <div className="absolute top-0 left-0 right-0" style={{ height: "55%", background: "linear-gradient(180deg, #0a0018 0%, #150a08 100%)" }} />
 
-        {/* Buildings — fallback to 5 default if array is empty */}
-        {(villageItems.length > 0 ? villageItems : [1,2,3,4,5].map(p => ({ position: p, stars: 1, name: `Building ${p}` }))).map((item) => {
+        {/* Buildings */}
+        {(villageItems.length > 0 ? villageItems : [1,2,3,4,5].map(p => ({ position: p, stars: 1, name: `Building ${p}`, image: "" }))).map((item) => {
           const pos = POSITIONS[item.position];
           if (!pos) return null;
           const alreadyPicked = pickedPositions.includes(item.position);
@@ -78,7 +79,7 @@ export default function EnemyVillageView({
           return (
             <button
               key={item.position}
-              className={`atk-building ${isSelected ? "atk-building-selected" : ""} ${alreadyPicked ? "atk-building-picked" : ""}`}
+              className={`ev-building ${isSelected ? "ev-selected" : ""} ${alreadyPicked ? "ev-picked" : ""}`}
               style={{
                 position: "absolute",
                 left: `${pos.x}%`,
@@ -89,32 +90,42 @@ export default function EnemyVillageView({
               onClick={() => canSelect && onSelectItem(item.position)}
               disabled={!canSelect}
             >
-              {/* Building visual */}
-              <div className="atk-building-inner" style={{
-                width: 70, height: 70, borderRadius: 12,
-                background: alreadyPicked ? "#333" : "linear-gradient(135deg, #3a2a1a, #5a3a20)",
-                border: isSelected ? "3px solid #F9E741" : "2px solid rgba(255,255,255,0.1)",
+              <div className="ev-inner" style={{
+                width: 80, height: 80, borderRadius: 14,
+                background: alreadyPicked ? "#222" : "linear-gradient(135deg, #3a2a1a, #5a3a20)",
+                border: isSelected ? "3px solid #F9E741" : "2px solid rgba(255,255,255,0.12)",
                 display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column",
-                boxShadow: isSelected ? "0 0 20px rgba(249,231,65,0.5)" : "0 4px 12px rgba(0,0,0,0.5)",
+                boxShadow: isSelected ? "0 0 24px rgba(249,231,65,0.6)" : "0 4px 12px rgba(0,0,0,0.5)",
+                overflow: "hidden",
               }}>
-                <span style={{ fontSize: 24 }}>🏠</span>
-                {/* Stars */}
-                <div className="flex gap-0.5 mt-1">
-                  {[0, 1, 2, 3].map(s => (
-                    <div key={s} style={{
-                      width: 8, height: 8,
-                      clipPath: "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)",
-                      background: s < item.stars ? "#FFD700" : "rgba(255,255,255,0.15)",
-                    }} />
-                  ))}
-                </div>
+                {item.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={item.image} alt={item.name} width={56} height={56}
+                    style={{ objectFit: "contain", filter: alreadyPicked ? "grayscale(100%)" : "none" }} />
+                ) : (
+                  <div style={{ width: 56, height: 56, borderRadius: 8, background: "rgba(180,150,100,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", fontFamily: "var(--font-dm-sans)" }}>?</span>
+                  </div>
+                )}
               </div>
-              <div className="text-[10px] text-white/60 mt-1 text-center" style={{ fontFamily: "var(--font-dm-sans)" }}>
+              {/* Stars */}
+              <div className="flex gap-0.5 mt-1 justify-center">
+                {[0, 1, 2, 3].map(s => (
+                  <div key={s} style={{
+                    width: 9, height: 9,
+                    clipPath: "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)",
+                    background: s < item.stars ? "#FFD700" : "rgba(255,255,255,0.15)",
+                  }} />
+                ))}
+              </div>
+              <div className="text-[9px] text-white/50 mt-0.5 text-center truncate w-[80px]" style={{ fontFamily: "var(--font-dm-sans)" }}>
                 {item.name}
               </div>
               {alreadyPicked && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-[20px]">✕</span>
+                <div className="absolute inset-0 flex items-center justify-center" style={{ top: 0 }}>
+                  <div style={{ width: 30, height: 30, borderRadius: "50%", background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ color: "#ff4444", fontSize: 18, fontWeight: 900 }}>✕</span>
+                  </div>
                 </div>
               )}
             </button>
@@ -122,20 +133,20 @@ export default function EnemyVillageView({
         })}
       </div>
 
-      {/* Bottom: Confirm attack button */}
+      {/* Bottom CTA */}
       <div className="absolute bottom-0 left-0 right-0 z-30 flex justify-center" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}>
         <button
           onClick={onConfirmAttack}
           disabled={selectedPosition === null}
-          className="px-8 py-4 rounded-full text-[18px] font-bold active:scale-[0.95] transition-transform"
+          className="w-[200px] h-[58px] rounded-[29px] text-[17px] font-bold active:scale-[0.96] transition-transform"
           style={{
-            background: selectedPosition !== null ? "#F9E741" : "rgba(255,255,255,0.1)",
-            color: selectedPosition !== null ? "#000" : "rgba(255,255,255,0.3)",
+            background: selectedPosition !== null ? "#F9E741" : "rgba(255,255,255,0.08)",
+            color: selectedPosition !== null ? "#000" : "rgba(255,255,255,0.25)",
             fontFamily: "var(--font-outfit)",
-            boxShadow: selectedPosition !== null ? "0 0 30px rgba(249,231,65,0.4)" : "none",
+            boxShadow: selectedPosition !== null ? "0 4px 20px rgba(249,231,65,0.4)" : "none",
           }}
         >
-          {selectedPosition !== null ? "⚔️ Attack!" : "Select a building"}
+          {selectedPosition !== null ? "Attack!" : "Select a building"}
         </button>
       </div>
     </div>
@@ -143,9 +154,9 @@ export default function EnemyVillageView({
 }
 
 const css = `
-.atk-building{background:none;border:none;cursor:pointer;padding:0;transition:transform .15s}
-.atk-building:active:not(:disabled){transform:translate(-50%,-50%) scale(.95)}
-.atk-building-selected .atk-building-inner{animation:atkPulse 1s ease-in-out infinite}
-.atk-building-picked{pointer-events:none;filter:grayscale(80%)}
-@keyframes atkPulse{0%,100%{box-shadow:0 0 20px rgba(249,231,65,.5)}50%{box-shadow:0 0 35px rgba(249,231,65,.8)}}
+.ev-building{background:none;border:none;cursor:pointer;padding:0;transition:transform .15s;position:relative}
+.ev-building:active:not(:disabled){transform:translate(-50%,-50%) scale(.93)!important}
+.ev-selected .ev-inner{animation:evPulse 1s ease-in-out infinite}
+.ev-picked{pointer-events:none;filter:grayscale(60%)}
+@keyframes evPulse{0%,100%{box-shadow:0 0 24px rgba(249,231,65,.6)}50%{box-shadow:0 0 40px rgba(249,231,65,.9)}}
 `;

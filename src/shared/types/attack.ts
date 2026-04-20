@@ -6,6 +6,7 @@ export interface VillageItem {
   position: number; // 1-5
   stars: number;     // 0-4
   name: string;
+  image?: string;    // building asset URL
 }
 
 export interface AttackInitResponse {

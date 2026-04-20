@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { apiFetch } from "@/services/api";
 import type {
   AttackSequenceState,
@@ -20,6 +20,7 @@ interface Props {
 
 export default function AttackSequence({ onComplete }: Props) {
   const [state, setState] = useState<AttackSequenceState>("CLOUDS_CLOSING");
+  const stateRef = useRef<AttackSequenceState>("CLOUDS_CLOSING");
   const [sessionId, setSessionId] = useState("");
   const [defenderUsername, setDefenderUsername] = useState("");
   const [defenderLevel, setDefenderLevel] = useState(1);
@@ -34,14 +35,23 @@ export default function AttackSequence({ onComplete }: Props) {
   const [currentImpact, setCurrentImpact] = useState<AttackAttemptResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Phase: CLOUDS_CLOSING → TRAVELING (fetch) → CLOUDS_OPENING → ATTACK_SELECT
+  // Keep stateRef in sync
+  const setStateTracked = useCallback((newState: AttackSequenceState) => {
+    console.log(`[attack-state] ${stateRef.current} → ${newState}`);
+    stateRef.current = newState;
+    setState(newState);
+  }, []);
+
+  // Clouds transition end — use ref to read current state
   const handleCloudsTransitionEnd = useCallback(() => {
-    if (state === "CLOUDS_CLOSING") {
-      setState("TRAVELING");
-    } else if (state === "RETURNING") {
+    const s = stateRef.current;
+    console.log(`[attack-state] clouds transition end, current=${s}`);
+    if (s === "CLOUDS_CLOSING") {
+      setStateTracked("TRAVELING");
+    } else if (s === "RETURNING") {
       onComplete();
     }
-  }, [state, onComplete]);
+  }, [onComplete, setStateTracked]);
 
   // Fetch attack session when traveling
   useEffect(() => {
@@ -53,9 +63,10 @@ export default function AttackSequence({ onComplete }: Props) {
       body: JSON.stringify({}),
     }).then((data: any) => {
       if (cancelled) return;
+      console.log(`[attack-state] initialize response: items=${data?.villageItems?.length}, session=${data?.attackSessionId}`);
       if (!data?.success || !data?.attackSessionId) {
         setError(data?.message || "No valid targets found");
-        setTimeout(() => { if (!cancelled) setState("RETURNING"); }, 2000);
+        setTimeout(() => { if (!cancelled) setStateTracked("RETURNING"); }, 2000);
         return;
       }
       setSessionId(data.attackSessionId);
@@ -63,28 +74,28 @@ export default function AttackSequence({ onComplete }: Props) {
       setDefenderLevel(data.defenderVillageLevel);
       setShieldActive(data.defenderShieldActive);
       setVillageItems(data.villageItems);
-      // Brief pause then open clouds
       setTimeout(() => {
-        if (!cancelled) setState("CLOUDS_OPENING");
+        if (!cancelled) setStateTracked("CLOUDS_OPENING");
       }, 800);
     }).catch((err: any) => {
       if (!cancelled) {
-        console.error("[attack init]", err?.message || err);
-        setError(err?.message || "Attack failed — no target found");
-        // Show error for 2s then return
-        setTimeout(() => { if (!cancelled) setState("RETURNING"); }, 2000);
+        console.error("[attack-state] initialize error:", err?.message);
+        setError(err?.message || "Attack failed");
+        setTimeout(() => { if (!cancelled) setStateTracked("RETURNING"); }, 2000);
       }
     });
 
     return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  // Clouds opened → show enemy village
+  // Clouds opened → show village after delay
   useEffect(() => {
     if (state === "CLOUDS_OPENING") {
-      const t = setTimeout(() => setState("ATTACK_SELECT"), 700);
+      const t = setTimeout(() => setStateTracked("ATTACK_SELECT"), 700);
       return () => clearTimeout(t);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
   const handleSelectItem = useCallback((position: number) => {
@@ -93,7 +104,7 @@ export default function AttackSequence({ onComplete }: Props) {
 
   const handleConfirmAttack = useCallback(async () => {
     if (selectedPosition === null || !sessionId) return;
-    setState("ATTACK_IMPACT");
+    setStateTracked("ATTACK_IMPACT");
 
     try {
       const result = await apiFetch<AttackAttemptResponse>("/attacks/attempt", {
@@ -101,12 +112,10 @@ export default function AttackSequence({ onComplete }: Props) {
         body: JSON.stringify({ attackSessionId: sessionId, pickedPosition: selectedPosition }),
       });
 
+      console.log(`[attack-state] attempt result: outcome=${result.outcome}, coins=${result.coinsTransferred}`);
       setCurrentImpact(result);
-
-      // Update shield state if consumed
       if (result.shieldConsumed) setShieldActive(false);
 
-      // Track attempt
       setAttempts(prev => [...prev, {
         attemptNumber: attackNumber,
         pickedPosition: selectedPosition,
@@ -116,76 +125,63 @@ export default function AttackSequence({ onComplete }: Props) {
         itemBurned: result.itemBurned,
       }]);
 
-      if (result.coinsTransferred > 0) {
-        setTotalCoinsStolen(prev => prev + result.coinsTransferred);
-      }
-      if (result.itemBurned) {
-        setTotalItemsBurned(prev => prev + 1);
-      }
-
+      if (result.coinsTransferred > 0) setTotalCoinsStolen(prev => prev + result.coinsTransferred);
+      if (result.itemBurned) setTotalItemsBurned(prev => prev + 1);
       setPickedPositions(prev => [...prev, selectedPosition]);
     } catch {
-      // On error, skip to summary
-      setState("SUMMARY");
+      setStateTracked("SUMMARY");
     }
-  }, [selectedPosition, sessionId, attackNumber]);
+  }, [selectedPosition, sessionId, attackNumber, setStateTracked]);
 
   const handleImpactDone = useCallback(() => {
     setCurrentImpact(null);
     setSelectedPosition(null);
-
     if (attackNumber >= 2) {
-      setState("SUMMARY");
+      setStateTracked("SUMMARY");
     } else {
       setAttackNumber(2);
-      setState("ATTACK_SELECT");
+      setStateTracked("ATTACK_SELECT");
     }
-  }, [attackNumber]);
+  }, [attackNumber, setStateTracked]);
 
   const handleSummaryClose = useCallback(() => {
-    setState("RETURNING");
-  }, []);
+    setStateTracked("RETURNING");
+  }, [setStateTracked]);
 
-  // Determine cloud state
+  // Cloud state
+  const showClouds = state === "CLOUDS_CLOSING" || state === "TRAVELING" || state === "CLOUDS_OPENING" || state === "RETURNING";
   let cloudState: "closing" | "open" | "opening" = "open";
   if (state === "CLOUDS_CLOSING" || state === "TRAVELING") cloudState = "closing";
   else if (state === "CLOUDS_OPENING") cloudState = "opening";
   else if (state === "RETURNING") cloudState = "closing";
 
   return (
-    <div className="fixed inset-0 z-[190]">
-      {/* Clouds */}
-      {(state === "CLOUDS_CLOSING" || state === "TRAVELING" || state === "CLOUDS_OPENING" || state === "RETURNING") && (
+    <div className="fixed inset-0 z-[190]" style={{ overflow: "hidden" }}>
+      {/* Clouds — always render during transitions */}
+      {showClouds && (
         <AttackClouds state={cloudState} onTransitionEnd={handleCloudsTransitionEnd} />
       )}
 
       {/* Traveling text */}
       {state === "TRAVELING" && (
-        <div className="fixed inset-0 z-[310] flex items-center justify-center">
+        <div className="fixed inset-0 z-[310] flex items-center justify-center" style={{ background: "rgba(10,10,20,0.95)" }}>
           <div className="text-center">
             <div className="text-[20px] font-bold text-white animate-pulse" style={{ fontFamily: "var(--font-outfit)" }}>
               Finding target...
             </div>
-            <div className="text-[12px] text-white/40 mt-2" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              სამიზნის ძებნა...
-            </div>
           </div>
         </div>
       )}
 
-      {/* Error fallback */}
+      {/* Error */}
       {error && state === "RETURNING" && (
-        <div className="fixed inset-0 z-[310] flex items-center justify-center">
-          <div className="text-center px-6">
-            <div className="text-[16px] font-bold text-white/60" style={{ fontFamily: "var(--font-outfit)" }}>
-              {error}
-            </div>
-          </div>
+        <div className="fixed inset-0 z-[310] flex items-center justify-center" style={{ background: "rgba(10,10,20,0.95)" }}>
+          <div className="text-[16px] font-bold text-white/60" style={{ fontFamily: "var(--font-outfit)" }}>{error}</div>
         </div>
       )}
 
-      {/* Enemy village view */}
-      {state === "ATTACK_SELECT" && (
+      {/* Enemy village */}
+      {(state === "ATTACK_SELECT" || state === "ATTACK_IMPACT") && (
         <EnemyVillageView
           defenderUsername={defenderUsername}
           defenderLevel={defenderLevel}
@@ -199,7 +195,7 @@ export default function AttackSequence({ onComplete }: Props) {
         />
       )}
 
-      {/* Impact animation */}
+      {/* Impact */}
       {state === "ATTACK_IMPACT" && currentImpact && (
         <AttackImpact
           outcome={currentImpact.outcome}
@@ -208,7 +204,7 @@ export default function AttackSequence({ onComplete }: Props) {
         />
       )}
 
-      {/* Summary modal */}
+      {/* Summary */}
       {state === "SUMMARY" && (
         <AttackResultModal
           attempts={attempts}

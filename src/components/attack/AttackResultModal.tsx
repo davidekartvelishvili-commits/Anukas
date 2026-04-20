@@ -65,8 +65,8 @@ export default function AttackResultModal({ attempts, totalCoinsStolen, totalIte
         {/* Close button */}
         <button
           onClick={onClose}
-          className="w-full py-3.5 rounded-[12px] text-[15px] font-bold active:scale-[0.97] transition-transform"
-          style={{ background: "#F9E741", color: "#000", fontFamily: "var(--font-outfit)" }}
+          className="w-full h-[54px] rounded-[27px] text-[16px] font-bold active:scale-[0.96] transition-transform"
+          style={{ background: "#F9E741", color: "#000", fontFamily: "var(--font-outfit)", boxShadow: "0 4px 20px rgba(249,231,65,0.3)" }}
         >
           Close
         </button>

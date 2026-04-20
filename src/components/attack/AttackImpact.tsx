@@ -112,7 +112,7 @@ export default function AttackImpact({ outcome, coinsTransferred, onDone }: Prop
     : "#FF4411";
 
   return (
-    <div className="fixed inset-0 z-[250] flex items-center justify-center" onClick={onDone}>
+    <div className="fixed inset-0 z-[250] flex items-center justify-center overflow-hidden" onClick={onDone} style={{ pointerEvents: "auto" }}>
       <style>{impactCss}</style>
       {/* Screen shake */}
       <div className={`atki-shake ${outcome === "coins_stolen" ? "atki-shake-heavy" : outcome === "shield_blocked" ? "atki-shake-light" : "atki-shake-med"}`}>

@@ -109,10 +109,22 @@ attacks.post("/initialize", async (c) => {
       sql`UPDATE user_village_profile SET attack_charges = attack_charges - 3, updated_at = datetime('now') WHERE user_id = ${userId}`
     );
 
+    // Use attacker's village buildings for images (visual template)
+    const attackerProgress = await db.select().from(userVillageProgress).where(eq(userVillageProgress.userId, userId));
+    const attackerActive = attackerProgress.find(p => !p.completed) || attackerProgress[0];
+    let botBuildingImages: Record<number, string> = {};
+    if (attackerActive) {
+      const blds = await db.select().from(villageBuildings).where(eq(villageBuildings.villageId, attackerActive.villageId));
+      for (const b of blds) {
+        botBuildingImages[b.position] = b.star1Image || b.star2Image || "";
+      }
+    }
+
     const botItems = [1, 2, 3, 4, 5].map(pos => ({
       position: pos,
       stars: 1 + Math.floor(Math.random() * 3),
       name: botBuildingNames[pos - 1],
+      image: botBuildingImages[pos] || "",
     }));
 
     console.log(`[attack] bot village created, sessionId=${sessionId}, items=${botItems.length}`);
@@ -142,7 +154,7 @@ attacks.post("/initialize", async (c) => {
   const activeProgress = defenderProgress.find(p => !p.completed) || defenderProgress[0];
 
   // Build village items from progress OR default 5 buildings
-  let villageItems: Array<{ position: number; stars: number; name: string }> = [];
+  let villageItems: Array<{ position: number; stars: number; name: string; image: string }> = [];
   let starValues: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
 
   if (activeProgress) {
@@ -154,11 +166,16 @@ attacks.post("/initialize", async (c) => {
       5: activeProgress.building5Stars,
     };
     const buildings = await db.select().from(villageBuildings).where(eq(villageBuildings.villageId, activeProgress.villageId));
-    villageItems = buildings.map(b => ({
-      position: b.position,
-      stars: starValues[b.position] || 0,
-      name: b.name,
-    }));
+    villageItems = buildings.map(b => {
+      const s = starValues[b.position] || 0;
+      let img = "";
+      if (s >= 4) img = b.star4Image || b.star3Image || "";
+      else if (s === 3) img = b.star3Image || "";
+      else if (s === 2) img = b.star2Image || "";
+      else if (s === 1) img = b.star1Image || "";
+      else img = b.star1Image || ""; // preview for 0 stars
+      return { position: b.position, stars: s, name: b.name, image: img };
+    });
   }
 
   // If no buildings found, generate default set
@@ -167,6 +184,7 @@ attacks.post("/initialize", async (c) => {
       position: pos,
       stars: starValues[pos] || 0,
       name: botBuildingNames[pos - 1],
+      image: "",
     }));
   }
 
@@ -244,10 +262,11 @@ attacks.post("/attempt", async (c) => {
 
   const attemptNumber = session.attacksUsed + 1;
   const defenderId = session.defenderId;
+  const isBotAttack = defenderId === userId;
 
-  // Check defender shield (use shield_count, fallback to timestamp)
+  // Check defender shield — skip for bot attacks (attacker is defender)
   const [defenderProfile] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, defenderId)).limit(1);
-  const defenderShieldCount = (defenderProfile as any)?.shieldCount ?? 0;
+  const defenderShieldCount = isBotAttack ? 0 : (defenderProfile?.shieldCount ?? 0);
   const shieldActive = defenderShieldCount > 0;
 
   let outcome: string;
