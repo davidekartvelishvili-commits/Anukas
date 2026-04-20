@@ -49,10 +49,9 @@ function generateParticles() {
 
 interface Props {
   onDone: () => void;
-  audioCtx?: AudioContext | null;
 }
 
-export default function ShieldJackpotReveal({ onDone, audioCtx: externalCtx }: Props) {
+export default function ShieldJackpotReveal({ onDone }: Props) {
   const [particles] = useState(generateParticles);
 
   // Auto-dismiss after 6.5s
@@ -61,60 +60,13 @@ export default function ShieldJackpotReveal({ onDone, audioCtx: externalCtx }: P
     return () => clearTimeout(timer);
   }, [onDone]);
 
-  // Shield win sound — triumphant fanfare
-  // Uses existing AudioContext if passed (already unlocked by user tap),
-  // falls back to creating new one + trying to resume it.
+  // Shield win sound — MP3 file, same approach as win-music.mp3
   useEffect(() => {
-    try {
-      const ctx = externalCtx || new (window.AudioContext || (window as any).webkitAudioContext)();
-      if (ctx.state === "suspended") ctx.resume();
-      const t = ctx.currentTime;
-
-      // Rising chord: C5 → E5 → G5 (major triad, staggered)
-      const notes = [523, 659, 784];
-      notes.forEach((freq, i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(freq, t);
-        gain.gain.setValueAtTime(0, t + i * 0.15);
-        gain.gain.linearRampToValueAtTime(0.3, t + i * 0.15 + 0.06);
-        gain.gain.setValueAtTime(0.3, t + i * 0.15 + 0.3);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(t + i * 0.15);
-        osc.stop(t + 2.5);
-      });
-
-      // Bright shimmer on top
-      const shimmer = ctx.createOscillator();
-      const sGain = ctx.createGain();
-      shimmer.type = "sine";
-      shimmer.frequency.setValueAtTime(1568, t + 0.5);
-      shimmer.frequency.exponentialRampToValueAtTime(2093, t + 0.9);
-      sGain.gain.setValueAtTime(0, t + 0.5);
-      sGain.gain.linearRampToValueAtTime(0.2, t + 0.6);
-      sGain.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
-      shimmer.connect(sGain);
-      sGain.connect(ctx.destination);
-      shimmer.start(t + 0.5);
-      shimmer.stop(t + 1.8);
-
-      // Low impact boom at start
-      const boom = ctx.createOscillator();
-      const bGain = ctx.createGain();
-      boom.type = "sine";
-      boom.frequency.setValueAtTime(120, t);
-      boom.frequency.exponentialRampToValueAtTime(40, t + 0.3);
-      bGain.gain.setValueAtTime(0.4, t);
-      bGain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-      boom.connect(bGain);
-      bGain.connect(ctx.destination);
-      boom.start(t);
-      boom.stop(t + 0.4);
-    } catch {}
-  }, [externalCtx]);
+    const audio = new Audio("/audio/shield-win.mp3");
+    audio.volume = 1.0;
+    audio.play().catch(() => {});
+    return () => { audio.pause(); audio.currentTime = 0; };
+  }, []);
 
   const { sparks, sparks2, confetti, coins, glitter, streaks } = particles;
 
