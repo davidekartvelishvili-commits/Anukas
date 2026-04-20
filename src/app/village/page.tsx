@@ -851,27 +851,32 @@ export default function VillagePage() {
               </span>
             </div>
 
-            {/* Stars — reflects live village star count after each upgrade */}
-            <div className="flex items-center gap-1">
-              <div style={{ width: 28, height: 28, clipPath: "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)", background: "#FFD700" }} />
+            {/* Stars — center */}
+            <div className="flex items-center gap-1 px-3 py-1 rounded-full" style={{ background: "rgba(180,140,80,0.7)" }}>
+              <div style={{ width: 24, height: 24, clipPath: "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)", background: "#FFD700" }} />
               <span className="text-white text-[15px] font-bold" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>
                 {village?.totalStars ?? 0}
               </span>
             </div>
 
-            {/* Swords + Shields — 3 slots each, same as Lucky Drop */}
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full" style={{ background: "rgba(180,140,80,0.7)" }}>
-              {[0, 1, 2].map((i) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={`sw-${i}`} src="/images/sword.png" alt="" width={34} height={34}
-                  style={{ objectFit: "contain", opacity: i < (profile?.cardCount ?? 0) ? 1 : 0.2 }} />
-              ))}
-              <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.25)", margin: "0 2px" }} />
-              {[0, 1, 2].map((i) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={`sh-${i}`} src="/images/shield.png" alt="" width={26} height={26}
-                  style={{ objectFit: "contain", opacity: i < (profile?.shieldActive ? 1 : 0) ? 1 : 0.2 }} />
-              ))}
+            {/* Shields (top) + Swords (bottom) — stacked */}
+            <div className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-[14px]" style={{ background: "rgba(180,140,80,0.7)" }}>
+              {/* Shields row */}
+              <div className="flex items-center gap-0">
+                {[0, 1, 2].map((i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={`sh-${i}`} src="/images/shield.png" alt="" width={24} height={24}
+                    style={{ objectFit: "contain", opacity: i < (profile?.shieldActive ? 1 : 0) ? 1 : 0.2 }} />
+                ))}
+              </div>
+              {/* Swords row */}
+              <div className="flex items-center gap-0">
+                {[0, 1, 2].map((i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={`sw-${i}`} src="/images/sword.png" alt="" width={24} height={24}
+                    style={{ objectFit: "contain", opacity: i < (profile?.cardCount ?? 0) ? 1 : 0.2 }} />
+                ))}
+              </div>
             </div>
           </div>
         </div>
