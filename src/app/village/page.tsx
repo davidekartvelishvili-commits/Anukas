@@ -860,37 +860,19 @@ export default function VillagePage() {
             </div>
 
             {/* Attack cards */}
-            <div className="flex items-center gap-1 pl-1 pr-2.5 py-1 rounded-full" style={{ background: "rgba(200,80,80,0.6)" }}>
+            <div className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full" style={{ background: "rgba(200,80,80,0.6)" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/sword.png" alt="sword" width={24} height={24} style={{ objectFit: "contain" }} />
-              <span className="text-white text-[13px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
+              <img src="/images/sword.png" alt="sword" width={28} height={28} style={{ objectFit: "contain" }} />
+              <span className="text-white text-[15px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
                 {profile?.cardCount ?? 0}
               </span>
             </div>
 
             {/* Shields */}
-            <div className="flex items-center gap-1 pl-1 pr-2.5 py-1 rounded-full" style={{ background: "rgba(150,200,240,0.5)" }}>
-              {profile?.shieldActive ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src="/images/shield.png"
-                  alt="shield"
-                  width={24}
-                  height={24}
-                  style={{ objectFit: "contain" }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: "50%",
-                    border: "2px dashed rgba(255,255,255,0.55)",
-                    background: "rgba(255,255,255,0.08)",
-                  }}
-                />
-              )}
-              <span className="text-white text-[13px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
+            <div className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full" style={{ background: "rgba(150,200,240,0.5)" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/shield.png" alt="shield" width={28} height={28} style={{ objectFit: "contain", opacity: profile?.shieldActive ? 1 : 0.35 }} />
+              <span className="text-white text-[15px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
                 {profile?.shieldActive ? "1" : "0"}
               </span>
             </div>

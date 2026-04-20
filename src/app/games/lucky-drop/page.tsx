@@ -958,30 +958,21 @@ export default function LuckyDropPage() {
             <path d="M4 4l8 8M12 4L4 12" />
           </svg>
         </button>
-        <div className="bg-white/[0.08] backdrop-blur-2xl border border-white/10 rounded-[22px] px-5 py-2 flex flex-col items-center gap-px">
-          <div className="flex items-center gap-1.5 font-bold text-[17px] text-white" style={{ fontFamily: "var(--font-outfit)" }}>
-            <img src="/images/coin-icon.png" alt="coin" width={16} height={16} style={{ objectFit: "contain" }} />
-            {betAmount > 0 ? betAmount : "—"}
-          </div>
-          <span className="text-[10px] text-white/[0.45] font-medium uppercase tracking-wider" style={{ fontFamily: "var(--font-dm-sans)" }}>Lucky Drop</span>
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          {/* Attack cards — 3 slots */}
-          <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/30 border border-white/[0.08]">
-            {[0, 1, 2].map((i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={`sw-${i}`} src="/images/sword.png" alt="" width={20} height={20}
-                style={{ objectFit: "contain", opacity: i < attackCards ? 1 : 0.2 }} />
-            ))}
-          </div>
+        {/* Swords + Shields — side by side */}
+        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-black/30 border border-white/[0.08]">
+          {/* Swords — 3 slots */}
+          {[0, 1, 2].map((i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={`sw-${i}`} src="/images/sword.png" alt="" width={26} height={26}
+              style={{ objectFit: "contain", opacity: i < attackCards ? 1 : 0.2 }} />
+          ))}
+          <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)" }} />
           {/* Shields — 3 slots */}
-          <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/30 border border-white/[0.08]">
-            {[0, 1, 2].map((i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={`sh-${i}`} src="/images/shield.png" alt="" width={20} height={20}
-                style={{ objectFit: "contain", opacity: i < shieldCount ? 1 : 0.2 }} />
-            ))}
-          </div>
+          {[0, 1, 2].map((i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={`sh-${i}`} src="/images/shield.png" alt="" width={26} height={26}
+              style={{ objectFit: "contain", opacity: i < shieldCount ? 1 : 0.2 }} />
+          ))}
         </div>
       </div>
 
