@@ -230,6 +230,7 @@ export default function LuckyDropPage() {
   const [winAnimAmount, setWinAnimAmount] = useState(0);
   const [bonusRoundInfo, setBonusRoundInfo] = useState<{ coins: number; gamesLeft: number } | null>(null);
   const [showShieldAnim, setShowShieldAnim] = useState(false);
+  const pendingShieldRef = useRef(false);
   const dropCount = useRef(0);
 
   // Canvas-rendered confetti particles. Replaces the old DOM-div-per-particle
@@ -786,9 +787,20 @@ export default function LuckyDropPage() {
           setShowWinAnim(true);
           playWinAudio();
         }
-        // Shield milestone reward — show jackpot reveal animation
+        // Shield milestone reward — queue for next settle if win is playing
         if (serverResult.rewards?.shield) {
-          setTimeout(() => setShowShieldAnim(true), serverResult.won ? 2500 : 500);
+          if (serverResult.won) {
+            // Win animation is playing — queue shield for later
+            pendingShieldRef.current = true;
+          } else {
+            // No win animation — show shield immediately
+            setShowShieldAnim(true);
+          }
+        }
+        // Show queued shield animation if no win animation this time
+        if (!serverResult.won && pendingShieldRef.current) {
+          pendingShieldRef.current = false;
+          setShowShieldAnim(true);
         }
         // Coalesced balance update — ONE setBalance per ball settle
         // instead of two. If parallel balls are still in flight, clamp to
