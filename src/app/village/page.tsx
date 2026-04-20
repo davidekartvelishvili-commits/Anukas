@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import CloudReveal from "@/components/CloudReveal";
 import BattleAnimation from "@/components/BattleAnimation";
+import WorkerCrew from "@/components/village/WorkerCrew";
 import { apiFetch } from "@/services/api";
 import { getCoinBalance, setCoinBalance } from "@/services/balance";
 import { getMe } from "@/services/auth";
@@ -821,11 +822,21 @@ export default function VillagePage() {
 
         {/* ── BUILD ANIMATION overlay (shown at target building position) ── */}
         {animatingBuildingPos !== null && BUILDING_POSITIONS[animatingBuildingPos] && (
-          <BuildAnimation
-            x={BUILDING_POSITIONS[animatingBuildingPos].x}
-            y={BUILDING_POSITIONS[animatingBuildingPos].y}
-            size={BUILDING_SIZE}
-          />
+          <>
+            <BuildAnimation
+              x={BUILDING_POSITIONS[animatingBuildingPos].x}
+              y={BUILDING_POSITIONS[animatingBuildingPos].y}
+              size={BUILDING_SIZE}
+            />
+            <WorkerCrew
+              houseX={50}
+              houseY={72}
+              targetX={BUILDING_POSITIONS[animatingBuildingPos].x}
+              targetY={BUILDING_POSITIONS[animatingBuildingPos].y}
+              taskDurationMs={2000}
+              onComplete={() => {}}
+            />
+          </>
         )}
 
         {/* ── TOP UI ── */}
