@@ -4,7 +4,7 @@ import { eq, desc, and, or } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { gameConfig, gameHistory, transactions, promoCodes, promoCodeUses, userVillageProfile, villageCards, userCards, villageConfig } from "../db/schema.js";
+import { gameConfig, gameHistory, transactions, promoCodes, promoCodeUses, userVillageProfile, villageConfig } from "../db/schema.js";
 import { sql } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { playGame, playChickenRush, createTransaction } from "../services/gameEngine.js";
@@ -102,16 +102,11 @@ async function grantPlinkoMilestoneRewards(userId: string) {
   }
 
   if (ballsPerCard > 0 && count > 0 && count % ballsPerCard === 0) {
-    // Grant the first active Common Pack card (the default "attack" card).
-    // If it doesn't exist, fall back to any active card.
-    const [common] = await db.select().from(villageCards)
-      .where(and(eq(villageCards.isActive, true), eq(villageCards.rarity, "common")))
-      .limit(1);
-    const card = common || (await db.select().from(villageCards).where(eq(villageCards.isActive, true)).limit(1))[0];
-    if (card) {
-      await db.insert(userCards).values({ id: nanoid(), userId, cardId: card.id } as any);
-      out.card = { id: card.id, name: card.name };
-    }
+    await (db as any).run(
+      sql`UPDATE user_village_profile SET attack_charges = MIN(attack_charges + 1, 3), updated_at = datetime('now') WHERE user_id = ${userId}`
+    );
+    const [updatedProfile] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);
+    out.card = { attackCharges: (updatedProfile as any)?.attackCharges ?? 0 };
   }
 
   return out;

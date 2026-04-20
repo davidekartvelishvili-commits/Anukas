@@ -422,6 +422,38 @@ export const villageConfig = sqliteTable("village_config", {
   updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
 });
 
+// ═══════════════════════════════════════
+// ATTACK SYSTEM v2
+// ═══════════════════════════════════════
+
+export const attackSessions = sqliteTable("attack_sessions", {
+  id: text("id").primaryKey(),
+  attackerId: text("attacker_id").notNull().references(() => users.id),
+  defenderId: text("defender_id").notNull().references(() => users.id),
+  defenderCoinSnapshot: integer("defender_coin_snapshot").notNull(),
+  coinsHiddenTotal: integer("coins_hidden_total").notNull(),
+  itemAPosition: integer("item_a_position").notNull(), // 1-5
+  itemACoins: integer("item_a_coins").notNull(),
+  itemBPosition: integer("item_b_position").notNull(), // 1-5
+  itemBCoins: integer("item_b_coins").notNull(),
+  attacksUsed: integer("attacks_used").default(0).notNull(),
+  status: text("status").default("pending").notNull(), // pending | in_progress | completed
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+  completedAt: text("completed_at"),
+});
+
+export const attackAttempts = sqliteTable("attack_attempts", {
+  id: text("id").primaryKey(),
+  attackSessionId: text("attack_session_id").notNull().references(() => attackSessions.id),
+  attemptNumber: integer("attempt_number").notNull(), // 1 or 2
+  pickedPosition: integer("picked_position").notNull(), // 1-5
+  outcome: text("outcome").notNull(), // coins_stolen | empty_burn | shield_blocked
+  coinsTransferred: integer("coins_transferred").default(0).notNull(),
+  shieldConsumed: integer("shield_consumed", { mode: "boolean" }).default(false).notNull(),
+  itemBurned: integer("item_burned", { mode: "boolean" }).default(false).notNull(),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
 export const simulationRuns = sqliteTable("simulation_runs", {
   id: text("id").primaryKey(),
   adminId: text("admin_id").notNull(),

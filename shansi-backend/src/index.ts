@@ -10,6 +10,7 @@ import admin from "./routes/admin.js";
 import games from "./routes/games.js";
 import merchant from "./routes/merchant.js";
 import village from "./routes/village.js";
+import attacks from "./routes/attacks.js";
 import { offersRoute } from "./routes/offers.js";
 import { publicRoute } from "./routes/public.js";
 import { AppError } from "./utils/errors.js";
@@ -219,6 +220,38 @@ async function runStartupMigrations() {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       completed_at TEXT
     )`,
+    // ── Attack system v2 ──
+    sql`ALTER TABLE user_village_profile ADD COLUMN attack_charges INTEGER NOT NULL DEFAULT 0`,
+    sql`ALTER TABLE users ADD COLUMN last_attack_seen_at TEXT`,
+    sql`CREATE TABLE IF NOT EXISTS attack_sessions (
+      id TEXT PRIMARY KEY,
+      attacker_id TEXT NOT NULL REFERENCES users(id),
+      defender_id TEXT NOT NULL REFERENCES users(id),
+      defender_coin_snapshot INTEGER NOT NULL,
+      coins_hidden_total INTEGER NOT NULL,
+      item_a_position INTEGER NOT NULL,
+      item_a_coins INTEGER NOT NULL,
+      item_b_position INTEGER NOT NULL,
+      item_b_coins INTEGER NOT NULL,
+      attacks_used INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      completed_at TEXT
+    )`,
+    sql`CREATE TABLE IF NOT EXISTS attack_attempts (
+      id TEXT PRIMARY KEY,
+      attack_session_id TEXT NOT NULL REFERENCES attack_sessions(id),
+      attempt_number INTEGER NOT NULL,
+      picked_position INTEGER NOT NULL,
+      outcome TEXT NOT NULL,
+      coins_transferred INTEGER NOT NULL DEFAULT 0,
+      shield_consumed INTEGER NOT NULL DEFAULT 0,
+      item_burned INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    sql`CREATE INDEX IF NOT EXISTS idx_attack_sessions_attacker ON attack_sessions(attacker_id, created_at)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_attack_sessions_defender ON attack_sessions(defender_id, created_at)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_attack_attempts_session ON attack_attempts(attack_session_id)`,
   ];
   for (const s of statements) {
     try { await (db as any).run(s); } catch (e: any) {
@@ -382,6 +415,7 @@ app.route("/admin", admin);
 app.route("/games", games);
 app.route("/merchant", merchant);
 app.route("/village", village);
+app.route("/attacks", attacks);
 app.route("/offers", offersRoute);
 app.route("/public", publicRoute);
 
