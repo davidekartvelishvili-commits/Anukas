@@ -967,16 +967,14 @@ export default function LuckyDropPage() {
         <div className="flex items-center gap-1.5">
           {/* Attack cards */}
           <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/10 border border-white/[0.08]">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF6B6B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-              <polyline points="14 2 14 8 20 8"/>
-            </svg>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/sword.png" alt="" width={16} height={16} style={{ objectFit: "contain" }} />
             <span className="text-white text-[12px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>{attackCards}</span>
           </div>
           {/* Shields */}
           <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/10 border border-white/[0.08]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/shield.png" alt="" width={14} height={14} style={{ objectFit: "contain" }} />
+            <img src="/images/shield.png" alt="" width={16} height={16} style={{ objectFit: "contain" }} />
             <span className="text-white text-[12px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>{shieldCount}</span>
           </div>
         </div>

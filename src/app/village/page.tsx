@@ -860,13 +860,9 @@ export default function VillagePage() {
             </div>
 
             {/* Attack cards */}
-            <div className="flex items-center gap-1 pl-1.5 pr-2.5 py-1 rounded-full" style={{ background: "rgba(200,80,80,0.6)" }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="12" y1="12" x2="12" y2="18"/>
-                <line x1="9" y1="15" x2="15" y2="15"/>
-              </svg>
+            <div className="flex items-center gap-1 pl-1 pr-2.5 py-1 rounded-full" style={{ background: "rgba(200,80,80,0.6)" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/sword.png" alt="sword" width={24} height={24} style={{ objectFit: "contain" }} />
               <span className="text-white text-[13px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
                 {profile?.cardCount ?? 0}
               </span>
