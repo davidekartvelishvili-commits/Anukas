@@ -6,6 +6,9 @@ import AuthGuard from "@/components/AuthGuard";
 import CloudReveal from "@/components/CloudReveal";
 import BattleAnimation from "@/components/BattleAnimation";
 import WorkerCrew from "@/components/village/WorkerCrew";
+import AttackSequence from "@/components/attack/AttackSequence";
+import AttackedNotificationModal from "@/components/attack/AttackedNotificationModal";
+import type { AttackNotification } from "@/shared/types/attack";
 import { apiFetch } from "@/services/api";
 import { getCoinBalance, setCoinBalance } from "@/services/balance";
 import { getMe } from "@/services/auth";
@@ -296,6 +299,10 @@ export default function VillagePage() {
   const [showCoinAlert, setShowCoinAlert] = useState(false);
   // Battle animation — shown when user gets attacked
   const [showBattleAnim, setShowBattleAnim] = useState(false);
+  // Attack sequence (Coin Master-style)
+  const [showAttackSequence, setShowAttackSequence] = useState(false);
+  // Defender notifications
+  const [attackNotifications, setAttackNotifications] = useState<AttackNotification[]>([]);
   // Worker crew — separate from build animation so workers persist longer
   const [workerTarget, setWorkerTarget] = useState<{ x: number; y: number } | null>(null);
   const workerCrewRef = useRef<import("@/components/village/WorkerCrew").WorkerCrewHandle>(null);
@@ -346,14 +353,17 @@ export default function VillagePage() {
     Promise.all([
       apiFetch("/village/current").catch(() => null),
       apiFetch("/village/profile").catch(() => null),
-    ]).then(([vData, pData]: any[]) => {
+      apiFetch("/attacks/pending-notifications").catch(() => null),
+    ]).then(([vData, pData, atkData]: any[]) => {
       if (vData?.success) {
         setVillage(vData.village);
-        // If user has already built anything → hide welcome banner immediately
         const hasBuilt = vData.village?.buildings?.some((b: Building) => b.currentStars > 0);
         if (hasBuilt) setShowWelcome(false);
       }
       if (pData?.success) setProfile(pData.profile);
+      if (atkData?.success && atkData.notifications?.length > 0) {
+        setAttackNotifications(atkData.notifications);
+      }
       setLoading(false);
     });
   }, []);
@@ -478,6 +488,19 @@ export default function VillagePage() {
       {/* Battle animation — when user gets attacked */}
       {showBattleAnim && !animatingBuildingPos && (
         <BattleAnimation onDone={() => setShowBattleAnim(false)} />
+      )}
+
+      {/* Attack sequence (Coin Master-style) */}
+      {showAttackSequence && (
+        <AttackSequence onComplete={() => setShowAttackSequence(false)} />
+      )}
+
+      {/* Defender notification modal */}
+      {attackNotifications.length > 0 && (
+        <AttackedNotificationModal
+          notifications={attackNotifications}
+          onClose={() => setAttackNotifications([])}
+        />
       )}
 
       {/* Insufficient coins notification */}
@@ -914,6 +937,15 @@ export default function VillagePage() {
                 ))}
               </div>
             </div>
+
+            {/* DEV: Attack trigger — remove in production */}
+            <button
+              onClick={() => setShowAttackSequence(true)}
+              className="px-2 py-1 rounded-full text-[10px] font-bold"
+              style={{ background: "rgba(239,68,68,0.6)", color: "#fff" }}
+            >
+              ⚔ DEV
+            </button>
           </div>
         </div>
 
