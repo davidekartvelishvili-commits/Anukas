@@ -296,6 +296,8 @@ export default function VillagePage() {
   const [showCoinAlert, setShowCoinAlert] = useState(false);
   // Battle animation — shown when user gets attacked
   const [showBattleAnim, setShowBattleAnim] = useState(false);
+  // Worker crew — separate from build animation so workers persist longer
+  const [workerTarget, setWorkerTarget] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
@@ -381,6 +383,9 @@ export default function VillagePage() {
 
     setUpgrading(building.id);
     setAnimatingBuildingPos(building.position);
+    // Spawn worker crew — they manage their own lifecycle
+    const bPos = BUILDING_POSITIONS[building.position];
+    if (bPos) setWorkerTarget({ x: bPos.x, y: bPos.y });
     // Don't allow building during battle animation
     if (showBattleAnim) return;
     // Play building construction sound — duck music volume during build
@@ -822,21 +827,23 @@ export default function VillagePage() {
 
         {/* ── BUILD ANIMATION overlay (shown at target building position) ── */}
         {animatingBuildingPos !== null && BUILDING_POSITIONS[animatingBuildingPos] && (
-          <>
-            <BuildAnimation
-              x={BUILDING_POSITIONS[animatingBuildingPos].x}
-              y={BUILDING_POSITIONS[animatingBuildingPos].y}
-              size={BUILDING_SIZE}
-            />
-            <WorkerCrew
-              houseX={50}
-              houseY={72}
-              targetX={BUILDING_POSITIONS[animatingBuildingPos].x}
-              targetY={BUILDING_POSITIONS[animatingBuildingPos].y}
-              taskDurationMs={2000}
-              onComplete={() => {}}
-            />
-          </>
+          <BuildAnimation
+            x={BUILDING_POSITIONS[animatingBuildingPos].x}
+            y={BUILDING_POSITIONS[animatingBuildingPos].y}
+            size={BUILDING_SIZE}
+          />
+        )}
+
+        {/* ── WORKER CREW — separate lifecycle, persists after build animation ends ── */}
+        {workerTarget && (
+          <WorkerCrew
+            houseX={50}
+            houseY={75}
+            targetX={workerTarget.x}
+            targetY={workerTarget.y}
+            taskDurationMs={2500}
+            onComplete={() => setWorkerTarget(null)}
+          />
         )}
 
         {/* ── TOP UI ── */}
