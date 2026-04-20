@@ -249,24 +249,35 @@ export default function LuckyDropPage() {
   const [showAttackSequence, setShowAttackSequence] = useState(false);
   const dropCount = useRef(0);
 
+  const animDelayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const playNextAnim = useCallback(() => {
     if (animQueueRef.current.length === 0) {
       animPlayingRef.current = false;
       return;
     }
+    // 3 second gap between animations
     animPlayingRef.current = true;
-    const next = animQueueRef.current.shift()!;
-    if (next === "shield") setShowShieldAnim(true);
-    else setShowCardAnim(true);
+    if (animDelayTimer.current) clearTimeout(animDelayTimer.current);
+    animDelayTimer.current = setTimeout(() => {
+      animDelayTimer.current = null;
+      const next = animQueueRef.current.shift();
+      if (!next) { animPlayingRef.current = false; return; }
+      if (next === "shield") setShowShieldAnim(true);
+      else setShowCardAnim(true);
+    }, 3000);
   }, []);
 
   const queueAnim = useCallback((type: "shield" | "card") => {
     animQueueRef.current.push(type);
-    // Only start if nothing is currently playing (win anim checked separately)
     if (!animPlayingRef.current && !showWinAnimRef.current) {
-      playNextAnim();
+      // First animation starts immediately, subsequent ones get 3s gap
+      animPlayingRef.current = true;
+      const next = animQueueRef.current.shift()!;
+      if (next === "shield") setShowShieldAnim(true);
+      else setShowCardAnim(true);
     }
-  }, [playNextAnim]);
+  }, []);
 
   // Canvas-rendered confetti particles. Replaces the old DOM-div-per-particle
   // approach which was creating 20-50 <div>s per win, each running a 4s CSS
@@ -987,18 +998,22 @@ export default function LuckyDropPage() {
         amount={winAnimAmount}
         onDone={() => { setShowWinAnim(false); stopWinAudio(); playNextAnim(); }}
       />
+      {/* Block interaction during any animation overlay */}
+      {(showWinAnim || showShieldAnim || showCardAnim || showAttackSequence) && (
+        <div className="fixed inset-0 z-[180]" style={{ pointerEvents: "auto" }} />
+      )}
 
       {/* Shield jackpot reveal animation */}
       {showShieldAnim && (
-        <ShieldJackpotReveal onDone={() => { setShowShieldAnim(false); playNextAnim(); }} />
+        <ShieldJackpotReveal onDone={() => { setShowShieldAnim(false); playNextAnim(); /* 3s delay inside playNextAnim */ }} />
       )}
 
       {showCardAnim && (
         <AttackCardReveal onDone={() => {
           setShowCardAnim(false);
-          // If 3 swords collected → trigger attack sequence
           if (attackCards >= 3) {
-            setShowAttackSequence(true);
+            // 3 swords → delay 3s then trigger attack sequence
+            setTimeout(() => setShowAttackSequence(true), 3000);
           } else {
             playNextAnim();
           }
