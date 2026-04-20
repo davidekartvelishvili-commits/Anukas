@@ -298,6 +298,8 @@ export default function VillagePage() {
   const [showBattleAnim, setShowBattleAnim] = useState(false);
   // Worker crew — separate from build animation so workers persist longer
   const [workerTarget, setWorkerTarget] = useState<{ x: number; y: number } | null>(null);
+  const workerCrewRef = useRef<import("@/components/village/WorkerCrew").WorkerCrewHandle>(null);
+  const pendingBuildRef = useRef<Building | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
@@ -370,8 +372,10 @@ export default function VillagePage() {
     return () => clearInterval(iv);
   }, [showWelcome]);
 
-  const handleUpgrade = async (building: Building) => {
+  // Step 1: User clicks card → spawn workers to walk to the item
+  const handleUpgrade = (building: Building) => {
     if (building.complete || !building.nextCost || upgrading) return;
+    if (showBattleAnim) return;
     setShowWelcome(false);
     setShowHand(false);
 
@@ -382,13 +386,21 @@ export default function VillagePage() {
     }
 
     setUpgrading(building.id);
-    setAnimatingBuildingPos(building.position);
-    // Spawn worker crew — they manage their own lifecycle
+    pendingBuildRef.current = building;
+
+    // Spawn workers — they walk to item first
     const bPos = BUILDING_POSITIONS[building.position];
     if (bPos) setWorkerTarget({ x: bPos.x, y: bPos.y });
-    // Don't allow building during battle animation
-    if (showBattleAnim) return;
-    // Play building construction sound — duck music volume during build
+  };
+
+  // Step 2: Workers arrive at item → start build animation + API call
+  const handleWorkersArrived = async () => {
+    const building = pendingBuildRef.current;
+    if (!building || !building.nextCost) return;
+
+    setAnimatingBuildingPos(building.position);
+
+    // Play building sound — duck music
     try {
       if (villageMusicRef.current) villageMusicRef.current.volume = 0.15;
       const sfx = new Audio("/audio/building.mp3");
@@ -398,13 +410,13 @@ export default function VillagePage() {
         if (villageMusicRef.current) villageMusicRef.current.volume = 0.5;
       };
     } catch {}
-    // Optimistic local coin deduction for snappy UI
+
+    // Optimistic coin deduction
     const cost = building.nextCost;
     const optimisticBalance = getCoinBalance() - cost;
     setCoinBalance(optimisticBalance);
     setCoinBalanceState(optimisticBalance);
 
-    // Minimum animation duration so players see the build even when API is fast
     const animationTime = new Promise((r) => setTimeout(r, 2800));
 
     try {
@@ -412,10 +424,8 @@ export default function VillagePage() {
         method: "POST",
         body: JSON.stringify({ buildingId: building.id }),
       });
-      // Wait for BOTH animation and API call to complete
       const [res] = (await Promise.all([apiCall, animationTime])) as any[];
       if (res?.success) {
-        // Refresh village, profile, and user data (syncs real coin balance)
         const [vData, pData] = await Promise.all([
           apiFetch("/village/current").catch(() => null),
           apiFetch("/village/profile").catch(() => null),
@@ -425,18 +435,25 @@ export default function VillagePage() {
         if (pData?.success) setProfile(pData.profile);
         setCoinBalanceState(getCoinBalance());
       } else {
-        // Rollback optimistic deduction
         setCoinBalance(optimisticBalance + cost);
         setCoinBalanceState(optimisticBalance + cost);
       }
     } catch {
-      // Still wait for animation to finish for UX
       await animationTime;
-      // Rollback optimistic deduction on error
       setCoinBalance(optimisticBalance + cost);
       setCoinBalanceState(optimisticBalance + cost);
     }
+
     setAnimatingBuildingPos(null);
+    pendingBuildRef.current = null;
+
+    // Step 3: Build done → tell workers to walk home
+    workerCrewRef.current?.startReturn();
+  };
+
+  // Step 4: Workers arrive home → cleanup
+  const handleWorkersHome = () => {
+    setWorkerTarget(null);
     setUpgrading(null);
   };
 
@@ -834,15 +851,16 @@ export default function VillagePage() {
           />
         )}
 
-        {/* ── WORKER CREW — separate lifecycle, persists after build animation ends ── */}
+        {/* ── WORKER CREW — walks to item, waits for build, walks back ── */}
         {workerTarget && (
           <WorkerCrew
+            ref={workerCrewRef}
             houseX={50}
             houseY={75}
             targetX={workerTarget.x}
             targetY={workerTarget.y}
-            taskDurationMs={2500}
-            onComplete={() => setWorkerTarget(null)}
+            onArrive={handleWorkersArrived}
+            onComplete={handleWorkersHome}
           />
         )}
 
