@@ -241,11 +241,30 @@ export default function LuckyDropPage() {
   const [bonusRoundInfo, setBonusRoundInfo] = useState<{ coins: number; gamesLeft: number } | null>(null);
   const [showShieldAnim, setShowShieldAnim] = useState(false);
   const [showCardAnim, setShowCardAnim] = useState(false);
-  const pendingShieldRef = useRef(false);
-  const pendingCardRef = useRef(false);
+  const animQueueRef = useRef<("shield" | "card")[]>([]);
+  const animPlayingRef = useRef(false);
   const [attackCards, setAttackCards] = useState(0);
   const [shieldCount, setShieldCount] = useState(0);
   const dropCount = useRef(0);
+
+  const playNextAnim = useCallback(() => {
+    if (animQueueRef.current.length === 0) {
+      animPlayingRef.current = false;
+      return;
+    }
+    animPlayingRef.current = true;
+    const next = animQueueRef.current.shift()!;
+    if (next === "shield") setShowShieldAnim(true);
+    else setShowCardAnim(true);
+  }, []);
+
+  const queueAnim = useCallback((type: "shield" | "card") => {
+    animQueueRef.current.push(type);
+    // Only start if nothing is currently playing (win anim checked separately)
+    if (!animPlayingRef.current && !showWinAnimRef.current) {
+      playNextAnim();
+    }
+  }, [playNextAnim]);
 
   // Canvas-rendered confetti particles. Replaces the old DOM-div-per-particle
   // approach which was creating 20-50 <div>s per win, each running a 4s CSS
@@ -801,32 +820,14 @@ export default function LuckyDropPage() {
           setShowWinAnim(true);
           playWinAudio();
         }
-        // Shield milestone reward — queue for next settle if win is playing
+        // Queue reward animations — they play one at a time, after win anim
         if (serverResult.rewards?.shield) {
-          setShieldCount((c) => c + 1);
-          if (serverResult.won) {
-            pendingShieldRef.current = true;
-          } else {
-            setShowShieldAnim(true);
-          }
+          setShieldCount((c) => Math.min(c + 1, 3));
+          queueAnim("shield");
         }
-        // Attack card milestone reward — queue similarly
         if (serverResult.rewards?.card) {
-          setAttackCards((c) => c + 1);
-          if (serverResult.won || serverResult.rewards?.shield) {
-            pendingCardRef.current = true;
-          } else {
-            setShowCardAnim(true);
-          }
-        }
-        // Show queued animations if no win animation this time
-        if (!serverResult.won && pendingShieldRef.current) {
-          pendingShieldRef.current = false;
-          setShowShieldAnim(true);
-        }
-        if (!serverResult.won && !pendingShieldRef.current && pendingCardRef.current) {
-          pendingCardRef.current = false;
-          setShowCardAnim(true);
+          setAttackCards((c) => Math.min(c + 1, 3));
+          queueAnim("card");
         }
         // Coalesced balance update — ONE setBalance per ball settle
         // instead of two. If parallel balls are still in flight, clamp to
@@ -964,18 +965,22 @@ export default function LuckyDropPage() {
           </div>
           <span className="text-[10px] text-white/[0.45] font-medium uppercase tracking-wider" style={{ fontFamily: "var(--font-dm-sans)" }}>Lucky Drop</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          {/* Attack cards */}
-          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/10 border border-white/[0.08]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/sword.png" alt="" width={16} height={16} style={{ objectFit: "contain" }} />
-            <span className="text-white text-[12px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>{attackCards}</span>
+        <div className="flex flex-col items-end gap-1">
+          {/* Attack cards — 3 slots */}
+          <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/30 border border-white/[0.08]">
+            {[0, 1, 2].map((i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={`sw-${i}`} src="/images/sword.png" alt="" width={20} height={20}
+                style={{ objectFit: "contain", opacity: i < attackCards ? 1 : 0.2 }} />
+            ))}
           </div>
-          {/* Shields */}
-          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/10 border border-white/[0.08]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/shield.png" alt="" width={16} height={16} style={{ objectFit: "contain" }} />
-            <span className="text-white text-[12px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>{shieldCount}</span>
+          {/* Shields — 3 slots */}
+          <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/30 border border-white/[0.08]">
+            {[0, 1, 2].map((i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={`sh-${i}`} src="/images/shield.png" alt="" width={20} height={20}
+                style={{ objectFit: "contain", opacity: i < shieldCount ? 1 : 0.2 }} />
+            ))}
           </div>
         </div>
       </div>
@@ -986,23 +991,16 @@ export default function LuckyDropPage() {
       <WinAnimation
         show={showWinAnim}
         amount={winAnimAmount}
-        onDone={() => { setShowWinAnim(false); stopWinAudio(); }}
+        onDone={() => { setShowWinAnim(false); stopWinAudio(); playNextAnim(); }}
       />
 
       {/* Shield jackpot reveal animation */}
       {showShieldAnim && (
-        <ShieldJackpotReveal onDone={() => {
-          setShowShieldAnim(false);
-          // Show queued card animation after shield finishes
-          if (pendingCardRef.current) {
-            pendingCardRef.current = false;
-            setShowCardAnim(true);
-          }
-        }} />
+        <ShieldJackpotReveal onDone={() => { setShowShieldAnim(false); playNextAnim(); }} />
       )}
 
       {showCardAnim && (
-        <AttackCardReveal onDone={() => setShowCardAnim(false)} />
+        <AttackCardReveal onDone={() => { setShowCardAnim(false); playNextAnim(); }} />
       )}
 
       {/* Bonus round banner */}
