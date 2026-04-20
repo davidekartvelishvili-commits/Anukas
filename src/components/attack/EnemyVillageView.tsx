@@ -67,13 +67,13 @@ export default function EnemyVillageView({
         {/* Ground */}
         <div className="absolute bottom-0 left-0 right-0" style={{ height: "40%", background: "linear-gradient(180deg, #2a1508 0%, #1a0a04 100%)" }} />
 
-        {/* Buildings */}
-        {villageItems.map((item) => {
+        {/* Buildings — fallback to 5 default if array is empty */}
+        {(villageItems.length > 0 ? villageItems : [1,2,3,4,5].map(p => ({ position: p, stars: 1, name: `Building ${p}` }))).map((item) => {
           const pos = POSITIONS[item.position];
           if (!pos) return null;
           const alreadyPicked = pickedPositions.includes(item.position);
           const isSelected = selectedPosition === item.position;
-          const canSelect = !alreadyPicked && item.stars > 0;
+          const canSelect = !alreadyPicked;
 
           return (
             <button

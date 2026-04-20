@@ -47,6 +47,7 @@ attacks.post("/initialize", async (c) => {
   const candidates = await db.select().from(userVillageProfile)
     .where(and(eq(userVillageProfile.currentLevel, attackerLevel)));
 
+  // Tier 1: strict (same level + stars > 0 + coins > 0 + not attacked 24h)
   const validTargets: Array<{ userId: string; profile: any }> = [];
   for (const cand of candidates) {
     if (cand.userId === userId) continue;
@@ -57,51 +58,120 @@ attacks.post("/initialize", async (c) => {
     validTargets.push({ userId: cand.userId, profile: cand });
   }
 
-  console.log(`[attack] candidates=${candidates.length} validTargets=${validTargets.length}`);
+  // Tier 2: relaxed (same level + stars > 0, drop coin + cooldown)
   if (validTargets.length === 0) {
-    // Fallback: find ANY other user with a village profile (ignore level/stars/coins)
-    const anyUser = candidates.find(c => c.userId !== userId);
-    console.log(`[attack] fallback anyUser=${!!anyUser}`);
-    if (anyUser) {
-      validTargets.push({ userId: anyUser.userId, profile: anyUser });
-    } else {
-      // No other users at all — refund charges and return error
-      await (db as any).run(
-        sql`UPDATE user_village_profile SET attack_charges = attack_charges + 3, updated_at = datetime('now') WHERE user_id = ${userId}`
-      );
-      throw new BadRequestError("No valid targets found");
+    for (const cand of candidates) {
+      if (cand.userId === userId) continue;
+      if (cand.totalStars <= 0) continue;
+      validTargets.push({ userId: cand.userId, profile: cand });
     }
   }
 
-  // Pick random target
+  console.log(`[attack] candidates=${candidates.length} validTargets=${validTargets.length}`);
+
+  // No real target with stars > 0 — generate a bot village
+  let isBotVillage = false;
+  if (validTargets.length === 0) {
+    console.log(`[attack] no valid targets, generating bot village`);
+    isBotVillage = true;
+  }
+
+  // Bot village names
+  const botNames = ["Shadow Fox", "Iron Wolf", "Storm Eagle", "Dark Knight", "Blaze Runner"];
+  const botBuildingNames = ["House", "Tower", "Market", "Temple", "Garden"];
+
+  if (isBotVillage) {
+    // Generate deterministic bot village
+    const botCoins = 50 + Math.floor(Math.random() * 150);
+    const botHidden = Math.floor(botCoins * 0.5);
+    const botPer = Math.floor(botHidden / 2);
+    const posA = 1 + Math.floor(Math.random() * 5);
+    let posB = posA;
+    while (posB === posA) posB = 1 + Math.floor(Math.random() * 5);
+
+    const sessionId = nanoid();
+    // Use attacker as both attacker and defender for bot (coins come from nowhere)
+    await db.insert(attackSessions).values({
+      id: sessionId,
+      attackerId: userId,
+      defenderId: userId, // bot — self-referencing, attack attempts handle this
+      defenderCoinSnapshot: botCoins,
+      coinsHiddenTotal: botHidden,
+      itemAPosition: posA,
+      itemACoins: botPer,
+      itemBPosition: posB,
+      itemBCoins: botHidden - botPer,
+      attacksUsed: 0,
+      status: "in_progress",
+    });
+
+    await (db as any).run(
+      sql`UPDATE user_village_profile SET attack_charges = attack_charges - 3, updated_at = datetime('now') WHERE user_id = ${userId}`
+    );
+
+    const botItems = [1, 2, 3, 4, 5].map(pos => ({
+      position: pos,
+      stars: 1 + Math.floor(Math.random() * 3),
+      name: botBuildingNames[pos - 1],
+    }));
+
+    console.log(`[attack] bot village created, sessionId=${sessionId}, items=${botItems.length}`);
+
+    return c.json({
+      success: true,
+      attackSessionId: sessionId,
+      defenderUsername: botNames[Math.floor(Math.random() * botNames.length)],
+      defenderVillageLevel: attackerLevel,
+      defenderShieldActive: false,
+      defenderShieldCount: 0,
+      villageItems: botItems,
+      isBot: true,
+    });
+  }
+
+  // Real target
   const target = validTargets[Math.floor(Math.random() * validTargets.length)];
   const defenderId = target.userId;
 
-  // Snapshot defender's coin balance
   const coinBalance = await getCoinBalance(defenderId);
   const coinsHiddenTotal = Math.floor(coinBalance * 0.5);
   const perItem = Math.floor(coinsHiddenTotal / 2);
 
-  // Get defender's village progress to pick positions with stars > 0
+  // Get defender's village progress
   const defenderProgress = await db.select().from(userVillageProgress).where(eq(userVillageProgress.userId, defenderId));
   const activeProgress = defenderProgress.find(p => !p.completed) || defenderProgress[0];
 
-  // Find positions with stars > 0
-  const positionsWithStars: number[] = [];
+  // Build village items from progress OR default 5 buildings
+  let villageItems: Array<{ position: number; stars: number; name: string }> = [];
+  let starValues: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+
   if (activeProgress) {
-    const starValues: Record<number, number> = {
+    starValues = {
       1: activeProgress.building1Stars,
       2: activeProgress.building2Stars,
       3: activeProgress.building3Stars,
       4: activeProgress.building4Stars,
       5: activeProgress.building5Stars,
     };
-    for (let i = 1; i <= 5; i++) {
-      if (starValues[i] > 0) positionsWithStars.push(i);
-    }
+    const buildings = await db.select().from(villageBuildings).where(eq(villageBuildings.villageId, activeProgress.villageId));
+    villageItems = buildings.map(b => ({
+      position: b.position,
+      stars: starValues[b.position] || 0,
+      name: b.name,
+    }));
   }
 
-  // If no positions with stars, use random 2 positions
+  // If no buildings found, generate default set
+  if (villageItems.length === 0) {
+    villageItems = [1, 2, 3, 4, 5].map(pos => ({
+      position: pos,
+      stars: starValues[pos] || 0,
+      name: botBuildingNames[pos - 1],
+    }));
+  }
+
+  // Pick 2 positions with stars > 0 for coin hiding
+  const positionsWithStars = [1, 2, 3, 4, 5].filter(p => starValues[p] > 0);
   let posA: number, posB: number;
   if (positionsWithStars.length >= 2) {
     const shuffled = [...positionsWithStars].sort(() => Math.random() - 0.5);
@@ -109,7 +179,6 @@ attacks.post("/initialize", async (c) => {
     posB = shuffled[1];
   } else if (positionsWithStars.length === 1) {
     posA = positionsWithStars[0];
-    // Pick a random different position
     const others = [1, 2, 3, 4, 5].filter(p => p !== posA);
     posB = others[Math.floor(Math.random() * others.length)];
   } else {
@@ -118,7 +187,6 @@ attacks.post("/initialize", async (c) => {
     while (posB === posA) posB = 1 + Math.floor(Math.random() * 5);
   }
 
-  // Create session
   const sessionId = nanoid();
   await db.insert(attackSessions).values({
     id: sessionId,
@@ -134,34 +202,15 @@ attacks.post("/initialize", async (c) => {
     status: "in_progress",
   });
 
-  // Deduct 3 attack charges from attacker
   await (db as any).run(
     sql`UPDATE user_village_profile SET attack_charges = attack_charges - 3, updated_at = datetime('now') WHERE user_id = ${userId}`
   );
 
-  // Get defender info
   const [defenderUser] = await db.select().from(users).where(eq(users.id, defenderId)).limit(1);
   const [defenderProfileFull] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, defenderId)).limit(1);
   const defenderShieldCount = defenderProfileFull?.shieldCount ?? 0;
 
-  // Get village items for display
-  let villageItems: Array<{ position: number; stars: number; name: string }> = [];
-  if (activeProgress) {
-    const [v] = await db.select().from(villages).where(eq(villages.id, activeProgress.villageId)).limit(1);
-    const buildings = await db.select().from(villageBuildings).where(eq(villageBuildings.villageId, activeProgress.villageId));
-    const starValues: Record<number, number> = {
-      1: activeProgress.building1Stars,
-      2: activeProgress.building2Stars,
-      3: activeProgress.building3Stars,
-      4: activeProgress.building4Stars,
-      5: activeProgress.building5Stars,
-    };
-    villageItems = buildings.map(b => ({
-      position: b.position,
-      stars: starValues[b.position] || 0,
-      name: b.name,
-    }));
-  }
+  console.log(`[attack] session created, target=${defenderId}, items=${villageItems.length}, sessionId=${sessionId}`);
 
   return c.json({
     success: true,
@@ -222,9 +271,11 @@ attacks.post("/attempt", async (c) => {
 
     if (hitA || hitB) {
       coinsTransferred = hitA ? session.itemACoins : session.itemBCoins;
-      // Transfer coins
+      // Transfer coins (for bot villages, only add to attacker)
       await addCoins(userId, coinsTransferred);
-      await deductCoins(defenderId, coinsTransferred);
+      if (defenderId !== userId) {
+        await deductCoins(defenderId, coinsTransferred);
+      }
       outcome = "coins_stolen";
       itemBurned = true;
     } else {
@@ -232,8 +283,8 @@ attacks.post("/attempt", async (c) => {
       itemBurned = true;
     }
 
-    // Burn: decrement the building's stars by 1 on defender's progress
-    if (itemBurned) {
+    // Burn: decrement the building's stars by 1 on defender's progress (skip for bot)
+    if (itemBurned && defenderId !== userId) {
       const defenderProgress = await db.select().from(userVillageProgress).where(eq(userVillageProgress.userId, defenderId));
       const activeProgress = defenderProgress.find(p => !p.completed) || defenderProgress[0];
       if (activeProgress) {
