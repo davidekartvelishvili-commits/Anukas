@@ -503,6 +503,7 @@ export default function LuckyDropPage() {
       const now = performance.now();
       const s = stateRef.current;
       const { W, H } = s;
+      const frozen = anyAnimPlayingRef.current;
 
       // Background — baked once per resize, cheap bitmap copy per frame
       ctx.drawImage(bgSprite, 0, 0);
@@ -523,7 +524,7 @@ export default function LuckyDropPage() {
       // globalAlpha is set at most 3 times total (start of each pass + reset)
       // instead of 2× per glowing peg per frame.
       for (const peg of s.pegs) {
-        peg.glow *= 0.9;
+        if (!frozen) peg.glow *= 0.9;
         const visR = peg.r + 0.5;
         const hitR = visR + peg.glow * 1.5;
         ctx.drawImage(pegSprite, peg.x - hitR, peg.y - hitR, hitR * 2, hitR * 2);
@@ -540,7 +541,7 @@ export default function LuckyDropPage() {
       // Slots — two-pass draw to minimize globalAlpha thrashing
       for (let i = 0; i < s.slots.length; i++) {
         const sl = s.slots[i];
-        sl.glow *= 0.94;
+        if (!frozen) sl.glow *= 0.94;
         if (sl.sprite) ctx.drawImage(sl.sprite, Math.round(sl.x), Math.round(sl.y));
       }
       for (let i = 0; i < s.slots.length; i++) {
@@ -568,7 +569,7 @@ export default function LuckyDropPage() {
         const b = s.balls[i];
         if (!b.alive) { s.balls.splice(i, 1); continue; }
 
-        if (!b.settled) {
+        if (!b.settled && !frozen) {
           // Plinko physics: ball falls under real gravity, bounces off pegs
           // with energy-retained reflection + random scatter. The generated
           // `path`'s FINAL waypoint is the server-determined slot, used only
@@ -720,10 +721,12 @@ export default function LuckyDropPage() {
         let writeIdx = 0;
         for (let i = 0; i < pList.length; i++) {
           const p = pList[i];
-          p.vy += GRAVITY;
-          p.x += p.vx;
-          p.y += p.vy;
-          p.life -= 1;
+          if (!frozen) {
+            p.vy += GRAVITY;
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 1;
+          }
           if (p.life <= 0 || p.y > s.H + 20) continue;
           pList[writeIdx++] = p;
           ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.maxLife));
