@@ -213,10 +213,17 @@ export default function LuckyDropPage() {
   }, []);
 
   useEffect(() => {
-    ensureActiveTransaction().then((tx) => {
-      setBalance(tx.coinsRemaining);
-      storeCoin(tx.coinsRemaining);
-    }).catch(() => {});
+    // Fetch coin balance from server (sum of ALL active transactions — matches home page)
+    import("@/services/auth").then(({ getMe }) => {
+      getMe().then((data: any) => {
+        if (data?.user?.coinBalance !== undefined) {
+          setBalance(data.user.coinBalance);
+          storeCoin(data.user.coinBalance);
+        }
+      }).catch(() => {});
+    });
+    // Also ensure active transaction exists
+    ensureActiveTransaction().catch(() => {});
     // Fetch village profile for attack cards + shield count
     import("@/services/api").then(({ apiFetch }) => {
       apiFetch("/village/profile").then((data: any) => {
@@ -248,21 +255,27 @@ export default function LuckyDropPage() {
   const [shieldCount, setShieldCount] = useState(0);
   const [showAttackSequence, setShowAttackSequence] = useState(false);
   const attackTriggeredRef = useRef(false);
+  const anyAnimPlayingRef = useRef(false); // blocks ball drops during ANY animation
   const dropCount = useRef(0);
 
-  // Auto-trigger attack when charges reach 3 (from page load or card earn)
+  // Sync anyAnimPlayingRef whenever any animation state changes
   useEffect(() => {
-    if (attackCards >= 3 && !showAttackSequence && !attackTriggeredRef.current) {
-      // Delay slightly so UI renders the 3/3 glow first
+    anyAnimPlayingRef.current = showWinAnim || showShieldAnim || showCardAnim || showAttackSequence;
+  }, [showWinAnim, showShieldAnim, showCardAnim, showAttackSequence]);
+
+  // Auto-trigger attack when charges reach 3 — wait for all animations to finish
+  useEffect(() => {
+    if (attackCards >= 3 && !showAttackSequence && !attackTriggeredRef.current
+        && !showWinAnim && !showShieldAnim && !showCardAnim) {
       const t = setTimeout(() => {
-        if (!attackTriggeredRef.current) {
+        if (!attackTriggeredRef.current && !anyAnimPlayingRef.current) {
           attackTriggeredRef.current = true;
           setShowAttackSequence(true);
         }
       }, 2000);
       return () => clearTimeout(t);
     }
-  }, [attackCards, showAttackSequence]);
+  }, [attackCards, showAttackSequence, showWinAnim, showShieldAnim, showCardAnim]);
 
   const animDelayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -285,8 +298,8 @@ export default function LuckyDropPage() {
 
   const queueAnim = useCallback((type: "shield" | "card") => {
     animQueueRef.current.push(type);
-    if (!animPlayingRef.current && !showWinAnimRef.current) {
-      // First animation starts immediately, subsequent ones get 3s gap
+    // Only start if nothing is playing at all
+    if (!animPlayingRef.current && !anyAnimPlayingRef.current) {
       animPlayingRef.current = true;
       const next = animQueueRef.current.shift()!;
       if (next === "shield") setShowShieldAnim(true);
@@ -758,11 +771,8 @@ export default function LuckyDropPage() {
 
   const handleDrop = useCallback(() => {
     if (betAmount <= 0 || balance < betAmount) return;
-    // Block drops while win animation is playing (ref — reading this
-    // from the showWinAnimRef instead of state so handleDrop stays
-    // stable when showWinAnim toggles, letting the memoized bottom UI
-    // skip re-renders on win-animation transitions).
-    if (showWinAnimRef.current) return;
+    // Block drops while ANY animation is playing
+    if (anyAnimPlayingRef.current) return;
 
     // Deduct locally for instant UI feedback
     setBalance((prev) => prev - betAmount);
