@@ -61,7 +61,7 @@ export default function AttackedNotificationModal({ notifications, onClose }: Pr
                   {n.attackerName}
                 </div>
                 <div className="text-[10px] text-white/40">
-                  {n.outcome === "coins_stolen" ? `Stole ${n.coinsLost} coins` :
+                  {n.outcome === "coins_stolen" ? `Took ${n.coinsLost} coins` :
                    n.outcome === "shield_blocked" ? "Shield blocked" :
                    "Burned empty building"}
                 </div>

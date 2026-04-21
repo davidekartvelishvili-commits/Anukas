@@ -5,7 +5,7 @@ import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
 import {
   users, userVillageProfile, userVillageProgress, attackSessions, attackAttempts,
-  villages, villageBuildings,
+  villages, villageBuildings, gameHistory,
 } from "../db/schema.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { BadRequestError } from "../utils/errors.js";
@@ -356,6 +356,19 @@ attacks.post("/attempt", async (c) => {
     updates.completedAt = new Date().toISOString();
   }
   await db.update(attackSessions).set(updates).where(eq(attackSessions.id, attackSessionId));
+
+  // Post to live wins feed if coins were taken
+  if (coinsTransferred > 0) {
+    try {
+      await db.insert(gameHistory).values({
+        id: nanoid(),
+        userId,
+        gameType: "village_attack",
+        betAmount: 0,
+        winAmount: coinsTransferred / 100, // coins → Lari for display
+      });
+    } catch {}
+  }
 
   return c.json({
     success: true,

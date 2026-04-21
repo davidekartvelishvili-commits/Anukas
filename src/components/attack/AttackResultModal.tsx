@@ -54,7 +54,7 @@ export default function AttackResultModal({ attempts, totalCoinsStolen, totalIte
                 {a.outcome === "coins_stolen" ? "💰" : a.outcome === "shield_blocked" ? "🛡️" : "🔥"}
               </span>
               <span className="flex-1 text-[13px] font-medium text-white/80" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                {a.outcome === "coins_stolen" ? `Stole ${a.coinsTransferred} coins` :
+                {a.outcome === "coins_stolen" ? `Took ${a.coinsTransferred} coins` :
                  a.outcome === "shield_blocked" ? "Blocked by shield" :
                  "Empty — burned"}
               </span>

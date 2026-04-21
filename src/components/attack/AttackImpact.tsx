@@ -96,16 +96,16 @@ export default function AttackImpact({ outcome, coinsTransferred, onDone }: Prop
   }, [outcome]);
 
   const title = outcome === "coins_stolen"
-    ? `+${coinsTransferred} Coins!`
+    ? `+${coinsTransferred} Coins Taken!`
     : outcome === "shield_blocked"
     ? "Shield Blocked!"
-    : "Empty! Burned!";
+    : "Burned!";
 
   const titleGe = outcome === "coins_stolen"
-    ? `მოიპარე ${coinsTransferred} კოინი!`
+    ? `აიღე ${coinsTransferred} კოინი!`
     : outcome === "shield_blocked"
-    ? "დაბლოკილი ფარით!"
-    : "ცარიელია! დაიწვა!";
+    ? "ფარმა დაიცვა!"
+    : "დაიწვა!";
 
   const titleColor = outcome === "coins_stolen" ? "#F9E741"
     : outcome === "shield_blocked" ? "#88CCFF"

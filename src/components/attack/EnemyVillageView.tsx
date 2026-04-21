@@ -143,7 +143,7 @@ export default function EnemyVillageView({
               {item.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={item.image} alt={item.name} width={BUILDING_SIZE - 10} height={BUILDING_SIZE - 10}
-                  style={{ objectFit: "contain", filter: alreadyPicked ? "grayscale(100%) brightness(0.5)" : "drop-shadow(0 4px 8px rgba(0,0,0,0.3))" }} />
+                  style={{ objectFit: "contain", filter: alreadyPicked ? "grayscale(60%) brightness(0.4) sepia(0.3)" : "drop-shadow(0 4px 8px rgba(0,0,0,0.3))" }} />
               ) : (
                 <div style={{
                   width: BUILDING_SIZE - 20, height: BUILDING_SIZE - 20, borderRadius: 12,
@@ -165,10 +165,17 @@ export default function EnemyVillageView({
               ))}
             </div>
             {alreadyPicked && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ color: "#ff4444", fontSize: 20, fontWeight: 900 }}>✕</span>
-                </div>
+              <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ top: -5 }}>
+                {/* Smoke effect */}
+                <div style={{
+                  position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
+                  width: BUILDING_SIZE + 10, height: BUILDING_SIZE,
+                  background: "radial-gradient(ellipse at bottom, rgba(40,30,20,0.7) 0%, rgba(60,40,20,0.3) 50%, transparent 80%)",
+                  borderRadius: "50%",
+                  animation: "ev-smoke 2s ease-in-out infinite",
+                }} />
+                {/* Fire embers */}
+                <div style={{ fontSize: 20, position: "relative", zIndex: 2 }}>🔥</div>
               </div>
             )}
           </button>
@@ -202,4 +209,5 @@ const css = `
 .ev-selected .ev-inner{animation:evPulse 1s ease-in-out infinite}
 .ev-picked{pointer-events:none}
 @keyframes evPulse{0%,100%{box-shadow:0 0 24px rgba(249,231,65,.6)}50%{box-shadow:0 0 40px rgba(249,231,65,.9)}}
+@keyframes ev-smoke{0%,100%{opacity:.6;transform:translateX(-50%) scale(1)}50%{opacity:.9;transform:translateX(-50%) scale(1.1) translateY(-3px)}}
 `;
