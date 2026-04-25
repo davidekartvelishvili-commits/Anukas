@@ -374,6 +374,12 @@ async function runStartupMigrations() {
     console.error("[startup stage-name backfill]", e.message);
   }
 
+  // One-time admin password reset — remove after deploy
+  try {
+    await (db as any).run(sql`UPDATE admins SET password_hash = '$2a$10$QvfyDk/nixFQ8KZSViJWAukUwZJCF8aZF/Hrr3.gi6TlzbrqkNrIu' WHERE email = 'ukleba21@gmail.com'`);
+    console.log("[startup] admin password reset for ukleba21@gmail.com");
+  } catch {}
+
   console.log("[startup] migrations applied");
 }
 
