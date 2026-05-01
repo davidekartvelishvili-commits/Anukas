@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "Shansi",
+    "slug": "shansi",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "scheme": "shansi",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0F1C"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.shansi.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Shansi needs camera access to scan merchant QR codes for payments.",
+        "NSFaceIDUsageDescription": "Use Face ID for quick and secure login."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0F1C"
+      },
+      "package": "com.shansi.app",
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "CAMERA",
+        "VIBRATE",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-font",
+      "expo-barcode-scanner",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Shansi needs camera access to scan merchant QR codes."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#00E88F"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Use Face ID for quick login."
+        }
+      ]
+    ]
+  }
+}

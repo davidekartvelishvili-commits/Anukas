@@ -179,16 +179,16 @@ function ParticleCanvas({ running }: { running: boolean }) {
       if (runningRef.current && ts - lastMs > 50) {
         lastMs = ts;
         const cx = w / 2;
-        if (frame % 2 === 0) spawn(Math.random() * w, -35, 2, "coin", { angle: Math.PI / 2, spread: 0.5 });
-        if (frame % 3 === 0) spawn(Math.random() * w, -20, 1, "bill", { angle: Math.PI / 2, spread: 0.4 });
-        if (frame % 12 === 0) {
-          spawn(cx, h * 0.55, 5, "coin", { scatter: 90 });
-          spawn(cx, h * 0.55, 3, "bill", { scatter: 70 });
+        if (frame % 4 === 0) spawn(Math.random() * w, -35, 1, "coin", { angle: Math.PI / 2, spread: 0.5 });
+        if (frame % 6 === 0) spawn(Math.random() * w, -20, 1, "bill", { angle: Math.PI / 2, spread: 0.4 });
+        if (frame % 18 === 0) {
+          spawn(cx, h * 0.55, 2, "coin", { scatter: 90 });
+          spawn(cx, h * 0.55, 1, "bill", { scatter: 70 });
         }
-        if (frame % 20 === 0) {
-          spawn(w * 0.12, h * 0.38, 5, "coin");
-          spawn(w * 0.88, h * 0.38, 5, "coin");
-          spawn(cx, h * 0.52, 4, "spark");
+        if (frame % 28 === 0) {
+          spawn(w * 0.12, h * 0.38, 2, "coin");
+          spawn(w * 0.88, h * 0.38, 2, "coin");
+          spawn(cx, h * 0.52, 2, "spark");
         }
       }
 
@@ -222,14 +222,14 @@ function ParticleCanvas({ running }: { running: boolean }) {
     const w = ref.current.offsetWidth;
     const h = ref.current.offsetHeight;
     const cx = w / 2, cy = h * 0.55;
-    sp(cx, cy, 28, "coin", { scatter: 30 });
-    sp(cx, cy, 12, "bill", { scatter: 50 });
-    sp(cx, cy, 18, "spark");
+    sp(cx, cy, 12, "coin", { scatter: 30 });
+    sp(cx, cy, 5, "bill", { scatter: 50 });
+    sp(cx, cy, 8, "spark");
     setTimeout(() => {
-      sp(cx, cy, 20, "coin", { scatter: 100 });
-      sp(w * 0.15, h * 0.35, 12, "coin");
-      sp(w * 0.85, h * 0.35, 12, "coin");
-      sp(cx, cy - 20, 10, "bill", { scatter: 80 });
+      sp(cx, cy, 8, "coin", { scatter: 100 });
+      sp(w * 0.15, h * 0.35, 5, "coin");
+      sp(w * 0.85, h * 0.35, 5, "coin");
+      sp(cx, cy - 20, 4, "bill", { scatter: 80 });
     }, 300);
   }, [running]);
 

@@ -258,9 +258,11 @@ export default function LuckyDropPage() {
   const anyAnimPlayingRef = useRef(false); // blocks ball drops during ANY animation
   const dropCount = useRef(0);
 
-  // Sync anyAnimPlayingRef whenever any animation state changes
+  // Sync anyAnimPlayingRef whenever any animation state changes.
+  // Also respect animPlayingRef which stays true during the gap
+  // between queued animations (e.g. 3s delay between shield/card).
   useEffect(() => {
-    anyAnimPlayingRef.current = showWinAnim || showShieldAnim || showCardAnim || showAttackSequence;
+    anyAnimPlayingRef.current = showWinAnim || showShieldAnim || showCardAnim || showAttackSequence || animPlayingRef.current;
   }, [showWinAnim, showShieldAnim, showCardAnim, showAttackSequence]);
 
   // Auto-trigger attack when charges reach 3 — wait for all animations to finish
@@ -282,15 +284,19 @@ export default function LuckyDropPage() {
   const playNextAnim = useCallback(() => {
     if (animQueueRef.current.length === 0) {
       animPlayingRef.current = false;
+      // Let the useEffect sync anyAnimPlayingRef from show-states
       return;
     }
-    // 3 second gap between animations
+    // 3 second gap between animations — keep the blocking ref locked
+    // so no new ball drops (and their win animations) can sneak in
+    // during the gap between queued animations.
     animPlayingRef.current = true;
+    anyAnimPlayingRef.current = true;
     if (animDelayTimer.current) clearTimeout(animDelayTimer.current);
     animDelayTimer.current = setTimeout(() => {
       animDelayTimer.current = null;
       const next = animQueueRef.current.shift();
-      if (!next) { animPlayingRef.current = false; return; }
+      if (!next) { animPlayingRef.current = false; anyAnimPlayingRef.current = false; return; }
       if (next === "shield") setShowShieldAnim(true);
       else setShowCardAnim(true);
     }, 3000);
@@ -856,7 +862,12 @@ export default function LuckyDropPage() {
         if (serverResult.totalWin > 0 && serverResult.won) {
           setWinAmount(serverResult.totalWin);
           spawnParticles(serverResult.bonusWin > 20 ? 50 : 20, serverResult.bonusWin > 20);
-          // Trigger the new fancy win animation overlay + audio
+          // Trigger the new fancy win animation overlay + audio.
+          // Set the blocking ref synchronously BEFORE queueAnim runs below,
+          // so queued shield/card animations wait for the win anim to finish
+          // instead of playing on top of it (React batches setShowWinAnim,
+          // so the useEffect that syncs anyAnimPlayingRef hasn't fired yet).
+          anyAnimPlayingRef.current = true;
           setWinAnimAmount(serverResult.totalWin);
           setShowWinAnim(true);
           playWinAudio();
