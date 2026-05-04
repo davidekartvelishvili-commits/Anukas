@@ -35,7 +35,7 @@ const ITEMS: FloatingItem[] = [
 const CAROUSEL_DURATION = 4000;       // 4s carousel phase
 const STAGGER_DELAY = 100;            // 100ms between each item falling
 const CAROUSEL_RADIUS = 160;          // circle radius in px
-const CAROUSEL_SPEED = 0.001571;      // radians per ms — exactly 1 full circle in CAROUSEL_DURATION
+const CAROUSEL_SPEED = 0.001178;      // radians per ms — 3/4 circle in CAROUSEL_DURATION
 
 /* ───────── LOGO ───────── */
 
