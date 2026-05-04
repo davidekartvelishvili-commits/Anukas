@@ -228,6 +228,7 @@ export default function LuckyDropPage() {
     import("@/services/api").then(({ apiFetch }) => {
       apiFetch("/village/profile").then((data: any) => {
         if (data?.success) {
+          setVillageActive(!!data.villageActive);
           setAttackCards(data.profile.attackCharges ?? data.profile.cardCount ?? 0);
           setShieldCount(data.profile.shieldCount ?? (data.profile.shieldActive ? 1 : 0));
         }
@@ -253,6 +254,7 @@ export default function LuckyDropPage() {
   const animPlayingRef = useRef(false);
   const [attackCards, setAttackCards] = useState(0);
   const [shieldCount, setShieldCount] = useState(0);
+  const [villageActive, setVillageActive] = useState(false);
   const [showAttackSequence, setShowAttackSequence] = useState(false);
   const attackTriggeredRef = useRef(false);
   const anyAnimPlayingRef = useRef(false); // blocks ball drops during ANY animation
@@ -1021,36 +1023,38 @@ export default function LuckyDropPage() {
             <path d="M4 4l8 8M12 4L4 12" />
           </svg>
         </button>
-        {/* Swords + Shields with counters */}
-        <div className="flex items-center gap-2">
-          {/* Swords pill */}
-          <div
-            className="flex items-center gap-1.5 px-3 py-2 rounded-full backdrop-blur-lg border"
-            style={{
-              background: attackCards >= 3 ? "rgba(249,231,65,0.2)" : "rgba(255,255,255,0.1)",
-              borderColor: attackCards >= 3 ? "rgba(249,231,65,0.5)" : "rgba(255,255,255,0.12)",
-              boxShadow: attackCards >= 3 ? "0 0 12px rgba(249,231,65,0.4)" : "none",
-              animation: attackCards >= 3 ? "ld-pulse 1.5s ease-in-out infinite" : "none",
-            }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/sword.png" alt="" width={24} height={24} style={{ objectFit: "contain" }} />
-            <span className="text-[14px] font-bold" style={{
-              color: attackCards >= 3 ? "#F9E741" : "#fff",
-              fontFamily: "var(--font-outfit)",
-            }}>
-              {attackCards}/3
-            </span>
+        {/* Swords + Shields with counters — only visible when village is active */}
+        {villageActive && (
+          <div className="flex items-center gap-2">
+            {/* Swords pill */}
+            <div
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full backdrop-blur-lg border"
+              style={{
+                background: attackCards >= 3 ? "rgba(249,231,65,0.2)" : "rgba(255,255,255,0.1)",
+                borderColor: attackCards >= 3 ? "rgba(249,231,65,0.5)" : "rgba(255,255,255,0.12)",
+                boxShadow: attackCards >= 3 ? "0 0 12px rgba(249,231,65,0.4)" : "none",
+                animation: attackCards >= 3 ? "ld-pulse 1.5s ease-in-out infinite" : "none",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/sword.png" alt="" width={24} height={24} style={{ objectFit: "contain" }} />
+              <span className="text-[14px] font-bold" style={{
+                color: attackCards >= 3 ? "#F9E741" : "#fff",
+                fontFamily: "var(--font-outfit)",
+              }}>
+                {attackCards}/3
+              </span>
+            </div>
+            {/* Shields pill */}
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/10 border border-white/[0.12] backdrop-blur-lg">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/shield.png" alt="" width={22} height={22} style={{ objectFit: "contain" }} />
+              <span className="text-[14px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
+                {shieldCount}/3
+              </span>
+            </div>
           </div>
-          {/* Shields pill */}
-          <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/10 border border-white/[0.12] backdrop-blur-lg">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/shield.png" alt="" width={22} height={22} style={{ objectFit: "contain" }} />
-            <span className="text-[14px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
-              {shieldCount}/3
-            </span>
-          </div>
-        </div>
+        )}
         <style>{`@keyframes ld-pulse{0%,100%{box-shadow:0 0 12px rgba(249,231,65,0.4)}50%{box-shadow:0 0 24px rgba(249,231,65,0.7)}}`}</style>
       </div>
 

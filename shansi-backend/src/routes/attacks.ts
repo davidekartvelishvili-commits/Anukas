@@ -5,7 +5,7 @@ import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
 import {
   users, userVillageProfile, userVillageProgress, attackSessions, attackAttempts,
-  villages, villageBuildings, gameHistory,
+  villages, villageBuildings, gameHistory, villageConfig,
 } from "../db/schema.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { BadRequestError } from "../utils/errors.js";
@@ -23,6 +23,10 @@ function starColumn(position: number): string {
 attacks.post("/initialize", async (c) => {
   const userId = c.get("userId") as string;
   const db = getDb();
+
+  // Block attacks when village is deactivated
+  const [activeRow] = await db.select().from(villageConfig).where(eq(villageConfig.key, "village_active")).limit(1);
+  if (activeRow?.value !== "true") throw new BadRequestError("Village feature is currently disabled");
 
   // Validate attacker has >= 3 attack charges
   const [attackerProfile] = await db.select().from(userVillageProfile).where(eq(userVillageProfile.userId, userId)).limit(1);

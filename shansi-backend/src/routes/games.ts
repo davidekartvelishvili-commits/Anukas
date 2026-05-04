@@ -76,6 +76,9 @@ async function grantPlinkoMilestoneRewards(userId: string) {
   // Read the three relevant config keys
   const cfg = await db.select().from(villageConfig);
   const cfgMap = new Map(cfg.map((r: any) => [r.key, r.value]));
+
+  // If village feature is deactivated, skip all milestone rewards
+  if (cfgMap.get("village_active") !== "true") return {};
   const ballsPerShield = parseInt(cfgMap.get("balls_per_shield") || "0", 10);
   const ballsPerCard = parseInt(cfgMap.get("balls_per_attack_card") || "0", 10);
   const shieldHours = parseInt(cfgMap.get("shield_reward_hours") || "24", 10);

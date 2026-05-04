@@ -97,6 +97,7 @@ function VillageContent() {
 
   // Config
   const [configDirty, setConfigDirty] = useState<Record<string, string>>({});
+  const [villageActive, setVillageActive] = useState(false);
 
   // Stats / attacks
   const [stats, setStats] = useState<any>(null);
@@ -124,7 +125,10 @@ function VillageContent() {
         getVillageLevels(), getVillageConfig(), getVillageStats(), getVillageAttacks(1),
       ]) as any[];
       if (l.success) setLevels(l.levels);
-      if (co.success) setConfigDirty(co.config);
+      if (co.success) {
+        setConfigDirty(co.config);
+        setVillageActive(co.config.village_active === "true");
+      }
       if (s.success) setStats(s.stats);
       if (a.success) setAttacks(a.attacks);
     } catch {}
@@ -205,6 +209,40 @@ function VillageContent() {
         </header>
 
         <div className="p-4 lg:p-6">
+          {/* VILLAGE ACTIVE TOGGLE */}
+          <div className="flex items-center gap-4 mb-5 rounded-2xl border p-4" style={{ background: "#111111", borderColor: villageActive ? "#22C55E40" : "#EF444440" }}>
+            <button
+              onClick={async () => {
+                const newVal = !villageActive;
+                setVillageActive(newVal);
+                try {
+                  await updateVillageConfig({ ...configDirty, village_active: String(newVal) });
+                  setConfigDirty((c) => ({ ...c, village_active: String(newVal) }));
+                } catch (e: any) {
+                  setVillageActive(!newVal);
+                  alert(e.message);
+                }
+              }}
+              className="relative w-14 h-7 rounded-full transition-all duration-200"
+              style={{ background: villageActive ? "#22C55E" : "#333" }}
+            >
+              <div
+                className="absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-all duration-200"
+                style={{ left: villageActive ? "calc(100% - 26px)" : "2px" }}
+              />
+            </button>
+            <div>
+              <span className="text-[14px] font-bold" style={{ color: villageActive ? "#22C55E" : "#EF4444" }}>
+                {villageActive ? "სოფელი აქტიურია" : "სოფელი გამორთულია"}
+              </span>
+              <p className="text-[11px] mt-0.5" style={{ color: "#666" }}>
+                {villageActive
+                  ? "ფარები, ხმლები და შეტევები ჩართულია თამაშებში"
+                  : "ფარები და ხმლები არ გამოჩნდება თამაშებში"}
+              </p>
+            </div>
+          </div>
+
           {/* TABS */}
           <div className="flex flex-wrap gap-2 mb-5">
             {[

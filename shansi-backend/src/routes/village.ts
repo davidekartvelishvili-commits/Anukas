@@ -59,6 +59,11 @@ async function checkLevelUp(userId: string) {
 village.get("/profile", async (c) => {
   const userId = c.get("userId") as string;
   const db = getDb();
+
+  // Check if village feature is active
+  const [activeRow] = await db.select().from(villageConfig).where(eq(villageConfig.key, "village_active")).limit(1);
+  const villageActive = activeRow?.value === "true";
+
   const profile = await getOrCreateProfile(userId);
   const [currentLvl] = await db.select().from(villageLevels).where(eq(villageLevels.levelNumber, profile.currentLevel)).limit(1);
   const allLevels = await db.select().from(villageLevels).orderBy(villageLevels.levelNumber);
@@ -69,6 +74,7 @@ village.get("/profile", async (c) => {
 
   return c.json({
     success: true,
+    villageActive,
     profile: {
       currentLevel: profile.currentLevel,
       totalStars: profile.totalStars,
