@@ -391,6 +391,8 @@ app.use("*", cors({
     const allowed = [
       "http://localhost:3000",
       "http://localhost:3001",
+      "https://shansi.app",
+      "https://www.shansi.app",
       process.env.FRONTEND_URL,
     ].filter(Boolean) as string[];
 

@@ -13,12 +13,12 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "API_URL": "https://your-staging-api.railway.app"
+        "API_URL": "https://api.shansi.app"
       }
     },
     "production": {
       "env": {
-        "API_URL": "https://your-production-api.railway.app"
+        "API_URL": "https://api.shansi.app"
       }
     }
   },
