@@ -90,6 +90,20 @@ export default function WelcomePage() {
       if (cb) {
         localStorage.setItem("auth_callback_url", cb);
       }
+      // Track page view
+      const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      fetch(`${API}/public/track`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: window.location.pathname,
+          referrer: document.referrer || null,
+          utm_source: params.get("utm_source") || null,
+          utm_medium: params.get("utm_medium") || null,
+          utm_campaign: params.get("utm_campaign") || null,
+          screenWidth: window.innerWidth,
+        }),
+      }).catch(() => {});
     } catch {}
   }, []);
 

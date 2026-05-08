@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, Text, ScrollView, Pressable, StyleSheet,
-  Image, RefreshControl, Dimensions,
+  Image, RefreshControl, Dimensions, Modal, TextInput,
+  Animated as RNAnimated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -11,17 +12,39 @@ import { getMe } from "../../services/auth";
 import { apiFetch } from "../../services/api";
 import { useAuth } from "../../providers/AuthProvider";
 import { useBalance } from "../../providers/BalanceProvider";
-import { colors, fonts, fontSize, radii, spacing } from "../../config/theme";
+import { LinearGradient } from "expo-linear-gradient";
+import { colors, fonts, fontSize } from "../../config/theme";
 
 type Nav = NativeStackNavigationProp<HomeStackParamList>;
-const { width: SCREEN_W } = Dimensions.get("window");
+const { width: SW } = Dimensions.get("window");
 
 const ALL_GAMES = [
-  { id: 1, name: "Midnight Machine", gameType: "slot", route: "MidnightMachine" as const, gradient: ["#4338CA", "#6366F1"] },
-  { id: 3, name: "Lucky Step", gameType: "chicken_rush", route: "ChickenRush" as const, gradient: ["#1a237e", "#7c4dff"] },
-  { id: 4, name: "Lucky Drop", gameType: "plinko", route: "LuckyDrop" as const, gradient: ["#1a237e", "#7c4dff"] },
-  { id: 5, name: "Air Hockey", gameType: "air_hockey", route: "AirHockey" as const, gradient: ["#0A0F1C", "#1C2539"] },
+  { id: 1, name: "Midnight Machine", gameType: "slot", route: "MidnightMachine" as const, gradient: ["#4338CA", "#6366F1"], cover: require("../../../assets/lucky-step-cover.png") },
+  { id: 3, name: "Lucky Step", gameType: "chicken_rush", route: "ChickenRush" as const, gradient: ["#1a237e", "#7c4dff"], cover: require("../../../assets/lucky-step-cover.png") },
+  { id: 4, name: "Lucky Drop", gameType: "plinko", route: "LuckyDrop" as const, gradient: ["#1a237e", "#7c4dff"], cover: require("../../../assets/lucky-drop-cover.png") },
+  { id: 5, name: "Air Hockey", gameType: "air_hockey", route: "AirHockey" as const, gradient: ["#0A0F1C", "#1C2539"], cover: require("../../../assets/air-hockey-cover.png") },
 ];
+
+interface RecentWin {
+  id: string;
+  name: string;
+  coins: number;
+  game: string;
+  createdAt: string;
+}
+
+function timeAgo(dateStr: string): string {
+  try {
+    const d = new Date(dateStr.includes("T") ? dateStr : dateStr.replace(" ", "T") + "Z");
+    const sec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (sec < 60) return "\u10D0\u10EE\u10DA\u10D0";
+    if (sec < 3600) return `${Math.floor(sec / 60)} \u10EC\u10D7`;
+    if (sec < 86400) return `${Math.floor(sec / 3600)} \u10E1\u10D7`;
+    return `${Math.floor(sec / 86400)} \u10D3\u10E6\u10D4`;
+  } catch {
+    return "";
+  }
+}
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -31,6 +54,11 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeGameTypes, setActiveGameTypes] = useState<string[]>(["slot", "plinko", "chicken_rush", "air_hockey"]);
   const [promoCount, setPromoCount] = useState(0);
+  const [promoSeenToday, setPromoSeenToday] = useState(false);
+  const [recentWins, setRecentWins] = useState<RecentWin[]>([]);
+  const [showBalanceModal, setShowBalanceModal] = useState(false);
+  const [showExchange, setShowExchange] = useState(false);
+  const [exchangeAmount, setExchangeAmount] = useState("");
 
   const fetchData = useCallback(async () => {
     try {
@@ -57,6 +85,21 @@ export default function HomeScreen() {
     } catch {}
   }, [updateUser, setCoins, setCash]);
 
+  // Live Recent Wins polling
+  useEffect(() => {
+    let alive = true;
+    const fetchWins = () => {
+      apiFetch("/public/recent-wins").then((data: any) => {
+        if (alive && data?.success && Array.isArray(data.wins)) {
+          setRecentWins(data.wins);
+        }
+      }).catch(() => {});
+    };
+    fetchWins();
+    const interval = setInterval(fetchWins, 8000);
+    return () => { alive = false; clearInterval(interval); };
+  }, []);
+
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const onRefresh = async () => {
@@ -66,11 +109,25 @@ export default function HomeScreen() {
   };
 
   const navigateToGame = (route: string) => {
-    // Navigate to GamesTab stack
     const parent = nav.getParent();
-    if (parent) {
-      parent.navigate("GamesTab", { screen: route });
-    }
+    if (parent) parent.navigate("GamesTab", { screen: route });
+  };
+
+  const handleExchange = async () => {
+    const amt = parseFloat(exchangeAmount);
+    if (!amt || amt <= 0 || amt > cash) return;
+    try {
+      const res = await apiFetch("/user/exchange", {
+        method: "POST",
+        body: JSON.stringify({ amount: amt }),
+      });
+      if (res?.success) {
+        setCash(res.cashBalance ?? cash - amt);
+        setCoins(res.coinBalance ?? coins + amt * 100);
+        setShowExchange(false);
+        setExchangeAmount("");
+      }
+    } catch {}
   };
 
   return (
@@ -82,34 +139,35 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
         }
       >
-        {/* Header: balances + avatar */}
+        {/* ── Header: balances + avatar ── */}
         <View style={styles.header}>
           <View style={styles.balanceRow}>
             {/* Coin balance */}
             <View style={styles.balancePill}>
-              <Text style={styles.coinIcon}>🪙</Text>
+              <Image source={require("../../../assets/coin-icon.png")} style={{ width: 22, height: 22 }} resizeMode="contain" />
               <Text style={styles.balanceText}>{coins.toLocaleString()}</Text>
             </View>
-            {/* Cash balance */}
+            {/* Cash balance — tappable */}
             <Pressable
-              onPress={() => nav.navigate("Wallet")}
-              style={styles.balancePill}
+              onPress={() => setShowBalanceModal(true)}
+              style={({ pressed }) => [styles.balancePill, pressed && { opacity: 0.8, transform: [{ scale: 0.95 }] }]}
             >
-              <Text style={styles.cashIcon}>₾</Text>
+              <Image source={require("../../../assets/lari-icon.png")} style={{ width: 38, height: 38 }} resizeMode="contain" />
               <Text style={styles.balanceText}>{cash.toFixed(2)}</Text>
             </Pressable>
           </View>
+          {/* Avatar */}
           <Pressable
             onPress={() => nav.navigate("Profile")}
-            style={styles.avatar}
+            style={({ pressed }) => [styles.avatar, pressed && { transform: [{ scale: 0.95 }] }]}
           >
-            <Text style={styles.avatarText}>
-              {user?.name?.[0]?.toUpperCase() || "👤"}
-            </Text>
+            <LinearGradient colors={["#C4E0F9", "#E8D5F5"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatarGradient}>
+              <Image source={require("../../../assets/profile-avatar.png")} style={styles.avatarImage} />
+            </LinearGradient>
           </Pressable>
         </View>
 
-        {/* Featured Games */}
+        {/* ── Featured Games ── */}
         <Text style={styles.sectionTitle}>Featured Games</Text>
         <ScrollView
           horizontal
@@ -120,93 +178,168 @@ export default function HomeScreen() {
             <Pressable
               key={game.id}
               onPress={() => navigateToGame(game.route)}
-              style={[styles.gameCard, { backgroundColor: game.gradient[0] }]}
+              style={({ pressed }) => [styles.gameCard, pressed && { transform: [{ scale: 0.97 }] }]}
             >
-              <Text style={styles.gameCardName}>{game.name}</Text>
+              <Image source={game.cover} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              {/* Gradient overlay at bottom */}
+              <View style={styles.gameCardGradient}>
+                <Text style={styles.gameCardName}>{game.name}</Text>
+              </View>
             </Pressable>
           ))}
         </ScrollView>
 
-        {/* Quick actions */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.actionsGrid}>
-          <ActionCard
-            label={"\u10E1\u10D9\u10D0\u10DC\u10D8"}
-            emoji="📷"
-            onPress={() => {
-              const parent = nav.getParent();
-              if (parent) parent.navigate("ScanTab");
-            }}
-          />
-          <ActionCard
-            label={"\u10E1\u10DD\u10E4\u10D4\u10DA\u10D8"}
-            emoji="🏘️"
-            onPress={() => {
-              const parent = nav.getParent();
-              if (parent) parent.navigate("VillageTab");
-            }}
-          />
-          <ActionCard
-            label={"\u10E0\u10D4\u10E4\u10D4\u10E0\u10D0\u10DA\u10D8"}
-            emoji="🎁"
-            badge={promoCount > 0 ? promoCount : undefined}
-            onPress={() => nav.navigate("Referral")}
-          />
-          <ActionCard
-            label={"\u10E8\u10D4\u10D7\u10D0\u10D5\u10D0\u10D6\u10D4\u10D1\u10D8"}
-            emoji="🎫"
-            onPress={() => nav.navigate("Promos")}
-          />
-        </View>
-
-        {/* Wallet section */}
-        <Pressable onPress={() => nav.navigate("Wallet")} style={styles.walletCard}>
-          <View>
-            <Text style={styles.walletLabel}>Your Winnings</Text>
-            <Text style={styles.walletAmount}>₾ {cash.toFixed(2)}</Text>
+        {/* ── Today's Promo Inbox ── */}
+        <Pressable
+          onPress={() => {
+            setPromoSeenToday(true);
+            nav.navigate("Promos");
+          }}
+          style={({ pressed }) => [styles.promoCard, pressed && { transform: [{ scale: 0.98 }] }]}
+        >
+          <View style={styles.promoLeft}>
+            <Image source={require("../../../assets/trophy.png")} style={{ width: 36, height: 36 }} resizeMode="contain" />
+            <Text style={styles.promoText}>Today's Promo Inbox</Text>
           </View>
-          <Text style={styles.walletArrow}>→</Text>
+          {!promoSeenToday && promoCount > 0 && (
+            <View style={styles.promoBadge}>
+              <Text style={styles.promoBadgeText}>{promoCount}</Text>
+            </View>
+          )}
         </Pressable>
 
-        {/* Leaderboard link */}
-        <Pressable onPress={() => nav.navigate("Leaderboard")} style={styles.leaderboardCard}>
-          <Text style={{ fontSize: 28 }}>🏆</Text>
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.leaderboardTitle}>Leaderboard</Text>
-            <Text style={styles.leaderboardSub}>See top referrers</Text>
+        {/* ── Live Recent Wins ── */}
+        {recentWins.length > 0 && (
+          <View style={{ marginTop: 20 }}>
+            <View style={styles.liveHeader}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveTitle}>Live Wins</Text>
+            </View>
+            {recentWins.map((win) => (
+              <View key={win.id} style={styles.winRow}>
+                <View style={styles.winAvatar}>
+                  <Text style={styles.winAvatarText}>{win.name.charAt(0).toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.winName}>
+                    {win.name}
+                    <Text style={styles.winGame}> — {win.game}</Text>
+                  </Text>
+                </View>
+                <View style={styles.winCoinsWrap}>
+                  <Image source={require("../../../assets/coin-icon.png")} style={{ width: 14, height: 14 }} resizeMode="contain" />
+                  <Text style={styles.winCoins}>+{win.coins.toLocaleString()}</Text>
+                </View>
+                <Text style={styles.winTime}>{timeAgo(win.createdAt)}</Text>
+              </View>
+            ))}
           </View>
-          <Text style={styles.walletArrow}>→</Text>
-        </Pressable>
+        )}
 
         <View style={{ height: 24 }} />
       </ScrollView>
-    </View>
-  );
-}
 
-function ActionCard({
-  label, emoji, badge, onPress,
-}: {
-  label: string; emoji: string; badge?: number; onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={styles.actionCard}>
-      <View style={styles.actionIconWrap}>
-        <Text style={{ fontSize: 24 }}>{emoji}</Text>
-        {badge !== undefined && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badge}</Text>
-          </View>
-        )}
-      </View>
-      <Text style={styles.actionLabel}>{label}</Text>
-    </Pressable>
+      {/* ── Balance Modal ── */}
+      <Modal visible={showBalanceModal} transparent animationType="slide" onRequestClose={() => setShowBalanceModal(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowBalanceModal(false)}>
+          <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Select an Option</Text>
+            <View style={styles.modalOptions}>
+              {/* Exchange */}
+              <Pressable
+                style={({ pressed }) => [styles.modalOption, pressed && { opacity: 0.8 }]}
+                onPress={() => {
+                  setShowBalanceModal(false);
+                  setExchangeAmount("");
+                  setShowExchange(true);
+                }}
+              >
+                <View style={styles.modalOptionIconWhite}>
+                  <Text style={{ fontSize: 22 }}>⇄</Text>
+                </View>
+                <Text style={styles.modalOptionText}>Exchange</Text>
+              </Pressable>
+              {/* Redeem Balance */}
+              <Pressable
+                style={({ pressed }) => [styles.modalOption, pressed && { opacity: 0.8 }]}
+                onPress={() => {
+                  setShowBalanceModal(false);
+                  nav.navigate("Wallet");
+                }}
+              >
+                <View style={styles.modalOptionIconGray}>
+                  <Text style={{ fontSize: 22, color: "#999" }}>↗</Text>
+                </View>
+                <Text style={[styles.modalOptionText, { color: "#999" }]}>Redeem Balance</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── Exchange Modal ── */}
+      <Modal visible={showExchange} transparent animationType="slide" onRequestClose={() => setShowExchange(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowExchange(false)}>
+          <Pressable style={styles.exchangeSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Exchange</Text>
+
+            {/* Cash input */}
+            <View style={styles.exchangeRow}>
+              <Image source={require("../../../assets/lari-icon.png")} style={{ width: 50, height: 50 }} resizeMode="contain" />
+              <TextInput
+                value={exchangeAmount}
+                onChangeText={setExchangeAmount}
+                placeholder="0"
+                placeholderTextColor="#666"
+                keyboardType="decimal-pad"
+                style={styles.exchangeInput}
+              />
+              <Text style={styles.exchangeBalance}>Balance: {cash.toFixed(2)} ₾</Text>
+            </View>
+
+            {/* Arrow */}
+            <View style={{ alignItems: "center", paddingVertical: 8 }}>
+              <Text style={{ color: "#F9E741", fontSize: 20 }}>↓</Text>
+            </View>
+
+            {/* Coin output */}
+            <View style={[styles.exchangeRow, { marginBottom: 16 }]}>
+              <Image source={require("../../../assets/coin-icon.png")} style={{ width: 42, height: 42 }} resizeMode="contain" />
+              <Text style={styles.exchangeOutput}>
+                {exchangeAmount ? (parseFloat(exchangeAmount) * 100).toLocaleString() : "0"}
+              </Text>
+              <Text style={styles.exchangeBalance}>Coins</Text>
+            </View>
+
+            {/* Rate */}
+            <Text style={styles.exchangeRate}>1₾ Cash = 100 Coin</Text>
+
+            {/* Exchange button */}
+            <Pressable
+              onPress={handleExchange}
+              disabled={!exchangeAmount || parseFloat(exchangeAmount) <= 0 || parseFloat(exchangeAmount) > cash}
+              style={({ pressed }) => [
+                styles.exchangeButton,
+                (!exchangeAmount || parseFloat(exchangeAmount) <= 0) && { opacity: 0.4 },
+                pressed && { transform: [{ scale: 0.97 }] },
+              ]}
+            >
+              <Text style={styles.exchangeButtonText}>Exchange</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000000" },
   scroll: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 100 },
+
+  // Header
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     marginBottom: 24,
@@ -214,76 +347,159 @@ const styles = StyleSheet.create({
   balanceRow: { flexDirection: "row", gap: 8 },
   balancePill: {
     flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 9999,
     backgroundColor: "#1C1C1E",
   },
-  coinIcon: { fontSize: 18 },
-  cashIcon: { fontSize: 18, color: colors.gold, fontFamily: fonts.outfit.bold },
   balanceText: {
-    color: colors.white, fontSize: 14, fontFamily: fonts.outfit.bold,
+    color: "#FFFFFF", fontSize: 14, fontFamily: fonts.outfit.bold,
   },
   avatar: {
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: "#1C1C1E", alignItems: "center", justifyContent: "center",
+    width: 48, height: 48, borderRadius: 24, overflow: "hidden",
   },
-  avatarText: { fontSize: 20, color: colors.white },
+  avatarGradient: {
+    width: 48, height: 48, borderRadius: 24, overflow: "hidden",
+  },
+  avatarImage: {
+    width: 48, height: 48,
+  },
+
+  // Section title
   sectionTitle: {
-    color: colors.white, fontSize: 22, fontFamily: fonts.outfit.bold,
+    color: "#FFFFFF", fontSize: 22, fontFamily: fonts.outfit.bold,
     marginBottom: 16, marginTop: 8,
   },
+
+  // Games
   gamesRow: { paddingRight: 16, gap: 12, marginBottom: 24 },
   gameCard: {
     width: 130, height: 130, borderRadius: 36,
-    alignItems: "center", justifyContent: "flex-end",
-    padding: 14,
+    overflow: "hidden",
+  },
+  gameCardGradient: {
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 14, paddingBottom: 14, paddingTop: 30,
+    backgroundColor: "rgba(0,0,0,0.35)",
   },
   gameCardName: {
-    color: colors.white, fontSize: 13, fontFamily: fonts.outfit.semiBold,
-    textAlign: "center",
+    color: "#FFFFFF", fontSize: 16, fontFamily: fonts.outfit.bold,
   },
-  actionsGrid: {
-    flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 24,
+
+  // Promo inbox
+  promoCard: {
+    marginTop: 24,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 20, paddingVertical: 20,
+    borderRadius: 20,
+    backgroundColor: "#A8E06C",
   },
-  actionCard: {
-    width: (SCREEN_W - 32 - 12) / 2 - 0.5,
-    backgroundColor: "#1C1C1E",
-    borderRadius: radii.lg,
-    padding: 16,
-    alignItems: "flex-start",
+  promoLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  promoText: {
+    fontSize: 17, fontFamily: fonts.outfit.bold, color: "#1A1A1A",
   },
-  actionIconWrap: { position: "relative", marginBottom: 8 },
-  badge: {
-    position: "absolute", top: -4, right: -10,
-    backgroundColor: colors.error, borderRadius: 10,
-    minWidth: 18, height: 18, alignItems: "center", justifyContent: "center",
-    paddingHorizontal: 4,
+  promoBadge: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: "#EF4444",
+    alignItems: "center", justifyContent: "center",
   },
-  badgeText: { color: colors.white, fontSize: 10, fontFamily: fonts.outfit.bold },
-  actionLabel: {
-    color: colors.white, fontSize: 14, fontFamily: fonts.dmSans.medium,
+  promoBadgeText: {
+    color: "#FFFFFF", fontSize: 13, fontFamily: fonts.outfit.bold,
   },
-  walletCard: {
-    backgroundColor: "#1C1C1E", borderRadius: radii.lg,
-    padding: 20, flexDirection: "row", alignItems: "center",
-    justifyContent: "space-between", marginBottom: 12,
+
+  // Live Wins
+  liveHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#22C55E" },
+  liveTitle: { color: "#F1F5F9", fontSize: 14, fontFamily: fonts.outfit.bold },
+  winRow: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: 12, backgroundColor: "#141B2D",
+    marginBottom: 6,
   },
-  walletLabel: {
-    color: colors.textSecondary, fontSize: 13, fontFamily: fonts.dmSans.regular,
-    marginBottom: 4,
+  winAvatar: {
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: "#1C2539",
+    alignItems: "center", justifyContent: "center",
   },
-  walletAmount: {
-    color: colors.accent, fontSize: 24, fontFamily: fonts.outfit.bold,
+  winAvatarText: { color: "#F1F5F9", fontSize: 11, fontFamily: fonts.outfit.bold },
+  winName: { color: "#F1F5F9", fontSize: 13, fontFamily: fonts.dmSans.semiBold },
+  winGame: { color: "#64748B", fontFamily: fonts.dmSans.regular },
+  winCoinsWrap: { flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 },
+  winCoins: { color: "#FFE500", fontSize: 13, fontFamily: fonts.outfit.bold },
+  winTime: { color: "#475569", fontSize: 10, fontFamily: fonts.dmSans.regular },
+
+  // Balance Modal
+  modalOverlay: {
+    flex: 1, justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.4)",
   },
-  walletArrow: { color: colors.textSecondary, fontSize: 20 },
-  leaderboardCard: {
-    backgroundColor: "#1C1C1E", borderRadius: radii.lg,
-    padding: 16, flexDirection: "row", alignItems: "center",
+  modalSheet: {
+    backgroundColor: "rgba(50,50,50,0.55)",
+    borderTopLeftRadius: 36, borderTopRightRadius: 36,
+    paddingTop: 12, paddingBottom: 32, paddingHorizontal: 20,
   },
-  leaderboardTitle: {
-    color: colors.white, fontSize: 16, fontFamily: fonts.outfit.semiBold,
+  modalHandle: {
+    width: 36, height: 5, borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    alignSelf: "center", marginBottom: 20,
   },
-  leaderboardSub: {
-    color: colors.textSecondary, fontSize: 13, fontFamily: fonts.dmSans.regular,
-    marginTop: 2,
+  modalTitle: {
+    color: "#FFFFFF", fontSize: 20, fontFamily: fonts.outfit.bold,
+    textAlign: "center", marginBottom: 24,
+  },
+  modalOptions: { flexDirection: "row", gap: 12, marginBottom: 8 },
+  modalOption: {
+    flex: 1, alignItems: "center", gap: 12,
+    paddingVertical: 24, borderRadius: 28,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.12)",
+  },
+  modalOptionIconWhite: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center", justifyContent: "center",
+  },
+  modalOptionIconGray: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: "#3A3A3C",
+    alignItems: "center", justifyContent: "center",
+  },
+  modalOptionText: {
+    color: "#FFFFFF", fontSize: 14, fontFamily: fonts.dmSans.semiBold,
+  },
+
+  // Exchange Modal
+  exchangeSheet: {
+    backgroundColor: "rgba(30,30,30,0.55)",
+    borderTopLeftRadius: 36, borderTopRightRadius: 36,
+    paddingTop: 12, paddingBottom: 32, paddingHorizontal: 20,
+  },
+  exchangeRow: {
+    flexDirection: "row", alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+  exchangeInput: {
+    flex: 1, color: "#FFFFFF", fontSize: 22, fontFamily: fonts.outfit.bold,
+    marginLeft: 8, padding: 0,
+  },
+  exchangeOutput: {
+    flex: 1, color: "#FFFFFF", fontSize: 22, fontFamily: fonts.outfit.bold,
+    marginLeft: 8,
+  },
+  exchangeBalance: {
+    color: "#999", fontSize: 15, fontFamily: fonts.dmSans.semiBold,
+  },
+  exchangeRate: {
+    color: "#999", fontSize: 13, fontFamily: fonts.dmSans.regular,
+    textAlign: "center", marginBottom: 20,
+  },
+  exchangeButton: {
+    alignSelf: "center",
+    paddingHorizontal: 40, paddingVertical: 18,
+    borderRadius: 9999,
+    backgroundColor: "#F9E741",
+  },
+  exchangeButtonText: {
+    color: "#000000", fontSize: 16, fontFamily: fonts.outfit.bold,
   },
 });

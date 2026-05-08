@@ -391,3 +391,7 @@ export async function pollSimulation(jobId: string) {
 export async function getSimulationHistory() {
   return adminFetch("/admin/algorithm/simulate-history");
 }
+
+export async function getAnalytics(days = 30) {
+  return adminFetch(`/admin/analytics?days=${days}`);
+}

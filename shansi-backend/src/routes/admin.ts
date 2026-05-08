@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig, bigWinConfig, bigWinPrizes, bigWinHistory, villages, villageBuildings, userVillageProgress, offers, tickets } from "../db/schema.js";
+import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig, bigWinConfig, bigWinPrizes, bigWinHistory, villages, villageBuildings, userVillageProgress, offers, tickets, pageViews } from "../db/schema.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/errors.js";
@@ -2542,6 +2542,70 @@ admin.delete("/tickets/:id", adminMiddleware, async (c) => {
   await db.delete(tickets).where(eq(tickets.id, id));
   await logAction(adminId, "delete_ticket", JSON.stringify({ id }));
   return c.json({ success: true });
+});
+
+// ═══════════════════════════════════════
+// ANALYTICS — page view stats
+// ═══════════════════════════════════════
+
+admin.get("/analytics", adminMiddleware, async (c) => {
+  const db = getDb();
+  const days = parseInt(c.req.query("days") || "30", 10);
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+
+  // Total views
+  const [totalRow] = await (db as any).all(
+    sql`SELECT count(*) as total FROM page_views WHERE created_at >= ${since}`
+  );
+  // Views today
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const [todayRow] = await (db as any).all(
+    sql`SELECT count(*) as total FROM page_views WHERE created_at >= ${todayStart.toISOString()}`
+  );
+
+  // Views per day
+  const dailyRows = await (db as any).all(
+    sql`SELECT date(created_at) as day, count(*) as views FROM page_views WHERE created_at >= ${since} GROUP BY date(created_at) ORDER BY day DESC`
+  );
+
+  // Top referrers
+  const referrerRows = await (db as any).all(
+    sql`SELECT referrer, count(*) as views FROM page_views WHERE created_at >= ${since} AND referrer IS NOT NULL AND referrer != '' GROUP BY referrer ORDER BY views DESC LIMIT 20`
+  );
+
+  // UTM sources
+  const utmRows = await (db as any).all(
+    sql`SELECT utm_source, utm_medium, utm_campaign, count(*) as views FROM page_views WHERE created_at >= ${since} AND utm_source IS NOT NULL GROUP BY utm_source, utm_medium, utm_campaign ORDER BY views DESC LIMIT 20`
+  );
+
+  // Device breakdown
+  const deviceRows = await (db as any).all(
+    sql`SELECT device_type, count(*) as views FROM page_views WHERE created_at >= ${since} GROUP BY device_type ORDER BY views DESC`
+  );
+
+  // Top pages
+  const pageRows = await (db as any).all(
+    sql`SELECT path, count(*) as views FROM page_views WHERE created_at >= ${since} GROUP BY path ORDER BY views DESC LIMIT 10`
+  );
+
+  // Country breakdown
+  const countryRows = await (db as any).all(
+    sql`SELECT country, count(*) as views FROM page_views WHERE created_at >= ${since} AND country IS NOT NULL GROUP BY country ORDER BY views DESC LIMIT 15`
+  );
+
+  return c.json({
+    success: true,
+    analytics: {
+      totalViews: totalRow?.total || 0,
+      todayViews: todayRow?.total || 0,
+      daily: dailyRows,
+      referrers: referrerRows,
+      utm: utmRows,
+      devices: deviceRows,
+      pages: pageRows,
+      countries: countryRows,
+    },
+  });
 });
 
 export default admin;

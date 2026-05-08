@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { referralConfig, systemConfig, tickets, gameHistory, users } from "../db/schema.js";
+import { referralConfig, systemConfig, tickets, gameHistory, users, pageViews } from "../db/schema.js";
+import { nanoid } from "nanoid";
 import { desc, and, gt, sql } from "drizzle-orm";
 
 // Public endpoints (no auth required) — used by OG metadata / scrapers / share pages
@@ -124,6 +125,38 @@ publicRoute.get("/recent-wins", async (c) => {
   }));
 
   return c.json({ success: true, wins });
+});
+
+// POST /public/track — record a page view (no auth)
+publicRoute.post("/track", async (c) => {
+  try {
+    const body = await c.req.json();
+    const db = getDb();
+    const ua = c.req.header("user-agent") || "";
+    const country = c.req.header("cf-ipcountry") || c.req.header("x-vercel-ip-country") || null;
+
+    // Detect device type from user-agent
+    let deviceType = "desktop";
+    if (/mobile|android|iphone|ipod/i.test(ua)) deviceType = "mobile";
+    else if (/tablet|ipad/i.test(ua)) deviceType = "tablet";
+
+    await db.insert(pageViews).values({
+      id: nanoid(),
+      path: body.path || "/",
+      referrer: body.referrer || null,
+      utmSource: body.utm_source || null,
+      utmMedium: body.utm_medium || null,
+      utmCampaign: body.utm_campaign || null,
+      userAgent: ua.slice(0, 500),
+      country,
+      deviceType,
+      screenWidth: body.screenWidth || null,
+    });
+    return c.json({ success: true });
+  } catch (e: any) {
+    console.error("[track]", e.message);
+    return c.json({ success: true }); // never fail the client
+  }
 });
 
 export { publicRoute };

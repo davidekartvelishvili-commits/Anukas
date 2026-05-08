@@ -29,6 +29,24 @@ function AuthContent() {
   const [pinError, setPinError] = useState("");
   const pinRef = useRef<HTMLInputElement>(null);
 
+  // Track auth page view
+  useEffect(() => {
+    const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    const params = new URLSearchParams(window.location.search);
+    fetch(`${API}/public/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path: "/auth",
+        referrer: document.referrer || null,
+        utm_source: params.get("utm_source") || null,
+        utm_medium: params.get("utm_medium") || null,
+        utm_campaign: params.get("utm_campaign") || null,
+        screenWidth: window.innerWidth,
+      }),
+    }).catch(() => {});
+  }, []);
+
   // On mobile Safari autoFocus doesn't open keyboard —
   // so we make the phone input bar itself a big tap target
 

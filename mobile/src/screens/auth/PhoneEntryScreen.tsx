@@ -4,8 +4,9 @@ import {
   KeyboardAvoidingView, Platform, ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { RouteProp } from "@react-navigation/native";
 import { checkPhone, sendOtp } from "../../services/auth";
 import { colors, fonts, fontSize } from "../../config/theme";
 
@@ -20,6 +21,9 @@ const formatPhone = (raw: string) => {
 export default function PhoneEntryScreen() {
   const insets = useSafeAreaInsets();
   const nav = useNavigation<NativeStackNavigationProp<any>>();
+  const route = useRoute<RouteProp<{ PhoneEntry: { mode?: "login" | "signup" } }, "PhoneEntry">>();
+  const mode = route.params?.mode ?? "signup";
+  const isLogin = mode === "login";
   const inputRef = useRef<TextInput>(null);
   const [phone, setPhone] = useState("");
   const [focused, setFocused] = useState(false);
@@ -56,13 +60,17 @@ export default function PhoneEntryScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Create account</Text>
+        <Pressable onPress={() => nav.goBack()} style={styles.backButton}>
+          <Text style={styles.backText}>{"‹"}</Text>
+        </Pressable>
+        <Text style={styles.headerTitle}>{isLogin ? "Log in" : "Create account"}</Text>
+        <View style={styles.backButton} />
       </View>
 
       {/* Content */}
       <View style={styles.content}>
         <Text style={styles.title}>Enter your{"\n"}phone number</Text>
-        <Text style={styles.subtitle}>Used to create your account</Text>
+        <Text style={styles.subtitle}>{isLogin ? "Enter the number linked to your account" : "Used to create your account"}</Text>
 
         {/* Phone input pill */}
         <Pressable
@@ -115,7 +123,24 @@ export default function PhoneEntryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000000" },
-  header: { alignItems: "center", paddingVertical: 12 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backText: {
+    color: colors.white,
+    fontSize: 32,
+    lineHeight: 36,
+  },
   headerTitle: {
     color: colors.white,
     fontSize: fontSize.md + 1,

@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import MainTabNavigator from "./MainTabNavigator";
+import WelcomeScreen from "../screens/auth/WelcomeScreen";
 import PhoneEntryScreen from "../screens/auth/PhoneEntryScreen";
 import OtpVerifyScreen from "../screens/auth/OtpVerifyScreen";
 import PinSetupScreen from "../screens/auth/PinSetupScreen";
@@ -33,6 +34,7 @@ export default function RootNavigator() {
         <Stack.Screen name="Main" component={MainTabNavigator} />
       ) : (
         <>
+          <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="PhoneEntry" component={PhoneEntryScreen} />
           <Stack.Screen name="OtpVerify" component={OtpVerifyScreen} />
           <Stack.Screen name="PinSetup" component={PinSetupScreen} />

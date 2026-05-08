@@ -469,3 +469,21 @@ export const simulationRuns = sqliteTable("simulation_runs", {
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
   completedAt: text("completed_at"),
 });
+
+// ═══════════════════════════════════════
+// PAGE VIEWS — lightweight analytics
+// ═══════════════════════════════════════
+
+export const pageViews = sqliteTable("page_views", {
+  id: text("id").primaryKey(),
+  path: text("path").notNull(),              // e.g. "/"
+  referrer: text("referrer"),                // where visitor came from
+  utmSource: text("utm_source"),             // ?utm_source=
+  utmMedium: text("utm_medium"),             // ?utm_medium=
+  utmCampaign: text("utm_campaign"),         // ?utm_campaign=
+  userAgent: text("user_agent"),
+  country: text("country"),                  // from CF header if available
+  deviceType: text("device_type"),           // mobile | desktop | tablet
+  screenWidth: integer("screen_width"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});

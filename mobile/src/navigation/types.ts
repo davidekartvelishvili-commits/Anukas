@@ -2,7 +2,8 @@ import type { NavigatorScreenParams } from "@react-navigation/native";
 
 // ── Auth Stack ──
 export type AuthStackParamList = {
-  PhoneEntry: undefined;
+  Welcome: undefined;
+  PhoneEntry: { mode?: "login" | "signup" };
   OtpVerify: { phone: string };
   PinSetup: { phone: string; token: string };
   PinLogin: { phone: string };
