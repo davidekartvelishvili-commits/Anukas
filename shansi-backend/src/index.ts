@@ -253,6 +253,21 @@ async function runStartupMigrations() {
     sql`CREATE INDEX IF NOT EXISTS idx_attack_sessions_attacker ON attack_sessions(attacker_id, created_at)`,
     sql`CREATE INDEX IF NOT EXISTS idx_attack_sessions_defender ON attack_sessions(defender_id, created_at)`,
     sql`CREATE INDEX IF NOT EXISTS idx_attack_attempts_session ON attack_attempts(attack_session_id)`,
+    // ── Page views analytics ──
+    sql`CREATE TABLE IF NOT EXISTS page_views (
+      id TEXT PRIMARY KEY,
+      path TEXT NOT NULL,
+      referrer TEXT,
+      utm_source TEXT,
+      utm_medium TEXT,
+      utm_campaign TEXT,
+      user_agent TEXT,
+      country TEXT,
+      device_type TEXT,
+      screen_width INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    sql`CREATE INDEX IF NOT EXISTS idx_page_views_created ON page_views(created_at)`,
   ];
   for (const s of statements) {
     try { await (db as any).run(s); } catch (e: any) {

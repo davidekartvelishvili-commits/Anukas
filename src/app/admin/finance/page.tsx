@@ -42,6 +42,7 @@ const NAV_ITEMS = [
   { label: "Withdrawals", id: "withdrawals", href: "/admin/withdrawals" },
   { label: "Finance", id: "finance", href: "/admin/finance" },
   { label: "Village", id: "village", href: "/admin/village" },
+  { label: "Analytics", id: "analytics", href: "/admin/analytics" },
   { label: "System", id: "system", href: "/admin/system" },
 ];
 

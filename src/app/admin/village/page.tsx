@@ -25,7 +25,7 @@ function NavIcon({ id, active }: { id: string; active: boolean }) {
     withdrawals: <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14V4M5 8l4-4 4 4" /></svg>,
     finance: <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 16V8l3-2 4 3 3-4 4 3v8" /></svg>,
     village: <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 16V8l7-5.5L16 8v8" /><path d="M6 16v-4h6v4" /></svg>,
-    system: <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="9" r="2.5" /><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2" /></svg>,
+    analytics: <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2,14 6,8 10,11 16,4" /><polyline points="12,4 16,4 16,8" /></svg>,    system: <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="9" r="2.5" /><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2" /></svg>,
   };
   return icons[id] || null;
 }
@@ -45,6 +45,7 @@ const NAV_ITEMS = [
   { label: "Withdrawals", id: "withdrawals", href: "/admin/withdrawals" },
   { label: "Finance", id: "finance", href: "/admin/finance" },
   { label: "Village", id: "village", href: "/admin/village" },
+  { label: "Analytics", id: "analytics", href: "/admin/analytics" },
   { label: "System", id: "system", href: "/admin/system" },
 ];
 const CURRENT = "village";
