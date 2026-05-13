@@ -143,7 +143,7 @@ function FeatureIcon({ name, size = 28 }: { name: string; size?: number }) {
 
 /* ───────── MAIN PAGE ───────── */
 
-export default function LandingPage() {
+export default function SecondLandingPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [scrollY, setScrollY] = useState(0);
