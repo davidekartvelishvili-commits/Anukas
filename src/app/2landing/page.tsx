@@ -399,6 +399,21 @@ export default function SecondLandingPage() {
                 </div>
               )}
             </div>
+
+            {/* Tagline below video */}
+            <p
+              className="text-center mt-10 md:mt-14 px-4"
+              style={{
+                fontFamily: "'DachiTheLynx', var(--font-outfit)",
+                fontWeight: 700,
+                fontStyle: "italic",
+                fontSize: "clamp(24px, 4vw, 44px)",
+                color: "#1a1a2e",
+                lineHeight: 1.3,
+              }}
+            >
+              ისიამოვნე ყოველი მომენტით, SHANSI შენს მხარესაა.
+            </p>
           </div>
         </section>
 
