@@ -83,6 +83,14 @@ export default function SecondLandingPage() {
           overflow-x: hidden;
         }
 
+        @font-face {
+          font-family: 'DachiTheLynx';
+          src: url('/fonts/DachiTheLynx.otf') format('opentype');
+          font-weight: normal;
+          font-style: normal;
+          font-display: swap;
+        }
+
         @keyframes floatBob {
           0%, 100% { transform: translateY(0) rotate(var(--rot)); }
           50%      { transform: translateY(-18px) rotate(var(--rot)); }
@@ -273,7 +281,7 @@ export default function SecondLandingPage() {
               <h1
                 className={`text-[#1A1A1A] leading-[0.95] tracking-[-0.03em] ${mounted ? "hero-in-d1" : "opacity-0"}`}
                 style={{
-                  fontFamily: "var(--font-outfit)",
+                  fontFamily: "'DachiTheLynx', var(--font-outfit)",
                   fontWeight: 900,
                   fontStyle: "italic",
                   fontSize: "clamp(40px, 8.5vw, 84px)",
@@ -284,7 +292,7 @@ export default function SecondLandingPage() {
               <h2
                 className={`text-[#1A1A1A] leading-[1.0] tracking-[-0.02em] mt-2 ${mounted ? "hero-in-d2" : "opacity-0"}`}
                 style={{
-                  fontFamily: "var(--font-outfit)",
+                  fontFamily: "'DachiTheLynx', var(--font-outfit)",
                   fontWeight: 900,
                   fontStyle: "italic",
                   fontSize: "clamp(34px, 7vw, 72px)",
