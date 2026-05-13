@@ -23,8 +23,8 @@ const FLOATING_ITEMS = [
   { src: "/images/onboarding/sneaker.png",       left: "70%",  top: "64%",  size: 200, rotate: -18, delay: 0.8,  duration: 6.6 },
   // Far-left edge: building
   { src: "/images/onboarding/building.png",      left: "-5%",  top: "48%",  size: 180, rotate: 5,   delay: 1.2,  duration: 5.5 },
-  // Bottom-left: suitcase
-  { src: "/images/onboarding/suitcase.png",      left: "10%",  top: "74%",  size: 200, rotate: -6,  delay: 0.6,  duration: 6.0 },
+  // Bottom-left: ali-nino
+  { src: "/images/onboarding/ali-nino.png",      left: "10%",  top: "74%",  size: 180, rotate: -6,  delay: 0.6,  duration: 6.0 },
 ];
 
 /* ───────── MERCHANT TICKER DATA ───────── */
@@ -314,8 +314,42 @@ export default function SecondLandingPage() {
         </section>
 
         {/* ═══════════ VIDEO SECTION — right below hero, like coverd ═══════════ */}
-        <section className="relative z-30 px-6 md:px-10 -mt-4" style={{ background: "transparent" }}>
-          <div className="max-w-[1200px] mx-auto">
+        <section className="relative z-30 px-6 md:px-10 -mt-12" style={{ background: "transparent" }}>
+          <div className="max-w-[1200px] mx-auto relative">
+            {/* Suitcase overlapping top-left of video */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/onboarding/suitcase.png"
+              alt=""
+              width={180}
+              height={180}
+              className="absolute pointer-events-none select-none hidden md:block"
+              style={{
+                left: -60,
+                top: -70,
+                zIndex: 40,
+                transform: "rotate(-6deg)",
+                filter: "drop-shadow(0 10px 25px rgba(0,0,0,0.12))",
+              }}
+              draggable={false}
+            />
+            {/* Golfball overlapping bottom-right of video */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/onboarding/golfball.png"
+              alt=""
+              width={150}
+              height={150}
+              className="absolute pointer-events-none select-none hidden md:block"
+              style={{
+                right: -40,
+                bottom: -60,
+                zIndex: 40,
+                transform: "rotate(12deg)",
+                filter: "drop-shadow(0 10px 25px rgba(0,0,0,0.12))",
+              }}
+              draggable={false}
+            />
             <div
               className="relative overflow-hidden cursor-pointer"
               style={{
