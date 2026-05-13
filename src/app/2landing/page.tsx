@@ -10,7 +10,7 @@ const FLOATING_ITEMS = [
   // Top-left: airplane — large, angled, partially off left edge
   { src: "/images/onboarding/airplane.png",      left: "2%",   top: "10%",  size: 220, rotate: -20, delay: 0.2,  duration: 6.0 },
   // Top-center: stethoscope
-  { src: "/images/onboarding/stethoscope.png",   left: "28%",  top: "-2%",  size: 130, rotate: 10,  delay: 0,    duration: 5.6 },
+  { src: "/images/onboarding/stethoscope.png",   left: "28%",  top: "-5%",  size: 85,  rotate: 10,  delay: 0,    duration: 5.6 },
   // Top-right: cards
   { src: "/images/onboarding/cards.png",         left: "60%",  top: "5%",   size: 190, rotate: -12, delay: 0.6,  duration: 6.4 },
   // Right: piggy bank
@@ -279,7 +279,7 @@ export default function SecondLandingPage() {
                   fontSize: "clamp(40px, 8.5vw, 84px)",
                 }}
               >
-                Buy Now, Win Maybe
+                გამოიყენე SHANSI
               </h1>
               <h2
                 className={`text-[#1A1A1A] leading-[1.0] tracking-[-0.02em] mt-2 ${mounted ? "hero-in-d2" : "opacity-0"}`}
