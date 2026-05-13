@@ -316,40 +316,42 @@ export default function SecondLandingPage() {
         {/* ═══════════ VIDEO SECTION — right below hero, like coverd ═══════════ */}
         <section className="relative z-30 px-6 md:px-10 -mt-12" style={{ background: "transparent" }}>
           <div className="max-w-[1200px] mx-auto relative">
-            {/* Suitcase overlapping top-left of video */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/onboarding/suitcase.png"
-              alt=""
-              width={180}
-              height={180}
+            {/* Suitcase overlapping top-left of video — floating */}
+            <div
               className="absolute pointer-events-none select-none hidden md:block"
               style={{
                 left: -60,
                 top: -70,
+                width: 180,
+                height: 180,
                 zIndex: 40,
-                transform: "rotate(-6deg)",
+                // @ts-expect-error CSS custom property
+                "--rot": "-6deg",
+                animation: "floatBob 6s ease-in-out infinite",
                 filter: "drop-shadow(0 10px 25px rgba(0,0,0,0.12))",
               }}
-              draggable={false}
-            />
-            {/* Golfball overlapping bottom-right of video — half on video */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/onboarding/golfball.png"
-              alt=""
-              width={100}
-              height={100}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/onboarding/suitcase.png" alt="" width={180} height={180} className="w-full h-full object-contain" draggable={false} />
+            </div>
+            {/* Golfball overlapping bottom-right of video — half on, floating */}
+            <div
               className="absolute pointer-events-none select-none hidden md:block"
               style={{
-                right: -30,
-                bottom: -40,
+                right: -20,
+                bottom: -50,
+                width: 110,
+                height: 110,
                 zIndex: 40,
-                transform: "rotate(12deg)",
+                // @ts-expect-error CSS custom property
+                "--rot": "12deg",
+                animation: "floatBob 5.5s ease-in-out 0.8s infinite",
                 filter: "drop-shadow(0 10px 25px rgba(0,0,0,0.12))",
               }}
-              draggable={false}
-            />
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/onboarding/golfball.png" alt="" width={110} height={110} className="w-full h-full object-contain" draggable={false} />
+            </div>
             <div
               className="relative overflow-hidden cursor-pointer"
               style={{
