@@ -24,7 +24,7 @@ const FLOATING_ITEMS = [
   // Far-left edge: building
   { src: "/images/onboarding/building.png",      left: "-5%",  top: "48%",  size: 180, rotate: 5,   delay: 1.2,  duration: 5.5 },
   // Bottom-left: ali-nino
-  { src: "/images/onboarding/ali-nino.png",      left: "10%",  top: "74%",  size: 180, rotate: -6,  delay: 0.6,  duration: 6.0 },
+  { src: "/images/onboarding/ali-nino.png",      left: "22%",  top: "78%",  size: 160, rotate: -6,  delay: 0.6,  duration: 6.0 },
 ];
 
 /* ───────── MERCHANT TICKER DATA ───────── */
@@ -333,17 +333,17 @@ export default function SecondLandingPage() {
               }}
               draggable={false}
             />
-            {/* Golfball overlapping bottom-right of video */}
+            {/* Golfball overlapping bottom-right of video — half on video */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/onboarding/golfball.png"
               alt=""
-              width={150}
-              height={150}
+              width={100}
+              height={100}
               className="absolute pointer-events-none select-none hidden md:block"
               style={{
-                right: -40,
-                bottom: -60,
+                right: -30,
+                bottom: -40,
                 zIndex: 40,
                 transform: "rotate(12deg)",
                 filter: "drop-shadow(0 10px 25px rgba(0,0,0,0.12))",
@@ -402,7 +402,7 @@ export default function SecondLandingPage() {
 
             {/* Tagline below video */}
             <p
-              className="text-center mt-10 md:mt-14 px-4"
+              className="text-center mt-16 md:mt-20 px-4"
               style={{
                 fontFamily: "'DachiTheLynx', var(--font-outfit)",
                 fontWeight: 700,
