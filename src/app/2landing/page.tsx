@@ -17,10 +17,10 @@ const FLOATING_ITEMS = [
   { src: "/images/onboarding/piggy-bank-pink.png",    left: "82%",  top: "14%",  size: 260, rotate: 15,  delay: 0.4,  duration: 5.8 },
   // Center-left below headline: sushi — smaller
   { src: "/images/onboarding/sushi.png",         left: "18%",  top: "50%",  size: 140, rotate: -8,  delay: 1.0,  duration: 6.2 },
-  // Center-right: ring — pushed further right/down, away from text
-  { src: "/images/onboarding/ring.png",          left: "65%",  top: "56%",  size: 130, rotate: 20,  delay: 1.4,  duration: 5.4 },
-  // Bottom-right: sneaker — smaller
-  { src: "/images/onboarding/sneaker.png",       left: "70%",  top: "55%",  size: 240, rotate: -18, delay: 0.8,  duration: 6.6 },
+  // Center-right: ring — more center and lower
+  { src: "/images/onboarding/ring.png",          left: "55%",  top: "62%",  size: 130, rotate: 20,  delay: 1.4,  duration: 5.4 },
+  // Bottom-right: sneaker — moved lower
+  { src: "/images/onboarding/sneaker.png",       left: "70%",  top: "64%",  size: 240, rotate: -18, delay: 0.8,  duration: 6.6 },
   // Far-left edge: building — partially cut off
   { src: "/images/onboarding/building.png",      left: "-5%",  top: "48%",  size: 220, rotate: 5,   delay: 1.2,  duration: 5.5 },
   // Bottom-left: suitcase — moved lower
@@ -139,7 +139,21 @@ export default function SecondLandingPage() {
               </span>
             </div>
 
-            {/* CTA button only — no nav links, matching coverd */}
+            {/* Center nav links — matching coverd */}
+            <div className="hidden md:flex items-center gap-8">
+              {["Home", "About", "Careers", "Support"].map((link, i) => (
+                <button
+                  key={link}
+                  onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                  className={`text-[15px] font-semibold text-[#1A1A1A] transition-colors hover:text-[#1A1A1A]/70 ${i === 0 ? "px-4 py-1.5 border border-[#1A1A1A] rounded-full" : ""}`}
+                  style={{ fontFamily: "var(--font-outfit)" }}
+                >
+                  {link}
+                </button>
+              ))}
+            </div>
+
+            {/* CTA button */}
             <button
               onClick={() => router.push("/auth")}
               className="px-7 py-3 rounded-full text-[15px] font-bold text-white transition-all duration-200 hover:scale-[1.04] active:scale-[0.96]"
@@ -271,7 +285,7 @@ export default function SecondLandingPage() {
                   fontSize: "clamp(34px, 7vw, 72px)",
                 }}
               >
-                We got you Shansi&apos;d
+                აქციე ხარჯი მოგებად
               </h2>
             </div>
           </div>
