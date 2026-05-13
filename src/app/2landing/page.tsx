@@ -8,23 +8,23 @@ import { useRouter } from "next/navigation";
 
 const FLOATING_ITEMS = [
   // Top-left: airplane — large, angled, partially off left edge
-  { src: "/images/onboarding/airplane.png",      left: "2%",   top: "10%",  size: 280, rotate: -20, delay: 0.2,  duration: 6.0 },
-  // Top-center: stethoscope — peeking from top, overlapping navbar
-  { src: "/images/onboarding/stethoscope.png",   left: "28%",  top: "-2%",  size: 160, rotate: 10,  delay: 0,    duration: 5.6 },
-  // Top-right: cards — tilted, right side
-  { src: "/images/onboarding/cards.png",         left: "60%",  top: "5%",   size: 240, rotate: -12, delay: 0.6,  duration: 6.4 },
-  // Right: piggy bank — far right, partially off-screen
-  { src: "/images/onboarding/piggy-bank-pink.png",    left: "82%",  top: "14%",  size: 260, rotate: 15,  delay: 0.4,  duration: 5.8 },
-  // Center-left below headline: sushi — smaller
-  { src: "/images/onboarding/sushi.png",         left: "18%",  top: "50%",  size: 140, rotate: -8,  delay: 1.0,  duration: 6.2 },
-  // Center-right: ring — more center and lower
-  { src: "/images/onboarding/ring.png",          left: "55%",  top: "62%",  size: 130, rotate: 20,  delay: 1.4,  duration: 5.4 },
-  // Bottom-right: sneaker — moved lower
-  { src: "/images/onboarding/sneaker.png",       left: "70%",  top: "64%",  size: 240, rotate: -18, delay: 0.8,  duration: 6.6 },
-  // Far-left edge: building — partially cut off
-  { src: "/images/onboarding/building.png",      left: "-5%",  top: "48%",  size: 220, rotate: 5,   delay: 1.2,  duration: 5.5 },
-  // Bottom-left: suitcase — moved lower
-  { src: "/images/onboarding/suitcase.png",      left: "10%",  top: "74%",  size: 240, rotate: -6,  delay: 0.6,  duration: 6.0 },
+  { src: "/images/onboarding/airplane.png",      left: "2%",   top: "10%",  size: 220, rotate: -20, delay: 0.2,  duration: 6.0 },
+  // Top-center: stethoscope
+  { src: "/images/onboarding/stethoscope.png",   left: "28%",  top: "-2%",  size: 130, rotate: 10,  delay: 0,    duration: 5.6 },
+  // Top-right: cards
+  { src: "/images/onboarding/cards.png",         left: "60%",  top: "5%",   size: 190, rotate: -12, delay: 0.6,  duration: 6.4 },
+  // Right: piggy bank
+  { src: "/images/onboarding/piggy-bank-pink.png",    left: "82%",  top: "14%",  size: 210, rotate: 15,  delay: 0.4,  duration: 5.8 },
+  // Center-left below headline: sushi
+  { src: "/images/onboarding/sushi.png",         left: "18%",  top: "50%",  size: 120, rotate: -8,  delay: 1.0,  duration: 6.2 },
+  // Center-right: ring
+  { src: "/images/onboarding/ring.png",          left: "55%",  top: "62%",  size: 110, rotate: 20,  delay: 1.4,  duration: 5.4 },
+  // Bottom-right: sneaker
+  { src: "/images/onboarding/sneaker.png",       left: "70%",  top: "64%",  size: 200, rotate: -18, delay: 0.8,  duration: 6.6 },
+  // Far-left edge: building
+  { src: "/images/onboarding/building.png",      left: "-5%",  top: "48%",  size: 180, rotate: 5,   delay: 1.2,  duration: 5.5 },
+  // Bottom-left: suitcase
+  { src: "/images/onboarding/suitcase.png",      left: "10%",  top: "74%",  size: 200, rotate: -6,  delay: 0.6,  duration: 6.0 },
 ];
 
 /* ───────── MERCHANT TICKER DATA ───────── */
@@ -140,13 +140,18 @@ export default function SecondLandingPage() {
             </div>
 
             {/* Center nav links — matching coverd */}
-            <div className="hidden md:flex items-center gap-8">
+            <div className="hidden md:flex items-center gap-6">
               {["Home", "About", "Careers", "Support"].map((link, i) => (
                 <button
                   key={link}
                   onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-                  className={`text-[15px] font-semibold text-[#1A1A1A] transition-colors hover:text-[#1A1A1A]/70 ${i === 0 ? "px-4 py-1.5 border border-[#1A1A1A] rounded-full" : ""}`}
-                  style={{ fontFamily: "var(--font-outfit)" }}
+                  className="text-[15px] font-semibold text-[#1A1A1A] px-5 py-1.5 rounded-full transition-all duration-200"
+                  style={{
+                    fontFamily: "var(--font-outfit)",
+                    border: i === 0 ? "2px solid #1A1A1A" : "2px solid transparent",
+                  }}
+                  onMouseEnter={(e) => { if (i !== 0) e.currentTarget.style.border = "2px solid #1A1A1A"; }}
+                  onMouseLeave={(e) => { if (i !== 0) e.currentTarget.style.border = "2px solid transparent"; }}
                 >
                   {link}
                 </button>
