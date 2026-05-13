@@ -311,8 +311,24 @@ export default function SecondLandingPage() {
 
         </section>
 
+        {/* ═══════════ VIDEO SECTION — right below hero, like coverd ═══════════ */}
+        <section className="relative z-30 px-6 md:px-10 -mt-4" style={{ background: "transparent" }}>
+          <div className="max-w-[1300px] mx-auto">
+            <div className="rounded-3xl overflow-hidden" style={{ boxShadow: "0 12px 50px rgba(0,0,0,0.15)" }}>
+              <video
+                src="/images/shansi-demo.mp4"
+                controls
+                playsInline
+                preload="metadata"
+                className="w-full h-auto"
+                style={{ display: "block" }}
+              />
+            </div>
+          </div>
+        </section>
+
         {/* ═══════════ MERCHANT TICKER ═══════════ */}
-        <div className="relative z-30 w-full overflow-hidden py-5" style={{ background: "#1A1A1A" }}>
+        <div className="relative z-30 w-full overflow-hidden py-5 mt-10" style={{ background: "#1A1A1A" }}>
           <div className="flex ticker-track" style={{ width: "200%" }}>
             {[...MERCHANTS, ...MERCHANTS, ...MERCHANTS, ...MERCHANTS].map((m, i) => (
               <div key={i} className="flex items-center gap-3 px-8 shrink-0">
@@ -338,22 +354,6 @@ export default function SecondLandingPage() {
             ))}
           </div>
         </div>
-
-        {/* ═══════════ VIDEO SECTION ═══════════ */}
-        <section className="py-16 md:py-24 px-6" style={{ background: "#FFFDF0" }}>
-          <div className="max-w-[800px] mx-auto">
-            <div className="rounded-3xl overflow-hidden" style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.10)" }}>
-              <video
-                src="/images/shansi-demo.mp4"
-                controls
-                playsInline
-                preload="metadata"
-                className="w-full h-auto"
-                style={{ display: "block" }}
-              />
-            </div>
-          </div>
-        </section>
 
         {/* ═══════════ HOW IT WORKS ═══════════ */}
         <section className="py-20 md:py-28 px-6" style={{ background: "#FFFDF0" }}>
