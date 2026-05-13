@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 /* ───────── 3D FLOATING ITEMS — matching coverd.us positions exactly ───────── */
@@ -45,6 +45,8 @@ const MERCHANTS = [
 export default function SecondLandingPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [videoPlaying, setVideoPlaying] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -314,15 +316,54 @@ export default function SecondLandingPage() {
         {/* ═══════════ VIDEO SECTION — right below hero, like coverd ═══════════ */}
         <section className="relative z-30 px-6 md:px-10 -mt-4" style={{ background: "transparent" }}>
           <div className="max-w-[1300px] mx-auto">
-            <div className="rounded-3xl overflow-hidden" style={{ boxShadow: "0 12px 50px rgba(0,0,0,0.15)" }}>
+            <div
+              className="relative overflow-hidden cursor-pointer"
+              style={{
+                borderRadius: 20,
+                boxShadow: "0 12px 50px rgba(0,0,0,0.15)",
+                maxHeight: "55vh",
+              }}
+              onClick={() => {
+                if (videoRef.current) {
+                  if (videoPlaying) {
+                    videoRef.current.pause();
+                    setVideoPlaying(false);
+                  } else {
+                    videoRef.current.play();
+                    setVideoPlaying(true);
+                  }
+                }
+              }}
+            >
               <video
+                ref={videoRef}
                 src="/images/shansi-demo.mp4"
-                controls
                 playsInline
                 preload="metadata"
-                className="w-full h-auto"
-                style={{ display: "block" }}
+                controls={videoPlaying}
+                className="w-full"
+                style={{ display: "block", objectFit: "cover", height: "55vh" }}
+                onEnded={() => setVideoPlaying(false)}
               />
+              {/* Play button overlay */}
+              {!videoPlaying && (
+                <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.25)" }}>
+                  <div
+                    className="flex items-center justify-center transition-transform duration-200 hover:scale-110"
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: "50%",
+                      background: "#F9E741",
+                      boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+                    }}
+                  >
+                    <svg width="32" height="36" viewBox="0 0 32 36" fill="none">
+                      <path d="M30 18L2 34V2L30 18Z" fill="#1A1A1A" />
+                    </svg>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </section>
