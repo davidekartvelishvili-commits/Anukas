@@ -1,155 +1,42 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-/* ───────── MERCHANT DATA (like Coverd's transaction cards) ───────── */
+/* ───────── FLOATING EMOJI ITEMS ───────── */
 
-const TRANSACTIONS = [
-  { name: "Stamba Hotel", amount: "₾120", icon: "/images/stamba-logo.png" },
-  { name: "Dunkin'", amount: "₾18", icon: "/images/dunkin-logo.jpg" },
-  { name: "Wendy's", amount: "₾32", icon: "/images/wendys-logo.png" },
+const FLOATING_ITEMS = [
+  { emoji: "☕", left: "4%",  top: "12%", size: 90,  rotate: -18, delay: 0,    duration: 5.5 },
+  { emoji: "🍺", left: "82%", top: "8%",  size: 100, rotate: 12,  delay: 0.8,  duration: 6.2 },
+  { emoji: "🍕", left: "88%", top: "55%", size: 85,  rotate: -25, delay: 1.6,  duration: 5.8 },
+  { emoji: "🛍️", left: "7%",  top: "60%", size: 95,  rotate: 15,  delay: 0.4,  duration: 6.5 },
+  { emoji: "🎮", left: "90%", top: "32%", size: 80,  rotate: -8,  delay: 2.0,  duration: 5.2 },
+  { emoji: "💰", left: "2%",  top: "38%", size: 105, rotate: 20,  delay: 1.2,  duration: 6.8 },
+  { emoji: "🎁", left: "78%", top: "75%", size: 88,  rotate: -14, delay: 0.6,  duration: 5.6 },
+  { emoji: "🪙", left: "15%", top: "80%", size: 75,  rotate: 28,  delay: 1.8,  duration: 6.0 },
+  { emoji: "🎰", left: "45%", top: "5%",  size: 70,  rotate: -10, delay: 2.4,  duration: 5.4 },
+  { emoji: "🏆", left: "35%", top: "82%", size: 78,  rotate: 8,   delay: 1.0,  duration: 6.3 },
 ];
 
-/* ───────── FEATURE ITEMS ───────── */
+/* ───────── MERCHANT TICKER DATA ───────── */
 
-const FEATURES = [
-  {
-    icon: "wallet",
-    title: "Up to 100% Cashback",
-    titleGe: "100%-მდე ქეშბექი",
-    desc: "Win back the full amount of your purchases through games.",
-  },
-  {
-    icon: "scan",
-    title: "Zero Hidden Fees",
-    titleGe: "დამალული საკომისიოების გარეშე",
-    desc: "Transparent. No subscriptions, no catches.",
-  },
-  {
-    icon: "flame",
-    title: "Smart Insights",
-    titleGe: "ჭკვიანი ანალიტიკა",
-    desc: "Track spending habits, build better financial routines.",
-  },
-  {
-    icon: "game",
-    title: "Automatic Game Entries",
-    titleGe: "ავტომატური თამაშის შესვლა",
-    desc: "Every purchase is a chance to win it back. Play instantly.",
-  },
+const MERCHANTS = [
+  { name: "Lui Coffee",    amount: "₾8"   },
+  { name: "Coffee LAB",    amount: "₾12"  },
+  { name: "Wendy's",       amount: "₾32"  },
+  { name: "Dunkin'",       amount: "₾18"  },
+  { name: "Stamba Hotel",  amount: "₾120" },
+  { name: "Entree",        amount: "₾45"  },
+  { name: "Rooms Hotel",   amount: "₾95"  },
+  { name: "Lolita",        amount: "₾28"  },
 ];
-
-/* ───────── GAME COVERS ───────── */
-
-const GAMES = [
-  { name: "Midnight Machine", cover: "/images/onboarding/slot-machine.mp4", type: "video" },
-  { name: "Chicken Rush", cover: "/images/lucky-step-cover.png", type: "image" },
-  { name: "Lucky Drop", cover: "/images/lucky-drop-cover.png", type: "image" },
-  { name: "Air Hockey", cover: "/images/air-hockey-cover.png", type: "image" },
-];
-
-/* ───────── FLOATING ITEMS (for hero background) ───────── */
-
-const FLOAT_ITEMS = [
-  "/images/onboarding/sushi.png",
-  "/images/onboarding/sneaker.png",
-  "/images/onboarding/piggy-bank.png",
-  "/images/onboarding/airplane.png",
-  "/images/onboarding/ring.png",
-  "/images/onboarding/cards.png",
-  "/images/onboarding/suitcase.png",
-  "/images/onboarding/building.png",
-];
-
-/* ───────── ICON COMPONENT (inline) ───────── */
-
-function FeatureIcon({ name, size = 28 }: { name: string; size?: number }) {
-  const props = {
-    width: size,
-    height: size,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "#00E88F",
-    strokeWidth: 1.8,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-
-  switch (name) {
-    case "wallet":
-      return (
-        <svg {...props}>
-          <rect x="2" y="6" width="20" height="14" rx="2" />
-          <path d="M2 10h20" />
-          <path d="M22 6V5a2 2 0 00-2-2H6a4 4 0 00-4 4" />
-          <circle cx="18" cy="14" r="1" fill="#00E88F" stroke="none" />
-        </svg>
-      );
-    case "scan":
-      return (
-        <svg {...props}>
-          <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M3 17v2a2 2 0 002 2h2M17 21h2a2 2 0 002-2v-2" />
-          <path d="M7 12h10" strokeWidth="2.5" />
-          <path d="M12 7v10" strokeWidth="2.5" />
-        </svg>
-      );
-    case "flame":
-      return (
-        <svg {...props} fill="#00E88F" fillOpacity="0.2">
-          <path d="M12 2c.5 4-2.5 6-2.5 10a5 5 0 0010 0c0-4-3-5.5-2.5-10a7.4 7.4 0 01-5 0z" />
-          <path d="M12 18a2.5 2.5 0 002.5-2.5c0-2-2.5-3-2.5-5-.5 1.5-2.5 2.5-2.5 5A2.5 2.5 0 0012 18z" fill="#00E88F" fillOpacity="0.4" />
-        </svg>
-      );
-    case "game":
-      return (
-        <svg {...props}>
-          <rect x="2" y="6" width="20" height="12" rx="4" />
-          <circle cx="8" cy="12" r="1.5" fill="#00E88F" stroke="none" />
-          <circle cx="16" cy="10" r="1" fill="#00E88F" stroke="none" />
-          <circle cx="16" cy="14" r="1" fill="#00E88F" stroke="none" />
-          <circle cx="14" cy="12" r="1" fill="#00E88F" stroke="none" />
-          <circle cx="18" cy="12" r="1" fill="#00E88F" stroke="none" />
-          <path d="M8 9v6M5 12h6" />
-        </svg>
-      );
-    case "trophy":
-      return (
-        <svg {...props}>
-          <path d="M6 3h12v6a6 6 0 01-12 0V3z" fill="#00E88F" fillOpacity="0.1" />
-          <path d="M6 5H4a1 1 0 00-1 1v1a4 4 0 004 4" />
-          <path d="M18 5h2a1 1 0 011 1v1a4 4 0 01-4 4" />
-          <path d="M12 13v3" />
-          <path d="M8 19h8" />
-          <path d="M9 19v-3h6v3" />
-        </svg>
-      );
-    case "star":
-      return (
-        <svg {...props} fill="#00E88F" fillOpacity="0.15">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-        </svg>
-      );
-    case "check":
-      return (
-        <svg {...props}>
-          <path d="M5 12l5 5L20 7" />
-        </svg>
-      );
-    default:
-      return null;
-  }
-}
 
 /* ───────── MAIN PAGE ───────── */
 
 export default function SecondLandingPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
-  const heroRef = useRef<HTMLDivElement>(null);
 
-  // Capture ?ref=CODE and track page view (same as before)
   useEffect(() => {
     setMounted(true);
     if (typeof window === "undefined") return;
@@ -179,123 +66,100 @@ export default function SecondLandingPage() {
     } catch {}
   }, []);
 
-  // Parallax scroll tracking
-  useEffect(() => {
-    const onScroll = () => setScrollY(window.scrollY);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
   return (
     <>
       <style>{`
         html, body {
-          background: #0A0F1C !important;
-          scroll-behavior: smooth;
+          background: #F9E741 !important;
+          overflow-x: hidden;
         }
-        .gradient-text {
-          background: linear-gradient(135deg, #00E88F 0%, #00D4AA 50%, #00BCD4 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+
+        /* ── Floating bob animation ── */
+        @keyframes floatBob {
+          0%, 100% { transform: translateY(0) rotate(var(--rot)); }
+          50% { transform: translateY(-18px) rotate(var(--rot)); }
         }
-        .glass-card {
-          background: rgba(255, 255, 255, 0.04);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(255, 255, 255, 0.08);
+
+        /* ── Fade in up on mount ── */
+        @keyframes heroFadeIn {
+          from { opacity: 0; transform: translateY(40px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
-        .glow-accent {
-          box-shadow: 0 0 40px rgba(0, 232, 143, 0.15), 0 0 80px rgba(0, 232, 143, 0.05);
+        .hero-animate {
+          animation: heroFadeIn 0.8s ease-out forwards;
         }
-        .float-slow {
-          animation: floatSlow 6s ease-in-out infinite;
-        }
-        .float-slow-delay {
-          animation: floatSlow 7s ease-in-out infinite 1s;
-        }
-        .float-slow-delay2 {
-          animation: floatSlow 8s ease-in-out infinite 2s;
-        }
-        @keyframes floatSlow {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-16px); }
-        }
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(30px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeInUp {
-          animation: fadeInUp 0.7s ease-out forwards;
-        }
-        .animate-fadeInUp-delay1 {
-          animation: fadeInUp 0.7s ease-out 0.15s forwards;
+        .hero-animate-d1 {
+          animation: heroFadeIn 0.8s ease-out 0.12s forwards;
           opacity: 0;
         }
-        .animate-fadeInUp-delay2 {
-          animation: fadeInUp 0.7s ease-out 0.3s forwards;
+        .hero-animate-d2 {
+          animation: heroFadeIn 0.8s ease-out 0.24s forwards;
           opacity: 0;
         }
-        .animate-fadeInUp-delay3 {
-          animation: fadeInUp 0.7s ease-out 0.45s forwards;
+        .hero-animate-d3 {
+          animation: heroFadeIn 0.8s ease-out 0.36s forwards;
           opacity: 0;
         }
-        .transaction-scroll {
-          animation: scrollLeft 20s linear infinite;
-        }
-        @keyframes scrollLeft {
-          0% { transform: translateX(0); }
+
+        /* ── Merchant ticker ── */
+        @keyframes tickerScroll {
+          0%   { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
-        .game-card:hover .game-overlay {
-          opacity: 1;
+        .ticker-track {
+          animation: tickerScroll 28s linear infinite;
         }
-        .game-card:hover img, .game-card:hover video {
-          transform: scale(1.05);
+
+        /* ── Floating emoji entrance ── */
+        @keyframes emojiPop {
+          0%   { opacity: 0; transform: scale(0.3) rotate(var(--rot)); }
+          60%  { opacity: 1; transform: scale(1.1) rotate(var(--rot)); }
+          100% { opacity: 1; transform: scale(1) rotate(var(--rot)); }
         }
       `}</style>
 
-      <div className="min-h-screen bg-[#0A0F1C] text-[#F1F5F9] overflow-x-hidden">
-        {/* ═══════════ NAVIGATION ═══════════ */}
-        <nav
-          className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
-          style={{
-            background: scrollY > 50 ? "rgba(10, 15, 28, 0.9)" : "transparent",
-            backdropFilter: scrollY > 50 ? "blur(20px)" : "none",
-            borderBottom: scrollY > 50 ? "1px solid rgba(255,255,255,0.06)" : "none",
-          }}
-        >
-          <div className="max-w-[1200px] mx-auto px-6 md:px-10 h-[72px] flex items-center justify-between">
+      <meta name="theme-color" content="#F9E741" />
+
+      <div className="min-h-screen" style={{ background: "#F9E741" }}>
+
+        {/* ═══════════ NAVBAR ═══════════ */}
+        <nav className="relative z-50 w-full">
+          <div className="max-w-[1200px] mx-auto px-5 sm:px-8 h-[68px] flex items-center justify-between">
             {/* Logo */}
-            <button
-              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-            >
+            <div className="flex items-center gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/shansi-logo.png" alt="Shansi" width={36} height={36} className="select-none" />
+              <img
+                src="/images/shansi-logo.png"
+                alt="Shansi"
+                width={36}
+                height={36}
+                className="select-none"
+                draggable={false}
+              />
               <span
-                className="text-[20px] font-bold text-white"
-                style={{ fontFamily: "var(--font-outfit)" }}
+                className="text-[22px] font-extrabold text-[#1A1A1A] tracking-[-0.02em]"
+                style={{ fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif" }}
               >
                 Shansi
               </span>
-            </button>
+            </div>
 
-            {/* Nav links */}
+            {/* Right side */}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push("/auth?mode=login")}
-                className="hidden sm:block px-5 py-2.5 text-[14px] font-medium text-[#94A3B8] hover:text-white transition-colors"
-                style={{ fontFamily: "var(--font-dm-sans)" }}
+                className="hidden sm:block px-5 py-2 text-[15px] font-semibold text-[#1A1A1A]/70 hover:text-[#1A1A1A] transition-colors"
+                style={{ fontFamily: "var(--font-outfit)" }}
               >
                 Log In
               </button>
               <button
                 onClick={() => router.push("/auth")}
-                className="px-6 py-2.5 rounded-full text-[14px] font-semibold text-[#0A0F1C] transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"
+                className="px-6 py-2.5 rounded-full text-[15px] font-bold text-white transition-all duration-200 hover:scale-[1.04] active:scale-[0.96]"
                 style={{
                   fontFamily: "var(--font-outfit)",
-                  background: "linear-gradient(135deg, #00E88F, #00D4AA)",
+                  background: "#10B981",
+                  boxShadow: "0 2px 12px rgba(16, 185, 129, 0.3)",
                 }}
               >
                 Get Started
@@ -304,421 +168,353 @@ export default function SecondLandingPage() {
           </div>
         </nav>
 
-        {/* ═══════════ HERO SECTION ═══════════ */}
-        <section ref={heroRef} className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-16 overflow-hidden">
-          {/* Background floating items */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ opacity: mounted ? 0.12 : 0, transition: "opacity 1.5s ease" }}>
-            {FLOAT_ITEMS.map((src, i) => (
-              <div
-                key={i}
-                className={`absolute ${i % 3 === 0 ? "float-slow" : i % 3 === 1 ? "float-slow-delay" : "float-slow-delay2"}`}
+        {/* ═══════════ HERO ═══════════ */}
+        <section className="relative min-h-[calc(100vh-68px)] flex flex-col items-center justify-center px-6 overflow-hidden">
+
+          {/* ── Floating emoji objects ── */}
+          {FLOATING_ITEMS.map((item, i) => (
+            <div
+              key={i}
+              className="absolute pointer-events-none select-none hidden sm:block"
+              style={{
+                left: item.left,
+                top: item.top,
+                fontSize: item.size,
+                lineHeight: 1,
+                // @ts-expect-error CSS custom property
+                "--rot": `${item.rotate}deg`,
+                animation: mounted
+                  ? `emojiPop 0.5s ease-out ${item.delay}s forwards, floatBob ${item.duration}s ease-in-out ${item.delay + 0.5}s infinite`
+                  : "none",
+                opacity: 0,
+                filter: "drop-shadow(0 8px 20px rgba(0,0,0,0.10))",
+              }}
+            >
+              {item.emoji}
+            </div>
+          ))}
+
+          {/* Mobile-only: smaller subset of emojis */}
+          {FLOATING_ITEMS.slice(0, 6).map((item, i) => (
+            <div
+              key={`m-${i}`}
+              className="absolute pointer-events-none select-none sm:hidden"
+              style={{
+                left: item.left,
+                top: item.top,
+                fontSize: item.size * 0.65,
+                lineHeight: 1,
+                // @ts-expect-error CSS custom property
+                "--rot": `${item.rotate}deg`,
+                animation: mounted
+                  ? `emojiPop 0.5s ease-out ${item.delay}s forwards, floatBob ${item.duration}s ease-in-out ${item.delay + 0.5}s infinite`
+                  : "none",
+                opacity: 0,
+                filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.08))",
+              }}
+            >
+              {item.emoji}
+            </div>
+          ))}
+
+          {/* ── Headline block ── */}
+          <div className="relative z-10 text-center max-w-[900px] mx-auto">
+            <h1
+              className={`text-[#1A1A1A] leading-[1.0] tracking-[-0.03em] mb-6 ${mounted ? "hero-animate-d1" : "opacity-0"}`}
+              style={{
+                fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif",
+                fontWeight: 900,
+                fontSize: "clamp(42px, 8vw, 82px)",
+              }}
+            >
+              Buy Now, Win Maybe
+            </h1>
+            <h2
+              className={`text-[#1A1A1A]/80 leading-[1.1] tracking-[-0.02em] mb-10 ${mounted ? "hero-animate-d2" : "opacity-0"}`}
+              style={{
+                fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif",
+                fontWeight: 800,
+                fontSize: "clamp(28px, 5vw, 52px)",
+              }}
+            >
+              We got you Shansi&apos;d
+            </h2>
+
+            {/* CTA */}
+            <div className={`flex flex-col sm:flex-row items-center justify-center gap-4 ${mounted ? "hero-animate-d3" : "opacity-0"}`}>
+              <button
+                onClick={() => router.push("/auth")}
+                className="px-10 py-4 rounded-2xl text-[17px] font-extrabold text-white transition-all duration-200 hover:scale-[1.04] active:scale-[0.96]"
                 style={{
-                  left: `${10 + (i % 4) * 22}%`,
-                  top: `${15 + Math.floor(i / 4) * 35}%`,
-                  transform: `rotate(${-15 + i * 8}deg)`,
+                  fontFamily: "var(--font-outfit)",
+                  background: "#1A1A1A",
+                  boxShadow: "0 4px 24px rgba(0,0,0,0.20)",
                 }}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={src}
-                  alt=""
-                  width={80 + (i % 3) * 20}
-                  height={80 + (i % 3) * 20}
-                  className="select-none opacity-60"
-                  draggable={false}
-                />
+                Sign Up Free
+              </button>
+              <button
+                onClick={() => router.push("/auth?mode=login")}
+                className="px-8 py-4 rounded-2xl text-[16px] font-bold text-[#1A1A1A] border-2 border-[#1A1A1A]/20 hover:border-[#1A1A1A]/40 transition-all duration-200 hover:scale-[1.03] active:scale-[0.97] sm:hidden"
+                style={{ fontFamily: "var(--font-outfit)" }}
+              >
+                Log In
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* ═══════════ MERCHANT TICKER ═══════════ */}
+        <div className="relative z-10 w-full overflow-hidden py-5" style={{ background: "#1A1A1A" }}>
+          <div className="flex ticker-track" style={{ width: "200%" }}>
+            {[...MERCHANTS, ...MERCHANTS, ...MERCHANTS, ...MERCHANTS].map((m, i) => (
+              <div key={i} className="flex items-center gap-3 px-8 shrink-0">
+                {/* Circle with first letter */}
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-[14px] font-bold text-[#1A1A1A] shrink-0"
+                  style={{ background: "#F9E741", fontFamily: "var(--font-outfit)" }}
+                >
+                  {m.name[0]}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className="text-[14px] font-semibold text-white whitespace-nowrap"
+                    style={{ fontFamily: "var(--font-dm-sans)" }}
+                  >
+                    {m.name}
+                  </span>
+                  <span
+                    className="text-[13px] font-bold text-[#10B981] whitespace-nowrap"
+                  >
+                    {m.amount}
+                  </span>
+                </div>
+                {/* Separator dot */}
+                <span className="text-white/20 text-[8px] ml-2">●</span>
               </div>
             ))}
           </div>
+        </div>
 
-          {/* Radial glow */}
-          <div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full pointer-events-none"
-            style={{
-              background: "radial-gradient(circle, rgba(0,232,143,0.08) 0%, transparent 70%)",
-            }}
-          />
-
-          {/* Hero content */}
-          <div className="relative z-10 text-center max-w-[800px]">
-            {/* Badge */}
-            <div
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card mb-8 ${mounted ? "animate-fadeInUp" : "opacity-0"}`}
-            >
-              <span className="w-2 h-2 rounded-full bg-[#00E88F] animate-pulse" />
-              <span className="text-[13px] text-[#94A3B8]" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                Gamified Cashback Platform
-              </span>
-            </div>
-
-            {/* Main heading */}
-            <h1
-              className={`text-[40px] sm:text-[56px] md:text-[72px] leading-[1.05] font-extrabold mb-6 ${mounted ? "animate-fadeInUp-delay1" : "opacity-0"}`}
-              style={{ fontFamily: "var(--font-outfit)" }}
-            >
-              Turn Expenses
-              <br />
-              into <span className="gradient-text">Games</span>
-            </h1>
-
-            {/* Subtitle */}
-            <p
-              className={`text-[16px] sm:text-[18px] text-[#94A3B8] leading-[1.6] max-w-[540px] mx-auto mb-10 ${mounted ? "animate-fadeInUp-delay2" : "opacity-0"}`}
-              style={{ fontFamily: "var(--font-dm-sans)" }}
-            >
-              Enjoy life&apos;s moments without the shadow of regret.
-              Track spending, play games, and win your purchases back.
-            </p>
-
-            {/* CTA buttons */}
-            <div className={`flex flex-col sm:flex-row items-center justify-center gap-4 ${mounted ? "animate-fadeInUp-delay3" : "opacity-0"}`}>
-              <button
-                onClick={() => router.push("/auth")}
-                className="w-full sm:w-auto px-8 py-4 rounded-xl text-[16px] font-bold text-[#0A0F1C] transition-all duration-200 hover:scale-[1.03] active:scale-[0.97] glow-accent"
-                style={{
-                  fontFamily: "var(--font-outfit)",
-                  background: "linear-gradient(135deg, #00E88F 0%, #00D4AA 100%)",
-                }}
-              >
-                Get Started — It&apos;s Free
-              </button>
-              <button
-                onClick={() => {
-                  document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className="w-full sm:w-auto px-8 py-4 rounded-xl text-[16px] font-semibold text-white glass-card hover:bg-white/[0.08] transition-all duration-200"
+        {/* ═══════════ FEATURES SECTION ═══════════ */}
+        <section className="py-20 md:py-28 px-6" style={{ background: "#FFFDF0" }}>
+          <div className="max-w-[1100px] mx-auto">
+            <div className="text-center mb-14 md:mb-18">
+              <h2
+                className="text-[32px] sm:text-[44px] md:text-[52px] font-extrabold text-[#1A1A1A] leading-[1.1] mb-4"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
-                Learn More
-              </button>
+                How It Works
+              </h2>
+              <p
+                className="text-[16px] sm:text-[18px] text-[#1A1A1A]/60 max-w-[480px] mx-auto"
+                style={{ fontFamily: "var(--font-dm-sans)" }}
+              >
+                Three steps to turn every purchase into a chance to win.
+              </p>
             </div>
-          </div>
 
-          {/* Transaction ticker */}
-          <div className="relative z-10 mt-16 w-full max-w-[700px] overflow-hidden rounded-2xl glass-card py-4">
-            <div className="flex transaction-scroll" style={{ width: "200%" }}>
-              {[...TRANSACTIONS, ...TRANSACTIONS, ...TRANSACTIONS, ...TRANSACTIONS].map((t, i) => (
-                <div key={i} className="flex items-center gap-3 px-6 shrink-0">
-                  <div className="w-10 h-10 rounded-full bg-white/10 overflow-hidden flex items-center justify-center">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={t.icon} alt={t.name} width={40} height={40} className="w-full h-full object-cover" />
-                  </div>
-                  <div>
-                    <p className="text-[14px] font-medium text-white" style={{ fontFamily: "var(--font-dm-sans)" }}>{t.name}</p>
-                    <p className="text-[13px] text-[#00E88F] font-semibold">{t.amount}</p>
-                  </div>
+            <div className="grid md:grid-cols-3 gap-6 md:gap-8">
+              {[
+                {
+                  emoji: "📱",
+                  step: "01",
+                  title: "Scan & Pay",
+                  desc: "Visit any partner merchant and scan the QR code to log your purchase instantly.",
+                },
+                {
+                  emoji: "🎮",
+                  step: "02",
+                  title: "Play Games",
+                  desc: "Use your entries to play — slots, plinko, chicken rush. Every purchase is a game ticket.",
+                },
+                {
+                  emoji: "💸",
+                  step: "03",
+                  title: "Win Cashback",
+                  desc: "Win up to 100% of your purchase back. Withdraw anytime, zero strings attached.",
+                },
+              ].map((s, i) => (
+                <div
+                  key={i}
+                  className="relative rounded-3xl p-8 md:p-10 text-center transition-all duration-200 hover:scale-[1.02]"
+                  style={{
+                    background: "white",
+                    boxShadow: "0 2px 20px rgba(0,0,0,0.04)",
+                    border: "1px solid rgba(0,0,0,0.06)",
+                  }}
+                >
+                  {/* Step number watermark */}
+                  <span
+                    className="absolute top-4 right-6 text-[48px] font-black text-[#1A1A1A]/[0.04] select-none"
+                    style={{ fontFamily: "var(--font-outfit)" }}
+                  >
+                    {s.step}
+                  </span>
+                  <div className="text-[48px] mb-5">{s.emoji}</div>
+                  <h3
+                    className="text-[20px] font-bold text-[#1A1A1A] mb-3"
+                    style={{ fontFamily: "var(--font-outfit)" }}
+                  >
+                    {s.title}
+                  </h3>
+                  <p
+                    className="text-[14px] text-[#1A1A1A]/55 leading-[1.6]"
+                    style={{ fontFamily: "var(--font-dm-sans)" }}
+                  >
+                    {s.desc}
+                  </p>
                 </div>
               ))}
             </div>
           </div>
-
-          {/* Scroll indicator */}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-40">
-            <span className="text-[12px] text-[#94A3B8]" style={{ fontFamily: "var(--font-dm-sans)" }}>Scroll</span>
-            <div className="w-[1px] h-6 bg-gradient-to-b from-[#94A3B8] to-transparent" />
-          </div>
         </section>
 
-        {/* ═══════════ DUAL FEATURE SECTION (Coverd style) ═══════════ */}
-        <section id="features" className="relative py-20 md:py-32 px-6">
-          <div className="max-w-[1200px] mx-auto grid md:grid-cols-2 gap-6 md:gap-8">
-            {/* Track your purchases */}
-            <div className="glass-card rounded-3xl p-8 md:p-10 group hover:border-[#00E88F]/20 transition-all duration-300">
-              <div className="w-14 h-14 rounded-2xl bg-[#00E88F]/10 flex items-center justify-center mb-6">
-                <FeatureIcon name="wallet" size={28} />
-              </div>
-              <h2
-                className="text-[28px] sm:text-[36px] font-bold leading-[1.15] mb-4"
+        {/* ═══════════ DUAL CARDS SECTION ═══════════ */}
+        <section className="py-16 md:py-24 px-6" style={{ background: "#FFFDF0" }}>
+          <div className="max-w-[1100px] mx-auto grid md:grid-cols-2 gap-6 md:gap-8">
+            {/* Track */}
+            <div
+              className="rounded-3xl p-8 md:p-10 transition-all duration-200 hover:scale-[1.01]"
+              style={{
+                background: "#F9E741",
+                boxShadow: "0 4px 30px rgba(249, 231, 65, 0.3)",
+              }}
+            >
+              <span className="text-[48px] mb-4 block">📊</span>
+              <h3
+                className="text-[28px] sm:text-[34px] font-extrabold text-[#1A1A1A] leading-[1.15] mb-4"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
                 Track your
-                <br />
-                purchases<span className="gradient-text">...</span>
-              </h2>
-              <p className="text-[15px] text-[#94A3B8] leading-[1.6] mb-6" style={{ fontFamily: "var(--font-dm-sans)" }}>
+                <br />purchases...
+              </h3>
+              <p
+                className="text-[15px] text-[#1A1A1A]/65 leading-[1.6]"
+                style={{ fontFamily: "var(--font-dm-sans)" }}
+              >
                 A sleek way to get on top of your spending — see insights, build better habits, and take control of your finances.
               </p>
-              {/* Mini merchant logos */}
-              <div className="flex items-center gap-3 mt-auto">
-                {TRANSACTIONS.map((t, i) => (
-                  <div key={i} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={t.icon} alt={t.name} width={40} height={40} className="w-full h-full object-cover" />
-                  </div>
-                ))}
-                <span className="text-[13px] text-[#94A3B8] ml-1" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                  +50 more
-                </span>
-              </div>
             </div>
 
-            {/* Win them back */}
-            <div className="glass-card rounded-3xl p-8 md:p-10 group hover:border-[#00E88F]/20 transition-all duration-300">
-              <div className="w-14 h-14 rounded-2xl bg-[#00E88F]/10 flex items-center justify-center mb-6">
-                <FeatureIcon name="trophy" size={28} />
-              </div>
-              <h2
-                className="text-[28px] sm:text-[36px] font-bold leading-[1.15] mb-4"
+            {/* Win */}
+            <div
+              className="rounded-3xl p-8 md:p-10 transition-all duration-200 hover:scale-[1.01]"
+              style={{
+                background: "#1A1A1A",
+                boxShadow: "0 4px 30px rgba(0,0,0,0.15)",
+              }}
+            >
+              <span className="text-[48px] mb-4 block">🏆</span>
+              <h3
+                className="text-[28px] sm:text-[34px] font-extrabold text-white leading-[1.15] mb-4"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
-                <span className="gradient-text">...</span>and win
-                <br />
-                them back
-              </h2>
-              <p className="text-[15px] text-[#94A3B8] leading-[1.6] mb-6" style={{ fontFamily: "var(--font-dm-sans)" }}>
+                ...and win
+                <br />them back
+              </h3>
+              <p
+                className="text-[15px] text-white/55 leading-[1.6]"
+                style={{ fontFamily: "var(--font-dm-sans)" }}
+              >
                 A fun and thrilling approach to get your purchases covered — play games, win them back. Every purchase is a new chance.
               </p>
-              {/* Mini game covers */}
-              <div className="flex items-center gap-3 mt-auto">
-                {GAMES.filter(g => g.type === "image").slice(0, 3).map((g, i) => (
-                  <div key={i} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={g.cover} alt={g.name} width={40} height={40} className="w-full h-full object-cover" />
-                  </div>
-                ))}
-                <span className="text-[13px] text-[#94A3B8] ml-1" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                  4 games
-                </span>
-              </div>
             </div>
           </div>
         </section>
 
-        {/* ═══════════ GAMES SHOWCASE ═══════════ */}
-        <section className="relative py-16 md:py-24 px-6">
-          <div className="max-w-[1200px] mx-auto">
-            <div className="text-center mb-12 md:mb-16">
-              <h2
-                className="text-[32px] sm:text-[44px] md:text-[52px] font-extrabold leading-[1.1] mb-4"
-                style={{ fontFamily: "var(--font-outfit)" }}
-              >
-                Play. Win. <span className="gradient-text">Repeat.</span>
-              </h2>
-              <p className="text-[16px] text-[#94A3B8] max-w-[500px] mx-auto" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                Every purchase enters you into exciting games. Four unique ways to win your money back.
-              </p>
-            </div>
-
+        {/* ═══════════ FEATURES GRID ═══════════ */}
+        <section className="py-16 md:py-24 px-6" style={{ background: "#FFFDF0" }}>
+          <div className="max-w-[1100px] mx-auto">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-              {GAMES.map((game, i) => (
+              {[
+                { emoji: "💳", title: "100% Cashback",       desc: "Win back the full purchase amount" },
+                { emoji: "🔓", title: "Zero Hidden Fees",    desc: "No subscriptions, no catches" },
+                { emoji: "📈", title: "Smart Insights",      desc: "Build better spending habits" },
+                { emoji: "🎲", title: "Auto Game Entries",   desc: "Every purchase is a game ticket" },
+              ].map((f, i) => (
                 <div
                   key={i}
-                  className="game-card relative rounded-2xl overflow-hidden aspect-square group cursor-pointer"
+                  className="rounded-2xl p-6 text-center transition-all duration-200 hover:scale-[1.03]"
+                  style={{
+                    background: "white",
+                    border: "1px solid rgba(0,0,0,0.06)",
+                    boxShadow: "0 1px 8px rgba(0,0,0,0.03)",
+                  }}
                 >
-                  {game.type === "video" ? (
-                    <video
-                      src={game.cover}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full h-full object-cover transition-transform duration-500"
-                    />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={game.cover}
-                      alt={game.name}
-                      className="w-full h-full object-cover transition-transform duration-500"
-                    />
-                  )}
-                  {/* Overlay */}
-                  <div className="game-overlay absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-4 opacity-0 transition-opacity duration-300 md:opacity-0">
-                    <p className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
-                      {game.name}
-                    </p>
-                  </div>
-                  {/* Always visible name on mobile */}
-                  <div className="md:hidden absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-                    <p className="text-[13px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
-                      {game.name}
-                    </p>
-                  </div>
+                  <div className="text-[36px] mb-3">{f.emoji}</div>
+                  <p
+                    className="text-[15px] font-bold text-[#1A1A1A] mb-1"
+                    style={{ fontFamily: "var(--font-outfit)" }}
+                  >
+                    {f.title}
+                  </p>
+                  <p
+                    className="text-[13px] text-[#1A1A1A]/50 leading-[1.5]"
+                    style={{ fontFamily: "var(--font-dm-sans)" }}
+                  >
+                    {f.desc}
+                  </p>
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-
-        {/* ═══════════ SHANSI CARD SECTION (like Coverd Card) ═══════════ */}
-        <section className="relative py-20 md:py-32 px-6">
-          {/* Background glow */}
-          <div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] pointer-events-none"
-            style={{
-              background: "radial-gradient(ellipse, rgba(0,232,143,0.06) 0%, transparent 70%)",
-            }}
-          />
-
-          <div className="relative max-w-[1200px] mx-auto">
-            <div className="glass-card rounded-3xl p-8 md:p-14 glow-accent">
-              {/* Badge */}
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#00E88F]/10 border border-[#00E88F]/20 mb-6">
-                <span className="text-[13px] font-medium text-[#00E88F]" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                  Now Available
-                </span>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-10 items-center">
-                {/* Text content */}
-                <div>
-                  <h2
-                    className="text-[32px] sm:text-[44px] md:text-[52px] font-extrabold leading-[1.05] mb-3"
-                    style={{ fontFamily: "var(--font-outfit)" }}
-                  >
-                    We Got You
-                    <br />
-                    <span className="gradient-text">Covered</span>
-                  </h2>
-                  <p className="text-[15px] text-[#94A3B8] leading-[1.7] mb-8 max-w-[440px]" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                    Shansi is a gamified cashback platform that offers up to 100% cash back, zero hidden fees, smart spending insights, and automatic entries into win-back games with every purchase.
-                  </p>
-
-                  <button
-                    onClick={() => router.push("/auth")}
-                    className="px-8 py-4 rounded-xl text-[16px] font-bold text-[#0A0F1C] transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"
-                    style={{
-                      fontFamily: "var(--font-outfit)",
-                      background: "linear-gradient(135deg, #00E88F 0%, #00D4AA 100%)",
-                    }}
-                  >
-                    Join Now
-                  </button>
-                </div>
-
-                {/* Feature cards grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  {FEATURES.map((f, i) => (
-                    <div
-                      key={i}
-                      className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-[#00E88F]/20 transition-all duration-200 hover:bg-white/[0.05]"
-                    >
-                      <div className="w-10 h-10 rounded-xl bg-[#00E88F]/10 flex items-center justify-center mb-3">
-                        <FeatureIcon name={f.icon} size={20} />
-                      </div>
-                      <p className="text-[14px] font-semibold text-white mb-1" style={{ fontFamily: "var(--font-outfit)" }}>
-                        {f.title}
-                      </p>
-                      <p className="text-[12px] text-[#94A3B8] leading-[1.5]" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                        {f.desc}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════════ HOW IT WORKS ═══════════ */}
-        <section className="relative py-16 md:py-24 px-6">
-          <div className="max-w-[800px] mx-auto text-center">
-            <h2
-              className="text-[32px] sm:text-[44px] font-extrabold leading-[1.1] mb-4"
-              style={{ fontFamily: "var(--font-outfit)" }}
-            >
-              How It <span className="gradient-text">Works</span>
-            </h2>
-            <p className="text-[16px] text-[#94A3B8] mb-12 md:mb-16" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              Three simple steps to start winning your purchases back.
-            </p>
-          </div>
-
-          <div className="max-w-[1000px] mx-auto grid md:grid-cols-3 gap-6 md:gap-8">
-            {[
-              {
-                step: "01",
-                icon: "scan",
-                title: "Scan & Pay",
-                titleGe: "სკანირება & გადახდა",
-                desc: "Visit any partner merchant and scan the QR code to log your purchase.",
-              },
-              {
-                step: "02",
-                icon: "game",
-                title: "Play Games",
-                titleGe: "თამაშის დაწყება",
-                desc: "Use your earned entries to play exciting games — slots, plinko, chicken rush, and more.",
-              },
-              {
-                step: "03",
-                icon: "wallet",
-                title: "Win Cashback",
-                titleGe: "ქეშბექის მიღება",
-                desc: "Win up to 100% of your purchase amount back. Withdraw anytime, no strings attached.",
-              },
-            ].map((step, i) => (
-              <div key={i} className="relative text-center">
-                {/* Step number */}
-                <span
-                  className="text-[64px] font-black text-white/[0.03] absolute -top-4 left-1/2 -translate-x-1/2 select-none"
-                  style={{ fontFamily: "var(--font-outfit)" }}
-                >
-                  {step.step}
-                </span>
-                <div className="relative z-10">
-                  <div className="w-16 h-16 rounded-2xl bg-[#00E88F]/10 border border-[#00E88F]/20 flex items-center justify-center mx-auto mb-5">
-                    <FeatureIcon name={step.icon} size={28} />
-                  </div>
-                  <h3
-                    className="text-[18px] font-bold mb-2"
-                    style={{ fontFamily: "var(--font-outfit)" }}
-                  >
-                    {step.title}
-                  </h3>
-                  <p className="text-[13px] text-[#94A3B8] leading-[1.6] max-w-[280px] mx-auto" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                    {step.desc}
-                  </p>
-                </div>
-              </div>
-            ))}
           </div>
         </section>
 
         {/* ═══════════ FINAL CTA ═══════════ */}
-        <section className="relative py-20 md:py-32 px-6">
+        <section className="py-20 md:py-28 px-6" style={{ background: "#F9E741" }}>
           <div className="max-w-[700px] mx-auto text-center">
             <h2
-              className="text-[32px] sm:text-[44px] md:text-[56px] font-extrabold leading-[1.05] mb-6"
+              className="text-[32px] sm:text-[44px] md:text-[56px] font-extrabold text-[#1A1A1A] leading-[1.05] mb-5"
               style={{ fontFamily: "var(--font-outfit)" }}
             >
-              Ready to Turn
-              <br />
-              Spending into <span className="gradient-text">Winning?</span>
+              Ready to Get
+              <br />Shansi&apos;d?
             </h2>
-            <p className="text-[16px] text-[#94A3B8] mb-10 max-w-[460px] mx-auto" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              Join thousands of users who are already winning their purchases back with Shansi.
+            <p
+              className="text-[16px] sm:text-[18px] text-[#1A1A1A]/60 mb-10 max-w-[420px] mx-auto"
+              style={{ fontFamily: "var(--font-dm-sans)" }}
+            >
+              Join thousands of users already winning their purchases back.
             </p>
             <button
               onClick={() => router.push("/auth")}
-              className="px-10 py-4 rounded-xl text-[17px] font-bold text-[#0A0F1C] transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] glow-accent"
+              className="px-10 py-4 rounded-2xl text-[17px] font-extrabold text-[#F9E741] transition-all duration-200 hover:scale-[1.04] active:scale-[0.96]"
               style={{
                 fontFamily: "var(--font-outfit)",
-                background: "linear-gradient(135deg, #00E88F 0%, #00D4AA 100%)",
+                background: "#1A1A1A",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.20)",
               }}
             >
               Sign Up Free
             </button>
-            <p className="text-[13px] text-[#94A3B8]/60 mt-4" style={{ fontFamily: "var(--font-dm-sans)" }}>
+            <p
+              className="text-[13px] text-[#1A1A1A]/40 mt-4"
+              style={{ fontFamily: "var(--font-dm-sans)" }}
+            >
               No credit card required
             </p>
           </div>
         </section>
 
         {/* ═══════════ FOOTER ═══════════ */}
-        <footer className="border-t border-white/[0.06] py-10 px-6">
-          <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-            {/* Logo */}
+        <footer className="py-8 px-6" style={{ background: "#1A1A1A" }}>
+          <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row items-center justify-between gap-5">
             <div className="flex items-center gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/shansi-logo.png" alt="Shansi" width={28} height={28} className="select-none" />
-              <span className="text-[16px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
+              <img src="/images/shansi-logo.png" alt="Shansi" width={24} height={24} className="select-none brightness-0 invert" />
+              <span
+                className="text-[15px] font-bold text-white"
+                style={{ fontFamily: "var(--font-outfit)" }}
+              >
                 Shansi
               </span>
             </div>
 
-            {/* Links */}
-            <div className="flex flex-wrap items-center justify-center gap-6 text-[13px] text-[#94A3B8]" style={{ fontFamily: "var(--font-dm-sans)" }}>
+            <div
+              className="flex flex-wrap items-center justify-center gap-6 text-[13px] text-white/50"
+              style={{ fontFamily: "var(--font-dm-sans)" }}
+            >
               <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="hover:text-white transition-colors">
                 Home
               </button>
@@ -730,9 +526,11 @@ export default function SecondLandingPage() {
               </button>
             </div>
 
-            {/* Copyright */}
-            <p className="text-[12px] text-[#94A3B8]/50" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              © 2026 Shansi. All rights reserved.
+            <p
+              className="text-[12px] text-white/30"
+              style={{ fontFamily: "var(--font-dm-sans)" }}
+            >
+              &copy; 2026 Shansi. All rights reserved.
             </p>
           </div>
         </footer>
