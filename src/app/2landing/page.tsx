@@ -10,21 +10,21 @@ const FLOATING_ITEMS = [
   // Top-left: airplane — large, angled, partially off left edge
   { src: "/images/onboarding/airplane.png",      left: "2%",   top: "10%",  size: 280, rotate: -20, delay: 0.2,  duration: 6.0 },
   // Top-center: stethoscope — peeking from top, overlapping navbar
-  { src: "/images/onboarding/stethoscope.png",   left: "28%",  top: "-2%",  size: 220, rotate: 10,  delay: 0,    duration: 5.6 },
+  { src: "/images/onboarding/stethoscope.png",   left: "28%",  top: "-2%",  size: 160, rotate: 10,  delay: 0,    duration: 5.6 },
   // Top-right: cards — tilted, right side
   { src: "/images/onboarding/cards.png",         left: "60%",  top: "5%",   size: 240, rotate: -12, delay: 0.6,  duration: 6.4 },
   // Right: piggy bank — far right, partially off-screen
   { src: "/images/onboarding/piggy-bank-pink.png",    left: "82%",  top: "14%",  size: 260, rotate: 15,  delay: 0.4,  duration: 5.8 },
-  // Center-left below headline: sushi
-  { src: "/images/onboarding/sushi.png",         left: "18%",  top: "50%",  size: 200, rotate: -8,  delay: 1.0,  duration: 6.2 },
-  // Center-right: ring — smaller, below headline
-  { src: "/images/onboarding/ring.png",          left: "58%",  top: "48%",  size: 160, rotate: 20,  delay: 1.4,  duration: 5.4 },
-  // Bottom-right: sneaker — large, dramatic angle
-  { src: "/images/onboarding/sneaker.png",       left: "70%",  top: "55%",  size: 320, rotate: -18, delay: 0.8,  duration: 6.6 },
+  // Center-left below headline: sushi — smaller
+  { src: "/images/onboarding/sushi.png",         left: "18%",  top: "50%",  size: 140, rotate: -8,  delay: 1.0,  duration: 6.2 },
+  // Center-right: ring — pushed further right/down, away from text
+  { src: "/images/onboarding/ring.png",          left: "65%",  top: "56%",  size: 130, rotate: 20,  delay: 1.4,  duration: 5.4 },
+  // Bottom-right: sneaker — smaller
+  { src: "/images/onboarding/sneaker.png",       left: "70%",  top: "55%",  size: 240, rotate: -18, delay: 0.8,  duration: 6.6 },
   // Far-left edge: building — partially cut off
   { src: "/images/onboarding/building.png",      left: "-5%",  top: "48%",  size: 220, rotate: 5,   delay: 1.2,  duration: 5.5 },
-  // Bottom-left: suitcase
-  { src: "/images/onboarding/suitcase.png",      left: "10%",  top: "68%",  size: 240, rotate: -6,  delay: 0.6,  duration: 6.0 },
+  // Bottom-left: suitcase — moved lower
+  { src: "/images/onboarding/suitcase.png",      left: "10%",  top: "74%",  size: 240, rotate: -6,  delay: 0.6,  duration: 6.0 },
 ];
 
 /* ───────── MERCHANT TICKER DATA ───────── */
@@ -249,7 +249,7 @@ export default function SecondLandingPage() {
           ))}
 
           {/* ── Headline — center, z-30 so text is always readable ── */}
-          <div className="flex-1 flex items-center justify-center relative z-30 pointer-events-none">
+          <div className="flex-1 flex items-center justify-center relative z-30 pointer-events-none" style={{ marginTop: "-6vh" }}>
             <div className="text-center max-w-[900px] mx-auto px-6 pointer-events-auto">
               <h1
                 className={`text-[#1A1A1A] leading-[0.95] tracking-[-0.03em] ${mounted ? "hero-in-d1" : "opacity-0"}`}
