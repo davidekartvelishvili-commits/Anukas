@@ -315,13 +315,14 @@ export default function SecondLandingPage() {
 
         {/* ═══════════ VIDEO SECTION — right below hero, like coverd ═══════════ */}
         <section className="relative z-30 px-6 md:px-10 -mt-4" style={{ background: "transparent" }}>
-          <div className="max-w-[1300px] mx-auto">
+          <div className="max-w-[1200px] mx-auto">
             <div
               className="relative overflow-hidden cursor-pointer"
               style={{
                 borderRadius: 20,
                 boxShadow: "0 12px 50px rgba(0,0,0,0.15)",
-                maxHeight: "55vh",
+                aspectRatio: "16 / 9",
+                background: "#1A1A1A",
               }}
               onClick={() => {
                 if (videoRef.current) {
@@ -341,8 +342,7 @@ export default function SecondLandingPage() {
                 playsInline
                 preload="metadata"
                 controls={videoPlaying}
-                className="w-full"
-                style={{ display: "block", objectFit: "cover", height: "55vh" }}
+                style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
                 onEnded={() => setVideoPlaying(false)}
               />
               {/* Play button overlay */}
