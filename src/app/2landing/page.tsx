@@ -3,30 +3,28 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-/* ───────── 3D FLOATING ITEMS — same assets as main landing page ───────── */
+/* ───────── 3D FLOATING ITEMS — matching coverd.us positions exactly ───────── */
+/* 9 items scattered around edges, very large, some partially off-screen */
 
 const FLOATING_ITEMS = [
-  // Top-left cluster
-  { src: "/images/onboarding/sushi.png",       left: "-2%",  top: "8%",   size: 130, rotate: -18, delay: 0,    duration: 5.8 },
-  { src: "/images/onboarding/piggy-bank.png",  left: "5%",   top: "42%",  size: 120, rotate: 14,  delay: 1.2,  duration: 6.4 },
-  { src: "/images/onboarding/yoga-mat.png",    left: "-1%",  top: "72%",  size: 110, rotate: 22,  delay: 0.6,  duration: 5.4 },
-
-  // Top-right cluster
-  { src: "/images/onboarding/sneaker.png",     left: "82%",  top: "6%",   size: 140, rotate: 12,  delay: 0.4,  duration: 6.0 },
-  { src: "/images/onboarding/airplane.png",    left: "85%",  top: "38%",  size: 125, rotate: -22, delay: 1.8,  duration: 5.6 },
-  { src: "/images/onboarding/ring.png",        left: "88%",  top: "68%",  size: 105, rotate: 28,  delay: 0.8,  duration: 6.6 },
-
-  // Top center (partially cut off)
-  { src: "/images/onboarding/cards.png",       left: "38%",  top: "-3%",  size: 120, rotate: -10, delay: 2.0,  duration: 5.2 },
-  { src: "/images/coin-icon.png",              left: "62%",  top: "-2%",  size: 100, rotate: 15,  delay: 1.4,  duration: 6.2 },
-
-  // Bottom edges
-  { src: "/images/onboarding/suitcase.png",    left: "12%",  top: "78%",  size: 115, rotate: -8,  delay: 1.0,  duration: 5.9 },
-  { src: "/images/trophy.png",                 left: "75%",  top: "76%",  size: 110, rotate: 18,  delay: 2.2,  duration: 6.1 },
-
-  // Far edges — partially off-screen for depth
-  { src: "/images/onboarding/building.png",    left: "-4%",  top: "20%",  size: 100, rotate: -5,  delay: 1.6,  duration: 6.8 },
-  { src: "/images/onboarding/golfball.png",    left: "92%",  top: "52%",  size: 95,  rotate: -15, delay: 0.2,  duration: 5.5 },
+  // Top-left: airplane — large, angled, partially off left edge
+  { src: "/images/onboarding/airplane.png",      left: "2%",   top: "10%",  size: 280, rotate: -20, delay: 0.2,  duration: 6.0 },
+  // Top-center: stethoscope — peeking from top, overlapping navbar
+  { src: "/images/onboarding/stethoscope.png",   left: "28%",  top: "-2%",  size: 220, rotate: 10,  delay: 0,    duration: 5.6 },
+  // Top-right: cards — tilted, right side
+  { src: "/images/onboarding/cards.png",         left: "60%",  top: "5%",   size: 240, rotate: -12, delay: 0.6,  duration: 6.4 },
+  // Right: piggy bank — far right, partially off-screen
+  { src: "/images/onboarding/piggy-bank.png",    left: "82%",  top: "14%",  size: 260, rotate: 15,  delay: 0.4,  duration: 5.8 },
+  // Center-left below headline: sushi
+  { src: "/images/onboarding/sushi.png",         left: "18%",  top: "50%",  size: 200, rotate: -8,  delay: 1.0,  duration: 6.2 },
+  // Center-right: ring — smaller, below headline
+  { src: "/images/onboarding/ring.png",          left: "58%",  top: "48%",  size: 160, rotate: 20,  delay: 1.4,  duration: 5.4 },
+  // Bottom-right: sneaker — large, dramatic angle
+  { src: "/images/onboarding/sneaker.png",       left: "70%",  top: "55%",  size: 320, rotate: -18, delay: 0.8,  duration: 6.6 },
+  // Far-left edge: building — partially cut off
+  { src: "/images/onboarding/building.png",      left: "-5%",  top: "48%",  size: 220, rotate: 5,   delay: 1.2,  duration: 5.5 },
+  // Bottom-left: suitcase
+  { src: "/images/onboarding/suitcase.png",      left: "10%",  top: "68%",  size: 240, rotate: -6,  delay: 0.6,  duration: 6.0 },
 ];
 
 /* ───────── MERCHANT TICKER DATA ───────── */
@@ -85,30 +83,25 @@ export default function SecondLandingPage() {
           overflow-x: hidden;
         }
 
-        /* ── Floating bob ── */
         @keyframes floatBob {
           0%, 100% { transform: translateY(0) rotate(var(--rot)); }
-          50%      { transform: translateY(-20px) rotate(var(--rot)); }
+          50%      { transform: translateY(-18px) rotate(var(--rot)); }
         }
 
-        /* ── Pop-in entrance ── */
         @keyframes itemPop {
-          0%   { opacity: 0; transform: scale(0.2) rotate(var(--rot)); }
-          70%  { opacity: 1; transform: scale(1.08) rotate(var(--rot)); }
+          0%   { opacity: 0; transform: scale(0.3) rotate(var(--rot)); }
+          70%  { opacity: 1; transform: scale(1.05) rotate(var(--rot)); }
           100% { opacity: 1; transform: scale(1) rotate(var(--rot)); }
         }
 
-        /* ── Hero text entrance ── */
         @keyframes heroUp {
           from { opacity: 0; transform: translateY(36px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        .hero-in     { animation: heroUp 0.7s ease-out forwards; }
         .hero-in-d1  { animation: heroUp 0.7s ease-out 0.10s forwards; opacity: 0; }
         .hero-in-d2  { animation: heroUp 0.7s ease-out 0.22s forwards; opacity: 0; }
         .hero-in-d3  { animation: heroUp 0.7s ease-out 0.34s forwards; opacity: 0; }
 
-        /* ── Merchant ticker ── */
         @keyframes tickerScroll {
           0%   { transform: translateX(0); }
           100% { transform: translateX(-50%); }
@@ -122,9 +115,11 @@ export default function SecondLandingPage() {
 
       <div className="min-h-screen" style={{ background: "#F9E741" }}>
 
-        {/* ═══════════ NAVBAR — transparent over yellow ═══════════ */}
-        <nav className="relative z-50 w-full">
-          <div className="max-w-[1200px] mx-auto px-5 sm:px-8 h-[68px] flex items-center justify-between">
+        {/* ═══════════ HERO — full viewport, everything lives here ═══════════ */}
+        <section className="relative h-screen flex flex-col overflow-hidden" style={{ background: "#F9E741" }}>
+
+          {/* ── Top bar: just logo + button, NO header bar, z-index BELOW items ── */}
+          <div className="relative z-10 w-full px-5 sm:px-10 pt-5 flex items-center justify-between">
             {/* Logo */}
             <div className="flex items-center gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -144,50 +139,37 @@ export default function SecondLandingPage() {
               </span>
             </div>
 
-            {/* Right */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => router.push("/auth?mode=login")}
-                className="hidden sm:block px-5 py-2 text-[15px] font-semibold text-[#1A1A1A]/70 hover:text-[#1A1A1A] transition-colors"
-                style={{ fontFamily: "var(--font-outfit)" }}
-              >
-                Log In
-              </button>
-              <button
-                onClick={() => router.push("/auth")}
-                className="px-6 py-2.5 rounded-full text-[15px] font-bold text-white transition-all duration-200 hover:scale-[1.04] active:scale-[0.96]"
-                style={{
-                  fontFamily: "var(--font-outfit)",
-                  background: "#10B981",
-                  boxShadow: "0 2px 12px rgba(16,185,129,0.3)",
-                }}
-              >
-                Get Started
-              </button>
-            </div>
+            {/* CTA button only — no nav links, matching coverd */}
+            <button
+              onClick={() => router.push("/auth")}
+              className="px-7 py-3 rounded-full text-[15px] font-bold text-white transition-all duration-200 hover:scale-[1.04] active:scale-[0.96]"
+              style={{
+                fontFamily: "var(--font-outfit)",
+                background: "#1A1A1A",
+              }}
+            >
+              Get Started
+            </button>
           </div>
-        </nav>
 
-        {/* ═══════════ HERO ═══════════ */}
-        <section className="relative min-h-[calc(100vh-68px)] flex flex-col items-center justify-center px-6 overflow-hidden">
-
-          {/* ── 3D floating objects — desktop ── */}
+          {/* ── 3D floating objects — z-20, they float OVER the nav bar ── */}
           {FLOATING_ITEMS.map((item, i) => (
             <div
               key={i}
-              className="absolute pointer-events-none select-none hidden sm:block"
+              className="absolute pointer-events-none select-none hidden md:block"
               style={{
                 left: item.left,
                 top: item.top,
                 width: item.size,
                 height: item.size,
+                zIndex: 20,
                 // @ts-expect-error CSS custom property
                 "--rot": `${item.rotate}deg`,
                 animation: mounted
                   ? `itemPop 0.5s ease-out ${item.delay}s forwards, floatBob ${item.duration}s ease-in-out ${item.delay + 0.5}s infinite`
                   : "none",
                 opacity: 0,
-                filter: "drop-shadow(0 10px 25px rgba(0,0,0,0.12))",
+                filter: "drop-shadow(0 12px 30px rgba(0,0,0,0.12))",
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -202,23 +184,24 @@ export default function SecondLandingPage() {
             </div>
           ))}
 
-          {/* ── 3D floating objects — mobile (fewer, smaller) ── */}
-          {FLOATING_ITEMS.filter((_, i) => i % 2 === 0).map((item, i) => (
+          {/* ── Tablet: slightly smaller ── */}
+          {FLOATING_ITEMS.map((item, i) => (
             <div
-              key={`m-${i}`}
-              className="absolute pointer-events-none select-none sm:hidden"
+              key={`t-${i}`}
+              className="absolute pointer-events-none select-none hidden sm:block md:hidden"
               style={{
                 left: item.left,
                 top: item.top,
                 width: item.size * 0.6,
                 height: item.size * 0.6,
+                zIndex: 20,
                 // @ts-expect-error CSS custom property
                 "--rot": `${item.rotate}deg`,
                 animation: mounted
                   ? `itemPop 0.5s ease-out ${item.delay}s forwards, floatBob ${item.duration}s ease-in-out ${item.delay + 0.5}s infinite`
                   : "none",
                 opacity: 0,
-                filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.10))",
+                filter: "drop-shadow(0 8px 20px rgba(0,0,0,0.10))",
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -233,57 +216,70 @@ export default function SecondLandingPage() {
             </div>
           ))}
 
-          {/* ── Headline ── */}
-          <div className="relative z-10 text-center max-w-[900px] mx-auto">
-            <h1
-              className={`text-[#1A1A1A] leading-[0.95] tracking-[-0.03em] ${mounted ? "hero-in-d1" : "opacity-0"}`}
+          {/* ── Mobile: only 5 items, much smaller ── */}
+          {FLOATING_ITEMS.filter((_, i) => [0, 3, 4, 6, 8].includes(i)).map((item, i) => (
+            <div
+              key={`m-${i}`}
+              className="absolute pointer-events-none select-none sm:hidden"
               style={{
-                fontFamily: "var(--font-outfit)",
-                fontWeight: 900,
-                fontStyle: "italic",
-                fontSize: "clamp(44px, 9vw, 84px)",
+                left: item.left,
+                top: item.top,
+                width: item.size * 0.38,
+                height: item.size * 0.38,
+                zIndex: 20,
+                // @ts-expect-error CSS custom property
+                "--rot": `${item.rotate}deg`,
+                animation: mounted
+                  ? `itemPop 0.5s ease-out ${item.delay}s forwards, floatBob ${item.duration}s ease-in-out ${item.delay + 0.5}s infinite`
+                  : "none",
+                opacity: 0,
+                filter: "drop-shadow(0 5px 12px rgba(0,0,0,0.08))",
               }}
             >
-              Buy Now, Win Maybe
-            </h1>
-            <h2
-              className={`text-[#1A1A1A]/75 leading-[1.0] tracking-[-0.02em] mt-3 mb-10 ${mounted ? "hero-in-d2" : "opacity-0"}`}
-              style={{
-                fontFamily: "var(--font-outfit)",
-                fontWeight: 800,
-                fontStyle: "italic",
-                fontSize: "clamp(30px, 5.5vw, 56px)",
-              }}
-            >
-              We got you Shansi&apos;d
-            </h2>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={item.src}
+                alt=""
+                width={Math.round(item.size * 0.38)}
+                height={Math.round(item.size * 0.38)}
+                className="w-full h-full object-contain"
+                draggable={false}
+              />
+            </div>
+          ))}
 
-            {/* CTA */}
-            <div className={`flex flex-col sm:flex-row items-center justify-center gap-4 ${mounted ? "hero-in-d3" : "opacity-0"}`}>
-              <button
-                onClick={() => router.push("/auth")}
-                className="px-10 py-4 rounded-full text-[17px] font-extrabold text-white transition-all duration-200 hover:scale-[1.04] active:scale-[0.96]"
+          {/* ── Headline — center, z-30 so text is always readable ── */}
+          <div className="flex-1 flex items-center justify-center relative z-30 pointer-events-none">
+            <div className="text-center max-w-[900px] mx-auto px-6 pointer-events-auto">
+              <h1
+                className={`text-[#1A1A1A] leading-[0.95] tracking-[-0.03em] ${mounted ? "hero-in-d1" : "opacity-0"}`}
                 style={{
                   fontFamily: "var(--font-outfit)",
-                  background: "#1A1A1A",
-                  boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+                  fontWeight: 900,
+                  fontStyle: "italic",
+                  fontSize: "clamp(40px, 8.5vw, 84px)",
                 }}
               >
-                Sign Up Free
-              </button>
-              <button
-                onClick={() => router.push("/auth?mode=login")}
-                className="px-8 py-4 rounded-full text-[16px] font-bold text-[#1A1A1A] border-2 border-[#1A1A1A]/20 hover:border-[#1A1A1A]/40 transition-all duration-200 sm:hidden"
-                style={{ fontFamily: "var(--font-outfit)" }}
+                Buy Now, Win Maybe
+              </h1>
+              <h2
+                className={`text-[#1A1A1A] leading-[1.0] tracking-[-0.02em] mt-2 ${mounted ? "hero-in-d2" : "opacity-0"}`}
+                style={{
+                  fontFamily: "var(--font-outfit)",
+                  fontWeight: 900,
+                  fontStyle: "italic",
+                  fontSize: "clamp(34px, 7vw, 72px)",
+                }}
               >
-                Log In
-              </button>
+                We got you Shansi&apos;d
+              </h2>
             </div>
           </div>
+
         </section>
 
         {/* ═══════════ MERCHANT TICKER ═══════════ */}
-        <div className="relative z-10 w-full overflow-hidden py-5" style={{ background: "#1A1A1A" }}>
+        <div className="relative z-30 w-full overflow-hidden py-5" style={{ background: "#1A1A1A" }}>
           <div className="flex ticker-track" style={{ width: "200%" }}>
             {[...MERCHANTS, ...MERCHANTS, ...MERCHANTS, ...MERCHANTS].map((m, i) => (
               <div key={i} className="flex items-center gap-3 px-8 shrink-0">
@@ -330,18 +326,14 @@ export default function SecondLandingPage() {
 
             <div className="grid md:grid-cols-3 gap-6 md:gap-8">
               {[
-                { emoji: "📱", step: "01", title: "Scan & Pay",    desc: "Visit any partner merchant and scan the QR code to log your purchase instantly." },
-                { emoji: "🎮", step: "02", title: "Play Games",    desc: "Use your entries to play — slots, plinko, chicken rush. Every purchase is a game ticket." },
-                { emoji: "💸", step: "03", title: "Win Cashback",  desc: "Win up to 100% of your purchase back. Withdraw anytime, zero strings attached." },
+                { emoji: "📱", step: "01", title: "Scan & Pay",   desc: "Visit any partner merchant and scan the QR code to log your purchase instantly." },
+                { emoji: "🎮", step: "02", title: "Play Games",   desc: "Use your entries to play — slots, plinko, chicken rush. Every purchase is a game ticket." },
+                { emoji: "💸", step: "03", title: "Win Cashback", desc: "Win up to 100% of your purchase back. Withdraw anytime, zero strings attached." },
               ].map((s, i) => (
                 <div
                   key={i}
                   className="relative rounded-3xl p-8 md:p-10 text-center transition-all duration-200 hover:scale-[1.02]"
-                  style={{
-                    background: "white",
-                    boxShadow: "0 2px 20px rgba(0,0,0,0.04)",
-                    border: "1px solid rgba(0,0,0,0.06)",
-                  }}
+                  style={{ background: "white", boxShadow: "0 2px 20px rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.06)" }}
                 >
                   <span
                     className="absolute top-4 right-6 text-[48px] font-black text-[#1A1A1A]/[0.04] select-none"
@@ -350,16 +342,10 @@ export default function SecondLandingPage() {
                     {s.step}
                   </span>
                   <div className="text-[48px] mb-5">{s.emoji}</div>
-                  <h3
-                    className="text-[20px] font-bold text-[#1A1A1A] mb-3"
-                    style={{ fontFamily: "var(--font-outfit)" }}
-                  >
+                  <h3 className="text-[20px] font-bold text-[#1A1A1A] mb-3" style={{ fontFamily: "var(--font-outfit)" }}>
                     {s.title}
                   </h3>
-                  <p
-                    className="text-[14px] text-[#1A1A1A]/55 leading-[1.6]"
-                    style={{ fontFamily: "var(--font-dm-sans)" }}
-                  >
+                  <p className="text-[14px] text-[#1A1A1A]/55 leading-[1.6]" style={{ fontFamily: "var(--font-dm-sans)" }}>
                     {s.desc}
                   </p>
                 </div>
@@ -376,26 +362,19 @@ export default function SecondLandingPage() {
               style={{ background: "#F9E741", boxShadow: "0 4px 30px rgba(249,231,65,0.3)" }}
             >
               <span className="text-[48px] mb-4 block">📊</span>
-              <h3
-                className="text-[28px] sm:text-[34px] font-extrabold text-[#1A1A1A] leading-[1.15] mb-4"
-                style={{ fontFamily: "var(--font-outfit)" }}
-              >
+              <h3 className="text-[28px] sm:text-[34px] font-extrabold text-[#1A1A1A] leading-[1.15] mb-4" style={{ fontFamily: "var(--font-outfit)" }}>
                 Track your<br />purchases...
               </h3>
               <p className="text-[15px] text-[#1A1A1A]/65 leading-[1.6]" style={{ fontFamily: "var(--font-dm-sans)" }}>
                 A sleek way to get on top of your spending — see insights, build better habits, and take control of your finances.
               </p>
             </div>
-
             <div
               className="rounded-3xl p-8 md:p-10 transition-all duration-200 hover:scale-[1.01]"
               style={{ background: "#1A1A1A", boxShadow: "0 4px 30px rgba(0,0,0,0.15)" }}
             >
               <span className="text-[48px] mb-4 block">🏆</span>
-              <h3
-                className="text-[28px] sm:text-[34px] font-extrabold text-white leading-[1.15] mb-4"
-                style={{ fontFamily: "var(--font-outfit)" }}
-              >
+              <h3 className="text-[28px] sm:text-[34px] font-extrabold text-white leading-[1.15] mb-4" style={{ fontFamily: "var(--font-outfit)" }}>
                 ...and win<br />them back
               </h3>
               <p className="text-[15px] text-white/55 leading-[1.6]" style={{ fontFamily: "var(--font-dm-sans)" }}>
@@ -421,12 +400,8 @@ export default function SecondLandingPage() {
                   style={{ background: "white", border: "1px solid rgba(0,0,0,0.06)", boxShadow: "0 1px 8px rgba(0,0,0,0.03)" }}
                 >
                   <div className="text-[36px] mb-3">{f.emoji}</div>
-                  <p className="text-[15px] font-bold text-[#1A1A1A] mb-1" style={{ fontFamily: "var(--font-outfit)" }}>
-                    {f.title}
-                  </p>
-                  <p className="text-[13px] text-[#1A1A1A]/50 leading-[1.5]" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                    {f.desc}
-                  </p>
+                  <p className="text-[15px] font-bold text-[#1A1A1A] mb-1" style={{ fontFamily: "var(--font-outfit)" }}>{f.title}</p>
+                  <p className="text-[13px] text-[#1A1A1A]/50 leading-[1.5]" style={{ fontFamily: "var(--font-dm-sans)" }}>{f.desc}</p>
                 </div>
               ))}
             </div>
@@ -442,10 +417,7 @@ export default function SecondLandingPage() {
             >
               Ready to Get<br />Shansi&apos;d?
             </h2>
-            <p
-              className="text-[16px] sm:text-[18px] text-[#1A1A1A]/60 mb-10 max-w-[420px] mx-auto"
-              style={{ fontFamily: "var(--font-dm-sans)" }}
-            >
+            <p className="text-[16px] sm:text-[18px] text-[#1A1A1A]/60 mb-10 max-w-[420px] mx-auto" style={{ fontFamily: "var(--font-dm-sans)" }}>
               Join thousands of users already winning their purchases back.
             </p>
             <button
@@ -467,18 +439,14 @@ export default function SecondLandingPage() {
             <div className="flex items-center gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/images/shansi-logo.png" alt="Shansi" width={24} height={24} className="select-none brightness-0 invert" />
-              <span className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
-                Shansi
-              </span>
+              <span className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>Shansi</span>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-6 text-[13px] text-white/50" style={{ fontFamily: "var(--font-dm-sans)" }}>
               <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="hover:text-white transition-colors">Home</button>
               <button onClick={() => router.push("/auth")} className="hover:text-white transition-colors">Sign Up</button>
               <button onClick={() => router.push("/auth?mode=login")} className="hover:text-white transition-colors">Log In</button>
             </div>
-            <p className="text-[12px] text-white/30" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              &copy; 2026 Shansi. All rights reserved.
-            </p>
+            <p className="text-[12px] text-white/30" style={{ fontFamily: "var(--font-dm-sans)" }}>&copy; 2026 Shansi. All rights reserved.</p>
           </div>
         </footer>
       </div>
