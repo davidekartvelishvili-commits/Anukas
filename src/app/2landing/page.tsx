@@ -197,7 +197,7 @@ export default function SecondLandingPage() {
                 top: item.top,
                 width: item.size,
                 height: item.size,
-                zIndex: 20,
+                zIndex: 40,
                 // @ts-expect-error CSS custom property
                 "--rot": `${item.rotate}deg`,
                 animation: mounted
@@ -229,7 +229,7 @@ export default function SecondLandingPage() {
                 top: item.top,
                 width: item.size * 0.6,
                 height: item.size * 0.6,
-                zIndex: 20,
+                zIndex: 40,
                 // @ts-expect-error CSS custom property
                 "--rot": `${item.rotate}deg`,
                 animation: mounted
@@ -261,7 +261,7 @@ export default function SecondLandingPage() {
                 top: item.top,
                 width: item.size * 0.38,
                 height: item.size * 0.38,
-                zIndex: 20,
+                zIndex: 40,
                 // @ts-expect-error CSS custom property
                 "--rot": `${item.rotate}deg`,
                 animation: mounted
@@ -334,12 +334,12 @@ export default function SecondLandingPage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/images/onboarding/suitcase.png" alt="" width={180} height={180} className="w-full h-full object-contain" draggable={false} />
             </div>
-            {/* Golfball overlapping bottom-right of video — half on, floating */}
+            {/* Golfball overlapping bottom-left of video — half on video */}
             <div
               className="absolute pointer-events-none select-none hidden md:block"
               style={{
-                right: -20,
-                bottom: -50,
+                left: 40,
+                bottom: -55,
                 width: 110,
                 height: 110,
                 zIndex: 40,
