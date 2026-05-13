@@ -10,13 +10,13 @@ const FLOATING_ITEMS = [
   // Top-left: airplane — large, angled, partially off left edge
   { src: "/images/onboarding/airplane.png",      left: "2%",   top: "10%",  size: 220, rotate: -20, delay: 0.2,  duration: 6.0 },
   // Top-center: stethoscope
-  { src: "/images/onboarding/stethoscope.png",   left: "28%",  top: "-5%",  size: 85,  rotate: 10,  delay: 0,    duration: 5.6 },
+  { src: "/images/onboarding/stethoscope.png",   left: "28%",  top: "2%",   size: 85,  rotate: 10,  delay: 0,    duration: 5.6 },
   // Top-right: cards
   { src: "/images/onboarding/cards.png",         left: "60%",  top: "5%",   size: 190, rotate: -12, delay: 0.6,  duration: 6.4 },
   // Right: piggy bank
   { src: "/images/onboarding/piggy-bank-pink.png",    left: "82%",  top: "14%",  size: 210, rotate: 15,  delay: 0.4,  duration: 5.8 },
   // Center-left below headline: sushi
-  { src: "/images/onboarding/sushi.png",         left: "18%",  top: "50%",  size: 120, rotate: -8,  delay: 1.0,  duration: 6.2 },
+  { src: "/images/onboarding/sushi.png",         left: "18%",  top: "58%",  size: 120, rotate: -8,  delay: 1.0,  duration: 6.2 },
   // Center-right: ring
   { src: "/images/onboarding/ring.png",          left: "55%",  top: "62%",  size: 110, rotate: 20,  delay: 1.4,  duration: 5.4 },
   // Bottom-right: sneaker
