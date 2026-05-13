@@ -3,155 +3,82 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-/* ───────── MERCHANT DATA (like Coverd's transaction cards) ───────── */
+/* ───────── ITEM CONFIG ───────── */
 
-const TRANSACTIONS = [
-  { name: "Stamba Hotel", amount: "₾120", icon: "/images/stamba-logo.png" },
-  { name: "Dunkin'", amount: "₾18", icon: "/images/dunkin-logo.jpg" },
-  { name: "Wendy's", amount: "₾32", icon: "/images/wendys-logo.png" },
-];
-
-/* ───────── FEATURE ITEMS ───────── */
-
-const FEATURES = [
-  {
-    icon: "wallet",
-    title: "Up to 100% Cashback",
-    titleGe: "100%-მდე ქეშბექი",
-    desc: "Win back the full amount of your purchases through games.",
-  },
-  {
-    icon: "scan",
-    title: "Zero Hidden Fees",
-    titleGe: "დამალული საკომისიოების გარეშე",
-    desc: "Transparent. No subscriptions, no catches.",
-  },
-  {
-    icon: "flame",
-    title: "Smart Insights",
-    titleGe: "ჭკვიანი ანალიტიკა",
-    desc: "Track spending habits, build better financial routines.",
-  },
-  {
-    icon: "game",
-    title: "Automatic Game Entries",
-    titleGe: "ავტომატური თამაშის შესვლა",
-    desc: "Every purchase is a chance to win it back. Play instantly.",
-  },
-];
-
-/* ───────── GAME COVERS ───────── */
-
-const GAMES = [
-  { name: "Midnight Machine", cover: "/images/onboarding/slot-machine.mp4", type: "video" },
-  { name: "Chicken Rush", cover: "/images/lucky-step-cover.png", type: "image" },
-  { name: "Lucky Drop", cover: "/images/lucky-drop-cover.png", type: "image" },
-  { name: "Air Hockey", cover: "/images/air-hockey-cover.png", type: "image" },
-];
-
-/* ───────── FLOATING ITEMS (for hero background) ───────── */
-
-const FLOAT_ITEMS = [
-  "/images/onboarding/sushi.png",
-  "/images/onboarding/sneaker.png",
-  "/images/onboarding/piggy-bank.png",
-  "/images/onboarding/airplane.png",
-  "/images/onboarding/ring.png",
-  "/images/onboarding/cards.png",
-  "/images/onboarding/suitcase.png",
-  "/images/onboarding/building.png",
-];
-
-/* ───────── ICON COMPONENT (inline) ───────── */
-
-function FeatureIcon({ name, size = 28 }: { name: string; size?: number }) {
-  const props = {
-    width: size,
-    height: size,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "#00E88F",
-    strokeWidth: 1.8,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-
-  switch (name) {
-    case "wallet":
-      return (
-        <svg {...props}>
-          <rect x="2" y="6" width="20" height="14" rx="2" />
-          <path d="M2 10h20" />
-          <path d="M22 6V5a2 2 0 00-2-2H6a4 4 0 00-4 4" />
-          <circle cx="18" cy="14" r="1" fill="#00E88F" stroke="none" />
-        </svg>
-      );
-    case "scan":
-      return (
-        <svg {...props}>
-          <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M3 17v2a2 2 0 002 2h2M17 21h2a2 2 0 002-2v-2" />
-          <path d="M7 12h10" strokeWidth="2.5" />
-          <path d="M12 7v10" strokeWidth="2.5" />
-        </svg>
-      );
-    case "flame":
-      return (
-        <svg {...props} fill="#00E88F" fillOpacity="0.2">
-          <path d="M12 2c.5 4-2.5 6-2.5 10a5 5 0 0010 0c0-4-3-5.5-2.5-10a7.4 7.4 0 01-5 0z" />
-          <path d="M12 18a2.5 2.5 0 002.5-2.5c0-2-2.5-3-2.5-5-.5 1.5-2.5 2.5-2.5 5A2.5 2.5 0 0012 18z" fill="#00E88F" fillOpacity="0.4" />
-        </svg>
-      );
-    case "game":
-      return (
-        <svg {...props}>
-          <rect x="2" y="6" width="20" height="12" rx="4" />
-          <circle cx="8" cy="12" r="1.5" fill="#00E88F" stroke="none" />
-          <circle cx="16" cy="10" r="1" fill="#00E88F" stroke="none" />
-          <circle cx="16" cy="14" r="1" fill="#00E88F" stroke="none" />
-          <circle cx="14" cy="12" r="1" fill="#00E88F" stroke="none" />
-          <circle cx="18" cy="12" r="1" fill="#00E88F" stroke="none" />
-          <path d="M8 9v6M5 12h6" />
-        </svg>
-      );
-    case "trophy":
-      return (
-        <svg {...props}>
-          <path d="M6 3h12v6a6 6 0 01-12 0V3z" fill="#00E88F" fillOpacity="0.1" />
-          <path d="M6 5H4a1 1 0 00-1 1v1a4 4 0 004 4" />
-          <path d="M18 5h2a1 1 0 011 1v1a4 4 0 01-4 4" />
-          <path d="M12 13v3" />
-          <path d="M8 19h8" />
-          <path d="M9 19v-3h6v3" />
-        </svg>
-      );
-    case "star":
-      return (
-        <svg {...props} fill="#00E88F" fillOpacity="0.15">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-        </svg>
-      );
-    case "check":
-      return (
-        <svg {...props}>
-          <path d="M5 12l5 5L20 7" />
-        </svg>
-      );
-    default:
-      return null;
-  }
+interface FloatingItem {
+  src: string;
+  x: number;
+  y: number;
+  width: number;
+  rotation: number;
+  depth: number;
+  zIndex: number;
 }
 
-/* ───────── MAIN PAGE ───────── */
+const ITEMS: FloatingItem[] = [
+  { src: "/images/onboarding/sushi.png",       x: -5,  y: 2,   width: 110, rotation: -15, depth: 1.8, zIndex: 5 },
+  { src: "/images/onboarding/airplane.png",    x: 20,  y: -5,  width: 120, rotation: -10, depth: 1.2, zIndex: 4 },
+  { src: "/images/onboarding/yoga-mat.png",    x: 48,  y: 5,   width: 100, rotation: 22,  depth: 0.8, zIndex: 2 },
+  { src: "/images/onboarding/sneaker.png",     x: 55,  y: 30,  width: 130, rotation: 8,   depth: 1.6, zIndex: 7 },
+  { src: "/images/onboarding/stethoscope.png", x: -3,  y: 35,  width: 105, rotation: -5,  depth: 1.3, zIndex: 6 },
+  { src: "/images/onboarding/building.png",    x: 30,  y: 45,  width: 100, rotation: 5,   depth: 1.0, zIndex: 3 },
+  { src: "/images/onboarding/piggy-bank.png",  x: 60,  y: 60,  width: 110, rotation: -6,  depth: 2.0, zIndex: 7 },
+  { src: "/images/onboarding/suitcase.png",   x: 35,  y: 68,  width: 115, rotation: 12,  depth: 1.4, zIndex: 5 },
+  { src: "/images/onboarding/ring.png",      x: 65,  y: -2,  width: 95,  rotation: -10, depth: 0.9, zIndex: 3 },
+  { src: "/images/onboarding/golfball.png", x: -2,  y: 55,  width: 80,  rotation: 0,   depth: 1.7, zIndex: 4 },
+  { src: "/images/onboarding/cards.png",   x: 42,  y: 25,  width: 120, rotation: -8,  depth: 1.1, zIndex: 3 },
+  { src: "/images/onboarding/ali-nino.png", x: 10,  y: 75,  width: 105, rotation: 10,  depth: 1.5, zIndex: 6 },
+];
 
-export default function LandingPage() {
+/* ───────── ENTRANCE ANIMATION ───────── */
+
+const CAROUSEL_DURATION = 4000;       // 4s carousel phase
+const STAGGER_DELAY = 100;            // 100ms between each item falling
+const CAROUSEL_RADIUS = 160;          // circle radius in px
+const CAROUSEL_SPEED = 0.001178;      // radians per ms — 3/4 circle in CAROUSEL_DURATION
+
+/* ───────── LOGO ───────── */
+
+function ShansiLogo() {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/images/shansi-logo.png"
+      alt="Shansi"
+      width={52}
+      height={52}
+      className="select-none"
+      draggable={false}
+    />
+  );
+}
+
+/* ───────── PHYSICS STATE (per item) ───────── */
+
+interface PhysicsBody {
+  // Position offset from initial CSS position
+  x: number;
+  y: number;
+  // Velocity
+  vx: number;
+  vy: number;
+  // Rotation (degrees, accumulated; cosmos-style 360° spins on impact)
+  r: number;
+  // Rotational velocity (degrees per frame)
+  vr: number;
+}
+
+/* ───────── MAIN ───────── */
+
+export default function WelcomePage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
-  const heroRef = useRef<HTMLDivElement>(null);
+  const [gyroGranted, setGyroGranted] = useState(false);
+  const userTapped = useRef(false);
 
-  // Capture ?ref=CODE and track page view (same as before)
+  // Capture ?ref=CODE from share link → store for the signup flow
+  // Capture ?callbackUrl= from AuthGuard redirect → persist for post-login
   useEffect(() => {
-    setMounted(true);
     if (typeof window === "undefined") return;
     try {
       const params = new URLSearchParams(window.location.search);
@@ -163,6 +90,7 @@ export default function LandingPage() {
       if (cb) {
         localStorage.setItem("auth_callback_url", cb);
       }
+      // Track page view
       const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
       fetch(`${API}/public/track`, {
         method: "POST",
@@ -179,564 +107,647 @@ export default function LandingPage() {
     } catch {}
   }, []);
 
-  // Parallax scroll tracking
+  const rawTilt = useRef({ x: 0, y: 0 });
+  const smoothTilt = useRef({ x: 0, y: 0 });
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const rafRef = useRef<number>(0);
+
+  // Physics bodies — one per item
+  const bodies = useRef<PhysicsBody[]>(ITEMS.map(() => ({ x: 0, y: 0, vx: 0, vy: 0, r: 0, vr: 0 })));
+
+  // Entrance animation state
+  const animPhase = useRef<"carousel" | "falling" | "settled">("carousel");
+  const animStartTime = useRef<number>(0);
+  const itemScale = useRef<number[]>(ITEMS.map(() => 1));
+  const hasBouncedFloor = useRef<boolean[]>(ITEMS.map(() => false));
+  const itemReleased = useRef<boolean[]>(ITEMS.map(() => false));
+  const itemFrozen = useRef<boolean[]>(ITEMS.map(() => false));
+
+  // Drag state
+  const draggingIdx = useRef<number | null>(null);
+  const dragPrev = useRef({ x: 0, y: 0 });
+  const dragVel = useRef({ x: 0, y: 0 });
+
+  const SENSITIVITY = 0.8;
+  const MAX_GYRO = 40;
+  const FRICTION = 0.96;
+  const COLLISION_RESPONSE = 0.5;
+  const BOUNCE = 0.6;
+
   useEffect(() => {
-    const onScroll = () => setScrollY(window.scrollY);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    setMounted(true);
+    animStartTime.current = performance.now();
+
+    // Get the center of an item in screen coordinates
+    const getCenter = (idx: number): { x: number; y: number } => {
+      const el = itemRefs.current[idx];
+      if (!el) return { x: 0, y: 0 };
+      const parent = el.parentElement?.getBoundingClientRect();
+      const pw = parent?.width || window.innerWidth;
+      const ph = parent?.height || window.innerHeight;
+      const item = ITEMS[idx];
+      const body = bodies.current[idx];
+      return {
+        x: (item.x / 100) * pw + item.width / 2 + body.x,
+        y: ((45 + item.y * 0.55) / 100) * ph + item.width / 2 + body.y,
+      };
+    };
+
+    // Compute the carousel offset for an item (offset from its base position to its circle slot)
+    const getCarouselOffset = (idx: number, elapsed: number) => {
+      const sw = window.innerWidth;
+      const sh = window.innerHeight;
+      const item = ITEMS[idx];
+      // Circle center: horizontally centered, vertically ~30% from top (near the title)
+      const cx = sw / 2;
+      const cy = sh * 0.38;
+      // Item base position (matches CSS)
+      const baseX = (item.x / 100) * sw;
+      const baseY = ((45 + item.y * 0.55) / 100) * sh;
+      // Angle for this item in the circle, rotating clockwise over time
+      const angle = (idx / ITEMS.length) * Math.PI * 2 + elapsed * CAROUSEL_SPEED;
+      const targetX = cx + CAROUSEL_RADIUS * Math.cos(angle) - item.width / 2;
+      const targetY = cy + CAROUSEL_RADIUS * Math.sin(angle) - item.width / 2;
+      return { x: targetX - baseX, y: targetY - baseY };
+    };
+
+    // ── Main physics loop at 60fps ──
+    const loop = () => {
+      const now = performance.now();
+      const elapsed = now - animStartTime.current;
+
+      // Lerp gyro
+      smoothTilt.current.x += (rawTilt.current.x - smoothTilt.current.x) * 0.1;
+      smoothTilt.current.y += (rawTilt.current.y - smoothTilt.current.y) * 0.1;
+      const sx = smoothTilt.current.x;
+      const sy = smoothTilt.current.y;
+
+      const n = ITEMS.length;
+
+      // ── PHASE: Carousel (first 2 seconds) ──
+      if (animPhase.current === "carousel") {
+        if (elapsed >= CAROUSEL_DURATION) {
+          // Transition to EXPLOSION — blast items outward from the carousel center
+          const sw = window.innerWidth;
+          const sh = window.innerHeight;
+          for (let i = 0; i < n; i++) {
+            const off = getCarouselOffset(i, elapsed);
+            bodies.current[i].x = off.x;
+            bodies.current[i].y = off.y;
+
+            // Outward direction = item's current offset from center, plus some jitter
+            const item = ITEMS[i];
+            const baseX = (item.x / 100) * sw;
+            const baseY = ((45 + item.y * 0.55) / 100) * sh;
+            const absX = baseX + off.x;
+            const absY = baseY + off.y;
+            const dx = absX - sw / 2;
+            const dy = absY - sh * 0.38; // carousel center Y
+            const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+            // Explosion speed — varies per item for organic feel
+            const speed = 22 + Math.random() * 14; // px/frame
+            const jitter = (Math.random() - 0.5) * 0.25; // small angle offset
+            const cos = dx / dist, sin = dy / dist;
+            // Rotate by jitter
+            const rc = Math.cos(jitter), rs = Math.sin(jitter);
+            const vxDir = cos * rc - sin * rs;
+            const vyDir = sin * rc + cos * rs;
+            bodies.current[i].vx = vxDir * speed;
+            bodies.current[i].vy = vyDir * speed;
+            // Random spin from the blast
+            bodies.current[i].vr = (Math.random() - 0.5) * 18;
+
+            itemScale.current[i] = 1.25; // pulse out on explosion
+            hasBouncedFloor.current[i] = false;
+            itemReleased.current[i] = true; // all released at once — no stagger
+            itemFrozen.current[i] = false;
+          }
+          animPhase.current = "falling";
+        } else {
+          // Position all items on the rotating circle
+          for (let i = 0; i < n; i++) {
+            const off = getCarouselOffset(i, elapsed);
+            bodies.current[i].x = off.x;
+            bodies.current[i].y = off.y;
+          }
+        }
+      }
+
+      // ── PHASE: Explosion (items blast outward from carousel center, then settle) ──
+      if (animPhase.current === "falling") {
+        const WALL_BOUNCE_FALL = 0.5;
+        let allSettled = true;
+
+        const screenW = window.innerWidth;
+        const screenH = window.innerHeight;
+
+        for (let i = 0; i < n; i++) {
+          const b = bodies.current[i];
+          const item = ITEMS[i];
+
+          // Skip frozen items — they've settled
+          if (itemFrozen.current[i]) {
+            continue;
+          }
+
+          // Air friction — slows the blast gradually (no gravity, zero-G feel)
+          b.vx *= 0.965;
+          b.vy *= 0.965;
+
+          b.x += b.vx;
+          b.y += b.vy;
+
+          // Angular motion + friction
+          b.r += b.vr;
+          b.vr *= 0.94;
+
+          // Absolute position for wall checks
+          const baseX = (item.x / 100) * screenW;
+          const baseY = ((45 + item.y * 0.55) / 100) * screenH;
+          const absLeft = baseX + b.x;
+          const absRight = absLeft + item.width;
+          const absTop = baseY + b.y;
+          const absBottom = absTop + item.width;
+
+          // Wall bounces — keep items on screen (no floor, it's 4 walls)
+          if (absLeft < -10) {
+            b.x = -10 - baseX;
+            b.vx = Math.abs(b.vx) * WALL_BOUNCE_FALL;
+          }
+          if (absRight > screenW + 10) {
+            b.x = screenW + 10 - item.width - baseX;
+            b.vx = -Math.abs(b.vx) * WALL_BOUNCE_FALL;
+          }
+          if (absTop < -10) {
+            b.y = -10 - baseY;
+            b.vy = Math.abs(b.vy) * WALL_BOUNCE_FALL;
+          }
+          if (absBottom > screenH + 10) {
+            b.y = screenH + 10 - item.width - baseY;
+            b.vy = -Math.abs(b.vy) * WALL_BOUNCE_FALL;
+          }
+
+          // Scale settle: 1.25 → 1.0
+          if (itemScale.current[i] > 1.001) {
+            itemScale.current[i] += (1.0 - itemScale.current[i]) * 0.08;
+          } else {
+            itemScale.current[i] = 1;
+          }
+
+          // Freeze once motion is essentially zero — wherever the item ends up is fine
+          const speedSq = b.vx * b.vx + b.vy * b.vy;
+          if (speedSq < 0.08 && Math.abs(b.vr) < 0.25) {
+            b.vx = 0;
+            b.vy = 0;
+            b.vr = 0;
+            itemFrozen.current[i] = true;
+            itemScale.current[i] = 1;
+            continue;
+          }
+
+          allSettled = false;
+        }
+
+        // Collision between falling items
+        for (let i = 0; i < n; i++) {
+          if (!itemReleased.current[i]) continue;
+          for (let j = i + 1; j < n; j++) {
+            if (!itemReleased.current[j]) continue;
+            const ci = getCenter(i);
+            const cj = getCenter(j);
+            const dx = cj.x - ci.x;
+            const dy = cj.y - ci.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const minDist = ITEMS[i].width * 0.35 + ITEMS[j].width * 0.35;
+            if (dist < minDist && dist > 0.5) {
+              const nx = dx / dist;
+              const ny = dy / dist;
+              const bi = bodies.current[i];
+              const bj = bodies.current[j];
+              const dvDotN = (bj.vx - bi.vx) * nx + (bj.vy - bi.vy) * ny;
+              if (dvDotN < 0) {
+                const impulse = -dvDotN * 0.4;
+                bi.vx -= nx * impulse;
+                bi.vy -= ny * impulse;
+                bj.vx += nx * impulse;
+                bj.vy += ny * impulse;
+              }
+              const overlap = (minDist - dist) * 0.5;
+              bi.x -= nx * overlap;
+              bi.y -= ny * overlap;
+              bj.x += nx * overlap;
+              bj.y += ny * overlap;
+            }
+          }
+        }
+
+        if (allSettled) {
+          animPhase.current = "settled";
+        }
+      }
+
+      // ── PHASE: Settled (normal physics) ──
+      if (animPhase.current === "settled") {
+        // ── Apply velocity + friction to non-dragged items ──
+        for (let i = 0; i < n; i++) {
+          const b = bodies.current[i];
+          if (draggingIdx.current === i) {
+            // While dragging: no inertia damping (direct follow). Rotation settles quickly.
+            b.vr *= 0.85;
+            if (Math.abs(b.vr) < 0.08) b.vr = 0;
+            b.r += b.vr;
+            continue;
+          }
+          b.x += b.vx;
+          b.y += b.vy;
+          b.vx *= FRICTION;
+          b.vy *= FRICTION;
+          if (Math.abs(b.vx) < 0.05) b.vx = 0;
+          if (Math.abs(b.vy) < 0.05) b.vy = 0;
+          // Rotation — strong angular friction so items don't keep spinning like a top
+          b.r += b.vr;
+          b.vr *= 0.93;
+          if (Math.abs(b.vr) < 0.08) b.vr = 0;
+        }
+
+        // ── Collision detection + momentum transfer ──
+        for (let i = 0; i < n; i++) {
+          for (let j = i + 1; j < n; j++) {
+            const ci = getCenter(i);
+            const cj = getCenter(j);
+            const dx = cj.x - ci.x;
+            const dy = cj.y - ci.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const ri = ITEMS[i].width * 0.35;
+            const rj = ITEMS[j].width * 0.35;
+            const minDist = ri + rj;
+
+            if (dist < minDist && dist > 0.5) {
+              const nx = dx / dist;
+              const ny = dy / dist;
+              const overlap = minDist - dist;
+
+              const bi = bodies.current[i];
+              const bj = bodies.current[j];
+
+              const dvx = bj.vx - bi.vx;
+              const dvy = bj.vy - bi.vy;
+              const dvDotN = dvx * nx + dvy * ny;
+
+              if (dvDotN < 0) {
+                const speed = Math.abs(dvDotN);
+                if (speed > 1.5 && userTapped.current && navigator.vibrate) {
+                  navigator.vibrate(Math.min(30, Math.round(speed * 4)));
+                }
+                const impulse = -(1 + BOUNCE) * dvDotN * COLLISION_RESPONSE;
+
+                if (draggingIdx.current === i) {
+                  bj.vx += nx * impulse * 2;
+                  bj.vy += ny * impulse * 2;
+                } else if (draggingIdx.current === j) {
+                  bi.vx -= nx * impulse * 2;
+                  bi.vy -= ny * impulse * 2;
+                } else {
+                  bi.vx -= nx * impulse;
+                  bi.vy -= ny * impulse;
+                  bj.vx += nx * impulse;
+                  bj.vy += ny * impulse;
+                }
+
+                // ── Gentle angular impulse — natural, subtle rotation on collision (not a fidget spinner) ──
+                const tx = -ny, ty = nx;
+                const tangential = dvx * tx + dvy * ty;
+                // Small multiplier + low cap so the spin is a subtle rotation, not a full spin
+                const spinMagnitude = Math.min(3.5, Math.abs(tangential) * 0.5);
+                const spinDir = tangential >= 0 ? 1 : -1;
+                if (draggingIdx.current !== j) bj.vr += spinDir * spinMagnitude;
+                if (draggingIdx.current !== i) bi.vr -= spinDir * spinMagnitude;
+              }
+
+              const sep = overlap * 0.5;
+              if (draggingIdx.current === i) {
+                bj.x += nx * overlap;
+                bj.y += ny * overlap;
+              } else if (draggingIdx.current === j) {
+                bi.x -= nx * overlap;
+                bi.y -= ny * overlap;
+              } else {
+                bi.x -= nx * sep;
+                bi.y -= ny * sep;
+                bj.x += nx * sep;
+                bj.y += ny * sep;
+              }
+            }
+          }
+        }
+
+        // ── Wall bouncing ──
+        const screenW = window.innerWidth;
+        const screenH = window.innerHeight;
+        for (let i = 0; i < n; i++) {
+          const item = ITEMS[i];
+          const b = bodies.current[i];
+          const baseX = (item.x / 100) * screenW;
+          const baseY = ((45 + item.y * 0.55) / 100) * screenH;
+          const actualLeft = baseX + b.x;
+          const actualRight = actualLeft + item.width;
+          const actualTop = baseY + b.y;
+          const actualBottom = actualTop + item.width;
+
+          const wallVibrate = (v: number) => {
+            if (Math.abs(v) > 2 && userTapped.current && navigator.vibrate) {
+              navigator.vibrate(Math.min(20, Math.round(Math.abs(v) * 3)));
+            }
+          };
+
+          // Wall-bounce angular impulse — very gentle, only noticeable on corner/glancing hits
+          const addSpinFromWall = (tangential: number) => {
+            const mag = Math.min(2.5, Math.abs(tangential) * 0.35);
+            b.vr += (tangential >= 0 ? 1 : -1) * mag;
+          };
+
+          if (actualLeft < -10) {
+            b.x = -10 - baseX;
+            wallVibrate(b.vx);
+            addSpinFromWall(b.vy); // vertical motion at left wall → spin
+            b.vx = Math.abs(b.vx) * BOUNCE;
+          }
+          if (actualRight > screenW + 10) {
+            b.x = screenW + 10 - item.width - baseX;
+            wallVibrate(b.vx);
+            addSpinFromWall(-b.vy);
+            b.vx = -Math.abs(b.vx) * BOUNCE;
+          }
+          if (actualTop < -10) {
+            b.y = -10 - baseY;
+            wallVibrate(b.vy);
+            addSpinFromWall(-b.vx);
+            b.vy = Math.abs(b.vy) * BOUNCE;
+          }
+          if (actualBottom > screenH + 10) {
+            b.y = screenH + 10 - item.width - baseY;
+            wallVibrate(b.vy);
+            addSpinFromWall(b.vx);
+            b.vy = -Math.abs(b.vy) * BOUNCE;
+          }
+        }
+      }
+
+      // ── Apply transforms ──
+      ITEMS.forEach((item, idx) => {
+        const el = itemRefs.current[idx];
+        if (!el) return;
+        const b = bodies.current[idx];
+        const scale = itemScale.current[idx];
+        // Only apply gyro/parallax after settling
+        const useGyro = animPhase.current === "settled";
+        const gyroX = useGyro ? Math.max(-MAX_GYRO, Math.min(MAX_GYRO, sx * item.depth * 30 * SENSITIVITY)) : 0;
+        const gyroY = useGyro ? Math.max(-MAX_GYRO, Math.min(MAX_GYRO, sy * item.depth * 18 * SENSITIVITY)) : 0;
+        const gyroDr = useGyro ? sx * item.depth * 3 : 0;
+        const totalX = gyroX + b.x;
+        const totalY = gyroY + b.y;
+        // Total rotation = original resting angle + gyro tilt + accumulated spin from collisions/walls
+        const totalRotation = item.rotation + gyroDr + b.r;
+        el.style.transform = `translate3d(${totalX}px, ${totalY}px, 0) rotate(${totalRotation}deg) scale(${scale})`;
+      });
+
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+
+    // ── Gyroscope ──
+    const onOrientation = (e: DeviceOrientationEvent) => {
+      rawTilt.current.x = Math.max(-1, Math.min(1, (e.gamma || 0) / 25));
+      rawTilt.current.y = Math.max(-1, Math.min(1, ((e.beta || 0) - 45) / 25));
+    };
+
+    // ── Mouse parallax (desktop) ──
+    const onMouse = (e: MouseEvent) => {
+      if (draggingIdx.current !== null) return; // don't mix mouse parallax with drag
+      rawTilt.current.x = (e.clientX / window.innerWidth - 0.5) * 2;
+      rawTilt.current.y = (e.clientY / window.innerHeight - 0.5) * 2;
+    };
+
+    const isIOS = typeof DeviceOrientationEvent !== "undefined" &&
+      typeof (DeviceOrientationEvent as any).requestPermission === "function";
+    if (!isIOS && typeof DeviceOrientationEvent !== "undefined") {
+      window.addEventListener("deviceorientation", onOrientation);
+    }
+    window.addEventListener("mousemove", onMouse);
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      window.removeEventListener("deviceorientation", onOrientation);
+      window.removeEventListener("mousemove", onMouse);
+    };
   }, []);
+
+  // ── iOS gyroscope permission ──
+  const requestGyro = () => {
+    if (gyroGranted) return;
+    const DOE = typeof DeviceOrientationEvent !== "undefined" ? DeviceOrientationEvent : null;
+    if (DOE && typeof (DOE as any).requestPermission === "function") {
+      (DOE as any).requestPermission().then((p: string) => {
+        if (p === "granted") {
+          setGyroGranted(true);
+          window.addEventListener("deviceorientation", (e: DeviceOrientationEvent) => {
+            rawTilt.current.x = Math.max(-1, Math.min(1, (e.gamma || 0) / 25));
+            rawTilt.current.y = Math.max(-1, Math.min(1, ((e.beta || 0) - 45) / 25));
+          });
+        }
+      }).catch(() => {});
+    }
+  };
+
+  // ── Drag handlers ──
+  const startDrag = (idx: number, cx: number, cy: number) => {
+    userTapped.current = true;
+    if (animPhase.current !== "settled") return;
+    draggingIdx.current = idx;
+    dragPrev.current = { x: cx, y: cy };
+    dragVel.current = { x: 0, y: 0 };
+    bodies.current[idx].vx = 0;
+    bodies.current[idx].vy = 0;
+    const el = itemRefs.current[idx];
+    if (el) el.style.zIndex = "30";
+  };
+
+  const moveDrag = (idx: number, cx: number, cy: number) => {
+    if (draggingIdx.current !== idx) return;
+    const dx = cx - dragPrev.current.x;
+    const dy = cy - dragPrev.current.y;
+    // Track velocity (smoothed)
+    dragVel.current.x = dragVel.current.x * 0.5 + dx * 0.5;
+    dragVel.current.y = dragVel.current.y * 0.5 + dy * 0.5;
+    // Move body directly
+    bodies.current[idx].x += dx;
+    bodies.current[idx].y += dy;
+    dragPrev.current = { x: cx, y: cy };
+  };
+
+  const endDrag = (idx: number) => {
+    if (draggingIdx.current !== idx) return;
+    // Apply inertia — fling velocity
+    bodies.current[idx].vx = dragVel.current.x * 1.5;
+    bodies.current[idx].vy = dragVel.current.y * 1.5;
+    draggingIdx.current = null;
+    const el = itemRefs.current[idx];
+    if (el) el.style.zIndex = String(ITEMS[idx].zIndex);
+  };
 
   return (
     <>
       <style>{`
         html, body {
-          background: #0A0F1C !important;
-          scroll-behavior: smooth;
-        }
-        .gradient-text {
-          background: linear-gradient(135deg, #00E88F 0%, #00D4AA 50%, #00BCD4 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-        .glass-card {
-          background: rgba(255, 255, 255, 0.04);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .glow-accent {
-          box-shadow: 0 0 40px rgba(0, 232, 143, 0.15), 0 0 80px rgba(0, 232, 143, 0.05);
-        }
-        .float-slow {
-          animation: floatSlow 6s ease-in-out infinite;
-        }
-        .float-slow-delay {
-          animation: floatSlow 7s ease-in-out infinite 1s;
-        }
-        .float-slow-delay2 {
-          animation: floatSlow 8s ease-in-out infinite 2s;
-        }
-        @keyframes floatSlow {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-16px); }
-        }
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(30px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeInUp {
-          animation: fadeInUp 0.7s ease-out forwards;
-        }
-        .animate-fadeInUp-delay1 {
-          animation: fadeInUp 0.7s ease-out 0.15s forwards;
-          opacity: 0;
-        }
-        .animate-fadeInUp-delay2 {
-          animation: fadeInUp 0.7s ease-out 0.3s forwards;
-          opacity: 0;
-        }
-        .animate-fadeInUp-delay3 {
-          animation: fadeInUp 0.7s ease-out 0.45s forwards;
-          opacity: 0;
-        }
-        .transaction-scroll {
-          animation: scrollLeft 20s linear infinite;
-        }
-        @keyframes scrollLeft {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .game-card:hover .game-overlay {
-          opacity: 1;
-        }
-        .game-card:hover img, .game-card:hover video {
-          transform: scale(1.05);
+          background: #FFE500 !important;
+          overflow: hidden !important;
+          height: 100%;
+          overscroll-behavior: none;
         }
       `}</style>
+      {/* Override theme-color for Safari status bar + URL bar */}
+      <meta name="theme-color" content="#FFE500" />
 
-      <div className="min-h-screen bg-[#0A0F1C] text-[#F1F5F9] overflow-x-hidden">
-        {/* ═══════════ NAVIGATION ═══════════ */}
-        <nav
-          className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
+      <main
+        className="fixed inset-0 flex flex-col overflow-hidden"
+        style={{
+          background: "#FFE500",
+          touchAction: "none",
+          overscrollBehavior: "none",
+        }}
+        onClick={() => { userTapped.current = true; requestGyro(); }}
+      >
+        {/* ── Top bar ── */}
+        <div
+          className="flex justify-end px-5 pt-3 relative z-50"
+          style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)", pointerEvents: "none" }}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); router.push("/auth?mode=login"); }}
+            className="text-[16px] font-bold text-[#1A1A1A] active:opacity-50 transition-opacity"
+            style={{ fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif", pointerEvents: "auto" }}
+          >
+            Log In
+          </button>
+        </div>
+
+        {/* ── Logo ── */}
+        <div
+          className="flex justify-center mt-24 relative z-50"
           style={{
-            background: scrollY > 50 ? "rgba(10, 15, 28, 0.9)" : "transparent",
-            backdropFilter: scrollY > 50 ? "blur(20px)" : "none",
-            borderBottom: scrollY > 50 ? "1px solid rgba(255,255,255,0.06)" : "none",
+            opacity: mounted ? 1 : 0,
+            transform: mounted ? "scale(1)" : "scale(0.8)",
+            transition: "all 0.5s ease-out 0.1s",
+            pointerEvents: "none",
           }}
         >
-          <div className="max-w-[1200px] mx-auto px-6 md:px-10 h-[72px] flex items-center justify-between">
-            {/* Logo */}
-            <button
-              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/shansi-logo.png" alt="Shansi" width={36} height={36} className="select-none" />
-              <span
-                className="text-[20px] font-bold text-white"
-                style={{ fontFamily: "var(--font-outfit)" }}
-              >
-                Shansi
-              </span>
-            </button>
+          <ShansiLogo />
+        </div>
 
-            {/* Nav links */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => router.push("/auth?mode=login")}
-                className="hidden sm:block px-5 py-2.5 text-[14px] font-medium text-[#94A3B8] hover:text-white transition-colors"
-                style={{ fontFamily: "var(--font-dm-sans)" }}
-              >
-                Log In
-              </button>
-              <button
-                onClick={() => router.push("/auth")}
-                className="px-6 py-2.5 rounded-full text-[14px] font-semibold text-[#0A0F1C] transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"
-                style={{
-                  fontFamily: "var(--font-outfit)",
-                  background: "linear-gradient(135deg, #00E88F, #00D4AA)",
-                }}
-              >
-                Get Started
-              </button>
-            </div>
-          </div>
-        </nav>
-
-        {/* ═══════════ HERO SECTION ═══════════ */}
-        <section ref={heroRef} className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-16 overflow-hidden">
-          {/* Background floating items */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ opacity: mounted ? 0.12 : 0, transition: "opacity 1.5s ease" }}>
-            {FLOAT_ITEMS.map((src, i) => (
-              <div
-                key={i}
-                className={`absolute ${i % 3 === 0 ? "float-slow" : i % 3 === 1 ? "float-slow-delay" : "float-slow-delay2"}`}
-                style={{
-                  left: `${10 + (i % 4) * 22}%`,
-                  top: `${15 + Math.floor(i / 4) * 35}%`,
-                  transform: `rotate(${-15 + i * 8}deg)`,
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={src}
-                  alt=""
-                  width={80 + (i % 3) * 20}
-                  height={80 + (i % 3) * 20}
-                  className="select-none opacity-60"
-                  draggable={false}
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Radial glow */}
-          <div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full pointer-events-none"
+        {/* ── Title — centered, one line, edge to edge ── */}
+        <div
+          className="px-3 mt-3 relative z-50 text-center"
+          style={{
+            opacity: mounted ? 1 : 0,
+            transform: mounted ? "translateY(0)" : "translateY(24px)",
+            transition: "all 0.6s ease-out 0.15s",
+            pointerEvents: "none",
+          }}
+        >
+          <h1
+            className="text-[#1A1A1A] leading-[1] tracking-[0.04em] whitespace-nowrap"
             style={{
-              background: "radial-gradient(circle, rgba(0,232,143,0.08) 0%, transparent 70%)",
+              fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif",
+              fontWeight: 900,
+              fontSize: "clamp(30px, 9.5vw, 52px)",
             }}
-          />
+          >
+            Welcome to Shansi!
+          </h1>
+        </div>
 
-          {/* Hero content */}
-          <div className="relative z-10 text-center max-w-[800px]">
-            {/* Badge */}
+        {/* ── Floating items — full screen, physics-driven ── */}
+        <div className="absolute inset-0 overflow-hidden" style={{ zIndex: 1 }}>
+          {ITEMS.map((item, idx) => (
             <div
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card mb-8 ${mounted ? "animate-fadeInUp" : "opacity-0"}`}
-            >
-              <span className="w-2 h-2 rounded-full bg-[#00E88F] animate-pulse" />
-              <span className="text-[13px] text-[#94A3B8]" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                Gamified Cashback Platform
-              </span>
-            </div>
-
-            {/* Main heading */}
-            <h1
-              className={`text-[40px] sm:text-[56px] md:text-[72px] leading-[1.05] font-extrabold mb-6 ${mounted ? "animate-fadeInUp-delay1" : "opacity-0"}`}
-              style={{ fontFamily: "var(--font-outfit)" }}
-            >
-              Turn Expenses
-              <br />
-              into <span className="gradient-text">Games</span>
-            </h1>
-
-            {/* Subtitle */}
-            <p
-              className={`text-[16px] sm:text-[18px] text-[#94A3B8] leading-[1.6] max-w-[540px] mx-auto mb-10 ${mounted ? "animate-fadeInUp-delay2" : "opacity-0"}`}
-              style={{ fontFamily: "var(--font-dm-sans)" }}
-            >
-              Enjoy life&apos;s moments without the shadow of regret.
-              Track spending, play games, and win your purchases back.
-            </p>
-
-            {/* CTA buttons */}
-            <div className={`flex flex-col sm:flex-row items-center justify-center gap-4 ${mounted ? "animate-fadeInUp-delay3" : "opacity-0"}`}>
-              <button
-                onClick={() => router.push("/auth")}
-                className="w-full sm:w-auto px-8 py-4 rounded-xl text-[16px] font-bold text-[#0A0F1C] transition-all duration-200 hover:scale-[1.03] active:scale-[0.97] glow-accent"
-                style={{
-                  fontFamily: "var(--font-outfit)",
-                  background: "linear-gradient(135deg, #00E88F 0%, #00D4AA 100%)",
-                }}
-              >
-                Get Started — It&apos;s Free
-              </button>
-              <button
-                onClick={() => {
-                  document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className="w-full sm:w-auto px-8 py-4 rounded-xl text-[16px] font-semibold text-white glass-card hover:bg-white/[0.08] transition-all duration-200"
-                style={{ fontFamily: "var(--font-outfit)" }}
-              >
-                Learn More
-              </button>
-            </div>
-          </div>
-
-          {/* Transaction ticker */}
-          <div className="relative z-10 mt-16 w-full max-w-[700px] overflow-hidden rounded-2xl glass-card py-4">
-            <div className="flex transaction-scroll" style={{ width: "200%" }}>
-              {[...TRANSACTIONS, ...TRANSACTIONS, ...TRANSACTIONS, ...TRANSACTIONS].map((t, i) => (
-                <div key={i} className="flex items-center gap-3 px-6 shrink-0">
-                  <div className="w-10 h-10 rounded-full bg-white/10 overflow-hidden flex items-center justify-center">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={t.icon} alt={t.name} width={40} height={40} className="w-full h-full object-cover" />
-                  </div>
-                  <div>
-                    <p className="text-[14px] font-medium text-white" style={{ fontFamily: "var(--font-dm-sans)" }}>{t.name}</p>
-                    <p className="text-[13px] text-[#00E88F] font-semibold">{t.amount}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Scroll indicator */}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-40">
-            <span className="text-[12px] text-[#94A3B8]" style={{ fontFamily: "var(--font-dm-sans)" }}>Scroll</span>
-            <div className="w-[1px] h-6 bg-gradient-to-b from-[#94A3B8] to-transparent" />
-          </div>
-        </section>
-
-        {/* ═══════════ DUAL FEATURE SECTION (Coverd style) ═══════════ */}
-        <section id="features" className="relative py-20 md:py-32 px-6">
-          <div className="max-w-[1200px] mx-auto grid md:grid-cols-2 gap-6 md:gap-8">
-            {/* Track your purchases */}
-            <div className="glass-card rounded-3xl p-8 md:p-10 group hover:border-[#00E88F]/20 transition-all duration-300">
-              <div className="w-14 h-14 rounded-2xl bg-[#00E88F]/10 flex items-center justify-center mb-6">
-                <FeatureIcon name="wallet" size={28} />
-              </div>
-              <h2
-                className="text-[28px] sm:text-[36px] font-bold leading-[1.15] mb-4"
-                style={{ fontFamily: "var(--font-outfit)" }}
-              >
-                Track your
-                <br />
-                purchases<span className="gradient-text">...</span>
-              </h2>
-              <p className="text-[15px] text-[#94A3B8] leading-[1.6] mb-6" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                A sleek way to get on top of your spending — see insights, build better habits, and take control of your finances.
-              </p>
-              {/* Mini merchant logos */}
-              <div className="flex items-center gap-3 mt-auto">
-                {TRANSACTIONS.map((t, i) => (
-                  <div key={i} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={t.icon} alt={t.name} width={40} height={40} className="w-full h-full object-cover" />
-                  </div>
-                ))}
-                <span className="text-[13px] text-[#94A3B8] ml-1" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                  +50 more
-                </span>
-              </div>
-            </div>
-
-            {/* Win them back */}
-            <div className="glass-card rounded-3xl p-8 md:p-10 group hover:border-[#00E88F]/20 transition-all duration-300">
-              <div className="w-14 h-14 rounded-2xl bg-[#00E88F]/10 flex items-center justify-center mb-6">
-                <FeatureIcon name="trophy" size={28} />
-              </div>
-              <h2
-                className="text-[28px] sm:text-[36px] font-bold leading-[1.15] mb-4"
-                style={{ fontFamily: "var(--font-outfit)" }}
-              >
-                <span className="gradient-text">...</span>and win
-                <br />
-                them back
-              </h2>
-              <p className="text-[15px] text-[#94A3B8] leading-[1.6] mb-6" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                A fun and thrilling approach to get your purchases covered — play games, win them back. Every purchase is a new chance.
-              </p>
-              {/* Mini game covers */}
-              <div className="flex items-center gap-3 mt-auto">
-                {GAMES.filter(g => g.type === "image").slice(0, 3).map((g, i) => (
-                  <div key={i} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={g.cover} alt={g.name} width={40} height={40} className="w-full h-full object-cover" />
-                  </div>
-                ))}
-                <span className="text-[13px] text-[#94A3B8] ml-1" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                  4 games
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════════ GAMES SHOWCASE ═══════════ */}
-        <section className="relative py-16 md:py-24 px-6">
-          <div className="max-w-[1200px] mx-auto">
-            <div className="text-center mb-12 md:mb-16">
-              <h2
-                className="text-[32px] sm:text-[44px] md:text-[52px] font-extrabold leading-[1.1] mb-4"
-                style={{ fontFamily: "var(--font-outfit)" }}
-              >
-                Play. Win. <span className="gradient-text">Repeat.</span>
-              </h2>
-              <p className="text-[16px] text-[#94A3B8] max-w-[500px] mx-auto" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                Every purchase enters you into exciting games. Four unique ways to win your money back.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-              {GAMES.map((game, i) => (
-                <div
-                  key={i}
-                  className="game-card relative rounded-2xl overflow-hidden aspect-square group cursor-pointer"
-                >
-                  {game.type === "video" ? (
-                    <video
-                      src={game.cover}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full h-full object-cover transition-transform duration-500"
-                    />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={game.cover}
-                      alt={game.name}
-                      className="w-full h-full object-cover transition-transform duration-500"
-                    />
-                  )}
-                  {/* Overlay */}
-                  <div className="game-overlay absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-4 opacity-0 transition-opacity duration-300 md:opacity-0">
-                    <p className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
-                      {game.name}
-                    </p>
-                  </div>
-                  {/* Always visible name on mobile */}
-                  <div className="md:hidden absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-                    <p className="text-[13px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
-                      {game.name}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════════ SHANSI CARD SECTION (like Coverd Card) ═══════════ */}
-        <section className="relative py-20 md:py-32 px-6">
-          {/* Background glow */}
-          <div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] pointer-events-none"
-            style={{
-              background: "radial-gradient(ellipse, rgba(0,232,143,0.06) 0%, transparent 70%)",
-            }}
-          />
-
-          <div className="relative max-w-[1200px] mx-auto">
-            <div className="glass-card rounded-3xl p-8 md:p-14 glow-accent">
-              {/* Badge */}
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#00E88F]/10 border border-[#00E88F]/20 mb-6">
-                <span className="text-[13px] font-medium text-[#00E88F]" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                  Now Available
-                </span>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-10 items-center">
-                {/* Text content */}
-                <div>
-                  <h2
-                    className="text-[32px] sm:text-[44px] md:text-[52px] font-extrabold leading-[1.05] mb-3"
-                    style={{ fontFamily: "var(--font-outfit)" }}
-                  >
-                    We Got You
-                    <br />
-                    <span className="gradient-text">Covered</span>
-                  </h2>
-                  <p className="text-[15px] text-[#94A3B8] leading-[1.7] mb-8 max-w-[440px]" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                    Shansi is a gamified cashback platform that offers up to 100% cash back, zero hidden fees, smart spending insights, and automatic entries into win-back games with every purchase.
-                  </p>
-
-                  <button
-                    onClick={() => router.push("/auth")}
-                    className="px-8 py-4 rounded-xl text-[16px] font-bold text-[#0A0F1C] transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"
-                    style={{
-                      fontFamily: "var(--font-outfit)",
-                      background: "linear-gradient(135deg, #00E88F 0%, #00D4AA 100%)",
-                    }}
-                  >
-                    Join Now
-                  </button>
-                </div>
-
-                {/* Feature cards grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  {FEATURES.map((f, i) => (
-                    <div
-                      key={i}
-                      className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-[#00E88F]/20 transition-all duration-200 hover:bg-white/[0.05]"
-                    >
-                      <div className="w-10 h-10 rounded-xl bg-[#00E88F]/10 flex items-center justify-center mb-3">
-                        <FeatureIcon name={f.icon} size={20} />
-                      </div>
-                      <p className="text-[14px] font-semibold text-white mb-1" style={{ fontFamily: "var(--font-outfit)" }}>
-                        {f.title}
-                      </p>
-                      <p className="text-[12px] text-[#94A3B8] leading-[1.5]" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                        {f.desc}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════════ HOW IT WORKS ═══════════ */}
-        <section className="relative py-16 md:py-24 px-6">
-          <div className="max-w-[800px] mx-auto text-center">
-            <h2
-              className="text-[32px] sm:text-[44px] font-extrabold leading-[1.1] mb-4"
-              style={{ fontFamily: "var(--font-outfit)" }}
-            >
-              How It <span className="gradient-text">Works</span>
-            </h2>
-            <p className="text-[16px] text-[#94A3B8] mb-12 md:mb-16" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              Three simple steps to start winning your purchases back.
-            </p>
-          </div>
-
-          <div className="max-w-[1000px] mx-auto grid md:grid-cols-3 gap-6 md:gap-8">
-            {[
-              {
-                step: "01",
-                icon: "scan",
-                title: "Scan & Pay",
-                titleGe: "სკანირება & გადახდა",
-                desc: "Visit any partner merchant and scan the QR code to log your purchase.",
-              },
-              {
-                step: "02",
-                icon: "game",
-                title: "Play Games",
-                titleGe: "თამაშის დაწყება",
-                desc: "Use your earned entries to play exciting games — slots, plinko, chicken rush, and more.",
-              },
-              {
-                step: "03",
-                icon: "wallet",
-                title: "Win Cashback",
-                titleGe: "ქეშბექის მიღება",
-                desc: "Win up to 100% of your purchase amount back. Withdraw anytime, no strings attached.",
-              },
-            ].map((step, i) => (
-              <div key={i} className="relative text-center">
-                {/* Step number */}
-                <span
-                  className="text-[64px] font-black text-white/[0.03] absolute -top-4 left-1/2 -translate-x-1/2 select-none"
-                  style={{ fontFamily: "var(--font-outfit)" }}
-                >
-                  {step.step}
-                </span>
-                <div className="relative z-10">
-                  <div className="w-16 h-16 rounded-2xl bg-[#00E88F]/10 border border-[#00E88F]/20 flex items-center justify-center mx-auto mb-5">
-                    <FeatureIcon name={step.icon} size={28} />
-                  </div>
-                  <h3
-                    className="text-[18px] font-bold mb-2"
-                    style={{ fontFamily: "var(--font-outfit)" }}
-                  >
-                    {step.title}
-                  </h3>
-                  <p className="text-[13px] text-[#94A3B8] leading-[1.6] max-w-[280px] mx-auto" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                    {step.desc}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ═══════════ FINAL CTA ═══════════ */}
-        <section className="relative py-20 md:py-32 px-6">
-          <div className="max-w-[700px] mx-auto text-center">
-            <h2
-              className="text-[32px] sm:text-[44px] md:text-[56px] font-extrabold leading-[1.05] mb-6"
-              style={{ fontFamily: "var(--font-outfit)" }}
-            >
-              Ready to Turn
-              <br />
-              Spending into <span className="gradient-text">Winning?</span>
-            </h2>
-            <p className="text-[16px] text-[#94A3B8] mb-10 max-w-[460px] mx-auto" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              Join thousands of users who are already winning their purchases back with Shansi.
-            </p>
-            <button
-              onClick={() => router.push("/auth")}
-              className="px-10 py-4 rounded-xl text-[17px] font-bold text-[#0A0F1C] transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] glow-accent"
+              key={idx}
+              ref={(el) => { itemRefs.current[idx] = el; }}
+              className="absolute will-change-transform touch-none cursor-grab active:cursor-grabbing"
               style={{
-                fontFamily: "var(--font-outfit)",
-                background: "linear-gradient(135deg, #00E88F 0%, #00D4AA 100%)",
+                left: `${item.x}%`,
+                top: `${45 + item.y * 0.55}%`,
+                width: item.width,
+                zIndex: item.zIndex,
+                transform: `translate3d(0, 0, 0) rotate(${item.rotation}deg)`,
+                filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.15))",
+              }}
+              onTouchStart={(e) => {
+                e.stopPropagation();
+                startDrag(idx, e.touches[0].clientX, e.touches[0].clientY);
+              }}
+              onTouchMove={(e) => {
+                moveDrag(idx, e.touches[0].clientX, e.touches[0].clientY);
+              }}
+              onTouchEnd={() => endDrag(idx)}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                startDrag(idx, e.clientX, e.clientY);
+                const onMove = (ev: MouseEvent) => moveDrag(idx, ev.clientX, ev.clientY);
+                const onUp = () => {
+                  endDrag(idx);
+                  window.removeEventListener("mousemove", onMove);
+                  window.removeEventListener("mouseup", onUp);
+                };
+                window.addEventListener("mousemove", onMove);
+                window.addEventListener("mouseup", onUp);
               }}
             >
-              Sign Up Free
-            </button>
-            <p className="text-[13px] text-[#94A3B8]/60 mt-4" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              No credit card required
-            </p>
-          </div>
-        </section>
-
-        {/* ═══════════ FOOTER ═══════════ */}
-        <footer className="border-t border-white/[0.06] py-10 px-6">
-          <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-            {/* Logo */}
-            <div className="flex items-center gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/shansi-logo.png" alt="Shansi" width={28} height={28} className="select-none" />
-              <span className="text-[16px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>
-                Shansi
-              </span>
+              <img
+                src={item.src}
+                alt=""
+                width={item.width}
+                height={item.width}
+                className="w-full h-auto object-contain select-none pointer-events-none"
+                draggable={false}
+                style={{
+                  opacity: mounted ? 1 : 0,
+                  transition: `opacity 0.5s ease-out ${0.3 + idx * 0.06}s`,
+                }}
+              />
             </div>
+          ))}
+        </div>
 
-            {/* Links */}
-            <div className="flex flex-wrap items-center justify-center gap-6 text-[13px] text-[#94A3B8]" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="hover:text-white transition-colors">
-                Home
-              </button>
-              <button onClick={() => router.push("/auth")} className="hover:text-white transition-colors">
-                Sign Up
-              </button>
-              <button onClick={() => router.push("/auth?mode=login")} className="hover:text-white transition-colors">
-                Log In
-              </button>
-            </div>
+        {/* ── Spacer ── */}
+        <div className="flex-1" />
 
-            {/* Copyright */}
-            <p className="text-[12px] text-[#94A3B8]/50" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              © 2026 Shansi. All rights reserved.
-            </p>
-          </div>
-        </footer>
-      </div>
+        {/* ── Sign up button ── */}
+        <div
+          className="relative flex justify-center mb-6"
+          style={{
+            zIndex: 40,
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)",
+            opacity: mounted ? 1 : 0,
+            transform: mounted ? "translateY(0)" : "translateY(16px)",
+            transition: "all 0.5s ease-out 0.3s",
+            pointerEvents: "none",
+          }}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); router.push("/auth"); }}
+            className="w-[145px] h-[66px] rounded-[33px] bg-[#1A1A1A] text-white text-[17px] font-bold active:scale-[0.96] transition-transform duration-150"
+            style={{
+              fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+              pointerEvents: "auto",
+            }}
+          >
+            Sign up
+          </button>
+        </div>
+      </main>
     </>
   );
 }
