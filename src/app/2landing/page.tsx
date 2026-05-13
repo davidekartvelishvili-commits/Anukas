@@ -78,12 +78,15 @@ export default function SecondLandingPage() {
   return (
     <>
       <style>{`
-        html, body {
+        html, html body {
           background: #F9E741 !important;
+          overflow: auto !important;
           overflow-x: hidden !important;
-          overflow-y: auto !important;
+          overflow-y: scroll !important;
           height: auto !important;
-          min-height: 100vh;
+          max-height: none !important;
+          position: static !important;
+          overscroll-behavior: auto !important;
         }
 
         @font-face {
@@ -127,7 +130,7 @@ export default function SecondLandingPage() {
       <div className="min-h-screen" style={{ background: "#F9E741" }}>
 
         {/* ═══════════ HERO — full viewport, everything lives here ═══════════ */}
-        <section className="relative flex flex-col" style={{ background: "#F9E741", height: "100vh", overflow: "visible" }}>
+        <section className="relative flex flex-col" style={{ background: "#F9E741", minHeight: "100vh" }}>
 
           {/* ── Top bar: just logo + button, NO header bar, z-index BELOW items ── */}
           <div className="relative z-10 w-full px-5 sm:px-10 pt-5 flex items-center justify-between">
