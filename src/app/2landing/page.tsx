@@ -14,7 +14,7 @@ const FLOATING_ITEMS = [
   // Top-right: cards — tilted, right side
   { src: "/images/onboarding/cards.png",         left: "60%",  top: "5%",   size: 240, rotate: -12, delay: 0.6,  duration: 6.4 },
   // Right: piggy bank — far right, partially off-screen
-  { src: "/images/onboarding/piggy-bank.png",    left: "82%",  top: "14%",  size: 260, rotate: 15,  delay: 0.4,  duration: 5.8 },
+  { src: "/images/onboarding/piggy-bank-pink.png",    left: "82%",  top: "14%",  size: 260, rotate: 15,  delay: 0.4,  duration: 5.8 },
   // Center-left below headline: sushi
   { src: "/images/onboarding/sushi.png",         left: "18%",  top: "50%",  size: 200, rotate: -8,  delay: 1.0,  duration: 6.2 },
   // Center-right: ring — smaller, below headline
