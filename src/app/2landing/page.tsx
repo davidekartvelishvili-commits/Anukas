@@ -18,7 +18,7 @@ const FLOATING_ITEMS = [
   // Center-left below headline: sushi
   { src: "/images/onboarding/sushi.png",         left: "18%",  top: "58%",  size: 120, rotate: -8,  delay: 1.0,  duration: 6.2 },
   // Center-right: ring
-  { src: "/images/onboarding/ring.png",          left: "55%",  top: "62%",  size: 110, rotate: 20,  delay: 1.4,  duration: 5.4 },
+  { src: "/images/onboarding/ring.png",          left: "55%",  top: "72%",  size: 110, rotate: 20,  delay: 1.4,  duration: 5.4 },
   // Bottom-right: sneaker
   { src: "/images/onboarding/sneaker.png",       left: "70%",  top: "64%",  size: 200, rotate: -18, delay: 0.8,  duration: 6.6 },
   // Far-left edge: building
@@ -124,7 +124,7 @@ export default function SecondLandingPage() {
       <div className="min-h-screen" style={{ background: "#F9E741" }}>
 
         {/* ═══════════ HERO — full viewport, everything lives here ═══════════ */}
-        <section className="relative h-screen flex flex-col overflow-hidden" style={{ background: "#F9E741" }}>
+        <section className="relative min-h-screen flex flex-col overflow-x-hidden overflow-y-visible" style={{ background: "#F9E741" }}>
 
           {/* ── Top bar: just logo + button, NO header bar, z-index BELOW items ── */}
           <div className="relative z-10 w-full px-5 sm:px-10 pt-5 flex items-center justify-between">
