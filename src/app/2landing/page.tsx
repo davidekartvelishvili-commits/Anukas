@@ -333,6 +333,22 @@ export default function SecondLandingPage() {
           </div>
         </div>
 
+        {/* ═══════════ VIDEO SECTION ═══════════ */}
+        <section className="py-16 md:py-24 px-6" style={{ background: "#FFFDF0" }}>
+          <div className="max-w-[800px] mx-auto">
+            <div className="rounded-3xl overflow-hidden" style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.10)" }}>
+              <video
+                src="/images/shansi-demo.mp4"
+                controls
+                playsInline
+                preload="metadata"
+                className="w-full h-auto"
+                style={{ display: "block" }}
+              />
+            </div>
+          </div>
+        </section>
+
         {/* ═══════════ HOW IT WORKS ═══════════ */}
         <section className="py-20 md:py-28 px-6" style={{ background: "#FFFDF0" }}>
           <div className="max-w-[1100px] mx-auto">
