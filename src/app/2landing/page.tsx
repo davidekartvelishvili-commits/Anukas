@@ -339,9 +339,9 @@ export default function SecondLandingPage() {
               className="absolute pointer-events-none select-none hidden md:block"
               style={{
                 left: 40,
-                bottom: 100,
-                width: 110,
-                height: 110,
+                bottom: 130,
+                width: 140,
+                height: 140,
                 zIndex: 40,
                 // @ts-expect-error CSS custom property
                 "--rot": "12deg",
