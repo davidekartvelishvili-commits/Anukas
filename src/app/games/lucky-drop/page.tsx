@@ -19,14 +19,20 @@ interface TrailPoint { x: number; y: number; a: number }
 interface Ball {
   x: number; y: number;
   vx: number; vy: number;
-  segIdx: number; // which path segment we're currently traversing
+  segIdx: number;
   r: number; alive: boolean; settled: boolean;
   trail: TrailPoint[];
   targetSlot: number;
   data: DropResult;
-  // Path is used only as a spine of waypoints so the ball reaches the
-  // correct slot. Vertical motion is real gravity; horizontal is a damped
-  // spring pulling toward the next waypoint's X.
+  rotation: number;
+  spin: number;
+  squash: number;
+  trailCounter: number;
+  // True until the API responds with the verdict. While awaiting, the
+  // ball free-falls under pure physics (gravity + peg bounces) with no
+  // target attractor, and is capped above the lock zone so it never
+  // commits to a slot before the server has decided.
+  awaiting: boolean;
   path: { x: number; y: number }[];
 }
 
@@ -322,8 +328,11 @@ export default function LuckyDropPage() {
     x: number; y: number; vx: number; vy: number;
     life: number; maxLife: number;
     color: string; size: number;
+    g?: number; fr?: number; glow?: boolean;
   };
   const particlesRef = useRef<CanvasParticle[]>([]);
+  // Screen shake on landing — intensity decays linearly until `until`
+  const shakeRef = useRef({ intensity: 0, until: 0 });
   const BET_OPTIONS = [10, 25, 50, 100, 250, 500];
 
   const riskRef = useRef(risk);
@@ -384,21 +393,53 @@ export default function LuckyDropPage() {
       sp.width = sw;
       sp.height = sh;
       const sctx = sp.getContext("2d")!;
-      // base card
-      sctx.fillStyle = sl.color;
-      sctx.fillRect(1, 0, sw - 2, sh);
-      // top accent
-      sctx.fillStyle = "rgba(255,255,255,0.35)";
-      sctx.fillRect(2, 0, sw - 4, 2);
-      // label
-      sctx.font = `${sl.mult >= 10 ? "900" : "700"} ${Math.min(sl.w * 0.38, 18)}px sans-serif`;
+      const isWin = sl.mult > 0;
+      // Serious neon palette — emerald for win, ember crimson for lose
+      const baseColor = isWin ? "#10D389" : "#E5354A";
+      const tipColor = isWin ? "#A6FFE0" : "#FFB4BD";
+      const darkColor = isWin ? "#07291E" : "#3A0B14";
+      const r = Math.min(8, sh * 0.30);
+      // Rounded LED bar
+      const x0 = 1.5, y0 = 1.5;
+      const w = sw - 3, h = sh - 3;
+      sctx.beginPath();
+      sctx.moveTo(x0 + r, y0);
+      sctx.lineTo(x0 + w - r, y0);
+      sctx.arcTo(x0 + w, y0, x0 + w, y0 + r, r);
+      sctx.lineTo(x0 + w, y0 + h - r);
+      sctx.arcTo(x0 + w, y0 + h, x0 + w - r, y0 + h, r);
+      sctx.lineTo(x0 + r, y0 + h);
+      sctx.arcTo(x0, y0 + h, x0, y0 + h - r, r);
+      sctx.lineTo(x0, y0 + r);
+      sctx.arcTo(x0, y0, x0 + r, y0, r);
+      sctx.closePath();
+      const g = sctx.createLinearGradient(0, y0, 0, y0 + h);
+      g.addColorStop(0, tipColor);
+      g.addColorStop(0.45, baseColor);
+      g.addColorStop(1, darkColor);
+      sctx.fillStyle = g;
+      sctx.fill();
+      // Top sheen
+      sctx.fillStyle = "rgba(255,255,255,0.40)";
+      sctx.fillRect(x0 + r, y0 + 1.5, w - r * 2, Math.max(1, h * 0.10));
+      // Glowing rim — shadowBlur paid ONCE at bake time, not per frame
+      sctx.shadowBlur = 10;
+      sctx.shadowColor = baseColor;
+      sctx.strokeStyle = baseColor;
+      sctx.lineWidth = 1.5;
+      sctx.stroke();
+      sctx.shadowBlur = 0;
+      // LED label — binary WIN / LOSE in uppercase for a more refined read
+      const label = isWin ? "WIN" : "LOSE";
+      const fontSize = Math.min(sw * 0.36, 15);
+      sctx.font = `800 ${fontSize}px sans-serif`;
       sctx.textAlign = "center";
       sctx.textBaseline = "middle";
+      sctx.shadowBlur = 6;
+      sctx.shadowColor = tipColor;
       sctx.fillStyle = "#FFFFFF";
-      sctx.fillText(sl.mult === 0 ? "0" : "WIN", sw / 2, sh / 2);
-      // right divider
-      sctx.fillStyle = "rgba(0,0,0,0.15)";
-      sctx.fillRect(sw - 1, 0, 1, sh);
+      sctx.fillText(label, sw / 2, sh / 2 + 1);
+      sctx.shadowBlur = 0;
       sl.sprite = sp;
     }
 
@@ -413,9 +454,9 @@ export default function LuckyDropPage() {
     if (!cvs) return;
     const ctx = cvs.getContext("2d")!;
 
-    // Pre-baked white-radial glow sprite — used for both peg hits and
-    // slot landings. Rendered once, then drawn per-frame via drawImage
-    // (MUCH cheaper than createRadialGradient + fillRect per hit per frame).
+    // ── Pre-baked sprites — all gradient/shadowBlur cost paid ONCE ──
+
+    // White additive halo — used over the neon background for hit bursts
     const GLOW_SIZE = 128;
     const glowSprite = document.createElement("canvas");
     glowSprite.width = glowSprite.height = GLOW_SIZE;
@@ -423,55 +464,102 @@ export default function LuckyDropPage() {
       const gctx = glowSprite.getContext("2d")!;
       const cx = GLOW_SIZE / 2;
       const g = gctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
-      g.addColorStop(0, "rgba(255,255,255,0.85)");
-      g.addColorStop(0.45, "rgba(255,255,255,0.25)");
+      g.addColorStop(0, "rgba(255,255,255,0.95)");
+      g.addColorStop(0.40, "rgba(255,255,255,0.30)");
       g.addColorStop(1, "rgba(255,255,255,0)");
       gctx.fillStyle = g;
       gctx.fillRect(0, 0, GLOW_SIZE, GLOW_SIZE);
     }
 
-    // Pre-baked peg dot sprite. 60 arc+fill calls per frame was adding up
-    // to ~6-12ms on mobile; one drawImage per peg is ~free.
-    const PEG_SPRITE_SIZE = 24; // generous, high-res; scaled down by drawImage
+    // Neon peg — white-hot core wrapped in cyan→magenta halo. Halo bleeds
+    // out so even the static state has a constant soft glow.
+    const PEG_SPRITE_SIZE = 64;
     const pegSprite = document.createElement("canvas");
     pegSprite.width = pegSprite.height = PEG_SPRITE_SIZE;
     {
       const pctx = pegSprite.getContext("2d")!;
-      pctx.fillStyle = "#FFFFFF";
-      pctx.beginPath();
-      pctx.arc(PEG_SPRITE_SIZE / 2, PEG_SPRITE_SIZE / 2, PEG_SPRITE_SIZE / 2 - 0.5, 0, Math.PI * 2);
-      pctx.fill();
+      const c = PEG_SPRITE_SIZE / 2;
+      const halo = pctx.createRadialGradient(c, c, 0, c, c, c);
+      halo.addColorStop(0, "rgba(0,229,255,0.85)");
+      halo.addColorStop(0.18, "rgba(0,229,255,0.55)");
+      halo.addColorStop(0.45, "rgba(60,120,200,0.28)");
+      halo.addColorStop(1, "rgba(20,50,120,0)");
+      pctx.fillStyle = halo;
+      pctx.fillRect(0, 0, PEG_SPRITE_SIZE, PEG_SPRITE_SIZE);
+      const core = pctx.createRadialGradient(c, c, 0, c, c, c * 0.22);
+      core.addColorStop(0, "#FFFFFF");
+      core.addColorStop(0.5, "rgba(220,250,255,0.95)");
+      core.addColorStop(1, "rgba(0,229,255,0)");
+      pctx.fillStyle = core;
+      pctx.fillRect(0, 0, PEG_SPRITE_SIZE, PEG_SPRITE_SIZE);
     }
 
-    // Pre-baked idle-pulse triangle with shadowBlur baked IN. Replaces a
-    // per-frame shadowBlur=15 operation that was costing 3-8ms/frame on
-    // mobile whenever no balls were in flight.
-    const IDLE_SPRITE_W = 60;
-    const IDLE_SPRITE_H = 48;
+    // Plasma orb ball — hot white center, cyan/magenta plasma halo, with
+    // an asymmetric specular highlight + energy arc so rotation reads.
+    const BALL_SPRITE_SIZE = 96;
+    const ballSprite = document.createElement("canvas");
+    ballSprite.width = ballSprite.height = BALL_SPRITE_SIZE;
+    {
+      const bctx = ballSprite.getContext("2d")!;
+      const c = BALL_SPRITE_SIZE / 2;
+      const halo = bctx.createRadialGradient(c, c, 0, c, c, c);
+      halo.addColorStop(0, "rgba(255,255,255,0)");
+      halo.addColorStop(0.30, "rgba(0,229,255,0.55)");
+      halo.addColorStop(0.55, "rgba(64,120,255,0.45)");
+      halo.addColorStop(1, "rgba(20,40,140,0)");
+      bctx.fillStyle = halo;
+      bctx.fillRect(0, 0, BALL_SPRITE_SIZE, BALL_SPRITE_SIZE);
+      const body = bctx.createRadialGradient(c, c, 0, c, c, c * 0.42);
+      body.addColorStop(0, "#FFFFFF");
+      body.addColorStop(0.55, "rgba(210,250,255,0.95)");
+      body.addColorStop(1, "rgba(0,180,255,0.45)");
+      bctx.fillStyle = body;
+      bctx.beginPath();
+      bctx.arc(c, c, c * 0.42, 0, Math.PI * 2);
+      bctx.fill();
+      const hi = bctx.createRadialGradient(c - c * 0.16, c - c * 0.20, 0, c - c * 0.16, c - c * 0.20, c * 0.16);
+      hi.addColorStop(0, "rgba(255,255,255,0.95)");
+      hi.addColorStop(1, "rgba(255,255,255,0)");
+      bctx.fillStyle = hi;
+      bctx.fillRect(0, 0, BALL_SPRITE_SIZE, BALL_SPRITE_SIZE);
+      bctx.strokeStyle = "rgba(255,255,255,0.65)";
+      bctx.lineWidth = 1.4;
+      bctx.beginPath();
+      bctx.arc(c, c, c * 0.32, -0.35, 0.35);
+      bctx.stroke();
+    }
+
+    // Idle "drop here" indicator — glowing downward chevron + halo, baked
+    const IDLE_SPRITE_W = 72;
+    const IDLE_SPRITE_H = 60;
     const idleGlowSprite = document.createElement("canvas");
     idleGlowSprite.width = IDLE_SPRITE_W;
     idleGlowSprite.height = IDLE_SPRITE_H;
     {
       const ictx = idleGlowSprite.getContext("2d")!;
-      // Translate so the triangle center sits at (IDLE_SPRITE_W/2, 35 within
-      // the sprite) — matches the original triangle height from tip at y=35
-      // down to base at y=47 in the original coords (12px tall).
       const cx = IDLE_SPRITE_W / 2;
-      const tipY = 24; // some padding above so blur has room
-      const baseY = 36;
-      ictx.shadowBlur = 15;
-      ictx.shadowColor = "#FFD700";
-      ictx.fillStyle = "#FFD700";
+      const halo = ictx.createRadialGradient(cx, IDLE_SPRITE_H / 2, 0, cx, IDLE_SPRITE_H / 2, IDLE_SPRITE_W / 2);
+      halo.addColorStop(0, "rgba(0,229,255,0.55)");
+      halo.addColorStop(0.6, "rgba(0,229,255,0.10)");
+      halo.addColorStop(1, "rgba(0,229,255,0)");
+      ictx.fillStyle = halo;
+      ictx.fillRect(0, 0, IDLE_SPRITE_W, IDLE_SPRITE_H);
+      ictx.shadowBlur = 14;
+      ictx.shadowColor = "#00E5FF";
+      ictx.strokeStyle = "#FFFFFF";
+      ictx.lineWidth = 3;
+      ictx.lineCap = "round";
+      ictx.lineJoin = "round";
       ictx.beginPath();
-      ictx.moveTo(cx, tipY);
-      ictx.lineTo(cx - 8, baseY);
-      ictx.lineTo(cx + 8, baseY);
-      ictx.closePath();
-      ictx.fill();
+      ictx.moveTo(cx - 12, IDLE_SPRITE_H / 2 - 4);
+      ictx.lineTo(cx, IDLE_SPRITE_H / 2 + 8);
+      ictx.lineTo(cx + 12, IDLE_SPRITE_H / 2 - 4);
+      ictx.stroke();
+      ictx.shadowBlur = 0;
     }
 
-    // Pre-baked background — radial gradient rebuilt every frame was a
-    // major mobile hit. Bake once per resize, drawImage each frame.
+    // Neon background — deep midnight, magenta top wash, cyan bottom
+    // wash near slot row, glowing arcade rails along the peg triangle.
     const bgSprite = document.createElement("canvas");
     function bakeBackground() {
       const w = cvs!.width;
@@ -479,12 +567,70 @@ export default function LuckyDropPage() {
       bgSprite.width = w;
       bgSprite.height = h;
       const bctx = bgSprite.getContext("2d")!;
-      const bg = bctx.createRadialGradient(w / 2, h * 0.3, 50, w / 2, h * 0.5, h * 0.8);
-      bg.addColorStop(0, "#1a237e");
-      bg.addColorStop(0.35, "#0d1254");
-      bg.addColorStop(0.7, "#070b2e");
-      bg.addColorStop(1, "#030612");
+      const bg = bctx.createRadialGradient(w / 2, h * 0.30, 0, w / 2, h * 0.50, h * 1.0);
+      bg.addColorStop(0, "#0A1530");
+      bg.addColorStop(0.35, "#050B22");
+      bg.addColorStop(0.7, "#020615");
+      bg.addColorStop(1, "#01030A");
       bctx.fillStyle = bg;
+      bctx.fillRect(0, 0, w, h);
+      // Faint cyan grid overlay (perspective hint)
+      bctx.strokeStyle = "rgba(0,229,255,0.04)";
+      bctx.lineWidth = 1;
+      const gap = Math.max(40, w * 0.09);
+      for (let x = gap / 2; x < w; x += gap) {
+        bctx.beginPath(); bctx.moveTo(x, 0); bctx.lineTo(x, h); bctx.stroke();
+      }
+      for (let y = gap / 2; y < h; y += gap) {
+        bctx.beginPath(); bctx.moveTo(0, y); bctx.lineTo(w, y); bctx.stroke();
+      }
+      // Top amber wash — warm casino-cabinet lighting overhead
+      const top = bctx.createLinearGradient(0, 0, 0, h * 0.35);
+      top.addColorStop(0, "rgba(255,180,80,0.14)");
+      top.addColorStop(1, "rgba(255,180,80,0)");
+      bctx.fillStyle = top;
+      bctx.fillRect(0, 0, w, h * 0.35);
+      // Bottom cyan wash near slot row
+      const s = stateRef.current;
+      if (s.slots.length > 0) {
+        const slotTopY = s.slots[0].y;
+        const bot = bctx.createLinearGradient(0, slotTopY - h * 0.15, 0, h);
+        bot.addColorStop(0, "rgba(0,229,255,0)");
+        bot.addColorStop(0.7, "rgba(0,229,255,0.12)");
+        bot.addColorStop(1, "rgba(0,229,255,0.20)");
+        bctx.fillStyle = bot;
+        bctx.fillRect(0, slotTopY - h * 0.15, w, h);
+      }
+      // Glowing arcade rails along the peg-field triangle
+      if (s.leftWall.length) {
+        bctx.shadowBlur = 10;
+        bctx.shadowColor = "#00E5FF";
+        bctx.strokeStyle = "rgba(0,229,255,0.55)";
+        bctx.lineWidth = 2;
+        bctx.beginPath();
+        for (const seg of s.leftWall) {
+          bctx.moveTo(seg.x1, seg.y1);
+          bctx.lineTo(seg.x2, seg.y2);
+        }
+        bctx.stroke();
+        // Right rail — warm amber to balance the cool cyan left rail.
+        // Cyan + amber is the classic premium casino duotone (cool/warm
+        // depth) without ever drifting into pink.
+        bctx.shadowColor = "#FFB627";
+        bctx.strokeStyle = "rgba(255,182,39,0.55)";
+        bctx.beginPath();
+        for (const seg of s.rightWall) {
+          bctx.moveTo(seg.x1, seg.y1);
+          bctx.lineTo(seg.x2, seg.y2);
+        }
+        bctx.stroke();
+        bctx.shadowBlur = 0;
+      }
+      // Vignette
+      const vg = bctx.createRadialGradient(w / 2, h / 2, h * 0.35, w / 2, h / 2, h * 0.80);
+      vg.addColorStop(0, "rgba(0,0,0,0)");
+      vg.addColorStop(1, "rgba(0,0,0,0.55)");
+      bctx.fillStyle = vg;
       bctx.fillRect(0, 0, w, h);
     }
 
@@ -495,14 +641,32 @@ export default function LuckyDropPage() {
       bakeBackground();
     }
     resize();
-    // Debounce so iOS URL-bar/pull-to-refresh gestures (which fire rapid
-    // resize events) don't cause the board to visibly stretch.
     let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     const debouncedResize = () => {
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(resize, 150);
     };
     window.addEventListener("resize", debouncedResize);
+
+    // Spark spawner — adds additive-blended micro particles for peg/landing
+    function spawnSparks(x: number, y: number, count: number) {
+      const arr = particlesRef.current;
+      const cols = ["#00E5FF", "#FFB627", "#FFFFFF", "#7FE3FF"];
+      for (let i = 0; i < count; i++) {
+        const ang = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.4;
+        const sp = 1.5 + Math.random() * 3.5;
+        arr.push({
+          x, y,
+          vx: Math.cos(ang) * sp,
+          vy: Math.sin(ang) * sp,
+          life: 14 + Math.random() * 12,
+          maxLife: 26,
+          color: cols[Math.floor(Math.random() * cols.length)],
+          size: 1.5 + Math.random() * 2,
+          g: 0.05, fr: 0.92, glow: true,
+        });
+      }
+    }
 
     let animId: number;
 
@@ -513,134 +677,210 @@ export default function LuckyDropPage() {
       const { W, H } = s;
       const frozen = anyAnimPlayingRef.current;
 
-      // Background — baked once per resize, cheap bitmap copy per frame
+      // ── Screen shake (applied via translate, wraps all draws) ──
+      const sh = shakeRef.current;
+      let shakeX = 0, shakeY = 0;
+      if (sh.until > now) {
+        const t = Math.max(0, (sh.until - now) / 480);
+        const mag = sh.intensity * t;
+        shakeX = (Math.random() - 0.5) * mag * 2;
+        shakeY = (Math.random() - 0.5) * mag * 2;
+      }
+      ctx.save();
+      if (shakeX || shakeY) ctx.translate(shakeX, shakeY);
+
+      // Background — baked once per resize
       ctx.drawImage(bgSprite, 0, 0);
 
-      if (s.balls.length === 0) {
-        const pulse = Math.sin(now * 0.004) * 0.3 + 0.7;
-        // Pre-baked sprite — drawImage + globalAlpha instead of per-frame
-        // shadowBlur=15 which was forcing a full-canvas GPU blur pass
-        // every single frame while idle.
-        ctx.globalAlpha = pulse * 0.6;
-        ctx.drawImage(idleGlowSprite, W / 2 - IDLE_SPRITE_W / 2, s.startY - 47 - 6);
+      // ── Marquee chase lights around slot row (idle attractor) ──
+      if (s.balls.length === 0 && s.slots.length > 0) {
+        const first = s.slots[0];
+        const last = s.slots[s.slots.length - 1];
+        const ly = first.y - 8;
+        const lx0 = first.x;
+        const lx1 = last.x + last.w;
+        const lw = lx1 - lx0;
+        const lights = 16;
+        const phase = (now * 0.003) % lights;
+        ctx.globalCompositeOperation = "lighter";
+        for (let i = 0; i < lights; i++) {
+          let d = (i - phase) % lights;
+          if (d < 0) d += lights;
+          const dd = Math.min(d, lights - d);
+          const intensity = Math.max(0, 1 - dd / 2.5);
+          if (intensity < 0.05) continue;
+          ctx.globalAlpha = intensity * 0.85;
+          ctx.fillStyle = (i % 2 === 0) ? "#00E5FF" : "#FFB627";
+          const rL = 2.4 + intensity * 1.8;
+          ctx.beginPath();
+          ctx.arc(lx0 + (i + 0.5) * (lw / lights), ly, rL, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalCompositeOperation = "source-over";
         ctx.globalAlpha = 1;
       }
 
-      // Pegs — two-pass draw to minimize globalAlpha thrashing:
-      //   pass 1: draw every peg dot at alpha=1
-      //   pass 2: draw only glowing pegs' halos (alpha varies)
-      // globalAlpha is set at most 3 times total (start of each pass + reset)
-      // instead of 2× per glowing peg per frame.
+      // Idle drop indicator
+      if (s.balls.length === 0) {
+        const pulse = Math.sin(now * 0.004) * 0.3 + 0.7;
+        ctx.globalAlpha = pulse * 0.85;
+        ctx.drawImage(idleGlowSprite, W / 2 - IDLE_SPRITE_W / 2, s.startY - 60);
+        ctx.globalAlpha = 1;
+      }
+
+      // ── Pegs — base draw + additive hit-glow pass ──
       for (const peg of s.pegs) {
         if (!frozen) peg.glow *= 0.9;
         const visR = peg.r + 0.5;
-        const hitR = visR + peg.glow * 1.5;
-        ctx.drawImage(pegSprite, peg.x - hitR, peg.y - hitR, hitR * 2, hitR * 2);
+        const hitR = visR + peg.glow * 2.2;
+        const drawSize = hitR * 5;
+        ctx.drawImage(pegSprite, peg.x - drawSize / 2, peg.y - drawSize / 2, drawSize, drawSize);
       }
+      ctx.globalCompositeOperation = "lighter";
       for (const peg of s.pegs) {
         if (peg.glow <= 0.05) continue;
         const visR = peg.r + 0.5;
-        const haloR = visR * 4;
-        ctx.globalAlpha = peg.glow;
+        const haloR = visR * 5;
+        ctx.globalAlpha = peg.glow * 0.85;
         ctx.drawImage(glowSprite, peg.x - haloR, peg.y - haloR, haloR * 2, haloR * 2);
       }
+      ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
 
-      // Slots — two-pass draw to minimize globalAlpha thrashing
+      // ── Slots — base draw + additive flash/beam pass ──
       for (let i = 0; i < s.slots.length; i++) {
         const sl = s.slots[i];
         if (!frozen) sl.glow *= 0.94;
         if (sl.sprite) ctx.drawImage(sl.sprite, Math.round(sl.x), Math.round(sl.y));
       }
+      ctx.globalCompositeOperation = "lighter";
       for (let i = 0; i < s.slots.length; i++) {
         const sl = s.slots[i];
         if (sl.glow <= 0.05) continue;
         const sx = Math.round(sl.x);
         const sy = Math.round(sl.y);
-        const sw = Math.round(sl.w);
-        const sh = Math.round(sl.h);
-        const cx2 = sx + sw / 2;
-        const cy2 = sy + sh / 2;
-        const haloR = Math.max(sw, sh) * 1.8;
-        ctx.globalAlpha = sl.glow * 0.8;
+        const sw2 = Math.round(sl.w);
+        const sh2 = Math.round(sl.h);
+        const cx2 = sx + sw2 / 2;
+        const cy2 = sy + sh2 / 2;
+        const haloR = Math.max(sw2, sh2) * 2.4;
+        const a = Math.min(1, sl.glow);
+        ctx.globalAlpha = a * 0.85;
         ctx.drawImage(glowSprite, cx2 - haloR, cy2 - haloR, haloR * 2, haloR * 2);
-        ctx.globalAlpha = sl.glow * 0.55;
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(sx + 1, sy, sw - 2, sh);
+        // Upward light beam on winning landings
+        if (a > 0.4) {
+          const beamH = sh2 * 4.5;
+          const beamGrad = ctx.createLinearGradient(cx2, sy, cx2, sy - beamH);
+          beamGrad.addColorStop(0, `rgba(255,255,255,${a * 0.55})`);
+          beamGrad.addColorStop(1, "rgba(255,255,255,0)");
+          ctx.fillStyle = beamGrad;
+          ctx.fillRect(cx2 - sw2 * 0.42, sy - beamH, sw2 * 0.84, beamH);
+        }
       }
+      ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
 
-      // Balls — path-based animation. Ball fillStyle is constant, hoisted
-      // out of the per-ball draw loop to skip redundant state writes.
-      if (s.balls.length > 0) ctx.fillStyle = "#FFE500";
+      // ── Balls — physics + render ──
       for (let i = s.balls.length - 1; i >= 0; i--) {
         const b = s.balls[i];
         if (!b.alive) { s.balls.splice(i, 1); continue; }
 
+        // Anticipation ring — pulsing amber outline around the destined
+        // slot while the ball is in the slow-mo zone. Only visible once
+        // the target is known (post-API).
+        if (!b.awaiting && !b.settled && b.y > s.startY + (ROWS - 2.0) * s.gapY && b.y < s.startY + ROWS * s.gapY) {
+          const ts = s.slots[b.data.slotIndex];
+          if (ts) {
+            const pulse = 0.5 + 0.5 * Math.sin(now * 0.014);
+            const padX = ts.w * 0.10;
+            const padY = ts.h * 0.30;
+            const rx = ts.x - padX;
+            const ry = ts.y - padY;
+            const rw = ts.w + padX * 2;
+            const rh = ts.h + padY * 2;
+            const rr = Math.min(10, rh * 0.3);
+            ctx.globalCompositeOperation = "lighter";
+            ctx.strokeStyle = `rgba(255,200,80,${0.45 * pulse + 0.20})`;
+            ctx.lineWidth = 2 + pulse * 1.5;
+            ctx.beginPath();
+            ctx.moveTo(rx + rr, ry);
+            ctx.lineTo(rx + rw - rr, ry);
+            ctx.arcTo(rx + rw, ry, rx + rw, ry + rr, rr);
+            ctx.lineTo(rx + rw, ry + rh - rr);
+            ctx.arcTo(rx + rw, ry + rh, rx + rw - rr, ry + rh, rr);
+            ctx.lineTo(rx + rr, ry + rh);
+            ctx.arcTo(rx, ry + rh, rx, ry + rh - rr, rr);
+            ctx.lineTo(rx, ry + rr);
+            ctx.arcTo(rx, ry, rx + rr, ry, rr);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.globalCompositeOperation = "source-over";
+          }
+        }
+
         if (!b.settled && !frozen) {
-          // Plinko physics: ball falls under real gravity, bounces off pegs
-          // with energy-retained reflection + random scatter. The generated
-          // `path`'s FINAL waypoint is the server-determined slot, used only
-          // as a gentle attractor in the bottom approach zone so the ball
-          // eventually arrives where it has to — but across most of its
-          // flight it's free to bounce chaotically like a real Plinko ball.
-          const GRAVITY = 0.35;       // gentler gravity — less bullet-like
-          const MAX_VY = 7.5;         // slower terminal speed (was 10)
-          const RESTITUTION = 0.30;   // low bounce energy so hits barely deflect (was 0.42)
+          const GRAVITY = 0.35;
+          const MAX_VY = 7.5;
+          const RESTITUTION = 0.30;
           const MAX_BOUNCE_UP = 2.5;
           const AIR = 0.995;
           const WALL_BOUNCE = 0.40;
-          const JITTER_X = 0.45;      // much less random scatter (was 1.2)
+          const JITTER_X = 0.45;
           const JITTER_Y = 0.18;
           const lastWp = b.path[b.path.length - 1];
           const targetSlot = s.slots[b.data.slotIndex] || null;
-
-          // Vertical gravity
-          b.vy = Math.min(MAX_VY, b.vy + GRAVITY);
-
-          // Gentle air resistance — lets bounces preserve most of their energy
-          b.vx *= AIR;
-
-          // Guidance — continuous pull toward target column throughout
-          // the entire fall (ramped by depth) so the ball trends toward
-          // its slot from early on, not zigzagging across the board.
           const topY = s.startY;
           const bottomY = s.startY + ROWS * s.gapY;
-          const fallFrac = Math.max(0, Math.min(1, (b.y - topY) / (bottomY - topY)));
-          const dxToTarget = lastWp.x - b.x;
 
-          if (b.y < bottomY) {
-            // In-triangle: constant pull with depth-ramped strength.
-            // Pegs still deflect via collision reflection below.
-            const pull = 0.004 + fallFrac * 0.030;     // 0.004 at top → 0.034 at bottom
-            b.vx += dxToTarget * pull;
-            // Cap vx so even a far-off ball can't dart across sideways.
-            // Allowed speed grows slightly with depth for the final approach.
-            const maxVx = 1.4 + fallFrac * 1.6;        // 1.4 → 3.0 px/frame
-            if (b.vx > maxVx) b.vx = maxVx;
-            else if (b.vx < -maxVx) b.vx = -maxVx;
-          } else {
-            // LOCK ZONE — below last peg row, ball MUST stay within its
-            // target slot's column. Clamp x strictly, zero vx, cap vy.
-            // No more bouncing, no more peg deflections (peg collisions
-            // are spatially above this zone anyway). Ball falls straight.
-            if (targetSlot) {
-              const minX = targetSlot.x + b.r;
-              const maxX = targetSlot.x + targetSlot.w - b.r;
-              if (b.x < minX) b.x = minX;
-              else if (b.x > maxX) b.x = maxX;
+          // Anticipation slow-mo — visual time-warp during the final
+          // approach. Only kicks in once the target is known (post-API).
+          const slowZoneStart = s.startY + (ROWS - 2.0) * s.gapY;
+          const inSlowMo = !b.awaiting && b.y > slowZoneStart && b.y < bottomY;
+          const dt = inSlowMo ? 0.55 : 1.0;
+
+          b.vy = Math.min(MAX_VY, b.vy + GRAVITY * dt);
+          b.vx *= AIR;
+
+          const fallFrac = Math.max(0, Math.min(1, (b.y - topY) / (bottomY - topY)));
+
+          if (b.awaiting) {
+            // Free-fall under pure physics — no target attractor. Cap
+            // depth so the ball can't reach the lock zone before the
+            // server has decided. Soft bounce keeps motion alive.
+            const awaitingFloor = s.startY + (ROWS - 4) * s.gapY;
+            if (b.y > awaitingFloor) {
+              b.y = awaitingFloor;
+              if (b.vy > 0) b.vy = -b.vy * 0.4;
             }
-            b.vx = 0;
-            if (b.vy > 4.5) b.vy = 4.5;
+          } else {
+            const dxToTarget = lastWp.x - b.x;
+            if (b.y < bottomY) {
+              const pull = 0.004 + fallFrac * 0.030;
+              b.vx += dxToTarget * pull * dt;
+              const maxVx = 1.4 + fallFrac * 1.6;
+              if (b.vx > maxVx) b.vx = maxVx;
+              else if (b.vx < -maxVx) b.vx = -maxVx;
+            } else {
+              if (targetSlot) {
+                const minX = targetSlot.x + b.r;
+                const maxX = targetSlot.x + targetSlot.w - b.r;
+                if (b.x < minX) b.x = minX;
+                else if (b.x > maxX) b.x = maxX;
+              }
+              b.vx = 0;
+              if (b.vy > 4.5) b.vy = 4.5;
+            }
+            // Telegraph the destination during slow-mo
+            if (inSlowMo && targetSlot) {
+              targetSlot.glow = Math.max(targetSlot.glow, 0.35 + 0.30 * Math.sin(now * 0.014));
+            }
           }
 
-          // Integrate velocity
-          b.x += b.vx;
-          b.y += b.vy;
+          // Integrate
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
 
-          // Triangle-wall containment — ball cannot escape out the angled
-          // sides of the peg field. Interpolates the wall X at current Y
-          // and bounces if the ball crosses it.
+          // Triangle walls
           if (s.leftWall.length && b.y >= s.leftWall[0].y1 && b.y <= s.leftWall[s.leftWall.length - 1].y2) {
             for (const seg of s.leftWall) {
               if (b.y >= seg.y1 && b.y <= seg.y2) {
@@ -666,7 +906,7 @@ export default function LuckyDropPage() {
             }
           }
 
-          // ── Peg collisions (circle vs circle) ──
+          // Peg collisions
           for (const peg of s.pegs) {
             const dx = b.x - peg.x;
             const dy = b.y - peg.y;
@@ -677,29 +917,40 @@ export default function LuckyDropPage() {
             const dist = Math.sqrt(distSq);
             const nx = dx / dist;
             const ny = dy / dist;
-            // Push ball outside the peg with a tiny cushion so it can't re-collide next frame
             const overlap = minDist - dist + 0.5;
             b.x += nx * overlap;
             b.y += ny * overlap;
             const vDotN = b.vx * nx + b.vy * ny;
             if (vDotN < 0) {
-              // Reflect with restitution (energy loss)
               b.vx -= (1 + RESTITUTION) * vDotN * nx;
               b.vy -= (1 + RESTITUTION) * vDotN * ny;
-              // Scatter
-              b.vx += (Math.random() - 0.5) * 2 * JITTER_X;
-              b.vy += (Math.random() - 0.5) * 2 * JITTER_Y;
-              // Cap upward bounce so the ball doesn't pop too high
+              b.vx += (Math.random() - 0.5) * 2 * JITTER_X * dt;
+              b.vy += (Math.random() - 0.5) * 2 * JITTER_Y * dt;
               if (b.vy < -MAX_BOUNCE_UP) b.vy = -MAX_BOUNCE_UP;
               peg.glow = 1;
+              b.squash = Math.max(b.squash, 0.32);
+              b.spin += (Math.random() - 0.5) * 0.25;
+              spawnSparks(b.x, b.y, inSlowMo ? 8 : 5);
               playPegSfx();
             }
           }
 
-          // Settle: once Y reaches the final waypoint, lock Y and ease X
-          // to the exact slot center so the outcome is guaranteed.
+          // Rotation + squash decay
+          b.rotation += b.vx * 0.06 + b.spin;
+          b.spin *= 0.92;
+          b.squash *= 0.85;
+
+          // Trail (every 2nd frame, cap at 10 points)
+          b.trailCounter = (b.trailCounter + 1) % 2;
+          if (b.trailCounter === 0) {
+            b.trail.push({ x: b.x, y: b.y, a: 1 });
+            if (b.trail.length > 10) b.trail.shift();
+          }
+          for (let ti = 0; ti < b.trail.length; ti++) b.trail[ti].a *= 0.88;
+
+          // Settle — only once the API has resolved (b.awaiting === false)
           const last = b.path[b.path.length - 1];
-          if (b.y >= last.y) {
+          if (!b.awaiting && b.y >= last.y) {
             b.y = last.y;
             b.vy = 0;
             b.x += (last.x - b.x) * 0.28;
@@ -707,45 +958,98 @@ export default function LuckyDropPage() {
               b.x = last.x;
               b.settled = true;
               for (const sl of s.slots) {
-                if (b.x >= sl.x && b.x <= sl.x + sl.w) { sl.glow = 1; break; }
+                if (b.x >= sl.x && b.x <= sl.x + sl.w) {
+                  sl.glow = Math.min(1.6, sl.glow + 1.4);
+                  break;
+                }
+              }
+              // Casino landing impact — shake + spark burst tuned to win size
+              if (b.data.multiplier >= 5) {
+                shakeRef.current = { intensity: 16, until: now + 520 };
+                spawnSparks(b.x, b.y - b.r * 0.5, 28);
+              } else if (b.data.multiplier >= 2) {
+                shakeRef.current = { intensity: 6, until: now + 240 };
+                spawnSparks(b.x, b.y - b.r * 0.5, 14);
+              } else {
+                spawnSparks(b.x, b.y - b.r * 0.5, 6);
               }
               if (typeof (b as any)._onSettle === "function") (b as any)._onSettle();
               setTimeout(() => { b.alive = false; }, 500);
             }
           }
-
         }
 
-        // Draw ball — flat welcome-page yellow (fillStyle hoisted above)
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-        ctx.fill();
+        // Trail render — additive plasma echoes behind the ball
+        if (b.trail.length) {
+          ctx.globalCompositeOperation = "lighter";
+          for (let ti = 0; ti < b.trail.length; ti++) {
+            const tp = b.trail[ti];
+            if (tp.a < 0.04) continue;
+            const rt = b.r * (0.55 + (ti / b.trail.length) * 0.55);
+            ctx.globalAlpha = tp.a * 0.45;
+            ctx.drawImage(ballSprite, tp.x - rt, tp.y - rt, rt * 2, rt * 2);
+          }
+          ctx.globalCompositeOperation = "source-over";
+          ctx.globalAlpha = 1;
+        }
+
+        // Ball render — rotated + squashed plasma orb
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.rotation);
+        const sxq = 1 + b.squash * 0.25;
+        const syq = 1 - b.squash * 0.45;
+        ctx.scale(sxq, syq);
+        const drawR = b.r * 2.6;
+        ctx.drawImage(ballSprite, -drawR, -drawR, drawR * 2, drawR * 2);
+        ctx.restore();
       }
 
-      // Particles — plain circles, no transform matrix math per particle
+      // ── Particles — one physics pass, two render passes (normal + additive) ──
       const pList = particlesRef.current;
       if (pList.length) {
-        const GRAVITY = 0.18;
         let writeIdx = 0;
         for (let i = 0; i < pList.length; i++) {
           const p = pList[i];
           if (!frozen) {
-            p.vy += GRAVITY;
+            const gp = p.g ?? 0.18;
+            const fr = p.fr ?? 1;
+            p.vy += gp;
+            if (fr !== 1) { p.vx *= fr; p.vy *= fr; }
             p.x += p.vx;
             p.y += p.vy;
             p.life -= 1;
           }
           if (p.life <= 0 || p.y > s.H + 20) continue;
           pList[writeIdx++] = p;
+        }
+        pList.length = writeIdx;
+        // Confetti (normal blend)
+        for (let i = 0; i < pList.length; i++) {
+          const p = pList[i];
+          if (p.glow) continue;
           ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.maxLife));
           ctx.fillStyle = p.color;
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2);
           ctx.fill();
         }
-        pList.length = writeIdx;
+        // Sparks (additive)
+        ctx.globalCompositeOperation = "lighter";
+        for (let i = 0; i < pList.length; i++) {
+          const p = pList[i];
+          if (!p.glow) continue;
+          ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.maxLife));
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalCompositeOperation = "source-over";
         ctx.globalAlpha = 1;
       }
+
+      ctx.restore();
     }
     loop();
 
@@ -754,7 +1058,7 @@ export default function LuckyDropPage() {
       if (resizeTimer) clearTimeout(resizeTimer);
       cancelAnimationFrame(animId);
     };
-  }, [calcLayout]);
+  }, [calcLayout, playPegSfx]);
 
   useEffect(() => { calcLayout(); }, [calcLayout]);
 
@@ -792,8 +1096,40 @@ export default function LuckyDropPage() {
 
     const currentRisk = risk;
     const currentBet = betAmount;
+    const mults = MULTIPLIERS[currentRisk];
 
-    // Fire API immediately (parallel — no queue)
+    // ── Spawn the ball IMMEDIATELY on click — zero perceived latency. ──
+    // The ball starts free-falling under pure physics (no target attractor).
+    // The API runs in parallel; when it returns, we set the ball's target
+    // slot and the existing path-based pull smoothly redirects it. While
+    // awaiting, the ball is soft-capped above the lock zone so it can't
+    // commit to a slot before the server decides.
+    const s = stateRef.current;
+    const ballR = Math.max(8, s.W * 0.015);
+    const startX = s.W / 2 + (Math.random() - 0.5) * s.gapX * 0.4;
+    const ball: Ball = {
+      x: startX,
+      y: s.startY - 30,
+      vx: 0,
+      vy: 2 + Math.random() * 1,
+      segIdx: 0,
+      r: ballR,
+      alive: true, settled: false,
+      trail: [], targetSlot: 0,
+      // Placeholder data — replaced when API responds. Multiplier 0 so
+      // settle effects can't accidentally fire jackpot shake before the
+      // verdict arrives.
+      data: { slotIndex: 0, multiplier: 0, winAmount: 0, risk: currentRisk },
+      rotation: 0,
+      spin: 0,
+      squash: 0,
+      trailCounter: 0,
+      awaiting: true,
+      path: [{ x: startX, y: s.startY + ROWS * s.gapY * 2 }], // dummy far below
+    };
+    s.balls.push(ball);
+
+    // Fire API in parallel — ball is already falling
     playGame("plinko").then((serverResult: any) => {
       // Always keep the LOWEST server balance (most up-to-date after all deductions)
       if (lastServerCoinsRef.current < 0 || serverResult.coinsRemaining < lastServerCoinsRef.current) {
@@ -817,17 +1153,14 @@ export default function LuckyDropPage() {
         setBonusRoundInfo(null);
       }
 
-      // Map server result to slot: WIN → random green slot, LOSE → random red slot
-      const mults = MULTIPLIERS[currentRisk];
+      // Map server verdict to slot: WIN → random green slot, LOSE → random red slot
       const won = serverResult.totalWin > 0;
       let closestIdx: number;
       if (won) {
-        // Pick a random WIN slot (indices where mult > 0)
-        const winSlots = mults.map((m, i) => ({ m, i })).filter(s => s.m > 0);
+        const winSlots = mults.map((m, i) => ({ m, i })).filter(slt => slt.m > 0);
         closestIdx = winSlots[Math.floor(Math.random() * winSlots.length)].i;
       } else {
-        // Pick a random LOSE slot (indices where mult === 0), prefer ones near center
-        const loseSlots = mults.map((m, i) => ({ m, i })).filter(s => s.m === 0);
+        const loseSlots = mults.map((m, i) => ({ m, i })).filter(slt => slt.m === 0);
         closestIdx = loseSlots[Math.floor(Math.random() * loseSlots.length)].i;
       }
 
@@ -838,22 +1171,17 @@ export default function LuckyDropPage() {
         risk: currentRisk,
       };
 
-      const s = stateRef.current;
-      const ballR = Math.max(8, s.W * 0.015);
-      const startX = s.W / 2 + (Math.random() - 0.5) * s.gapX * 0.4;
-      const path = generateBallPath(startX, s.startY, data.slotIndex, s.pegs, s.slots, s.gapX, s.gapY, ROWS);
-      const ball: Ball = {
-        x: startX,
-        y: s.startY - 30,
-        vx: 0,
-        vy: 2 + Math.random() * 1, // small initial drop velocity
-        segIdx: 0,
-        r: ballR,
-        alive: true, settled: false,
-        trail: [], targetSlot: data.slotIndex,
-        data,
-        path,
-      };
+      // ── Redirect the in-flight ball toward the correct slot ──
+      const targetSlot = s.slots[data.slotIndex];
+      if (targetSlot) {
+        ball.path = [{
+          x: targetSlot.x + targetSlot.w / 2,
+          y: targetSlot.y + targetSlot.h * 0.3,
+        }];
+      }
+      ball.data = data;
+      ball.targetSlot = data.slotIndex;
+      ball.awaiting = false;
 
       (ball as any)._onSettle = () => {
         pendingBallsRef.current--;
@@ -909,10 +1237,14 @@ export default function LuckyDropPage() {
         });
       };
 
-      s.balls.push(ball);
+      // Rare race: ball might already be settled (very slow API). Fire now.
+      if (ball.settled) {
+        (ball as any)._onSettle();
+      }
     }).catch((err: any) => {
-      // API failed — restore the local deduction
+      // API failed — kill the in-flight ball and restore the deduction
       console.error("Drop API error:", err.message);
+      ball.alive = false;
       pendingBallsRef.current--;
       setBalance((prev) => prev + currentBet);
       if (pendingBallsRef.current === 0 && lastServerCoinsRef.current >= 0) {
