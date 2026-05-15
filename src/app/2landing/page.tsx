@@ -29,25 +29,29 @@ const FLOATING_ITEMS = [
 
 /* ───────── TRANSACTION ROWS — 3 scrolling rows like coverd.us ───────── */
 
+// Row 1: largest cards, slowest scroll
 const TRX_ROW_1 = [
-  { src: "/images/trx-cavea.png",         scale: 1.15, rotate: -2 },
-  { src: "/images/trx-zara-visa.png",     scale: 0.9,  rotate: 3  },
-  { src: "/images/trx-nike.png",          scale: 1.0,  rotate: -1 },
-  { src: "/images/trx-coffeelab-amex.png", scale: 0.85, rotate: 2  },
+  { src: "/images/trx-cavea.png",         scale: 1.4,  rotate: -2, gap: 40 },
+  { src: "/images/trx-nike.png",          scale: 1.5,  rotate: 1,  gap: 60 },
+  { src: "/images/trx-zara-visa.png",     scale: 1.3,  rotate: -1, gap: 35 },
+  { src: "/images/trx-coffeelab-visa.png", scale: 1.45, rotate: 2,  gap: 50 },
 ];
 
+// Row 2: medium cards, medium scroll
 const TRX_ROW_2 = [
-  { src: "/images/trx-zara-amex.png",     scale: 1.0,  rotate: 2  },
-  { src: "/images/trx-coffeelab-visa.png", scale: 1.1,  rotate: -3 },
-  { src: "/images/trx-cavea.png",         scale: 0.85, rotate: 1  },
-  { src: "/images/trx-nike.png",          scale: 1.15, rotate: -2 },
+  { src: "/images/trx-zara-amex.png",     scale: 1.15, rotate: 2,  gap: 35 },
+  { src: "/images/trx-coffeelab-amex.png", scale: 1.0,  rotate: -2, gap: 50 },
+  { src: "/images/trx-cavea.png",         scale: 1.2,  rotate: 1,  gap: 30 },
+  { src: "/images/trx-nike.png",          scale: 1.1,  rotate: -1, gap: 45 },
 ];
 
+// Row 3: smallest cards, fastest scroll
 const TRX_ROW_3 = [
-  { src: "/images/trx-coffeelab-amex.png", scale: 1.0,  rotate: -1 },
-  { src: "/images/trx-zara-visa.png",     scale: 1.1,  rotate: 3  },
-  { src: "/images/trx-zara-amex.png",     scale: 0.9,  rotate: -2 },
-  { src: "/images/trx-coffeelab-visa.png", scale: 0.85, rotate: 1  },
+  { src: "/images/trx-coffeelab-visa.png", scale: 0.85, rotate: -1, gap: 30 },
+  { src: "/images/trx-zara-visa.png",     scale: 0.95, rotate: 2,  gap: 40 },
+  { src: "/images/trx-zara-amex.png",     scale: 0.8,  rotate: -2, gap: 25 },
+  { src: "/images/trx-nike.png",          scale: 0.9,  rotate: 1,  gap: 35 },
+  { src: "/images/trx-cavea.png",         scale: 0.85, rotate: -1, gap: 30 },
 ];
 
 /* ───────── MAIN PAGE ───────── */
@@ -132,9 +136,9 @@ export default function SecondLandingPage() {
           0%   { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
-        .trx-row-1 { animation: scrollRow 22s linear infinite; }
+        .trx-row-1 { animation: scrollRow 35s linear infinite; }
         .trx-row-2 { animation: scrollRow 28s linear infinite; }
-        .trx-row-3 { animation: scrollRow 35s linear infinite; }
+        .trx-row-3 { animation: scrollRow 20s linear infinite; }
       `}</style>
 
       <meta name="theme-color" content="#F9E741" />
@@ -431,36 +435,42 @@ export default function SecondLandingPage() {
         </section>
 
         {/* ═══════════ SCROLLING TRANSACTION ROWS — coverd.us style ═══════════ */}
-        <section className="py-10 md:py-16 overflow-hidden" style={{ background: "#F9E741" }}>
-          {[
-            { cards: TRX_ROW_1, className: "trx-row-1", mt: "" },
-            { cards: TRX_ROW_2, className: "trx-row-2", mt: "-mt-2 md:-mt-3" },
-            { cards: TRX_ROW_3, className: "trx-row-3", mt: "-mt-2 md:-mt-3" },
-          ].map((row, ri) => (
-            <div key={ri} className={`w-full overflow-hidden ${row.mt}`}>
-              <div className={`flex ${row.className}`} style={{ width: "200%" }}>
-                {[...row.cards, ...row.cards].map((card, ci) => (
-                  <div
-                    key={ci}
-                    className="shrink-0 px-3 md:px-4 py-2 select-none"
-                    style={{
-                      transform: `rotate(${card.rotate}deg) scale(${card.scale})`,
-                      filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.08))",
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={card.src}
-                      alt=""
-                      className="h-auto pointer-events-none"
-                      style={{ width: 260 }}
-                      draggable={false}
-                    />
-                  </div>
-                ))}
+        <section className="py-8 md:py-12 overflow-hidden" style={{ background: "#F9E741" }}>
+          <div className="flex flex-col" style={{ gap: "40px" }}>
+            {[
+              { cards: TRX_ROW_1, className: "trx-row-1" },
+              { cards: TRX_ROW_2, className: "trx-row-2" },
+              { cards: TRX_ROW_3, className: "trx-row-3" },
+            ].map((row, ri) => (
+              <div key={ri} className="w-full overflow-hidden">
+                <div className={`flex items-center ${row.className}`} style={{ width: "200%" }}>
+                  {[...row.cards, ...row.cards].map((card, ci) => (
+                    <div
+                      key={ci}
+                      className="shrink-0 select-none"
+                      style={{
+                        transform: `rotate(${card.rotate}deg)`,
+                        marginLeft: ci === 0 ? 0 : card.gap,
+                        marginRight: card.gap,
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={card.src}
+                        alt=""
+                        className="h-auto pointer-events-none"
+                        style={{
+                          width: 240 * card.scale,
+                          filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
+                        }}
+                        draggable={false}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </section>
 
 
