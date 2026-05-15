@@ -428,31 +428,21 @@ export default function SecondLandingPage() {
               ისიამოვნე ყოველი მომენტით, SHANSI შენს მხარესაა.
             </p>
 
-          </div>
-        </section>
-
-        {/* ═══════════ SCROLLING TRANSACTION ROWS — coverd.us style ═══════════ */}
-        <section className="py-8 md:py-12 overflow-hidden" style={{ background: "#F9E741" }}>
-          <div className="flex items-center justify-center flex-nowrap gap-6 md:gap-10 px-6 overflow-x-auto">
-            {TRX_ROW_1.map((card, ci) => (
-              <div
-                key={ci}
-                className="shrink-0 select-none"
-                style={{ transform: `rotate(${card.rotate}deg)` }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={card.src}
-                  alt=""
-                  className="h-auto pointer-events-none"
-                  style={{
-                    width: 240 * card.scale,
-                    filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
-                  }}
-                  draggable={false}
-                />
-              </div>
-            ))}
+            {/* Nike transaction — left aligned */}
+            <div className="mt-12 md:mt-16 select-none" style={{ marginLeft: 0, alignSelf: "flex-start" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/trx-nike.png"
+                alt=""
+                className="h-auto pointer-events-none"
+                style={{
+                  width: 380,
+                  transform: "rotate(-1deg)",
+                  filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
+                }}
+                draggable={false}
+              />
+            </div>
           </div>
         </section>
 
