@@ -436,7 +436,7 @@ export default function SecondLandingPage() {
 
         {/* ═══════════ SCROLLING TRANSACTION ROWS — coverd.us style ═══════════ */}
         <section className="py-8 md:py-12 overflow-hidden" style={{ background: "#F9E741" }}>
-          <div className="flex items-center justify-center flex-wrap gap-6 md:gap-10 px-6">
+          <div className="flex items-center justify-center flex-nowrap gap-6 md:gap-10 px-6 overflow-x-auto">
             {TRX_ROW_1.map((card, ci) => (
               <div
                 key={ci}
