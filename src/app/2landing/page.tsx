@@ -277,36 +277,6 @@ export default function SecondLandingPage() {
             </div>
           ))}
 
-          {/* ── Transaction cards — floating like coverd.us ── */}
-          {TRANSACTION_CARDS.map((card, i) => (
-            <div
-              key={`trx-${i}`}
-              className="absolute pointer-events-none select-none hidden md:block"
-              style={{
-                left: card.left,
-                top: card.top,
-                width: card.width,
-                zIndex: 35,
-                // @ts-expect-error CSS custom property
-                "--rot": `${card.rotate}deg`,
-                animation: mounted
-                  ? `itemPop 0.5s ease-out ${card.delay}s forwards, floatBob ${card.duration}s ease-in-out ${card.delay + 0.5}s infinite`
-                  : "none",
-                opacity: 0,
-                filter: "drop-shadow(0 8px 20px rgba(0,0,0,0.10))",
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={card.src}
-                alt=""
-                width={card.width}
-                className="w-full h-auto"
-                draggable={false}
-              />
-            </div>
-          ))}
-
           {/* ── Headline — center, z-30 so text is always readable ── */}
           <div className="flex-1 flex items-center justify-center relative z-30 pointer-events-none" style={{ marginTop: "-6vh" }}>
             <div className="text-center max-w-[900px] mx-auto px-6 pointer-events-auto">
@@ -440,6 +410,32 @@ export default function SecondLandingPage() {
             >
               ისიამოვნე ყოველი მომენტით, SHANSI შენს მხარესაა.
             </p>
+
+            {/* Transaction cards — below tagline */}
+            <div className="flex flex-wrap justify-center gap-6 mt-12 md:mt-16">
+              {TRANSACTION_CARDS.map((card, i) => (
+                <div
+                  key={`trx-${i}`}
+                  className="select-none"
+                  style={{
+                    width: card.width,
+                    // @ts-expect-error CSS custom property
+                    "--rot": `${card.rotate}deg`,
+                    animation: `floatBob ${card.duration}s ease-in-out ${card.delay}s infinite`,
+                    filter: "drop-shadow(0 8px 20px rgba(0,0,0,0.10))",
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={card.src}
+                    alt=""
+                    width={card.width}
+                    className="w-full h-auto"
+                    draggable={false}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
