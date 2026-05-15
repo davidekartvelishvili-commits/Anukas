@@ -410,8 +410,8 @@ export default function SecondLandingPage() {
               ისიამოვნე ყოველი მომენტით, SHANSI შენს მხარესაა.
             </p>
 
-            {/* Nike transaction — left aligned */}
-            <div className="mt-28 md:mt-36 mb-16 md:mb-24 select-none" style={{ marginLeft: 0, alignSelf: "flex-start" }}>
+            {/* Transactions row */}
+            <div className="mt-28 md:mt-36 mb-16 md:mb-24 flex items-end gap-6 md:gap-10 select-none" style={{ alignSelf: "flex-start" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/trx-nike.png"
@@ -420,6 +420,18 @@ export default function SecondLandingPage() {
                 style={{
                   width: 500,
                   transform: "rotate(-1deg)",
+                  filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
+                }}
+                draggable={false}
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/trx-zara-amex.png"
+                alt=""
+                className="h-auto pointer-events-none"
+                style={{
+                  width: 260,
+                  transform: "rotate(2deg)",
                   filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
                 }}
                 draggable={false}
