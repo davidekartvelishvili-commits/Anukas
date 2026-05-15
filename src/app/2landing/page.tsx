@@ -30,8 +30,10 @@ const FLOATING_ITEMS = [
 /* ───────── TRANSACTION CARDS — floating on hero like coverd.us ───────── */
 
 const TRANSACTION_CARDS = [
-  // Cavea — like Louis Vuitton position on coverd (upper-left area)
-  { src: "/images/trx-cavea.png", left: "8%", top: "32%", width: 280, rotate: -4, delay: 0.3, duration: 6.2 },
+  { src: "/images/trx-cavea.png",      width: 280, rotate: -4, delay: 0.3, duration: 6.2 },
+  { src: "/images/trx-zara-visa.png",  width: 280, rotate: 3,  delay: 0.6, duration: 5.8 },
+  { src: "/images/trx-zara-amex.png",  width: 280, rotate: -2, delay: 0.9, duration: 6.5 },
+  { src: "/images/trx-nike.png",       width: 280, rotate: 4,  delay: 1.2, duration: 5.5 },
 ];
 
 /* ───────── MAIN PAGE ───────── */
@@ -441,7 +443,7 @@ export default function SecondLandingPage() {
 
 
         {/* ═══════════ HOW IT WORKS ═══════════ */}
-        <section className="py-20 md:py-28 px-6" style={{ background: "#FFFDF0" }}>
+        <section className="py-20 md:py-28 px-6" style={{ background: "#F9E741" }}>
           <div className="max-w-[1100px] mx-auto">
             <div className="text-center mb-14">
               <h2
@@ -489,7 +491,7 @@ export default function SecondLandingPage() {
         </section>
 
         {/* ═══════════ DUAL CARDS ═══════════ */}
-        <section className="py-16 md:py-24 px-6" style={{ background: "#FFFDF0" }}>
+        <section className="py-16 md:py-24 px-6" style={{ background: "#F9E741" }}>
           <div className="max-w-[1100px] mx-auto grid md:grid-cols-2 gap-6 md:gap-8">
             <div
               className="rounded-3xl p-8 md:p-10 transition-all duration-200 hover:scale-[1.01]"
@@ -519,7 +521,7 @@ export default function SecondLandingPage() {
         </section>
 
         {/* ═══════════ FEATURES GRID ═══════════ */}
-        <section className="py-16 md:py-24 px-6" style={{ background: "#FFFDF0" }}>
+        <section className="py-16 md:py-24 px-6" style={{ background: "#F9E741" }}>
           <div className="max-w-[1100px] mx-auto">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
               {[
