@@ -418,7 +418,7 @@ export default function SecondLandingPage() {
                 alt=""
                 className="h-auto pointer-events-none"
                 style={{
-                  width: 500,
+                  width: 400,
                   transform: "rotate(-1deg)",
                   filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
                 }}
@@ -430,7 +430,7 @@ export default function SecondLandingPage() {
                 alt=""
                 className="h-auto pointer-events-none"
                 style={{
-                  width: 260,
+                  width: 210,
                   transform: "rotate(2deg)",
                   filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
                 }}
