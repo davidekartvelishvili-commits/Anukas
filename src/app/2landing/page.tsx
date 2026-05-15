@@ -411,7 +411,7 @@ export default function SecondLandingPage() {
             </p>
 
             {/* Transactions row */}
-            <div className="mt-28 md:mt-36 mb-16 md:mb-24 flex items-end gap-10 md:gap-16 select-none" style={{ alignSelf: "flex-start" }}>
+            <div className="mt-28 md:mt-36 mb-16 md:mb-24 flex items-end gap-16 md:gap-24 select-none" style={{ alignSelf: "flex-start" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/trx-nike.png"
