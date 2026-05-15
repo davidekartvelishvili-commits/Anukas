@@ -27,17 +27,11 @@ const FLOATING_ITEMS = [
   { src: "/images/onboarding/ali-nino.png",      left: "22%",  top: "78%",  size: 160, rotate: -6,  delay: 0.6,  duration: 6.0 },
 ];
 
-/* ───────── MERCHANT TICKER DATA ───────── */
+/* ───────── TRANSACTION CARDS — floating on hero like coverd.us ───────── */
 
-const MERCHANTS = [
-  { name: "Lui Coffee",   amount: "₾8"   },
-  { name: "Coffee LAB",   amount: "₾12"  },
-  { name: "Wendy's",      amount: "₾32"  },
-  { name: "Dunkin'",      amount: "₾18"  },
-  { name: "Stamba Hotel",  amount: "₾120" },
-  { name: "Entree",       amount: "₾45"  },
-  { name: "Rooms Hotel",  amount: "₾95"  },
-  { name: "Lolita",       amount: "₾28"  },
+const TRANSACTION_CARDS = [
+  // Cavea — like Louis Vuitton position on coverd (upper-left area)
+  { src: "/images/trx-cavea.png", left: "8%", top: "32%", width: 280, rotate: -4, delay: 0.3, duration: 6.2 },
 ];
 
 /* ───────── MAIN PAGE ───────── */
@@ -283,6 +277,36 @@ export default function SecondLandingPage() {
             </div>
           ))}
 
+          {/* ── Transaction cards — floating like coverd.us ── */}
+          {TRANSACTION_CARDS.map((card, i) => (
+            <div
+              key={`trx-${i}`}
+              className="absolute pointer-events-none select-none hidden md:block"
+              style={{
+                left: card.left,
+                top: card.top,
+                width: card.width,
+                zIndex: 35,
+                // @ts-expect-error CSS custom property
+                "--rot": `${card.rotate}deg`,
+                animation: mounted
+                  ? `itemPop 0.5s ease-out ${card.delay}s forwards, floatBob ${card.duration}s ease-in-out ${card.delay + 0.5}s infinite`
+                  : "none",
+                opacity: 0,
+                filter: "drop-shadow(0 8px 20px rgba(0,0,0,0.10))",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={card.src}
+                alt=""
+                width={card.width}
+                className="w-full h-auto"
+                draggable={false}
+              />
+            </div>
+          ))}
+
           {/* ── Headline — center, z-30 so text is always readable ── */}
           <div className="flex-1 flex items-center justify-center relative z-30 pointer-events-none" style={{ marginTop: "-6vh" }}>
             <div className="text-center max-w-[900px] mx-auto px-6 pointer-events-auto">
@@ -419,33 +443,6 @@ export default function SecondLandingPage() {
           </div>
         </section>
 
-        {/* ═══════════ MERCHANT TICKER ═══════════ */}
-        <div className="relative z-30 w-full overflow-hidden py-5 mt-10" style={{ background: "#1A1A1A" }}>
-          <div className="flex ticker-track" style={{ width: "200%" }}>
-            {[...MERCHANTS, ...MERCHANTS, ...MERCHANTS, ...MERCHANTS].map((m, i) => (
-              <div key={i} className="flex items-center gap-3 px-8 shrink-0">
-                <div
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-[14px] font-bold text-[#1A1A1A] shrink-0"
-                  style={{ background: "#F9E741", fontFamily: "var(--font-outfit)" }}
-                >
-                  {m.name[0]}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className="text-[14px] font-semibold text-white whitespace-nowrap"
-                    style={{ fontFamily: "var(--font-dm-sans)" }}
-                  >
-                    {m.name}
-                  </span>
-                  <span className="text-[13px] font-bold text-[#10B981] whitespace-nowrap">
-                    {m.amount}
-                  </span>
-                </div>
-                <span className="text-white/20 text-[8px] ml-2">●</span>
-              </div>
-            ))}
-          </div>
-        </div>
 
         {/* ═══════════ HOW IT WORKS ═══════════ */}
         <section className="py-20 md:py-28 px-6" style={{ background: "#FFFDF0" }}>
