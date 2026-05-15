@@ -31,10 +31,10 @@ const FLOATING_ITEMS = [
 
 // Row 1: largest cards, slowest scroll
 const TRX_ROW_1 = [
-  { src: "/images/trx-cavea.png",         scale: 1.4,  rotate: -2, gap: 40 },
-  { src: "/images/trx-nike.png",          scale: 1.5,  rotate: 1,  gap: 60 },
-  { src: "/images/trx-zara-visa.png",     scale: 1.3,  rotate: -1, gap: 35 },
-  { src: "/images/trx-coffeelab-visa.png", scale: 1.45, rotate: 2,  gap: 50 },
+  { src: "/images/trx-nike.png",          scale: 1.7,  rotate: -1, gap: 60 },
+  { src: "/images/trx-cavea.png",         scale: 1.3,  rotate: -2, gap: 40 },
+  { src: "/images/trx-zara-visa.png",     scale: 1.3,  rotate: 1,  gap: 35 },
+  { src: "/images/trx-coffeelab-visa.png", scale: 1.3,  rotate: 2,  gap: 50 },
 ];
 
 // Row 2: medium cards, medium scroll
