@@ -345,24 +345,6 @@ export default function SecondLandingPage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/images/onboarding/suitcase.png" alt="" width={180} height={180} className="w-full h-full object-contain" draggable={false} />
             </div>
-            {/* Golfball overlapping bottom-left of video — half on video */}
-            <div
-              className="absolute pointer-events-none select-none hidden md:block"
-              style={{
-                left: 40,
-                bottom: 130,
-                width: 140,
-                height: 140,
-                zIndex: 40,
-                // @ts-expect-error CSS custom property
-                "--rot": "12deg",
-                animation: "floatBob 5.5s ease-in-out 0.8s infinite",
-                filter: "drop-shadow(0 10px 25px rgba(0,0,0,0.12))",
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/onboarding/golfball.png" alt="" width={110} height={110} className="w-full h-full object-contain" draggable={false} />
-            </div>
             <div
               className="relative overflow-hidden cursor-pointer"
               style={{
@@ -429,7 +411,7 @@ export default function SecondLandingPage() {
             </p>
 
             {/* Nike transaction — left aligned */}
-            <div className="mt-20 md:mt-28 mb-16 md:mb-24 select-none" style={{ marginLeft: 0, alignSelf: "flex-start" }}>
+            <div className="mt-28 md:mt-36 mb-16 md:mb-24 select-none" style={{ marginLeft: 0, alignSelf: "flex-start" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/trx-nike.png"
