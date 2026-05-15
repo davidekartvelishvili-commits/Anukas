@@ -436,38 +436,24 @@ export default function SecondLandingPage() {
 
         {/* ═══════════ SCROLLING TRANSACTION ROWS — coverd.us style ═══════════ */}
         <section className="py-8 md:py-12 overflow-hidden" style={{ background: "#F9E741" }}>
-          <div className="flex flex-col" style={{ gap: "40px" }}>
-            {[
-              { cards: TRX_ROW_1, className: "trx-row-1" },
-              { cards: TRX_ROW_2, className: "trx-row-2" },
-              { cards: TRX_ROW_3, className: "trx-row-3" },
-            ].map((row, ri) => (
-              <div key={ri} className="w-full overflow-hidden">
-                <div className={`flex items-center ${row.className}`} style={{ width: "200%" }}>
-                  {[...row.cards, ...row.cards].map((card, ci) => (
-                    <div
-                      key={ci}
-                      className="shrink-0 select-none"
-                      style={{
-                        transform: `rotate(${card.rotate}deg)`,
-                        marginLeft: ci === 0 ? 0 : card.gap,
-                        marginRight: card.gap,
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={card.src}
-                        alt=""
-                        className="h-auto pointer-events-none"
-                        style={{
-                          width: 240 * card.scale,
-                          filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
-                        }}
-                        draggable={false}
-                      />
-                    </div>
-                  ))}
-                </div>
+          <div className="flex items-center justify-center flex-wrap gap-6 md:gap-10 px-6">
+            {TRX_ROW_1.map((card, ci) => (
+              <div
+                key={ci}
+                className="shrink-0 select-none"
+                style={{ transform: `rotate(${card.rotate}deg)` }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={card.src}
+                  alt=""
+                  className="h-auto pointer-events-none"
+                  style={{
+                    width: 240 * card.scale,
+                    filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
+                  }}
+                  draggable={false}
+                />
               </div>
             ))}
           </div>
