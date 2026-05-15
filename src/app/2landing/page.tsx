@@ -429,14 +429,14 @@ export default function SecondLandingPage() {
             </p>
 
             {/* Nike transaction — left aligned */}
-            <div className="mt-12 md:mt-16 select-none" style={{ marginLeft: 0, alignSelf: "flex-start" }}>
+            <div className="mt-20 md:mt-28 mb-16 md:mb-24 select-none" style={{ marginLeft: 0, alignSelf: "flex-start" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/trx-nike.png"
                 alt=""
                 className="h-auto pointer-events-none"
                 style={{
-                  width: 380,
+                  width: 500,
                   transform: "rotate(-1deg)",
                   filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
                 }}
