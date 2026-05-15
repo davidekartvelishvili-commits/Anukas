@@ -436,6 +436,18 @@ export default function SecondLandingPage() {
                 }}
                 draggable={false}
               />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/trx-coffeelab-amex.png"
+                alt=""
+                className="h-auto pointer-events-none"
+                style={{
+                  width: 300,
+                  transform: "rotate(-1.5deg)",
+                  filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
+                }}
+                draggable={false}
+              />
             </div>
           </div>
         </section>
