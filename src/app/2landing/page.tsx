@@ -27,13 +27,27 @@ const FLOATING_ITEMS = [
   { src: "/images/onboarding/ali-nino.png",      left: "22%",  top: "78%",  size: 160, rotate: -6,  delay: 0.6,  duration: 6.0 },
 ];
 
-/* ───────── TRANSACTION CARDS — floating on hero like coverd.us ───────── */
+/* ───────── TRANSACTION ROWS — 3 scrolling rows like coverd.us ───────── */
 
-const TRANSACTION_CARDS = [
-  { src: "/images/trx-cavea.png",      width: 280, rotate: -4, delay: 0.3, duration: 6.2 },
-  { src: "/images/trx-zara-visa.png",  width: 280, rotate: 3,  delay: 0.6, duration: 5.8 },
-  { src: "/images/trx-zara-amex.png",  width: 280, rotate: -2, delay: 0.9, duration: 6.5 },
-  { src: "/images/trx-nike.png",       width: 280, rotate: 4,  delay: 1.2, duration: 5.5 },
+const TRX_ROW_1 = [
+  { src: "/images/trx-cavea.png",         scale: 1.15, rotate: -2 },
+  { src: "/images/trx-zara-visa.png",     scale: 0.9,  rotate: 3  },
+  { src: "/images/trx-nike.png",          scale: 1.0,  rotate: -1 },
+  { src: "/images/trx-coffeelab-amex.png", scale: 0.85, rotate: 2  },
+];
+
+const TRX_ROW_2 = [
+  { src: "/images/trx-zara-amex.png",     scale: 1.0,  rotate: 2  },
+  { src: "/images/trx-coffeelab-visa.png", scale: 1.1,  rotate: -3 },
+  { src: "/images/trx-cavea.png",         scale: 0.85, rotate: 1  },
+  { src: "/images/trx-nike.png",          scale: 1.15, rotate: -2 },
+];
+
+const TRX_ROW_3 = [
+  { src: "/images/trx-coffeelab-amex.png", scale: 1.0,  rotate: -1 },
+  { src: "/images/trx-zara-visa.png",     scale: 1.1,  rotate: 3  },
+  { src: "/images/trx-zara-amex.png",     scale: 0.9,  rotate: -2 },
+  { src: "/images/trx-coffeelab-visa.png", scale: 0.85, rotate: 1  },
 ];
 
 /* ───────── MAIN PAGE ───────── */
@@ -114,13 +128,13 @@ export default function SecondLandingPage() {
         .hero-in-d2  { animation: heroUp 0.7s ease-out 0.22s forwards; opacity: 0; }
         .hero-in-d3  { animation: heroUp 0.7s ease-out 0.34s forwards; opacity: 0; }
 
-        @keyframes tickerScroll {
+        @keyframes scrollRow {
           0%   { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
-        .ticker-track {
-          animation: tickerScroll 30s linear infinite;
-        }
+        .trx-row-1 { animation: scrollRow 22s linear infinite; }
+        .trx-row-2 { animation: scrollRow 28s linear infinite; }
+        .trx-row-3 { animation: scrollRow 35s linear infinite; }
       `}</style>
 
       <meta name="theme-color" content="#F9E741" />
@@ -413,32 +427,40 @@ export default function SecondLandingPage() {
               ისიამოვნე ყოველი მომენტით, SHANSI შენს მხარესაა.
             </p>
 
-            {/* Transaction cards — below tagline */}
-            <div className="flex flex-wrap justify-center gap-6 mt-12 md:mt-16">
-              {TRANSACTION_CARDS.map((card, i) => (
-                <div
-                  key={`trx-${i}`}
-                  className="select-none"
-                  style={{
-                    width: card.width,
-                    // @ts-expect-error CSS custom property
-                    "--rot": `${card.rotate}deg`,
-                    animation: `floatBob ${card.duration}s ease-in-out ${card.delay}s infinite`,
-                    filter: "drop-shadow(0 8px 20px rgba(0,0,0,0.10))",
-                  }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={card.src}
-                    alt=""
-                    width={card.width}
-                    className="w-full h-auto"
-                    draggable={false}
-                  />
-                </div>
-              ))}
-            </div>
           </div>
+        </section>
+
+        {/* ═══════════ SCROLLING TRANSACTION ROWS — coverd.us style ═══════════ */}
+        <section className="py-10 md:py-16 overflow-hidden" style={{ background: "#F9E741" }}>
+          {[
+            { cards: TRX_ROW_1, className: "trx-row-1", mt: "" },
+            { cards: TRX_ROW_2, className: "trx-row-2", mt: "-mt-2 md:-mt-3" },
+            { cards: TRX_ROW_3, className: "trx-row-3", mt: "-mt-2 md:-mt-3" },
+          ].map((row, ri) => (
+            <div key={ri} className={`w-full overflow-hidden ${row.mt}`}>
+              <div className={`flex ${row.className}`} style={{ width: "200%" }}>
+                {[...row.cards, ...row.cards].map((card, ci) => (
+                  <div
+                    key={ci}
+                    className="shrink-0 px-3 md:px-4 py-2 select-none"
+                    style={{
+                      transform: `rotate(${card.rotate}deg) scale(${card.scale})`,
+                      filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.08))",
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={card.src}
+                      alt=""
+                      className="h-auto pointer-events-none"
+                      style={{ width: 260 }}
+                      draggable={false}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </section>
 
 
