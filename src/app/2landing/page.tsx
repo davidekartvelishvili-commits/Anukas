@@ -91,18 +91,25 @@ export default function SecondLandingPage() {
   }, []);
 
   useEffect(() => {
-    if (!trxRef.current) return;
+    // Fallback: show after 2s no matter what
+    const fallbackTimer = setTimeout(() => setTrxVisible(true), 2000);
+
+    if (!trxRef.current) return () => clearTimeout(fallbackTimer);
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setTrxVisible(true);
+          clearTimeout(fallbackTimer);
           observer.disconnect();
         }
       },
-      { threshold: 0.15 }
+      { threshold: 0.05, rootMargin: "200px" }
     );
     observer.observe(trxRef.current);
-    return () => observer.disconnect();
+    return () => {
+      clearTimeout(fallbackTimer);
+      observer.disconnect();
+    };
   }, []);
 
   return (
@@ -342,7 +349,7 @@ export default function SecondLandingPage() {
         </section>
 
         {/* ═══════════ VIDEO SECTION — right below hero, like coverd ═══════════ */}
-        <section className="relative z-30 px-6 md:px-10 -mt-12" style={{ background: "transparent", overflow: "hidden" }}>
+        <section className="relative z-30 px-6 md:px-10 -mt-12" style={{ background: "transparent" }}>
           <div className="max-w-[1200px] mx-auto relative">
             {/* Suitcase overlapping top-left of video — floating */}
             <div
@@ -432,7 +439,7 @@ export default function SecondLandingPage() {
               ref={trxRef}
               className="mt-28 md:mt-36 mb-16 md:mb-24 flex flex-col gap-16 md:gap-24 select-none"
               style={{
-                transform: trxVisible ? "translateX(0)" : "translateX(100vw)",
+                transform: trxVisible ? "translateX(0)" : "translateX(80%)",
                 opacity: trxVisible ? 1 : 0,
                 transition: "transform 0.9s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease-out",
               }}
