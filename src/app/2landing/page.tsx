@@ -91,21 +91,31 @@ export default function SecondLandingPage() {
   }, []);
 
   useEffect(() => {
-    // Fallback: show after 2s no matter what
-    const fallbackTimer = setTimeout(() => setTrxVisible(true), 2000);
+    const sentinel = trxRef.current;
+    if (!sentinel) {
+      console.log("[trx-anim] no ref found, forcing visible");
+      setTrxVisible(true);
+      return;
+    }
 
-    if (!trxRef.current) return () => clearTimeout(fallbackTimer);
     const observer = new IntersectionObserver(
       ([entry]) => {
+        console.log("[trx-anim] observer fired, isIntersecting:", entry.isIntersecting, "ratio:", entry.intersectionRatio);
         if (entry.isIntersecting) {
           setTrxVisible(true);
-          clearTimeout(fallbackTimer);
           observer.disconnect();
         }
       },
-      { threshold: 0.05, rootMargin: "200px" }
+      { threshold: 0.1 }
     );
-    observer.observe(trxRef.current);
+    observer.observe(sentinel);
+
+    // Fallback: show after 2s no matter what
+    const fallbackTimer = setTimeout(() => {
+      console.log("[trx-anim] fallback timer fired");
+      setTrxVisible(true);
+    }, 2000);
+
     return () => {
       clearTimeout(fallbackTimer);
       observer.disconnect();
@@ -160,6 +170,16 @@ export default function SecondLandingPage() {
         .trx-row-1 { animation: scrollRow 35s linear infinite; }
         .trx-row-2 { animation: scrollRow 28s linear infinite; }
         .trx-row-3 { animation: scrollRow 20s linear infinite; }
+
+        .trx-slide {
+          transform: translateX(100%);
+          opacity: 0;
+          transition: transform 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.9s ease;
+        }
+        .trx-slide.visible {
+          transform: translateX(0);
+          opacity: 1;
+        }
       `}</style>
 
       <meta name="theme-color" content="#F9E741" />
@@ -434,15 +454,11 @@ export default function SecondLandingPage() {
               პარტნიორ ობიექტებთან გადახდისას გამოიყენე SHANSI და დაიბრუნე 100%-მდე ქეშბექი
             </p>
 
+            {/* Sentinel for IntersectionObserver — always in-flow, invisible */}
+            <div ref={trxRef} style={{ height: 1 }} />
             {/* Transactions — 3 rows, slide in from right on scroll */}
             <div
-              ref={trxRef}
-              className="mt-28 md:mt-36 mb-16 md:mb-24 flex flex-col gap-16 md:gap-24 select-none"
-              style={{
-                transform: trxVisible ? "translateX(0)" : "translateX(80%)",
-                opacity: trxVisible ? 1 : 0,
-                transition: "transform 0.9s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease-out",
-              }}
+              className={`mt-28 md:mt-36 mb-16 md:mb-24 flex flex-col gap-16 md:gap-24 select-none trx-slide${trxVisible ? " visible" : ""}`}
             >
               {/* Row 1: 3 transactions */}
               <div className="flex items-end gap-16 md:gap-24">
