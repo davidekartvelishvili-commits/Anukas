@@ -534,7 +534,7 @@ export default function SecondLandingPage() {
                 alt="Shansi App"
                 className="pointer-events-none"
                 style={{
-                  width: 340,
+                  width: 700,
                   filter: "drop-shadow(0 12px 40px rgba(0,0,0,0.15))",
                 }}
                 draggable={false}
