@@ -564,9 +564,9 @@ export default function SecondLandingPage() {
 
             <div className="grid md:grid-cols-3 gap-6 md:gap-8">
               {[
-                { img: "/images/app-mockup.png", step: "01", title: "დაასკანერე QR კოდი",   desc: "ეწვიეთ პარტნიორ ობიექტს და დაასკანერეთ QR კოდი თქვენი შენაძენის დასაფიქსირებლად." },
-                { img: "/images/app-slots.png", step: "02", title: "ითამაშე თამაშები",   desc: "Use your entries to play — slots, plinko, chicken rush. Every purchase is a game ticket." },
-                { img: "/images/app-mockup.png", step: "03", title: "Win Cashback", desc: "Win up to 100% of your purchase back. Withdraw anytime, zero strings attached." },
+                { img: "/images/app-mockup.png", step: "01", title: "დაასკანერე QR კოდი",   desc: "ეწვიეთ პარტნიორ ობიექტს და დაასკანერეთ QR კოდი თქვენი შენაძენის დასაფიქსირებლად.", imgSize: 80 },
+                { img: "/images/app-slots.png", step: "02", title: "ითამაშე თამაშები",   desc: "Use your entries to play — slots, plinko, chicken rush. Every purchase is a game ticket.", imgSize: 120 },
+                { img: "/images/app-mockup.png", step: "03", title: "Win Cashback", desc: "Win up to 100% of your purchase back. Withdraw anytime, zero strings attached.", imgSize: 120 },
               ].map((s, i) => (
                 <div
                   key={i}
@@ -585,7 +585,7 @@ export default function SecondLandingPage() {
                       src={s.img}
                       alt=""
                       className="pointer-events-none select-none"
-                      style={{ width: 120, marginTop: -40, filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.10))" }}
+                      style={{ width: s.imgSize, marginTop: -40, filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.10))" }}
                       draggable={false}
                     />
                   </div>
