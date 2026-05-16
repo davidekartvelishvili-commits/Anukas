@@ -451,19 +451,21 @@ export default function SecondLandingPage() {
                   draggable={false}
                 />
               </div>
-              {/* Bottom row: Bolt */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/trx-bolt-amex.png"
-                alt=""
-                className="h-auto pointer-events-none"
-                style={{
-                  width: 400,
-                  transform: "rotate(-1deg)",
-                  filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
-                }}
-                draggable={false}
-              />
+              {/* Bottom row: Bolt — centered */}
+              <div className="flex justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/trx-bolt-amex.png"
+                  alt=""
+                  className="h-auto pointer-events-none"
+                  style={{
+                    width: 400,
+                    transform: "rotate(-1deg)",
+                    filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
+                  }}
+                  draggable={false}
+                />
+              </div>
             </div>
           </div>
         </section>
