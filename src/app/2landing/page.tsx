@@ -59,7 +59,7 @@ export default function SecondLandingPage() {
   const [videoPlaying, setVideoPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const trxRef = useRef<HTMLDivElement>(null);
-  const [trxVisible, setTrxVisible] = useState(false);
+  const trxWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -91,19 +91,36 @@ export default function SecondLandingPage() {
   }, []);
 
   useEffect(() => {
+    let ticking = false;
+    const updatePosition = () => {
+      const sentinel = trxRef.current;
+      const wrap = trxWrapRef.current;
+      if (!sentinel || !wrap) return;
+
+      const rect = sentinel.getBoundingClientRect();
+      const vh = window.innerHeight;
+      // Animation starts when sentinel top enters bottom of viewport
+      // Animation ends when sentinel top reaches 20% from top of viewport
+      const start = vh;       // sentinel.top == vh → progress 0
+      const end = vh * 0.2;   // sentinel.top == vh*0.2 → progress 1
+      const progress = Math.min(1, Math.max(0, (start - rect.top) / (start - end)));
+
+      const translateX = (1 - progress) * 100;
+      wrap.style.transform = `translateX(${translateX}%)`;
+      wrap.style.opacity = `${progress}`;
+      ticking = false;
+    };
+
     const handleScroll = () => {
-      const el = trxRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      if (rect.top < window.innerHeight * 0.8) {
-        console.log("[trx-anim] scroll trigger fired, top:", rect.top);
-        setTrxVisible(true);
-        window.removeEventListener("scroll", handleScroll);
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(updatePosition);
       }
     };
+
     window.addEventListener("scroll", handleScroll, { passive: true });
-    // Check immediately in case already scrolled
-    handleScroll();
+    // Run once on mount
+    updatePosition();
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -156,15 +173,6 @@ export default function SecondLandingPage() {
         .trx-row-2 { animation: scrollRow 28s linear infinite; }
         .trx-row-3 { animation: scrollRow 20s linear infinite; }
 
-        .trx-slide {
-          transform: translateX(100%);
-          opacity: 0;
-          transition: transform 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.9s ease;
-        }
-        .trx-slide.visible {
-          transform: translateX(0);
-          opacity: 1;
-        }
       `}</style>
 
       <meta name="theme-color" content="#F9E741" />
@@ -439,10 +447,13 @@ export default function SecondLandingPage() {
               პარტნიორ ობიექტებთან გადახდისას გამოიყენე SHANSI და დაიბრუნე 100%-მდე ქეშბექი
             </p>
 
-            {/* Transactions — 3 rows, slide in from right on scroll */}
+            {/* Sentinel — stays in flow to track scroll position */}
+            <div ref={trxRef} className="mt-28 md:mt-36" style={{ height: 0 }} />
+            {/* Transactions — 3 rows, scroll-linked slide from right */}
             <div
-              ref={trxRef}
-              className={`mt-28 md:mt-36 mb-16 md:mb-24 flex flex-col gap-16 md:gap-24 select-none trx-slide${trxVisible ? " visible" : ""}`}
+              ref={trxWrapRef}
+              className="mb-16 md:mb-24 flex flex-col gap-16 md:gap-24 select-none"
+              style={{ transform: "translateX(100%)", opacity: 0, willChange: "transform, opacity" }}
             >
               {/* Row 1: 3 transactions */}
               <div className="flex items-end gap-16 md:gap-24">
