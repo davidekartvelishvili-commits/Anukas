@@ -453,7 +453,7 @@ export default function SecondLandingPage() {
               </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/images/trx-coffeelab-amex.png"
+                src="/images/trx-zara-mc.png"
                 alt=""
                 className="h-auto pointer-events-none"
                 style={{
