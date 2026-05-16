@@ -452,7 +452,7 @@ export default function SecondLandingPage() {
                 />
               </div>
               {/* Row 2: Bolt — centered */}
-              <div className="flex justify-center">
+              <div className="flex justify-center" style={{ marginTop: -40 }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/images/trx-bolt-amex.png"
@@ -467,7 +467,7 @@ export default function SecondLandingPage() {
                 />
               </div>
               {/* Row 3: Zara Visa — left side, under Cavea */}
-              <div className="flex justify-start" style={{ marginTop: -40 }}>
+              <div className="flex justify-start" style={{ marginTop: -60 }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/images/trx-zara-visa2.png"
