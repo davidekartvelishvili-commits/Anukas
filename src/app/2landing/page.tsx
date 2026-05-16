@@ -484,7 +484,7 @@ export default function SecondLandingPage() {
             </div>
 
             {/* App mockup */}
-            <div className="mt-28 md:mt-36 flex justify-center">
+            <div className="mt-12 md:mt-16 flex justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/app-mockup.png"
