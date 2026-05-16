@@ -91,35 +91,20 @@ export default function SecondLandingPage() {
   }, []);
 
   useEffect(() => {
-    const sentinel = trxRef.current;
-    if (!sentinel) {
-      console.log("[trx-anim] no ref found, forcing visible");
-      setTrxVisible(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        console.log("[trx-anim] observer fired, isIntersecting:", entry.isIntersecting, "ratio:", entry.intersectionRatio);
-        if (entry.isIntersecting) {
-          setTrxVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.1 }
-    );
-    observer.observe(sentinel);
-
-    // Fallback: show after 2s no matter what
-    const fallbackTimer = setTimeout(() => {
-      console.log("[trx-anim] fallback timer fired");
-      setTrxVisible(true);
-    }, 2000);
-
-    return () => {
-      clearTimeout(fallbackTimer);
-      observer.disconnect();
+    const handleScroll = () => {
+      const el = trxRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight * 0.8) {
+        console.log("[trx-anim] scroll trigger fired, top:", rect.top);
+        setTrxVisible(true);
+        window.removeEventListener("scroll", handleScroll);
+      }
     };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    // Check immediately in case already scrolled
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (
@@ -454,10 +439,9 @@ export default function SecondLandingPage() {
               პარტნიორ ობიექტებთან გადახდისას გამოიყენე SHANSI და დაიბრუნე 100%-მდე ქეშბექი
             </p>
 
-            {/* Sentinel for IntersectionObserver — always in-flow, invisible */}
-            <div ref={trxRef} style={{ height: 1 }} />
             {/* Transactions — 3 rows, slide in from right on scroll */}
             <div
+              ref={trxRef}
               className={`mt-28 md:mt-36 mb-16 md:mb-24 flex flex-col gap-16 md:gap-24 select-none trx-slide${trxVisible ? " visible" : ""}`}
             >
               {/* Row 1: 3 transactions */}
