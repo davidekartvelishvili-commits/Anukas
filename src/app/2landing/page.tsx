@@ -565,7 +565,7 @@ export default function SecondLandingPage() {
             <div className="grid md:grid-cols-3 gap-6 md:gap-8">
               {[
                 { img: "/images/app-mockup.png", step: "01", title: "დაასკანერე QR კოდი",   desc: "ეწვიეთ პარტნიორ ობიექტს და დაასკანერეთ QR კოდი თქვენი შენაძენის დასაფიქსირებლად." },
-                { img: "/images/app-mockup.png", step: "02", title: "Play Games",   desc: "Use your entries to play — slots, plinko, chicken rush. Every purchase is a game ticket." },
+                { img: "/images/app-slots.png", step: "02", title: "Play Games",   desc: "Use your entries to play — slots, plinko, chicken rush. Every purchase is a game ticket." },
                 { img: "/images/app-mockup.png", step: "03", title: "Win Cashback", desc: "Win up to 100% of your purchase back. Withdraw anytime, zero strings attached." },
               ].map((s, i) => (
                 <div
