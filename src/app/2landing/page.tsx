@@ -558,7 +558,7 @@ export default function SecondLandingPage() {
                 className="text-[16px] sm:text-[18px] text-[#1A1A1A]/60 max-w-[480px] mx-auto"
                 style={{ fontFamily: "var(--font-dm-sans)" }}
               >
-                Three steps to turn every purchase into a chance to win.
+                3 მარტივი მოქმედებით დაიბრუნეთ გადახდილი თანხა
               </p>
             </div>
 
