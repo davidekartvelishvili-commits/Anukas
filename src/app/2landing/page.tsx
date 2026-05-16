@@ -552,7 +552,7 @@ export default function SecondLandingPage() {
                 className="text-[32px] sm:text-[44px] md:text-[52px] font-extrabold text-[#1A1A1A] leading-[1.1] mb-4"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
-                How It Works
+                როგორ გამოვიყენოთ პლატფორმა?
               </h2>
               <p
                 className="text-[16px] sm:text-[18px] text-[#1A1A1A]/60 max-w-[480px] mx-auto"
