@@ -58,6 +58,8 @@ export default function SecondLandingPage() {
   const [mounted, setMounted] = useState(false);
   const [videoPlaying, setVideoPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const trxRef = useRef<HTMLDivElement>(null);
+  const [trxVisible, setTrxVisible] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -86,6 +88,21 @@ export default function SecondLandingPage() {
         }),
       }).catch(() => {});
     } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!trxRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setTrxVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.15 }
+    );
+    observer.observe(trxRef.current);
+    return () => observer.disconnect();
   }, []);
 
   return (
@@ -325,7 +342,7 @@ export default function SecondLandingPage() {
         </section>
 
         {/* ═══════════ VIDEO SECTION — right below hero, like coverd ═══════════ */}
-        <section className="relative z-30 px-6 md:px-10 -mt-12" style={{ background: "transparent" }}>
+        <section className="relative z-30 px-6 md:px-10 -mt-12" style={{ background: "transparent", overflow: "hidden" }}>
           <div className="max-w-[1200px] mx-auto relative">
             {/* Suitcase overlapping top-left of video — floating */}
             <div
@@ -410,8 +427,16 @@ export default function SecondLandingPage() {
               პარტნიორ ობიექტებთან გადახდისას გამოიყენე SHANSI და დაიბრუნე 100%-მდე ქეშბექი
             </p>
 
-            {/* Transactions — 3 rows */}
-            <div className="mt-28 md:mt-36 mb-16 md:mb-24 flex flex-col gap-16 md:gap-24 select-none">
+            {/* Transactions — 3 rows, slide in from right on scroll */}
+            <div
+              ref={trxRef}
+              className="mt-28 md:mt-36 mb-16 md:mb-24 flex flex-col gap-16 md:gap-24 select-none"
+              style={{
+                transform: trxVisible ? "translateX(0)" : "translateX(100vw)",
+                opacity: trxVisible ? 1 : 0,
+                transition: "transform 0.9s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease-out",
+              }}
+            >
               {/* Row 1: 3 transactions */}
               <div className="flex items-end gap-16 md:gap-24">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
