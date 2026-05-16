@@ -571,7 +571,7 @@ export default function SecondLandingPage() {
                 <div
                   key={i}
                   className="relative rounded-3xl p-8 md:p-10 text-center transition-transform duration-200 hover:scale-[1.02]"
-                  style={{ background: "white", boxShadow: "0 2px 20px rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.06)", outline: "none" }}
+                  style={{ background: "white", boxShadow: "0 2px 20px rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.06)", outline: "none", overflow: "visible" }}
                 >
                   <span
                     className="absolute top-4 right-6 text-[48px] font-black text-[#1A1A1A]/[0.04] select-none"
@@ -579,13 +579,13 @@ export default function SecondLandingPage() {
                   >
                     {s.step}
                   </span>
-                  <div className="mb-5 flex justify-center items-end" style={{ height: 100 }}>
+                  <div className="mb-5 flex justify-center items-end" style={{ height: 100, overflow: "visible" }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={s.img}
                       alt=""
                       className="pointer-events-none select-none"
-                      style={{ width: 64, filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.10))" }}
+                      style={{ width: 120, marginTop: -40, filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.10))" }}
                       draggable={false}
                     />
                   </div>
