@@ -570,8 +570,8 @@ export default function SecondLandingPage() {
               ].map((s, i) => (
                 <div
                   key={i}
-                  className="relative rounded-3xl p-8 md:p-10 text-center transition-all duration-200 hover:scale-[1.02]"
-                  style={{ background: "white", boxShadow: "0 2px 20px rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.06)" }}
+                  className="relative rounded-3xl p-8 md:p-10 text-center transition-transform duration-200 hover:scale-[1.02]"
+                  style={{ background: "white", boxShadow: "0 2px 20px rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.06)", outline: "none" }}
                 >
                   <span
                     className="absolute top-4 right-6 text-[48px] font-black text-[#1A1A1A]/[0.04] select-none"
