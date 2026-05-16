@@ -428,7 +428,7 @@ export default function SecondLandingPage() {
               <div className="flex flex-col gap-16 md:gap-24">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/images/trx-zara-amex.png"
+                  src="/images/trx-nike-mc.png"
                   alt=""
                   className="h-auto pointer-events-none"
                   style={{
