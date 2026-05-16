@@ -467,14 +467,14 @@ export default function SecondLandingPage() {
                 />
               </div>
               {/* Row 3: Zara Visa — left side, under Cavea */}
-              <div className="flex justify-start">
+              <div className="flex justify-start" style={{ marginTop: -40 }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/images/trx-zara-visa2.png"
                   alt=""
                   className="h-auto pointer-events-none"
                   style={{
-                    width: 400,
+                    width: 280,
                     transform: "rotate(1deg)",
                     filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
                   }}
