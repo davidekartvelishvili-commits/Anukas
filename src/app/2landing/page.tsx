@@ -482,6 +482,21 @@ export default function SecondLandingPage() {
                 />
               </div>
             </div>
+
+            {/* App mockup */}
+            <div className="mt-28 md:mt-36 flex justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/app-mockup.png"
+                alt="Shansi App"
+                className="pointer-events-none"
+                style={{
+                  width: 340,
+                  filter: "drop-shadow(0 12px 40px rgba(0,0,0,0.15))",
+                }}
+                draggable={false}
+              />
+            </div>
           </div>
         </section>
 
