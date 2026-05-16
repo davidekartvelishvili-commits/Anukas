@@ -564,9 +564,9 @@ export default function SecondLandingPage() {
 
             <div className="grid md:grid-cols-3 gap-6 md:gap-8">
               {[
-                { emoji: "📱", step: "01", title: "Scan & Pay",   desc: "Visit any partner merchant and scan the QR code to log your purchase instantly." },
-                { emoji: "🎮", step: "02", title: "Play Games",   desc: "Use your entries to play — slots, plinko, chicken rush. Every purchase is a game ticket." },
-                { emoji: "💸", step: "03", title: "Win Cashback", desc: "Win up to 100% of your purchase back. Withdraw anytime, zero strings attached." },
+                { img: "/images/app-mockup.png", step: "01", title: "დაასკანერე QR კოდი",   desc: "Visit any partner merchant and scan the QR code to log your purchase instantly." },
+                { img: "/images/app-mockup.png", step: "02", title: "Play Games",   desc: "Use your entries to play — slots, plinko, chicken rush. Every purchase is a game ticket." },
+                { img: "/images/app-mockup.png", step: "03", title: "Win Cashback", desc: "Win up to 100% of your purchase back. Withdraw anytime, zero strings attached." },
               ].map((s, i) => (
                 <div
                   key={i}
@@ -579,7 +579,16 @@ export default function SecondLandingPage() {
                   >
                     {s.step}
                   </span>
-                  <div className="text-[48px] mb-5">{s.emoji}</div>
+                  <div className="mb-5 flex justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={s.img}
+                      alt=""
+                      className="pointer-events-none select-none"
+                      style={{ width: 64, filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.10))" }}
+                      draggable={false}
+                    />
+                  </div>
                   <h3 className="text-[20px] font-bold text-[#1A1A1A] mb-3" style={{ fontFamily: "var(--font-outfit)" }}>
                     {s.title}
                   </h3>
