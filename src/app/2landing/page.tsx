@@ -564,9 +564,9 @@ export default function SecondLandingPage() {
 
             <div className="grid md:grid-cols-3 gap-6 md:gap-8">
               {[
-                { img: "/images/app-mockup.png", step: "01", title: "დაასკანერე QR კოდი",   desc: "ეწვიეთ პარტნიორ ობიექტს და დაასკანერეთ QR კოდი თქვენი შენაძენის დასაფიქსირებლად.", imgSize: 120 },
+                { img: "/images/app-mockup.png", step: "01", title: "დაასკანერე QR კოდი",   desc: "ეწვიეთ პარტნიორ ობიექტს და დაასკანერეთ QR კოდი თქვენი შენაძენის დასაფიქსირებლად.", imgSize: 70 },
                 { img: "/images/app-slots.png", step: "02", title: "ითამაშე თამაშები",   desc: "გამოიყენე შენი ბილეთები და ითამაშე — სლოტები, პლინკო, ჩიქენ რაში. ყოველი შენაძენი თამაშის ბილეთია.", imgSize: 120 },
-                { img: "/images/app-cashback.png", step: "03", title: "მოიგე ქეშბექი", desc: "დაიბრუნე შენაძენის 100%-მდე თანხა. გამოიტანე ნებისმიერ დროს, ყოველგვარი პირობების გარეშე.", imgSize: 150 },
+                { img: "", step: "03", title: "მოიგე ქეშბექი", desc: "დაიბრუნე შენაძენის 100%-მდე თანხა. გამოიტანე ნებისმიერ დროს, ყოველგვარი პირობების გარეშე.", imgSize: 0 },
               ].map((s, i) => (
                 <div
                   key={i}
@@ -580,14 +580,18 @@ export default function SecondLandingPage() {
                     {s.step}
                   </span>
                   <div className="mb-5 flex justify-center items-end" style={{ height: 100, overflow: "visible" }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={s.img}
-                      alt=""
-                      className="pointer-events-none select-none"
-                      style={{ width: s.imgSize, marginTop: -40, filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.10))" }}
-                      draggable={false}
-                    />
+                    {s.img && (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={s.img}
+                          alt=""
+                          className="pointer-events-none select-none"
+                          style={{ width: s.imgSize, marginTop: -40, filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.10))" }}
+                          draggable={false}
+                        />
+                      </>
+                    )}
                   </div>
                   <h3 className="text-[20px] font-bold text-[#1A1A1A] mb-3" style={{ fontFamily: "var(--font-outfit)" }}>
                     {s.title}
