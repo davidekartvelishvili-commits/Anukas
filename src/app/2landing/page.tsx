@@ -550,7 +550,7 @@ export default function SecondLandingPage() {
             <div className="text-center mb-14">
               <h2
                 className="text-[32px] sm:text-[44px] md:text-[52px] font-extrabold text-[#1A1A1A] leading-[1.1] mb-4"
-                style={{ fontFamily: "var(--font-outfit)" }}
+                style={{ fontFamily: "'DachiTheLynx', var(--font-outfit)", fontStyle: "italic" }}
               >
                 როგორ გამოვიყენოთ პლატფორმა?
               </h2>
@@ -564,7 +564,7 @@ export default function SecondLandingPage() {
 
             <div className="grid md:grid-cols-3 gap-6 md:gap-8">
               {[
-                { img: "/images/app-mockup.png", step: "01", title: "დაასკანერე QR კოდი",   desc: "Visit any partner merchant and scan the QR code to log your purchase instantly." },
+                { img: "/images/app-mockup.png", step: "01", title: "დაასკანერე QR კოდი",   desc: "ეწვიეთ პარტნიორ ობიექტს და დაასკანერეთ QR კოდი თქვენი შენაძენის დასაფიქსირებლად." },
                 { img: "/images/app-mockup.png", step: "02", title: "Play Games",   desc: "Use your entries to play — slots, plinko, chicken rush. Every purchase is a game ticket." },
                 { img: "/images/app-mockup.png", step: "03", title: "Win Cashback", desc: "Win up to 100% of your purchase back. Withdraw anytime, zero strings attached." },
               ].map((s, i) => (
