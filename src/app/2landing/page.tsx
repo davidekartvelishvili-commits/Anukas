@@ -530,7 +530,7 @@ export default function SecondLandingPage() {
             <div className="mt-12 md:mt-16 flex justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/images/app-mockup.png"
+                src="/images/app-mockup2.png"
                 alt="Shansi App"
                 className="pointer-events-none"
                 style={{
