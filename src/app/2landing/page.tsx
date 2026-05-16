@@ -407,7 +407,7 @@ export default function SecondLandingPage() {
                 lineHeight: 1.3,
               }}
             >
-              ისიამოვნე ყოველი მომენტით, SHANSI შენს მხარესაა.
+              პარტნიორ ობიექტებთან გადახდისას გამოიყენე SHANSI და დაიბრუნე 100%-მდე ქეშბექი
             </p>
 
             {/* Transactions — 3 rows */}
