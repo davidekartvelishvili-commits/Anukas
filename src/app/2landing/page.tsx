@@ -424,18 +424,33 @@ export default function SecondLandingPage() {
                 }}
                 draggable={false}
               />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/trx-zara-amex.png"
-                alt=""
-                className="h-auto pointer-events-none"
-                style={{
-                  width: 210,
-                  transform: "rotate(2deg)",
-                  filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
-                }}
-                draggable={false}
-              />
+              {/* Zara + Bolt stacked vertically */}
+              <div className="flex flex-col gap-16 md:gap-24">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/trx-zara-amex.png"
+                  alt=""
+                  className="h-auto pointer-events-none"
+                  style={{
+                    width: 210,
+                    transform: "rotate(2deg)",
+                    filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
+                  }}
+                  draggable={false}
+                />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/trx-bolt-amex.png"
+                  alt=""
+                  className="h-auto pointer-events-none"
+                  style={{
+                    width: 400,
+                    transform: "rotate(-1deg)",
+                    filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
+                  }}
+                  draggable={false}
+                />
+              </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/trx-coffeelab-amex.png"
