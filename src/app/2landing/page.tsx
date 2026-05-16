@@ -410,9 +410,9 @@ export default function SecondLandingPage() {
               ისიამოვნე ყოველი მომენტით, SHANSI შენს მხარესაა.
             </p>
 
-            {/* Transactions — 3 on top, 1 on bottom */}
+            {/* Transactions — 3 rows */}
             <div className="mt-28 md:mt-36 mb-16 md:mb-24 flex flex-col gap-16 md:gap-24 select-none">
-              {/* Top row: 3 transactions */}
+              {/* Row 1: 3 transactions */}
               <div className="flex items-end gap-16 md:gap-24">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -451,7 +451,7 @@ export default function SecondLandingPage() {
                   draggable={false}
                 />
               </div>
-              {/* Bottom row: Bolt — centered */}
+              {/* Row 2: Bolt — centered */}
               <div className="flex justify-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -461,6 +461,21 @@ export default function SecondLandingPage() {
                   style={{
                     width: 400,
                     transform: "rotate(-1deg)",
+                    filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
+                  }}
+                  draggable={false}
+                />
+              </div>
+              {/* Row 3: Zara Visa — left side, under Cavea */}
+              <div className="flex justify-start">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/trx-zara-visa2.png"
+                  alt=""
+                  className="h-auto pointer-events-none"
+                  style={{
+                    width: 400,
+                    transform: "rotate(1deg)",
                     filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
                   }}
                   draggable={false}
