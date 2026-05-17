@@ -664,28 +664,83 @@ export default function MerchantsPage() {
                                                   finally { setProductImageLoading(false); }
                                                 }}
                                               />
-                                              <div className="flex items-center gap-3">
-                                                {productForm.image_url && (
-                                                  <img src={productForm.image_url} alt="" className="w-[48px] h-[48px] rounded-[8px] object-cover shrink-0" />
-                                                )}
-                                                <button
+                                              {productForm.image_url ? (
+                                                <div className="flex items-center gap-3">
+                                                  <img src={productForm.image_url} alt="" className="w-[80px] h-[80px] rounded-[10px] object-cover shrink-0" />
+                                                  <div className="flex flex-col gap-2">
+                                                    <button
+                                                      onClick={() => productImageRef.current?.click()}
+                                                      className="px-4 py-2 rounded-[8px] text-[12px] font-semibold"
+                                                      style={{ background: "#1C1C1E", color: "#FFF", border: "1px solid #252525" }}
+                                                    >
+                                                      შეცვლა
+                                                    </button>
+                                                    <button
+                                                      onClick={() => setProductForm((prev) => ({ ...prev, image_url: "" }))}
+                                                      className="text-[11px] px-2 py-1 rounded"
+                                                      style={{ color: "#EF4444" }}
+                                                    >
+                                                      წაშლა
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                <div
+                                                  className="rounded-[10px] flex flex-col items-center justify-center cursor-pointer transition-all"
+                                                  style={{
+                                                    height: 120,
+                                                    background: "#1C1C1E",
+                                                    border: "2px dashed #333",
+                                                  }}
                                                   onClick={() => productImageRef.current?.click()}
-                                                  disabled={productImageLoading}
-                                                  className="px-4 py-2 rounded-[8px] text-[12px] font-semibold"
-                                                  style={{ background: "#1C1C1E", color: "#FFF", border: "1px solid #252525" }}
+                                                  onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "#F9E741"; }}
+                                                  onDragLeave={(e) => { e.currentTarget.style.borderColor = "#333"; }}
+                                                  onDrop={async (e) => {
+                                                    e.preventDefault();
+                                                    e.currentTarget.style.borderColor = "#333";
+                                                    const file = e.dataTransfer.files?.[0];
+                                                    if (!file || !file.type.startsWith("image/")) return;
+                                                    setProductImageLoading(true);
+                                                    try {
+                                                      const base64 = await fileToCompressedBase64(file, 600, 0.85);
+                                                      setProductForm((prev) => ({ ...prev, image_url: base64 }));
+                                                    } catch { showToast("სურათი ვერ აიტვირთა", "error"); }
+                                                    finally { setProductImageLoading(false); }
+                                                  }}
+                                                  onPaste={async (e) => {
+                                                    const items = e.clipboardData?.items;
+                                                    if (!items) return;
+                                                    for (const item of Array.from(items)) {
+                                                      if (item.type.startsWith("image/")) {
+                                                        const file = item.getAsFile();
+                                                        if (!file) continue;
+                                                        setProductImageLoading(true);
+                                                        try {
+                                                          const base64 = await fileToCompressedBase64(file, 600, 0.85);
+                                                          setProductForm((prev) => ({ ...prev, image_url: base64 }));
+                                                        } catch { showToast("სურათი ვერ აიტვირთა", "error"); }
+                                                        finally { setProductImageLoading(false); }
+                                                        break;
+                                                      }
+                                                    }
+                                                  }}
+                                                  tabIndex={0}
                                                 >
-                                                  {productImageLoading ? "იტვირთება..." : productForm.image_url ? "შეცვლა" : "ატვირთვა"}
-                                                </button>
-                                                {productForm.image_url && (
-                                                  <button
-                                                    onClick={() => setProductForm((prev) => ({ ...prev, image_url: "" }))}
-                                                    className="text-[11px] px-2 py-1 rounded"
-                                                    style={{ color: "#EF4444" }}
-                                                  >
-                                                    წაშლა
-                                                  </button>
-                                                )}
-                                              </div>
+                                                  {productImageLoading ? (
+                                                    <span className="text-[12px]" style={{ color: "#666" }}>იტვირთება...</span>
+                                                  ) : (
+                                                    <>
+                                                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                                        <rect x="3" y="3" width="18" height="18" rx="3" />
+                                                        <circle cx="8.5" cy="8.5" r="1.5" />
+                                                        <path d="M21 15l-5-5L5 21" />
+                                                      </svg>
+                                                      <span className="text-[11px] mt-2" style={{ color: "#666" }}>ჩააგდე, ჩასვი ან აირჩიე</span>
+                                                      <span className="text-[9px] mt-0.5" style={{ color: "#444" }}>drag & drop · Ctrl+V · click</span>
+                                                    </>
+                                                  )}
+                                                </div>
+                                              )}
                                             </div>
                                             <div className="flex gap-2 mt-1">
                                               <button
