@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig, bigWinConfig, bigWinPrizes, bigWinHistory, villages, villageBuildings, userVillageProgress, offers, tickets, pageViews } from "../db/schema.js";
+import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, merchantProducts, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig, bigWinConfig, bigWinPrizes, bigWinHistory, villages, villageBuildings, userVillageProgress, offers, tickets, pageViews } from "../db/schema.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/errors.js";
@@ -1084,6 +1084,60 @@ admin.patch("/merchants/:id", adminMiddleware, async (c) => {
   await logAction(adminId, "update_merchant", JSON.stringify({ merchantId: id, updates }));
   const [updated] = await db.select().from(merchants).where(eq(merchants.id, id)).limit(1);
   return c.json({ success: true, merchant: updated });
+});
+
+// ══════════════════════════════════════
+// MERCHANT PRODUCTS
+// ══════════════════════════════════════
+
+// GET /admin/merchants/:id/products
+admin.get("/merchants/:id/products", adminMiddleware, async (c) => {
+  const merchantId = c.req.param("id") as string;
+  const db = getDb();
+  const products = await db.select().from(merchantProducts).where(eq(merchantProducts.merchantId, merchantId)).orderBy(merchantProducts.sortOrder);
+  return c.json({ success: true, products });
+});
+
+// POST /admin/merchants/:id/products
+admin.post("/merchants/:id/products", adminMiddleware, async (c) => {
+  const merchantId = c.req.param("id") as string;
+  const body = await c.req.json();
+  const db = getDb();
+  const id = nanoid();
+  await db.insert(merchantProducts).values({
+    id,
+    merchantId,
+    name: body.name,
+    price: body.price,
+    imageUrl: body.image_url || null,
+    sortOrder: body.sort_order || 0,
+  });
+  return c.json({ success: true, product: { id } });
+});
+
+// PATCH /admin/merchants/:mid/products/:pid
+admin.patch("/merchants/:mid/products/:pid", adminMiddleware, async (c) => {
+  const pid = c.req.param("pid") as string;
+  const body = await c.req.json();
+  const db = getDb();
+  const updates: any = {};
+  if (body.name !== undefined) updates.name = body.name;
+  if (body.price !== undefined) updates.price = body.price;
+  if (body.image_url !== undefined) updates.imageUrl = body.image_url;
+  if (body.sort_order !== undefined) updates.sortOrder = body.sort_order;
+  if (body.is_active !== undefined) updates.isActive = body.is_active;
+  if (Object.keys(updates).length > 0) {
+    await db.update(merchantProducts).set(updates).where(eq(merchantProducts.id, pid));
+  }
+  return c.json({ success: true });
+});
+
+// DELETE /admin/merchants/:mid/products/:pid
+admin.delete("/merchants/:mid/products/:pid", adminMiddleware, async (c) => {
+  const pid = c.req.param("pid") as string;
+  const db = getDb();
+  await db.delete(merchantProducts).where(eq(merchantProducts.id, pid));
+  return c.json({ success: true });
 });
 
 // ══════════════════════════════════════

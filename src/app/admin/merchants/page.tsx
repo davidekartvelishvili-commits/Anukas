@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getMerchants, getMerchant, updateMerchant, simulatePayment, createMerchant } from "@/services/admin";
+import { getMerchants, getMerchant, updateMerchant, simulatePayment, createMerchant, getMerchantProducts, createMerchantProduct, deleteMerchantProduct } from "@/services/admin";
 
 /* ── SVG ICONS ── */
 function NavIcon({ id, active }: { id: string; active: boolean }) {
@@ -177,8 +177,8 @@ export default function MerchantsPage() {
     setSelectedId(id);
     setDetailLoading(true);
     try {
-      const data = await getMerchant(id) as any;
-      setDetail(data);
+      const [data, prods] = await Promise.all([getMerchant(id), getMerchantProducts(id)]) as any[];
+      setDetail({ ...data, products: prods.products || [] });
     } catch { showToast("დეტალები ვერ ჩაიტვირთა", "error"); }
     finally { setDetailLoading(false); }
   };
@@ -558,6 +558,68 @@ export default function MerchantsPage() {
                                       </span>
                                     </div>
                                   </div>
+                                  {/* Products section */}
+                                  {detail.merchant && (
+                                    <div className="col-span-full mt-2">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <p className="text-[12px] font-medium" style={{ color: "#A0A0A0" }}>პროდუქტები</p>
+                                        <button
+                                          onClick={async () => {
+                                            const name = prompt("პროდუქტის სახელი:");
+                                            if (!name) return;
+                                            const priceStr = prompt("ფასი (₾):");
+                                            if (!priceStr) return;
+                                            const price = parseFloat(priceStr);
+                                            if (isNaN(price)) { showToast("არასწორი ფასი", "error"); return; }
+                                            const imageUrl = prompt("სურათის URL (ან ცარიელი):") || "";
+                                            try {
+                                              await createMerchantProduct(detail.merchant.id, { name, price, image_url: imageUrl || null });
+                                              showToast("პროდუქტი დაემატა");
+                                              const refreshed = await getMerchant(detail.merchant.id) as any;
+                                              setDetail(refreshed);
+                                              const prods = await getMerchantProducts(detail.merchant.id) as any;
+                                              setDetail((prev: any) => ({ ...prev, products: prods.products }));
+                                            } catch { showToast("შეცდომა", "error"); }
+                                          }}
+                                          className="text-[11px] px-3 py-1 rounded-full"
+                                          style={{ background: "#F9E741", color: "#000", fontWeight: 700 }}
+                                        >
+                                          + დამატება
+                                        </button>
+                                      </div>
+                                      {detail.products && detail.products.length > 0 ? (
+                                        <div className="space-y-1">
+                                          {detail.products.map((p: any) => (
+                                            <div key={p.id} className="flex items-center gap-3 py-2 border-b" style={{ borderColor: "#252525" }}>
+                                              {p.imageUrl && (
+                                                <img src={p.imageUrl} alt="" className="w-[36px] h-[36px] rounded-[8px] object-cover shrink-0" />
+                                              )}
+                                              <span className="text-[13px] flex-1" style={{ color: "#FFF" }}>{p.name}</span>
+                                              <span className="text-[13px] font-bold" style={{ color: "#F9E741" }}>{p.price?.toFixed(2)} ₾</span>
+                                              <button
+                                                onClick={async () => {
+                                                  if (!confirm("წაშლა?")) return;
+                                                  try {
+                                                    await deleteMerchantProduct(detail.merchant.id, p.id);
+                                                    showToast("წაიშალა");
+                                                    const prods = await getMerchantProducts(detail.merchant.id) as any;
+                                                    setDetail((prev: any) => ({ ...prev, products: prods.products }));
+                                                  } catch { showToast("შეცდომა", "error"); }
+                                                }}
+                                                className="text-[11px] px-2 py-0.5 rounded"
+                                                style={{ background: "#EF4444", color: "#FFF" }}
+                                              >
+                                                ×
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <p className="text-[11px]" style={{ color: "#555" }}>პროდუქტები არ არის</p>
+                                      )}
+                                    </div>
+                                  )}
+
                                   {detail.transactions && detail.transactions.length > 0 && (() => {
                                     const showCommission = detail.merchant?.commissionEnabled !== false;
                                     return (

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { referralConfig, systemConfig, tickets, gameHistory, users, pageViews, merchants } from "../db/schema.js";
+import { referralConfig, systemConfig, tickets, gameHistory, users, pageViews, merchants, merchantProducts } from "../db/schema.js";
 import { nanoid } from "nanoid";
 import { desc, and, gt, sql } from "drizzle-orm";
 
@@ -51,7 +51,14 @@ publicRoute.get("/partner-merchants", async (c) => {
     logoUrl: merchants.logoUrl,
     merchantCode: merchants.merchantCode,
   }).from(merchants).where(and(eq(merchants.isActive, true), eq(merchants.showOnPromos, true)));
-  return c.json({ success: true, merchants: results });
+
+  // Enrich with products
+  const enriched = await Promise.all(results.map(async (m) => {
+    const products = await db.select().from(merchantProducts).where(and(eq(merchantProducts.merchantId, m.id), eq(merchantProducts.isActive, true))).orderBy(merchantProducts.sortOrder);
+    return { ...m, products };
+  }));
+
+  return c.json({ success: true, merchants: enriched });
 });
 
 // GET /public/tickets — active tickets for home page strip

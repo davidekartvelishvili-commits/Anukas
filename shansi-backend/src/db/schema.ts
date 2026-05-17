@@ -178,6 +178,17 @@ export const merchants = sqliteTable("merchants", {
   approvedBy: text("approved_by"),
 });
 
+export const merchantProducts = sqliteTable("merchant_products", {
+  id: text("id").primaryKey(),
+  merchantId: text("merchant_id").notNull().references(() => merchants.id),
+  name: text("name").notNull(),
+  price: real("price").notNull(),
+  imageUrl: text("image_url"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
 export const offers = sqliteTable("offers", {
   id: text("id").primaryKey(),
   merchantId: text("merchant_id").notNull().references(() => merchants.id),

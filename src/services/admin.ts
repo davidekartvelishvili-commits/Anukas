@@ -256,6 +256,12 @@ export async function updateMerchant(id: string, data: Record<string, any>) {
   return adminFetch(`/admin/merchants/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 }
 
+// Merchant Products
+export const getMerchantProducts = (merchantId: string) => adminFetch(`/admin/merchants/${merchantId}/products`);
+export const createMerchantProduct = (merchantId: string, data: any) => adminFetch(`/admin/merchants/${merchantId}/products`, { method: "POST", body: JSON.stringify(data) });
+export const updateMerchantProduct = (merchantId: string, productId: string, data: any) => adminFetch(`/admin/merchants/${merchantId}/products/${productId}`, { method: "PATCH", body: JSON.stringify(data) });
+export const deleteMerchantProduct = (merchantId: string, productId: string) => adminFetch(`/admin/merchants/${merchantId}/products/${productId}`, { method: "DELETE" });
+
 export async function simulatePayment(userPhone: string, merchantId: string, amount: number) {
   return adminFetch("/admin/simulate-payment", {
     method: "POST",

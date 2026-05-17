@@ -175,7 +175,7 @@ export default function PromosPage() {
   const [flashDealsAll, setFlashDealsAll] = useState<Deal[]>([]);
   const [partnerPromos, setPartnerPromos] = useState<Partner[]>([]);
   const [recentWins, setRecentWins] = useState<Win[]>([]);
-  const [partnerMerchants, setPartnerMerchants] = useState<{ id: string; businessName: string; businessNameKa: string | null; category: string; logoUrl: string | null }[]>([]);
+  const [partnerMerchants, setPartnerMerchants] = useState<{ id: string; businessName: string; businessNameKa: string | null; category: string; logoUrl: string | null; products?: { id: string; name: string; price: number; imageUrl: string | null }[] }[]>([]);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
@@ -646,49 +646,84 @@ export default function PromosPage() {
                 >
                   {categoryLabels[cat] || cat}
                 </h2>
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-4">
                   {items.map((m) => {
                     const bg = bgForCategory(m.category);
+                    const products = m.products || [];
                     return (
                       <div
                         key={m.id}
-                        className="rounded-[16px] p-4 flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-transform"
+                        className="rounded-[16px] overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
                         style={{ background: "#1C1C1E" }}
                       >
-                        {/* Logo */}
-                        <div
-                          className="w-[56px] h-[56px] rounded-[14px] overflow-hidden flex items-center justify-center shrink-0"
-                          style={{ background: m.logoUrl ? "#FFFFFF" : bg.bgColor }}
-                        >
-                          {m.logoUrl ? (
-                            <img src={m.logoUrl} alt={m.businessName} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-[22px] font-bold" style={{ color: bg.textColor, fontFamily: "var(--font-outfit)" }}>
-                              {m.businessName.charAt(0)}
-                            </span>
-                          )}
-                        </div>
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <h3
-                            className="text-white text-[16px] font-bold truncate"
-                            style={{ fontFamily: "var(--font-outfit)" }}
+                        {/* Header: logo + name + arrow */}
+                        <div className="flex items-center gap-3 p-4 pb-3">
+                          <div
+                            className="w-[44px] h-[44px] rounded-[12px] overflow-hidden flex items-center justify-center shrink-0"
+                            style={{ background: m.logoUrl ? "#FFFFFF" : bg.bgColor }}
                           >
-                            {m.businessName}
-                          </h3>
-                          {m.businessNameKa && (
-                            <p
-                              className="text-[13px] truncate"
-                              style={{ color: "#9CA3AF", fontFamily: "var(--font-dm-sans)" }}
-                            >
-                              {m.businessNameKa}
-                            </p>
-                          )}
+                            {m.logoUrl ? (
+                              <img src={m.logoUrl} alt={m.businessName} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-[18px] font-bold" style={{ color: bg.textColor, fontFamily: "var(--font-outfit)" }}>
+                                {m.businessName.charAt(0)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-white text-[16px] font-bold truncate" style={{ fontFamily: "var(--font-outfit)" }}>
+                              {m.businessName}
+                            </h3>
+                            {m.businessNameKa && (
+                              <p className="text-[12px] truncate" style={{ color: "#9CA3AF", fontFamily: "var(--font-dm-sans)" }}>
+                                {m.businessNameKa}
+                              </p>
+                            )}
+                          </div>
+                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                            <path d="M7 4l6 6-6 6" />
+                          </svg>
                         </div>
-                        {/* Arrow */}
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                          <path d="M7 4l6 6-6 6" />
-                        </svg>
+
+                        {/* Products horizontal scroll */}
+                        {products.length > 0 && (
+                          <div className="flex gap-2.5 overflow-x-auto px-4 pb-4 scrollbar-hide">
+                            {products.map((p, pi) => (
+                              <div
+                                key={p.id}
+                                className="shrink-0 rounded-[12px] overflow-hidden relative"
+                                style={{
+                                  width: pi === 0 ? 200 : 100,
+                                  height: pi === 0 ? 160 : 100,
+                                  background: "#2A2A2E",
+                                }}
+                              >
+                                {p.imageUrl && (
+                                  <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                                )}
+                                {/* Price badge */}
+                                <div
+                                  className="absolute bottom-0 left-0 right-0 px-2.5 py-2"
+                                  style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.8))" }}
+                                >
+                                  {pi === 0 && (
+                                    <span
+                                      className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold mb-1"
+                                      style={{ background: "rgba(249,231,65,0.9)", color: "#1A1A1A", fontFamily: "var(--font-dm-sans)" }}
+                                    >
+                                      {p.name} · ₾{p.price.toFixed(2)}
+                                    </span>
+                                  )}
+                                  {pi !== 0 && (
+                                    <span className="text-[11px] font-bold" style={{ color: "#F9E741", fontFamily: "var(--font-dm-sans)" }}>
+                                      ₾{p.price.toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

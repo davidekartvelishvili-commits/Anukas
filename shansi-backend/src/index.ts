@@ -47,6 +47,16 @@ async function runStartupMigrations() {
     sql`ALTER TABLE merchants ADD COLUMN commission_enabled INTEGER NOT NULL DEFAULT 1`,
     sql`ALTER TABLE merchants ADD COLUMN logo_url TEXT`,
     sql`ALTER TABLE merchants ADD COLUMN show_on_promos INTEGER NOT NULL DEFAULT 0`,
+    sql`CREATE TABLE IF NOT EXISTS merchant_products (
+      id TEXT PRIMARY KEY,
+      merchant_id TEXT NOT NULL REFERENCES merchants(id),
+      name TEXT NOT NULL,
+      price REAL NOT NULL,
+      image_url TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     sql`ALTER TABLE referral_config ADD COLUMN bonus_every_n INTEGER NOT NULL DEFAULT 5`,
     sql`ALTER TABLE referral_config ADD COLUMN bonus_reward_coins INTEGER NOT NULL DEFAULT 500`,
     sql`ALTER TABLE referral_config ADD COLUMN signup_reward_lari INTEGER NOT NULL DEFAULT 10`,
