@@ -646,18 +646,14 @@ export default function PromosPage() {
                 >
                   {categoryLabels[cat] || cat}
                 </h2>
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-5">
                   {items.map((m) => {
                     const bg = bgForCategory(m.category);
                     const products = m.products || [];
                     return (
-                      <div
-                        key={m.id}
-                        className="rounded-[16px] overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
-                        style={{ background: "#1C1C1E" }}
-                      >
-                        {/* Header: logo + name + arrow */}
-                        <div className="flex items-center gap-3 p-4 pb-3">
+                      <div key={m.id}>
+                        {/* Header: logo + name + arrow — no card background */}
+                        <div className="flex items-center gap-3 mb-3 cursor-pointer active:opacity-70 transition-opacity">
                           <div
                             className="w-[44px] h-[44px] rounded-[12px] overflow-hidden flex items-center justify-center shrink-0"
                             style={{ background: m.logoUrl ? "#FFFFFF" : bg.bgColor }}
@@ -685,43 +681,71 @@ export default function PromosPage() {
                           </svg>
                         </div>
 
-                        {/* Products horizontal scroll */}
+                        {/* Products: big, 2 small stacked, big, ... */}
                         {products.length > 0 && (
-                          <div className="flex gap-2.5 overflow-x-auto px-4 pb-4 scrollbar-hide">
-                            {products.map((p, pi) => (
-                              <div
-                                key={p.id}
-                                className="shrink-0 rounded-[12px] overflow-hidden relative"
-                                style={{
-                                  width: pi === 0 ? 200 : 100,
-                                  height: pi === 0 ? 160 : 100,
-                                  background: "#2A2A2E",
-                                }}
-                              >
-                                {p.imageUrl && (
-                                  <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
-                                )}
-                                {/* Price badge */}
-                                <div
-                                  className="absolute bottom-0 left-0 right-0 px-2.5 py-2"
-                                  style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.8))" }}
-                                >
-                                  {pi === 0 && (
-                                    <span
-                                      className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold mb-1"
-                                      style={{ background: "rgba(249,231,65,0.9)", color: "#1A1A1A", fontFamily: "var(--font-dm-sans)" }}
-                                    >
-                                      {p.name} · ₾{p.price.toFixed(2)}
-                                    </span>
-                                  )}
-                                  {pi !== 0 && (
-                                    <span className="text-[11px] font-bold" style={{ color: "#F9E741", fontFamily: "var(--font-dm-sans)" }}>
-                                      ₾{p.price.toFixed(2)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
+                          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+                            {(() => {
+                              const chunks: { type: "big" | "small-pair"; items: typeof products }[] = [];
+                              let i = 0;
+                              while (i < products.length) {
+                                chunks.push({ type: "big", items: [products[i]] });
+                                i++;
+                                if (i < products.length) {
+                                  const pair = [products[i]];
+                                  i++;
+                                  if (i < products.length) { pair.push(products[i]); i++; }
+                                  chunks.push({ type: "small-pair", items: pair });
+                                }
+                              }
+                              return chunks.map((chunk, ci) => {
+                                if (chunk.type === "big") {
+                                  const p = chunk.items[0];
+                                  return (
+                                    <div key={`c${ci}`} className="shrink-0 rounded-[14px] overflow-hidden relative" style={{ width: 220, height: 180 }}>
+                                      {p.imageUrl ? (
+                                        <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center" style={{ background: "#1C1C1E" }}>
+                                          <span className="text-[32px]">🍽</span>
+                                        </div>
+                                      )}
+                                      <div className="absolute bottom-0 left-0 right-0 px-3 py-2.5" style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.85))" }}>
+                                        <span
+                                          className="inline-block px-2.5 py-1 rounded-full text-[12px] font-bold"
+                                          style={{ background: "rgba(249,231,65,0.9)", color: "#1A1A1A", fontFamily: "var(--font-dm-sans)" }}
+                                        >
+                                          {p.name} · ₾{p.price.toFixed(2)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                } else {
+                                  return (
+                                    <div key={`c${ci}`} className="shrink-0 flex flex-col gap-2" style={{ width: 105 }}>
+                                      {chunk.items.map((p) => (
+                                        <div key={p.id} className="rounded-[12px] overflow-hidden relative" style={{ height: 87 }}>
+                                          {p.imageUrl ? (
+                                            <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center" style={{ background: "#1C1C1E" }}>
+                                              <span className="text-[20px]">🍽</span>
+                                            </div>
+                                          )}
+                                          <div className="absolute bottom-0 right-0 px-2 py-1">
+                                            <span
+                                              className="text-[11px] font-bold px-1.5 py-0.5 rounded-[6px]"
+                                              style={{ background: "rgba(0,0,0,0.7)", color: "#F9E741", fontFamily: "var(--font-dm-sans)" }}
+                                            >
+                                              ₾{p.price.toFixed(2)}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                }
+                              });
+                            })()}
                           </div>
                         )}
                       </div>
