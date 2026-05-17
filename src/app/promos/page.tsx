@@ -497,6 +497,7 @@ export default function PromosPage() {
           )}
 
           {/* ── 4. Flash Deals ── */}
+          {flashDeals.length > 0 && (
           <div style={stagger(3)}>
             <h2
               className="text-white text-[22px] font-bold mb-4"
@@ -547,6 +548,7 @@ export default function PromosPage() {
               ))}
             </div>
           </div>
+          )}
 
           {/* ── 5. Partner Promos ── */}
           <div style={stagger(4)}>
@@ -619,54 +621,65 @@ export default function PromosPage() {
             </div>
           </div>
 
-          {/* ── 5b. Partner Merchants (permanent) ── */}
-          {partnerMerchants.length > 0 && (
-          <div style={stagger(5)}>
-            <h2
-              className="text-white text-[22px] font-bold mb-4"
-              style={{ fontFamily: "var(--font-outfit)" }}
-            >
-              პარტნიორები
-            </h2>
-            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide mb-6">
-              {partnerMerchants.map((m) => {
-                const bg = bgForCategory(m.category);
-                return (
-                  <div
-                    key={m.id}
-                    className="shrink-0 w-[130px] rounded-[24px] p-4 flex flex-col items-center text-center cursor-pointer active:scale-[0.97] transition-transform"
-                    style={{ background: "#1C1C1E" }}
-                  >
-                    <div
-                      className="w-[64px] h-[64px] rounded-[18px] overflow-hidden flex items-center justify-center mb-3"
-                      style={{ background: m.logoUrl ? "#FFFFFF" : bg.bgColor }}
-                    >
-                      {m.logoUrl ? (
-                        <img src={m.logoUrl} alt={m.businessName} className="w-[80%] h-[80%] object-contain" />
-                      ) : (
-                        <span className="text-[24px] font-bold" style={{ color: bg.textColor, fontFamily: "var(--font-outfit)" }}>
-                          {m.businessName.charAt(0)}
+          {/* ── 5b. Partner Merchants grouped by category ── */}
+          {(() => {
+            const grouped: Record<string, typeof partnerMerchants> = {};
+            partnerMerchants.forEach((m) => {
+              const cat = m.category || "other";
+              if (!grouped[cat]) grouped[cat] = [];
+              grouped[cat].push(m);
+            });
+            const categoryLabels: Record<string, string> = {
+              cafe: "Cafe",
+              restaurant: "Restaurant",
+              grocery: "Grocery",
+              entertainment: "Entertainment",
+              game_lounge: "Game Lounge",
+              autoservice: "Autoservice",
+              other: "Other",
+            };
+            return Object.entries(grouped).map(([cat, items]) => (
+              <div key={cat} style={stagger(5)}>
+                <h2
+                  className="text-white text-[22px] font-bold mb-4"
+                  style={{ fontFamily: "var(--font-outfit)" }}
+                >
+                  {categoryLabels[cat] || cat}
+                </h2>
+                <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide mb-6">
+                  {items.map((m) => {
+                    const bg = bgForCategory(m.category);
+                    return (
+                      <div
+                        key={m.id}
+                        className="shrink-0 w-[130px] rounded-[24px] p-4 flex flex-col items-center text-center cursor-pointer active:scale-[0.97] transition-transform"
+                        style={{ background: "#1C1C1E" }}
+                      >
+                        <div
+                          className="w-[64px] h-[64px] rounded-[18px] overflow-hidden flex items-center justify-center mb-3"
+                          style={{ background: m.logoUrl ? "#FFFFFF" : bg.bgColor }}
+                        >
+                          {m.logoUrl ? (
+                            <img src={m.logoUrl} alt={m.businessName} className="w-[80%] h-[80%] object-contain" />
+                          ) : (
+                            <span className="text-[24px] font-bold" style={{ color: bg.textColor, fontFamily: "var(--font-outfit)" }}>
+                              {m.businessName.charAt(0)}
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          className="text-white text-[13px] font-bold mb-0.5"
+                          style={{ fontFamily: "var(--font-outfit)" }}
+                        >
+                          {m.businessNameKa || m.businessName}
                         </span>
-                      )}
-                    </div>
-                    <span
-                      className="text-white text-[13px] font-bold mb-0.5"
-                      style={{ fontFamily: "var(--font-outfit)" }}
-                    >
-                      {m.businessNameKa || m.businessName}
-                    </span>
-                    <span
-                      className="text-[11px]"
-                      style={{ color: "#9CA3AF", fontFamily: "var(--font-dm-sans)" }}
-                    >
-                      {m.category}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ));
+          })()}
 
           {/* ── 6. Recent Wins ── */}
           <div style={stagger(5)}>
