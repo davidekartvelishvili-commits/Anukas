@@ -661,7 +661,7 @@ export default function PromosPage() {
                           style={{ background: m.logoUrl ? "#FFFFFF" : bg.bgColor }}
                         >
                           {m.logoUrl ? (
-                            <img src={m.logoUrl} alt={m.businessName} className="w-[80%] h-[80%] object-contain" />
+                            <img src={m.logoUrl} alt={m.businessName} className="w-full h-full object-cover" />
                           ) : (
                             <span className="text-[22px] font-bold" style={{ color: bg.textColor, fontFamily: "var(--font-outfit)" }}>
                               {m.businessName.charAt(0)}
