@@ -630,49 +630,65 @@ export default function PromosPage() {
               grouped[cat].push(m);
             });
             const categoryLabels: Record<string, string> = {
-              cafe: "Cafe",
-              restaurant: "Restaurant",
+              cafe: "Cafes",
+              restaurant: "Restaurants",
               grocery: "Grocery",
               entertainment: "Entertainment",
-              game_lounge: "Game Lounge",
+              game_lounge: "Game Lounges",
               autoservice: "Autoservice",
               other: "Other",
             };
             return Object.entries(grouped).map(([cat, items]) => (
-              <div key={cat} style={stagger(5)}>
+              <div key={cat} style={stagger(5)} className="mb-6">
                 <h2
-                  className="text-white text-[22px] font-bold mb-4"
+                  className="text-white text-[20px] font-bold mb-4 uppercase tracking-wide"
                   style={{ fontFamily: "var(--font-outfit)" }}
                 >
                   {categoryLabels[cat] || cat}
                 </h2>
-                <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide mb-6">
+                <div className="flex flex-col gap-3">
                   {items.map((m) => {
                     const bg = bgForCategory(m.category);
                     return (
                       <div
                         key={m.id}
-                        className="shrink-0 w-[130px] rounded-[24px] p-4 flex flex-col items-center text-center cursor-pointer active:scale-[0.97] transition-transform"
+                        className="rounded-[16px] p-4 flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-transform"
                         style={{ background: "#1C1C1E" }}
                       >
+                        {/* Logo */}
                         <div
-                          className="w-[64px] h-[64px] rounded-[18px] overflow-hidden flex items-center justify-center mb-3"
+                          className="w-[56px] h-[56px] rounded-[14px] overflow-hidden flex items-center justify-center shrink-0"
                           style={{ background: m.logoUrl ? "#FFFFFF" : bg.bgColor }}
                         >
                           {m.logoUrl ? (
                             <img src={m.logoUrl} alt={m.businessName} className="w-[80%] h-[80%] object-contain" />
                           ) : (
-                            <span className="text-[24px] font-bold" style={{ color: bg.textColor, fontFamily: "var(--font-outfit)" }}>
+                            <span className="text-[22px] font-bold" style={{ color: bg.textColor, fontFamily: "var(--font-outfit)" }}>
                               {m.businessName.charAt(0)}
                             </span>
                           )}
                         </div>
-                        <span
-                          className="text-white text-[13px] font-bold mb-0.5"
-                          style={{ fontFamily: "var(--font-outfit)" }}
-                        >
-                          {m.businessNameKa || m.businessName}
-                        </span>
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <h3
+                            className="text-white text-[16px] font-bold truncate"
+                            style={{ fontFamily: "var(--font-outfit)" }}
+                          >
+                            {m.businessName}
+                          </h3>
+                          {m.businessNameKa && (
+                            <p
+                              className="text-[13px] truncate"
+                              style={{ color: "#9CA3AF", fontFamily: "var(--font-dm-sans)" }}
+                            >
+                              {m.businessNameKa}
+                            </p>
+                          )}
+                        </div>
+                        {/* Arrow */}
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                          <path d="M7 4l6 6-6 6" />
+                        </svg>
                       </div>
                     );
                   })}
