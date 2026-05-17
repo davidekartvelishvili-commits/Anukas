@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { referralConfig, systemConfig, tickets, gameHistory, users, pageViews } from "../db/schema.js";
+import { referralConfig, systemConfig, tickets, gameHistory, users, pageViews, merchants } from "../db/schema.js";
 import { nanoid } from "nanoid";
 import { desc, and, gt, sql } from "drizzle-orm";
 
@@ -38,6 +38,20 @@ publicRoute.get("/features", async (c) => {
       mysteryBoxEnabled: mbx?.value !== "false", // default enabled
     },
   });
+});
+
+// GET /public/partner-merchants — active merchants marked to show on promos
+publicRoute.get("/partner-merchants", async (c) => {
+  const db = getDb();
+  const results = await db.select({
+    id: merchants.id,
+    businessName: merchants.businessName,
+    businessNameKa: merchants.businessNameKa,
+    category: merchants.category,
+    logoUrl: merchants.logoUrl,
+    merchantCode: merchants.merchantCode,
+  }).from(merchants).where(and(eq(merchants.isActive, true), eq(merchants.showOnPromos, true)));
+  return c.json({ success: true, merchants: results });
 });
 
 // GET /public/tickets — active tickets for home page strip

@@ -171,6 +171,7 @@ export const merchants = sqliteTable("merchants", {
   qrCode: text("qr_code").unique(),
   isActive: integer("is_active", { mode: "boolean" }).default(false).notNull(),
   isVerified: integer("is_verified", { mode: "boolean" }).default(false).notNull(),
+  showOnPromos: integer("show_on_promos", { mode: "boolean" }).default(false).notNull(),
   contactPerson: text("contact_person"),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
   approvedAt: text("approved_at"),

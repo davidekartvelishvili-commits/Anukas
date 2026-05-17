@@ -1075,6 +1075,7 @@ admin.patch("/merchants/:id", adminMiddleware, async (c) => {
   if (body.commission_percent !== undefined) updates.commissionPercent = body.commission_percent;
   if (body.commission_enabled !== undefined) updates.commissionEnabled = body.commission_enabled;
   if (body.logo_url !== undefined) updates.logoUrl = body.logo_url;
+  if (body.show_on_promos !== undefined) updates.showOnPromos = body.show_on_promos;
 
   if (Object.keys(updates).length > 0) {
     await db.update(merchants).set(updates).where(eq(merchants.id, id));

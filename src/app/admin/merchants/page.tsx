@@ -500,6 +500,40 @@ export default function MerchantsPage() {
                                     </p>
                                   </div>
 
+                                  {/* Show on promos toggle */}
+                                  <div>
+                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>პრომოზე ჩვენება</p>
+                                    <button
+                                      onClick={async () => {
+                                        const current = detail.merchant?.showOnPromos === true;
+                                        try {
+                                          await updateMerchant(detail.merchant.id, { show_on_promos: !current });
+                                          showToast(!current ? "პრომოზე დაემატა" : "პრომოდან წაიშალა");
+                                          fetchMerchants();
+                                        } catch { showToast("შეცდომა", "error"); }
+                                      }}
+                                      className="relative inline-flex items-center rounded-full transition-all duration-200"
+                                      style={{
+                                        width: 44,
+                                        height: 24,
+                                        background: detail.merchant?.showOnPromos === true ? "#22C55E" : "#444",
+                                      }}
+                                    >
+                                      <span
+                                        className="inline-block rounded-full bg-white transition-all duration-200"
+                                        style={{
+                                          width: 18,
+                                          height: 18,
+                                          transform: `translateX(${detail.merchant?.showOnPromos === true ? 22 : 4}px)`,
+                                          boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
+                                        }}
+                                      />
+                                    </button>
+                                    <p className="text-[11px] mt-1" style={{ color: detail.merchant?.showOnPromos === true ? "#22C55E" : "#EF4444" }}>
+                                      {detail.merchant?.showOnPromos === true ? "ჩართულია" : "გამორთულია"}
+                                    </p>
+                                  </div>
+
                                   {detail.merchant?.commissionEnabled !== false && (
                                     <div>
                                       <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10EF\u10D0\u10DB\u10E3\u10E0\u10D8 \u10D9\u10DD\u10DB\u10D8\u10E1\u10D8\u10D0"}</p>

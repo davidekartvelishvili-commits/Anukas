@@ -46,6 +46,7 @@ async function runStartupMigrations() {
     sql`ALTER TABLE transactions ADD COLUMN payment_transaction_id TEXT`,
     sql`ALTER TABLE merchants ADD COLUMN commission_enabled INTEGER NOT NULL DEFAULT 1`,
     sql`ALTER TABLE merchants ADD COLUMN logo_url TEXT`,
+    sql`ALTER TABLE merchants ADD COLUMN show_on_promos INTEGER NOT NULL DEFAULT 0`,
     sql`ALTER TABLE referral_config ADD COLUMN bonus_every_n INTEGER NOT NULL DEFAULT 5`,
     sql`ALTER TABLE referral_config ADD COLUMN bonus_reward_coins INTEGER NOT NULL DEFAULT 500`,
     sql`ALTER TABLE referral_config ADD COLUMN signup_reward_lari INTEGER NOT NULL DEFAULT 10`,
