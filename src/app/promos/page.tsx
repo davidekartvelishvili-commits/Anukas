@@ -718,21 +718,21 @@ export default function PromosPage() {
                                           <span className="text-[32px]">🍽</span>
                                         </div>
                                       )}
-                                      <div className="absolute bottom-0 left-0 right-0 px-3 py-2.5" style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.85))" }}>
+                                      <div className="absolute bottom-0 right-0 px-2 py-1">
                                         <span
-                                          className="inline-block px-2.5 py-1 rounded-full text-[12px] font-bold"
-                                          style={{ background: "rgba(249,231,65,0.9)", color: "#1A1A1A", fontFamily: "var(--font-dm-sans)" }}
+                                          className="text-[11px] font-bold px-1.5 py-0.5 rounded-[6px]"
+                                          style={{ background: "rgba(0,0,0,0.7)", color: "#F9E741", fontFamily: "var(--font-dm-sans)" }}
                                         >
-                                          {p.name} · ₾{p.price.toFixed(2)}
+                                          {p.name ? `${p.name} · ` : ""}₾{p.price.toFixed(2)}
                                         </span>
                                       </div>
                                     </div>
                                   );
                                 } else {
                                   return (
-                                    <div key={`c${ci}`} className="shrink-0 flex flex-col gap-2" style={{ width: 105 }}>
+                                    <div key={`c${ci}`} className="shrink-0 flex flex-col gap-2" style={{ width: 130 }}>
                                       {chunk.items.map((p) => (
-                                        <div key={p.id} className="rounded-[12px] overflow-hidden relative" style={{ height: 87 }}>
+                                        <div key={p.id} className="rounded-[12px] overflow-hidden relative" style={{ height: 104 }}>
                                           {p.imageUrl ? (
                                             <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
                                           ) : (
