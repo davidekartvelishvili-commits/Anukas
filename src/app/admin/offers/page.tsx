@@ -443,12 +443,14 @@ export default function OffersPage() {
                   {(["featured", "flash", "partner"] as const).map((t) => {
                     const active = form.offer_type === t;
                     const tc = typeColor(t);
+                    const hint = t === "featured" ? "მთავარი ბანერი" : t === "flash" ? "დროებითი აქცია" : "პარტნიორის შეთავაზება";
                     return (
                       <button key={t} onClick={() => setForm({ ...form, offer_type: t })}
-                        className="py-3 rounded-[8px] text-[13px] font-bold transition-all"
+                        className="py-3 rounded-[8px] text-[13px] font-bold transition-all flex flex-col items-center gap-1"
                         style={{ background: active ? tc.bg : "#0F0F0F", border: `1px solid ${active ? tc.fg : "#252525"}`, color: active ? tc.fg : "#A0A0A0" }}
                       >
                         {typeLabel(t)}
+                        <span className="text-[9px] font-normal opacity-70">{hint}</span>
                       </button>
                     );
                   })}
@@ -459,10 +461,12 @@ export default function OffersPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] mb-1.5 block font-semibold uppercase" style={{ color: "#666" }}>Boosted %</label>
+                  <p className="text-[9px] mb-1" style={{ color: "#555" }}>გაზრდილი ქეშბექის პროცენტი აქციის დროს</p>
                   <input type="number" min="0" max="100" step="1" value={form.boosted_rate} onChange={(e) => setForm({ ...form, boosted_rate: e.target.value })} style={inputStyle} />
                 </div>
                 <div>
                   <label className="text-[11px] mb-1.5 block font-semibold uppercase" style={{ color: "#666" }}>Normal %</label>
+                  <p className="text-[9px] mb-1" style={{ color: "#555" }}>ჩვეულებრივი ქეშბექის პროცენტი</p>
                   <input type="number" min="0" max="100" step="1" value={form.normal_rate} onChange={(e) => setForm({ ...form, normal_rate: e.target.value })} style={inputStyle} />
                 </div>
               </div>
@@ -470,22 +474,26 @@ export default function OffersPage() {
               {/* Title */}
               <div>
                 <label className="text-[11px] mb-1.5 block font-semibold uppercase" style={{ color: "#666" }}>სათაური</label>
+                <p className="text-[9px] mb-1" style={{ color: "#555" }}>მოკლე სათაური რომელიც მომხმარებელს გამოუჩნდება</p>
                 <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Extra cashback today" style={inputStyle} />
               </div>
 
               {/* Description */}
               <div>
                 <label className="text-[11px] mb-1.5 block font-semibold uppercase" style={{ color: "#666" }}>აღწერა</label>
+                <p className="text-[9px] mb-1" style={{ color: "#555" }}>დეტალური აღწერა აქციის შესახებ</p>
                 <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="2x cashback on coffee today only" style={{ ...inputStyle, resize: "none" }} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] mb-1.5 block font-semibold uppercase" style={{ color: "#666" }}>დალაგების ნომერი</label>
+                  <p className="text-[9px] mb-1" style={{ color: "#555" }}>რიგითობა სიაში (0 = პირველი)</p>
                   <input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: e.target.value })} style={inputStyle} />
                 </div>
                 <div>
                   <label className="text-[11px] mb-1.5 block font-semibold uppercase" style={{ color: "#666" }}>აქტიური</label>
+                  <p className="text-[9px] mb-1" style={{ color: "#555" }}>ჩართე/გამორთე ოფერი</p>
                   <button
                     onClick={() => setForm({ ...form, is_active: !form.is_active })}
                     className="relative inline-flex items-center rounded-full transition-all"
@@ -500,10 +508,12 @@ export default function OffersPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] mb-1.5 block font-semibold uppercase" style={{ color: "#666" }}>იწყება</label>
+                  <p className="text-[9px] mb-1" style={{ color: "#555" }}>აქციის დაწყების თარიღი</p>
                   <input type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} style={inputStyle} />
                 </div>
                 <div>
                   <label className="text-[11px] mb-1.5 block font-semibold uppercase" style={{ color: "#666" }}>მთავრდება</label>
+                  <p className="text-[9px] mb-1" style={{ color: "#555" }}>აქციის დასრულების თარიღი</p>
                   <input type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} style={inputStyle} />
                 </div>
               </div>
