@@ -1,18 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/:path*",
-      "has": [
-        {
-          "type": "host",
-          "value": "merchants.shansi.app"
-        }
-      ],
-      "destination": "/merchant/register"
-    }
-  ],
-  "redirects": [
-    {
       "source": "/",
       "has": [
         {
@@ -20,8 +8,7 @@
           "value": "merchants.shansi.app"
         }
       ],
-      "destination": "/merchant/register",
-      "permanent": false
+      "destination": "/merchant/register"
     }
   ]
 }

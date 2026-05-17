@@ -263,6 +263,7 @@ export function setupSocketServer(httpServer: any): void {
           "http://localhost:3001",
           "https://shansi.app",
           "https://www.shansi.app",
+          "https://merchants.shansi.app",
           process.env.FRONTEND_URL,
         ].filter(Boolean) as string[];
         if (allowed.includes(origin)) return callback(null, true);
