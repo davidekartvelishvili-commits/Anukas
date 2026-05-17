@@ -8,7 +8,7 @@
           "value": "merchants.shansi.app"
         }
       ],
-      "destination": "/merchant/register",
+      "destination": "https://shansi.vercel.app/merchant/register",
       "permanent": false
     }
   ]
