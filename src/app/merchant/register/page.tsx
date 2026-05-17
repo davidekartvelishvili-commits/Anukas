@@ -5,13 +5,12 @@ import { useRouter } from "next/navigation";
 import { registerMerchant } from "@/services/merchant";
 
 const CATEGORIES = [
-  { value: "food", label: "საკვები" },
-  { value: "retail", label: "საცალო" },
   { value: "cafe", label: "კაფე" },
   { value: "restaurant", label: "რესტორანი" },
-  { value: "pharmacy", label: "აფთიაქი" },
   { value: "grocery", label: "სასურსათო" },
   { value: "entertainment", label: "გართობა" },
+  { value: "game_lounge", label: "გეიმ ლაუნჯი" },
+  { value: "autoservice", label: "ავტოსერვისი" },
   { value: "other", label: "სხვა" },
 ];
 
