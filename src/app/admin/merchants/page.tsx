@@ -510,6 +510,8 @@ export default function MerchantsPage() {
                                           await updateMerchant(detail.merchant.id, { show_on_promos: !current });
                                           showToast(!current ? "პრომოზე დაემატა" : "პრომოდან წაიშალა");
                                           fetchMerchants();
+                                          const refreshed = await getMerchant(detail.merchant.id) as any;
+                                          setDetail(refreshed);
                                         } catch { showToast("შეცდომა", "error"); }
                                       }}
                                       className="relative inline-flex items-center rounded-full transition-all duration-200"
