@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getMerchants, getMerchant, updateMerchant, simulatePayment, createMerchant, getMerchantProducts, createMerchantProduct, deleteMerchantProduct } from "@/services/admin";
+import { getMerchants, getMerchant, updateMerchant, simulatePayment, createMerchant, getMerchantProducts, createMerchantProduct, updateMerchantProduct, deleteMerchantProduct } from "@/services/admin";
 
 /* ── SVG ICONS ── */
 function NavIcon({ id, active }: { id: string; active: boolean }) {
@@ -155,6 +155,13 @@ export default function MerchantsPage() {
   const [editingLogoFor, setEditingLogoFor] = useState<string | null>(null);
   const [detailLogoLoading, setDetailLogoLoading] = useState(false);
 
+  // Product form state
+  const [showProductForm, setShowProductForm] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [productForm, setProductForm] = useState({ name: "", price: "", image_url: "" });
+  const [productImageLoading, setProductImageLoading] = useState(false);
+  const productImageRef = useRef<HTMLInputElement>(null);
+
   const showToast = (msg: string, type: "success" | "error" = "success") => setToast({ msg, type });
 
   /* ── Fetch ── */
@@ -181,6 +188,11 @@ export default function MerchantsPage() {
       setDetail({ ...data, products: prods.products || [] });
     } catch { showToast("დეტალები ვერ ჩაიტვირთა", "error"); }
     finally { setDetailLoading(false); }
+  };
+
+  const refreshProducts = async (merchantId: string) => {
+    const prods = await getMerchantProducts(merchantId) as any;
+    setDetail((prev: any) => prev ? ({ ...prev, products: prods.products || [] }) : prev);
   };
 
   /* ── Actions ── */
@@ -560,63 +572,186 @@ export default function MerchantsPage() {
                                   </div>
                                   {/* Products section */}
                                   {detail.merchant && (
-                                    <div className="col-span-full mt-2">
-                                      <div className="flex items-center justify-between mb-2">
-                                        <p className="text-[12px] font-medium" style={{ color: "#A0A0A0" }}>პროდუქტები</p>
+                                    <div className="col-span-full mt-4">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <p className="text-[14px] font-bold" style={{ color: "#FFF" }}>პროდუქტები</p>
                                         <button
-                                          onClick={async () => {
-                                            const name = prompt("პროდუქტის სახელი:");
-                                            if (!name) return;
-                                            const priceStr = prompt("ფასი (₾):");
-                                            if (!priceStr) return;
-                                            const price = parseFloat(priceStr);
-                                            if (isNaN(price)) { showToast("არასწორი ფასი", "error"); return; }
-                                            const imageUrl = prompt("სურათის URL (ან ცარიელი):") || "";
-                                            try {
-                                              await createMerchantProduct(detail.merchant.id, { name, price, image_url: imageUrl || null });
-                                              showToast("პროდუქტი დაემატა");
-                                              const refreshed = await getMerchant(detail.merchant.id) as any;
-                                              setDetail(refreshed);
-                                              const prods = await getMerchantProducts(detail.merchant.id) as any;
-                                              setDetail((prev: any) => ({ ...prev, products: prods.products }));
-                                            } catch { showToast("შეცდომა", "error"); }
+                                          onClick={() => {
+                                            setEditingProduct(null);
+                                            setProductForm({ name: "", price: "", image_url: "" });
+                                            setShowProductForm(true);
                                           }}
-                                          className="text-[11px] px-3 py-1 rounded-full"
-                                          style={{ background: "#F9E741", color: "#000", fontWeight: 700 }}
+                                          className="text-[12px] px-4 py-1.5 rounded-full font-bold"
+                                          style={{ background: "#F9E741", color: "#000" }}
                                         >
                                           + დამატება
                                         </button>
                                       </div>
+
+                                      {/* Product form (add / edit) */}
+                                      {showProductForm && (
+                                        <div className="rounded-[12px] p-4 mb-4" style={{ background: "#0F0F0F", border: "1px solid #252525" }}>
+                                          <p className="text-[13px] font-bold mb-3" style={{ color: "#FFF" }}>
+                                            {editingProduct ? "რედაქტირება" : "ახალი პროდუქტი"}
+                                          </p>
+                                          <div className="flex flex-col gap-3">
+                                            <div>
+                                              <label className="text-[11px] mb-1 block font-semibold uppercase" style={{ color: "#666" }}>სახელი</label>
+                                              <input
+                                                type="text"
+                                                value={productForm.name}
+                                                onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                                                placeholder="კარტოფილი ფრი"
+                                                className="w-full rounded-[8px] px-3 py-2.5 text-[13px] outline-none"
+                                                style={{ background: "#1C1C1E", color: "#FFF", border: "1px solid #252525" }}
+                                              />
+                                            </div>
+                                            <div>
+                                              <label className="text-[11px] mb-1 block font-semibold uppercase" style={{ color: "#666" }}>ფასი (₾)</label>
+                                              <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                value={productForm.price}
+                                                onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                                                placeholder="4.45"
+                                                className="w-full rounded-[8px] px-3 py-2.5 text-[13px] outline-none"
+                                                style={{ background: "#1C1C1E", color: "#FFF", border: "1px solid #252525" }}
+                                              />
+                                            </div>
+                                            <div>
+                                              <label className="text-[11px] mb-1 block font-semibold uppercase" style={{ color: "#666" }}>სურათი</label>
+                                              <input
+                                                ref={productImageRef}
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={async (e) => {
+                                                  const file = e.target.files?.[0];
+                                                  if (!file) return;
+                                                  setProductImageLoading(true);
+                                                  try {
+                                                    const base64 = await fileToCompressedBase64(file, 600, 0.85);
+                                                    setProductForm((prev) => ({ ...prev, image_url: base64 }));
+                                                  } catch { showToast("სურათი ვერ აიტვირთა", "error"); }
+                                                  finally { setProductImageLoading(false); }
+                                                }}
+                                              />
+                                              <div className="flex items-center gap-3">
+                                                {productForm.image_url && (
+                                                  <img src={productForm.image_url} alt="" className="w-[48px] h-[48px] rounded-[8px] object-cover shrink-0" />
+                                                )}
+                                                <button
+                                                  onClick={() => productImageRef.current?.click()}
+                                                  disabled={productImageLoading}
+                                                  className="px-4 py-2 rounded-[8px] text-[12px] font-semibold"
+                                                  style={{ background: "#1C1C1E", color: "#FFF", border: "1px solid #252525" }}
+                                                >
+                                                  {productImageLoading ? "იტვირთება..." : productForm.image_url ? "შეცვლა" : "ატვირთვა"}
+                                                </button>
+                                                {productForm.image_url && (
+                                                  <button
+                                                    onClick={() => setProductForm((prev) => ({ ...prev, image_url: "" }))}
+                                                    className="text-[11px] px-2 py-1 rounded"
+                                                    style={{ color: "#EF4444" }}
+                                                  >
+                                                    წაშლა
+                                                  </button>
+                                                )}
+                                              </div>
+                                            </div>
+                                            <div className="flex gap-2 mt-1">
+                                              <button
+                                                onClick={() => { setShowProductForm(false); setEditingProduct(null); }}
+                                                className="flex-1 py-2.5 rounded-[8px] text-[13px] font-semibold"
+                                                style={{ background: "#1C1C1E", color: "#A0A0A0", border: "1px solid #252525" }}
+                                              >
+                                                გაუქმება
+                                              </button>
+                                              <button
+                                                onClick={async () => {
+                                                  if (!productForm.name || !productForm.price) { showToast("შეავსეთ სახელი და ფასი", "error"); return; }
+                                                  const price = parseFloat(productForm.price);
+                                                  if (isNaN(price)) { showToast("არასწორი ფასი", "error"); return; }
+                                                  try {
+                                                    if (editingProduct) {
+                                                      await updateMerchantProduct(detail.merchant.id, editingProduct.id, {
+                                                        name: productForm.name,
+                                                        price,
+                                                        image_url: productForm.image_url || null,
+                                                      });
+                                                      showToast("შენახულია");
+                                                    } else {
+                                                      await createMerchantProduct(detail.merchant.id, {
+                                                        name: productForm.name,
+                                                        price,
+                                                        image_url: productForm.image_url || null,
+                                                      });
+                                                      showToast("პროდუქტი დაემატა");
+                                                    }
+                                                    setShowProductForm(false);
+                                                    setEditingProduct(null);
+                                                    setProductForm({ name: "", price: "", image_url: "" });
+                                                    await refreshProducts(detail.merchant.id);
+                                                  } catch { showToast("შეცდომა", "error"); }
+                                                }}
+                                                className="flex-1 py-2.5 rounded-[8px] text-[13px] font-bold"
+                                                style={{ background: "#F9E741", color: "#000" }}
+                                              >
+                                                {editingProduct ? "შენახვა" : "დამატება"}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Product list */}
                                       {detail.products && detail.products.length > 0 ? (
-                                        <div className="space-y-1">
+                                        <div className="space-y-2">
                                           {detail.products.map((p: any) => (
-                                            <div key={p.id} className="flex items-center gap-3 py-2 border-b" style={{ borderColor: "#252525" }}>
-                                              {p.imageUrl && (
-                                                <img src={p.imageUrl} alt="" className="w-[36px] h-[36px] rounded-[8px] object-cover shrink-0" />
-                                              )}
-                                              <span className="text-[13px] flex-1" style={{ color: "#FFF" }}>{p.name}</span>
-                                              <span className="text-[13px] font-bold" style={{ color: "#F9E741" }}>{p.price?.toFixed(2)} ₾</span>
+                                            <div key={p.id} className="flex items-center gap-3 p-3 rounded-[10px]" style={{ background: "#0F0F0F", border: "1px solid #1A1A1A" }}>
+                                              <div className="w-[50px] h-[50px] rounded-[10px] overflow-hidden shrink-0 flex items-center justify-center" style={{ background: "#1C1C1E" }}>
+                                                {p.imageUrl ? (
+                                                  <img src={p.imageUrl} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                  <span className="text-[18px]">🍽</span>
+                                                )}
+                                              </div>
+                                              <div className="flex-1 min-w-0">
+                                                <p className="text-[13px] font-semibold truncate" style={{ color: "#FFF" }}>{p.name}</p>
+                                                <p className="text-[12px] font-bold" style={{ color: "#F9E741" }}>{p.price?.toFixed(2)} ₾</p>
+                                              </div>
+                                              <button
+                                                onClick={() => {
+                                                  setEditingProduct(p);
+                                                  setProductForm({ name: p.name, price: String(p.price), image_url: p.imageUrl || "" });
+                                                  setShowProductForm(true);
+                                                }}
+                                                className="text-[11px] px-3 py-1.5 rounded-[6px] font-semibold"
+                                                style={{ background: "#1C1C1E", color: "#F9E741", border: "1px solid #252525" }}
+                                              >
+                                                ✏️
+                                              </button>
                                               <button
                                                 onClick={async () => {
                                                   if (!confirm("წაშლა?")) return;
                                                   try {
                                                     await deleteMerchantProduct(detail.merchant.id, p.id);
                                                     showToast("წაიშალა");
-                                                    const prods = await getMerchantProducts(detail.merchant.id) as any;
-                                                    setDetail((prev: any) => ({ ...prev, products: prods.products }));
+                                                    await refreshProducts(detail.merchant.id);
                                                   } catch { showToast("შეცდომა", "error"); }
                                                 }}
-                                                className="text-[11px] px-2 py-0.5 rounded"
-                                                style={{ background: "#EF4444", color: "#FFF" }}
+                                                className="text-[11px] px-2 py-1.5 rounded-[6px]"
+                                                style={{ background: "#1C1C1E", color: "#EF4444", border: "1px solid #252525" }}
                                               >
-                                                ×
+                                                🗑
                                               </button>
                                             </div>
                                           ))}
                                         </div>
-                                      ) : (
-                                        <p className="text-[11px]" style={{ color: "#555" }}>პროდუქტები არ არის</p>
-                                      )}
+                                      ) : !showProductForm ? (
+                                        <p className="text-[12px]" style={{ color: "#555" }}>პროდუქტები არ არის დამატებული</p>
+                                      ) : null}
                                     </div>
                                   )}
 
