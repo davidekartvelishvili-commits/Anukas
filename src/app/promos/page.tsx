@@ -710,7 +710,7 @@ export default function PromosPage() {
                                 if (chunk.type === "big") {
                                   const p = chunk.items[0];
                                   return (
-                                    <div key={`c${ci}`} className="shrink-0 rounded-[14px] overflow-hidden relative" style={{ width: 220, height: 180 }}>
+                                    <div key={`c${ci}`} className="shrink-0 rounded-[14px] overflow-hidden relative" style={{ width: 280, height: 210 }}>
                                       {p.imageUrl ? (
                                         <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
                                       ) : (
