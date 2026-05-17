@@ -175,7 +175,7 @@ export default function PromosPage() {
   const [flashDealsAll, setFlashDealsAll] = useState<Deal[]>([]);
   const [partnerPromos, setPartnerPromos] = useState<Partner[]>([]);
   const [recentWins, setRecentWins] = useState<Win[]>([]);
-  const [partnerMerchants, setPartnerMerchants] = useState<{ id: string; businessName: string; businessNameKa: string | null; category: string; logoUrl: string | null; products?: { id: string; name: string; price: number; imageUrl: string | null }[] }[]>([]);
+  const [partnerMerchants, setPartnerMerchants] = useState<{ id: string; businessName: string; businessNameKa: string | null; category: string; logoUrl: string | null; products?: { id: string; name: string; price: number; imageUrl: string | null; sortOrder?: number }[] }[]>([]);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
@@ -685,18 +685,27 @@ export default function PromosPage() {
                         {products.length > 0 && (
                           <div className="flex gap-2 overflow-x-auto scrollbar-hide">
                             {(() => {
+                              // Group products into chunks: big ones solo, consecutive smalls paired
                               const chunks: { type: "big" | "small-pair"; items: typeof products }[] = [];
-                              let i = 0;
-                              while (i < products.length) {
-                                chunks.push({ type: "big", items: [products[i]] });
-                                i++;
-                                if (i < products.length) {
-                                  const pair = [products[i]];
-                                  i++;
-                                  if (i < products.length) { pair.push(products[i]); i++; }
-                                  chunks.push({ type: "small-pair", items: pair });
+                              let smallBuffer: typeof products = [];
+                              const flushSmalls = () => {
+                                while (smallBuffer.length >= 2) {
+                                  chunks.push({ type: "small-pair", items: [smallBuffer.shift()!, smallBuffer.shift()!] });
                                 }
-                              }
+                                if (smallBuffer.length === 1) {
+                                  chunks.push({ type: "small-pair", items: [smallBuffer.shift()!] });
+                                }
+                              };
+                              products.forEach((p) => {
+                                const isBig = (p as any).sortOrder === 0 || (p as any).sortOrder === undefined;
+                                if (isBig) {
+                                  flushSmalls();
+                                  chunks.push({ type: "big", items: [p] });
+                                } else {
+                                  smallBuffer.push(p);
+                                }
+                              });
+                              flushSmalls();
                               return chunks.map((chunk, ci) => {
                                 if (chunk.type === "big") {
                                   const p = chunk.items[0];

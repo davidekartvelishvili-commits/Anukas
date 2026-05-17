@@ -158,7 +158,7 @@ export default function MerchantsPage() {
   // Product form state
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
-  const [productForm, setProductForm] = useState({ name: "", price: "", image_url: "" });
+  const [productForm, setProductForm] = useState({ name: "", price: "", image_url: "", size: "big" as "big" | "small" });
   const [productImageLoading, setProductImageLoading] = useState(false);
   const productImageRef = useRef<HTMLInputElement>(null);
 
@@ -578,7 +578,7 @@ export default function MerchantsPage() {
                                         <button
                                           onClick={() => {
                                             setEditingProduct(null);
-                                            setProductForm({ name: "", price: "", image_url: "" });
+                                            setProductForm({ name: "", price: "", image_url: "", size: "big" });
                                             setShowProductForm(true);
                                           }}
                                           className="text-[12px] px-4 py-1.5 rounded-full font-bold"
@@ -595,6 +595,32 @@ export default function MerchantsPage() {
                                             {editingProduct ? "რედაქტირება" : "ახალი პროდუქტი"}
                                           </p>
                                           <div className="flex flex-col gap-3">
+                                            {/* Size selector */}
+                                            <div>
+                                              <label className="text-[11px] mb-1.5 block font-semibold uppercase" style={{ color: "#666" }}>ზომა</label>
+                                              <div className="grid grid-cols-2 gap-2">
+                                                {(["big", "small"] as const).map((s) => (
+                                                  <button
+                                                    key={s}
+                                                    onClick={() => setProductForm({ ...productForm, size: s })}
+                                                    className="py-2.5 rounded-[8px] text-[13px] font-bold transition-all"
+                                                    style={{
+                                                      background: productForm.size === s ? (s === "big" ? "#F9E741" : "#F9E741") : "#1C1C1E",
+                                                      color: productForm.size === s ? "#000" : "#A0A0A0",
+                                                      border: `1px solid ${productForm.size === s ? "#F9E741" : "#252525"}`,
+                                                    }}
+                                                  >
+                                                    {s === "big" ? "დიდი" : "პატარა"}
+                                                  </button>
+                                                ))}
+                                              </div>
+                                              <p className="text-[9px] mt-1" style={{ color: "#555" }}>
+                                                {productForm.size === "big" ? "დიდი სურათი სახელითა და ფასით" : "პატარა სურათი მხოლოდ ფასით"}
+                                              </p>
+                                            </div>
+
+                                            {/* Name — only for big */}
+                                            {productForm.size === "big" && (
                                             <div>
                                               <label className="text-[11px] mb-1 block font-semibold uppercase" style={{ color: "#666" }}>სახელი</label>
                                               <input
@@ -606,6 +632,7 @@ export default function MerchantsPage() {
                                                 style={{ background: "#1C1C1E", color: "#FFF", border: "1px solid #252525" }}
                                               />
                                             </div>
+                                            )}
                                             <div>
                                               <label className="text-[11px] mb-1 block font-semibold uppercase" style={{ color: "#666" }}>ფასი (₾)</label>
                                               <input
@@ -670,28 +697,31 @@ export default function MerchantsPage() {
                                               </button>
                                               <button
                                                 onClick={async () => {
-                                                  if (!productForm.name || !productForm.price) { showToast("შეავსეთ სახელი და ფასი", "error"); return; }
+                                                  if (productForm.size === "big" && !productForm.name) { showToast("შეავსეთ სახელი", "error"); return; }
+                                                  if (!productForm.price) { showToast("შეავსეთ ფასი", "error"); return; }
                                                   const price = parseFloat(productForm.price);
                                                   if (isNaN(price)) { showToast("არასწორი ფასი", "error"); return; }
                                                   try {
                                                     if (editingProduct) {
                                                       await updateMerchantProduct(detail.merchant.id, editingProduct.id, {
-                                                        name: productForm.name,
+                                                        name: productForm.name || "",
                                                         price,
                                                         image_url: productForm.image_url || null,
+                                                        sort_order: productForm.size === "big" ? 0 : 1,
                                                       });
                                                       showToast("შენახულია");
                                                     } else {
                                                       await createMerchantProduct(detail.merchant.id, {
-                                                        name: productForm.name,
+                                                        name: productForm.name || "",
                                                         price,
                                                         image_url: productForm.image_url || null,
+                                                        sort_order: productForm.size === "big" ? 0 : 1,
                                                       });
                                                       showToast("პროდუქტი დაემატა");
                                                     }
                                                     setShowProductForm(false);
                                                     setEditingProduct(null);
-                                                    setProductForm({ name: "", price: "", image_url: "" });
+                                                    setProductForm({ name: "", price: "", image_url: "", size: "big" });
                                                     await refreshProducts(detail.merchant.id);
                                                   } catch { showToast("შეცდომა", "error"); }
                                                 }}
@@ -724,7 +754,7 @@ export default function MerchantsPage() {
                                               <button
                                                 onClick={() => {
                                                   setEditingProduct(p);
-                                                  setProductForm({ name: p.name, price: String(p.price), image_url: p.imageUrl || "" });
+                                                  setProductForm({ name: p.name, price: String(p.price), image_url: p.imageUrl || "", size: (p.sortOrder === 1 ? "small" : "big") });
                                                   setShowProductForm(true);
                                                 }}
                                                 className="text-[11px] px-3 py-1.5 rounded-[6px] font-semibold"
