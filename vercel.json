@@ -1,5 +1,5 @@
 {
-  "redirects": [
+  "rewrites": [
     {
       "source": "/:path*",
       "has": [
@@ -8,7 +8,19 @@
           "value": "merchants.shansi.app"
         }
       ],
-      "destination": "https://shansi.vercel.app/merchant/register",
+      "destination": "/merchant/register"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "merchants.shansi.app"
+        }
+      ],
+      "destination": "/merchant/register",
       "permanent": false
     }
   ]
