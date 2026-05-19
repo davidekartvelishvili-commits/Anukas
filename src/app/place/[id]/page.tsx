@@ -67,6 +67,7 @@ export default function MerchantDetailPage() {
   const [reviewComment, setReviewComment] = useState("");
   const [selectedTxId, setSelectedTxId] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [showCantReviewPopup, setShowCantReviewPopup] = useState(false);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -295,9 +296,15 @@ export default function MerchantDetailPage() {
               <h2 className="text-white text-[18px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
                 შეფასებები {reviews.length > 0 && <span className="text-[14px] font-normal" style={{ color: "#666" }}>({reviews.length})</span>}
               </h2>
-              {canReview && !showReviewForm && (
+              {!showReviewForm && (
                 <button
-                  onClick={() => setShowReviewForm(true)}
+                  onClick={() => {
+                    if (canReview) {
+                      setShowReviewForm(true);
+                    } else {
+                      setShowCantReviewPopup(true);
+                    }
+                  }}
                   className="text-[12px] px-4 py-1.5 rounded-full font-bold"
                   style={{ background: "#F9E741", color: "#000" }}
                 >
@@ -432,7 +439,58 @@ export default function MerchantDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Can't review popup — glassy style */}
+        {showCantReviewPopup && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            onClick={() => setShowCantReviewPopup(false)}
+          >
+            <div className="absolute inset-0 bg-black/40" />
+            <div
+              className="relative rounded-[20px] px-6 py-7 max-w-[320px] w-full"
+              style={{
+                background: "rgba(50, 50, 50, 0.08)",
+                backdropFilter: "blur(12px) saturate(200%)",
+                WebkitBackdropFilter: "blur(12px) saturate(200%)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                animation: "fadeIn 0.2s ease-out",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-4">
+                <span className="text-[40px]">🔒</span>
+              </div>
+              <h3
+                className="text-white text-[18px] font-bold mb-2 text-center"
+                style={{ fontFamily: "var(--font-outfit)" }}
+              >
+                შეფასების დატოვება
+              </h3>
+              <p
+                className="text-[rgba(255,255,255,0.6)] text-[14px] mb-5 leading-relaxed text-center"
+                style={{ fontFamily: "var(--font-dm-sans)" }}
+              >
+                შეფასების დასატოვებლად ჯერ უნდა შეიძინოთ პროდუქტი <span className="text-white font-semibold">{merchant.businessNameKa || merchant.businessName}</span>-ში და დაასკანეროთ QR კოდი.
+              </p>
+              <button
+                onClick={() => setShowCantReviewPopup(false)}
+                className="w-full py-3 rounded-full text-[14px] font-bold"
+                style={{ background: "#F9E741", color: "#1A1A1A" }}
+              >
+                გასაგებია
+              </button>
+            </div>
+          </div>
+        )}
       </main>
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </AuthGuard>
   );
 }
