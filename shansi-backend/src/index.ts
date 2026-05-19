@@ -16,6 +16,9 @@ import { publicRoute } from "./routes/public.js";
 import { AppError } from "./utils/errors.js";
 import { getEnv } from "./utils/env.js";
 import { getDb } from "./db/client.js";
+import { merchants, merchantBranches } from "./db/schema.js";
+import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
 
 // Run schema migrations at startup so newly added columns/tables exist
 // before any Drizzle SELECT * queries hit them.
@@ -415,6 +418,39 @@ async function runStartupMigrations() {
     await (db as any).run(sql`UPDATE admins SET password_hash = '$2a$10$QvfyDk/nixFQ8KZSViJWAukUwZJCF8aZF/Hrr3.gi6TlzbrqkNrIu' WHERE email = 'ukleba21@gmail.com'`);
     console.log("[startup] admin password reset for ukleba21@gmail.com");
   } catch {}
+
+  // One-time: seed McDonald's branches (Tbilisi)
+  try {
+    const [mcD] = await db.select({ id: merchants.id }).from(merchants).where(eq(merchants.businessName, "McDonald's")).limit(1);
+    if (mcD) {
+      const existing = await db.select().from(merchantBranches).where(eq(merchantBranches.merchantId, mcD.id)).limit(1);
+      if (existing.length === 0) {
+        const branches = [
+          { name: "McDonald's Eristavi", address: "3 Eristavi St", lat: 41.7068, lng: 44.7734 },
+          { name: "McDonald's Rustaveli", address: "24 Rustaveli Ave", lat: 41.6975, lng: 44.8015 },
+          { name: "McDonald's Vake", address: "36 Chavchavadze Ave", lat: 41.7088, lng: 44.7587 },
+          { name: "McDonald's Saburtalo", address: "41 Vazha-Pshavela Ave", lat: 41.7275, lng: 44.7471 },
+          { name: "McDonald's Gldani", address: "30 Khizanishvili St", lat: 41.7795, lng: 44.8135 },
+          { name: "McDonald's East Point", address: "East Point Mall", lat: 41.7260, lng: 44.8584 },
+          { name: "McDonald's Marjanishvili", address: "1 Marjanishvili St", lat: 41.6921, lng: 44.7977 },
+          { name: "McDonald's Isani", address: "Isani Metro", lat: 41.6920, lng: 44.8227 },
+        ];
+        for (const b of branches) {
+          await db.insert(merchantBranches).values({ id: nanoid(), merchantId: mcD.id, ...b });
+        }
+        console.log("[startup] seeded McDonald's branches");
+      }
+    }
+    // Seed Kvarts Coffee branch
+    const [kv] = await db.select({ id: merchants.id }).from(merchants).where(eq(merchants.businessName, "Kvarts Coffee")).limit(1);
+    if (kv) {
+      const existing = await db.select().from(merchantBranches).where(eq(merchantBranches.merchantId, kv.id)).limit(1);
+      if (existing.length === 0) {
+        await db.insert(merchantBranches).values({ id: nanoid(), merchantId: kv.id, name: "Kvarts Coffee Rustaveli", address: "26 Rustaveli Ave", lat: 41.6969, lng: 44.8010 });
+        console.log("[startup] seeded Kvarts Coffee branch");
+      }
+    }
+  } catch (e: any) { console.error("[startup] branch seed error:", e.message); }
 
   console.log("[startup] migrations applied");
 }
