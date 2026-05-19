@@ -156,6 +156,31 @@ function offerToPartner(o: ApiOffer): Partner {
 }
 
 /* ───────── MAIN ───────── */
+// Haversine distance in meters
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const toRad = (d: number) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatDistance(meters: number): string {
+  if (meters >= 1000) return `${(meters / 1000).toFixed(1)} კმ`;
+  return `${Math.round(meters)} მ`;
+}
+
+function getNearestBranchDistance(branches: { lat: number; lng: number }[], userLat: number, userLng: number): string | null {
+  if (!branches || branches.length === 0) return null;
+  let min = Infinity;
+  for (const b of branches) {
+    const d = haversineDistance(userLat, userLng, b.lat, b.lng);
+    if (d < min) min = d;
+  }
+  return formatDistance(min);
+}
+
 export default function PromosPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -175,11 +200,23 @@ export default function PromosPage() {
   const [flashDealsAll, setFlashDealsAll] = useState<Deal[]>([]);
   const [partnerPromos, setPartnerPromos] = useState<Partner[]>([]);
   const [recentWins, setRecentWins] = useState<Win[]>([]);
-  const [partnerMerchants, setPartnerMerchants] = useState<{ id: string; businessName: string; businessNameKa: string | null; category: string; logoUrl: string | null; rating?: number; address?: string | null; products?: { id: string; name: string; price: number; imageUrl: string | null; sortOrder?: number }[] }[]>([]);
+  const [partnerMerchants, setPartnerMerchants] = useState<{ id: string; businessName: string; businessNameKa: string | null; category: string; logoUrl: string | null; rating?: number; address?: string | null; branches?: { lat: number; lng: number; name: string }[]; products?: { id: string; name: string; price: number; imageUrl: string | null; sortOrder?: number }[] }[]>([]);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
     return () => clearTimeout(t);
+  }, []);
+
+  // Get user location
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {},
+        { enableHighAccuracy: false, timeout: 5000 }
+      );
+    }
   }, []);
 
   // Fetch real offers + recent wins
@@ -690,21 +727,27 @@ export default function PromosPage() {
                                   </span>
                                 </>
                               )}
-                              {m.address && (
-                                <>
-                                  <span className="text-[10px]" style={{ color: "#555" }}>·</span>
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
-                                    <circle cx="12" cy="5" r="3" fill="#9CA3AF" />
-                                    <path d="M12 10v4" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
-                                    <path d="M12 14l-4 7" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
-                                    <path d="M12 14l4 7" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
-                                    <path d="M7 12l5 2 5-2" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                                  </svg>
-                                  <span className="text-[12px]" style={{ color: "#9CA3AF", fontFamily: "var(--font-dm-sans)" }}>
-                                    {m.address}
-                                  </span>
-                                </>
-                              )}
+                              {(() => {
+                                const dist = userLocation && m.branches && m.branches.length > 0
+                                  ? getNearestBranchDistance(m.branches, userLocation.lat, userLocation.lng)
+                                  : null;
+                                if (!dist) return null;
+                                return (
+                                  <>
+                                    <span className="text-[10px]" style={{ color: "#555" }}>·</span>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
+                                      <circle cx="12" cy="5" r="3" fill="#9CA3AF" />
+                                      <path d="M12 10v4" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
+                                      <path d="M12 14l-4 7" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
+                                      <path d="M12 14l4 7" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
+                                      <path d="M7 12l5 2 5-2" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                                    </svg>
+                                    <span className="text-[12px]" style={{ color: "#9CA3AF", fontFamily: "var(--font-dm-sans)" }}>
+                                      {dist}
+                                    </span>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">

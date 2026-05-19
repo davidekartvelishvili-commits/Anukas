@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AdminEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, merchantProducts, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig, bigWinConfig, bigWinPrizes, bigWinHistory, villages, villageBuildings, userVillageProgress, offers, tickets, pageViews } from "../db/schema.js";
+import { admins, gameConfig, pool, gameHistory, adminLogs, users, otpRateLimits, transactions, referrals, referralConfig, promoCodes, promoCodeUses, merchants, merchantBranches, merchantProducts, paymentTransactions, withdrawals, systemConfig, pendingPayments, simulationRuns, poolFundings, villageLevels, villageCards, userVillageProfile, userCards, villageAttacks, villageConfig, bigWinConfig, bigWinPrizes, bigWinHistory, villages, villageBuildings, userVillageProgress, offers, tickets, pageViews } from "../db/schema.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEnv } from "../utils/env.js";
 import { BadRequestError, UnauthorizedError, RateLimitError } from "../utils/errors.js";
@@ -1138,6 +1138,35 @@ admin.delete("/merchants/:mid/products/:pid", adminMiddleware, async (c) => {
   const pid = c.req.param("pid") as string;
   const db = getDb();
   await db.delete(merchantProducts).where(eq(merchantProducts.id, pid));
+  return c.json({ success: true });
+});
+
+// ══════════════════════════════════════
+// MERCHANT BRANCHES
+// ══════════════════════════════════════
+
+admin.get("/merchants/:id/branches", adminMiddleware, async (c) => {
+  const merchantId = c.req.param("id") as string;
+  const db = getDb();
+  const branches = await db.select().from(merchantBranches).where(eq(merchantBranches.merchantId, merchantId));
+  return c.json({ success: true, branches });
+});
+
+admin.post("/merchants/:id/branches", adminMiddleware, async (c) => {
+  const merchantId = c.req.param("id") as string;
+  const body = await c.req.json();
+  const db = getDb();
+  const id = nanoid();
+  await db.insert(merchantBranches).values({
+    id, merchantId, name: body.name, address: body.address || null, lat: body.lat, lng: body.lng,
+  });
+  return c.json({ success: true, branch: { id } });
+});
+
+admin.delete("/merchants/:mid/branches/:bid", adminMiddleware, async (c) => {
+  const bid = c.req.param("bid") as string;
+  const db = getDb();
+  await db.delete(merchantBranches).where(eq(merchantBranches.id, bid));
   return c.json({ success: true });
 });
 

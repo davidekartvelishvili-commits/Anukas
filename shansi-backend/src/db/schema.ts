@@ -179,6 +179,16 @@ export const merchants = sqliteTable("merchants", {
   approvedBy: text("approved_by"),
 });
 
+export const merchantBranches = sqliteTable("merchant_branches", {
+  id: text("id").primaryKey(),
+  merchantId: text("merchant_id").notNull().references(() => merchants.id),
+  name: text("name").notNull(),
+  address: text("address"),
+  lat: real("lat").notNull(),
+  lng: real("lng").notNull(),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
 export const merchantProducts = sqliteTable("merchant_products", {
   id: text("id").primaryKey(),
   merchantId: text("merchant_id").notNull().references(() => merchants.id),

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { referralConfig, systemConfig, tickets, gameHistory, users, pageViews, merchants, merchantProducts } from "../db/schema.js";
+import { referralConfig, systemConfig, tickets, gameHistory, users, pageViews, merchants, merchantProducts, merchantBranches } from "../db/schema.js";
 import { nanoid } from "nanoid";
 import { desc, and, gt, sql } from "drizzle-orm";
 
@@ -54,10 +54,11 @@ publicRoute.get("/partner-merchants", async (c) => {
     address: merchants.address,
   }).from(merchants).where(and(eq(merchants.isActive, true), eq(merchants.showOnPromos, true)));
 
-  // Enrich with products
+  // Enrich with products and branches
   const enriched = await Promise.all(results.map(async (m) => {
     const products = await db.select().from(merchantProducts).where(and(eq(merchantProducts.merchantId, m.id), eq(merchantProducts.isActive, true))).orderBy(merchantProducts.sortOrder);
-    return { ...m, products };
+    const branches = await db.select({ lat: merchantBranches.lat, lng: merchantBranches.lng, name: merchantBranches.name }).from(merchantBranches).where(eq(merchantBranches.merchantId, m.id));
+    return { ...m, products, branches };
   }));
 
   return c.json({ success: true, merchants: enriched });

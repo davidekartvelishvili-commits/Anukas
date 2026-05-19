@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getMerchants, getMerchant, updateMerchant, simulatePayment, createMerchant, getMerchantProducts, createMerchantProduct, updateMerchantProduct, deleteMerchantProduct } from "@/services/admin";
+import { getMerchants, getMerchant, updateMerchant, simulatePayment, createMerchant, getMerchantProducts, createMerchantProduct, updateMerchantProduct, deleteMerchantProduct, getMerchantBranches, createMerchantBranch, deleteMerchantBranch } from "@/services/admin";
 
 /* ── SVG ICONS ── */
 function NavIcon({ id, active }: { id: string; active: boolean }) {
@@ -184,8 +184,8 @@ export default function MerchantsPage() {
     setSelectedId(id);
     setDetailLoading(true);
     try {
-      const [data, prods] = await Promise.all([getMerchant(id), getMerchantProducts(id)]) as any[];
-      setDetail({ ...data, products: prods.products || [] });
+      const [data, prods, brs] = await Promise.all([getMerchant(id), getMerchantProducts(id), getMerchantBranches(id)]) as any[];
+      setDetail({ ...data, products: prods.products || [], branches: brs.branches || [] });
     } catch { showToast("დეტალები ვერ ჩაიტვირთა", "error"); }
     finally { setDetailLoading(false); }
   };
@@ -862,6 +862,68 @@ export default function MerchantsPage() {
                                       ) : !showProductForm ? (
                                         <p className="text-[12px]" style={{ color: "#555" }}>პროდუქტები არ არის დამატებული</p>
                                       ) : null}
+                                    </div>
+                                  )}
+
+                                  {/* Branches section */}
+                                  {detail.merchant && (
+                                    <div className="col-span-full mt-4">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <p className="text-[14px] font-bold" style={{ color: "#FFF" }}>ფილიალები</p>
+                                        <button
+                                          onClick={async () => {
+                                            const name = prompt("ფილიალის სახელი (მაგ: ერისთავის ფილიალი):");
+                                            if (!name) return;
+                                            const address = prompt("მისამართი:") || "";
+                                            const latStr = prompt("Latitude (მაგ: 41.7151):");
+                                            if (!latStr) return;
+                                            const lngStr = prompt("Longitude (მაგ: 44.8271):");
+                                            if (!lngStr) return;
+                                            const lat = parseFloat(latStr), lng = parseFloat(lngStr);
+                                            if (isNaN(lat) || isNaN(lng)) { showToast("არასწორი კოორდინატები", "error"); return; }
+                                            try {
+                                              await createMerchantBranch(detail.merchant.id, { name, address, lat, lng });
+                                              showToast("ფილიალი დაემატა");
+                                              const brs = await getMerchantBranches(detail.merchant.id) as any;
+                                              setDetail((prev: any) => prev ? ({ ...prev, branches: brs.branches || [] }) : prev);
+                                            } catch { showToast("შეცდომა", "error"); }
+                                          }}
+                                          className="text-[12px] px-4 py-1.5 rounded-full font-bold"
+                                          style={{ background: "#F9E741", color: "#000" }}
+                                        >
+                                          + ფილიალი
+                                        </button>
+                                      </div>
+                                      {detail.branches && detail.branches.length > 0 ? (
+                                        <div className="space-y-2">
+                                          {detail.branches.map((b: any) => (
+                                            <div key={b.id} className="flex items-center gap-3 p-3 rounded-[10px]" style={{ background: "#0F0F0F", border: "1px solid #1A1A1A" }}>
+                                              <div className="flex-1 min-w-0">
+                                                <p className="text-[13px] font-semibold" style={{ color: "#FFF" }}>{b.name}</p>
+                                                <p className="text-[11px]" style={{ color: "#666" }}>{b.address || "—"}</p>
+                                                <p className="text-[10px] font-mono" style={{ color: "#555" }}>{b.lat}, {b.lng}</p>
+                                              </div>
+                                              <button
+                                                onClick={async () => {
+                                                  if (!confirm("წაშლა?")) return;
+                                                  try {
+                                                    await deleteMerchantBranch(detail.merchant.id, b.id);
+                                                    showToast("წაიშალა");
+                                                    const brs = await getMerchantBranches(detail.merchant.id) as any;
+                                                    setDetail((prev: any) => prev ? ({ ...prev, branches: brs.branches || [] }) : prev);
+                                                  } catch { showToast("შეცდომა", "error"); }
+                                                }}
+                                                className="text-[11px] px-2 py-1.5 rounded-[6px]"
+                                                style={{ background: "#1C1C1E", color: "#EF4444", border: "1px solid #252525" }}
+                                              >
+                                                🗑
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <p className="text-[12px]" style={{ color: "#555" }}>ფილიალები არ არის დამატებული</p>
+                                      )}
                                     </div>
                                   )}
 

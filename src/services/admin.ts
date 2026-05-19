@@ -262,6 +262,11 @@ export const createMerchantProduct = (merchantId: string, data: any) => adminFet
 export const updateMerchantProduct = (merchantId: string, productId: string, data: any) => adminFetch(`/admin/merchants/${merchantId}/products/${productId}`, { method: "PATCH", body: JSON.stringify(data) });
 export const deleteMerchantProduct = (merchantId: string, productId: string) => adminFetch(`/admin/merchants/${merchantId}/products/${productId}`, { method: "DELETE" });
 
+// Merchant Branches
+export const getMerchantBranches = (merchantId: string) => adminFetch(`/admin/merchants/${merchantId}/branches`);
+export const createMerchantBranch = (merchantId: string, data: any) => adminFetch(`/admin/merchants/${merchantId}/branches`, { method: "POST", body: JSON.stringify(data) });
+export const deleteMerchantBranch = (merchantId: string, branchId: string) => adminFetch(`/admin/merchants/${merchantId}/branches/${branchId}`, { method: "DELETE" });
+
 export async function simulatePayment(userPhone: string, merchantId: string, amount: number) {
   return adminFetch("/admin/simulate-payment", {
     method: "POST",
