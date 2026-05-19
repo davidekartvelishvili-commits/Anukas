@@ -217,6 +217,7 @@ export default function LuckyDropPage() {
     import("@/services/auth").then(({ getMe }) => {
       getMe().then((data: any) => {
         if (data?.user?.coinBalance !== undefined) {
+          console.log('[balance-debug] setBalance at line 220, value:', data.user.coinBalance, 'source: getMe coinBalance');
           setBalance(data.user.coinBalance);
           storeCoin(data.user.coinBalance);
         }
@@ -786,7 +787,10 @@ export default function LuckyDropPage() {
     if (anyAnimPlayingRef.current) return;
 
     // Deduct locally for instant UI feedback
-    setBalance((prev) => prev - betAmount);
+    setBalance((prev) => {
+      console.log('[balance-debug] setBalance at line 789, value:', prev - betAmount, 'source: optimistic deduct, prev:', prev, 'betAmount:', betAmount);
+      return prev - betAmount;
+    });
     pendingBallsRef.current++;
     dropCount.current++;
 
@@ -811,6 +815,7 @@ export default function LuckyDropPage() {
           setBonusRoundInfo({ coins: serverResult.freeCoins, gamesLeft: serverResult.bonusGamesLeft || 0 });
           // Update balance to bonus coins after showing notification
           setTimeout(() => {
+            console.log('[balance-debug] setBalance at line 813, value:', serverResult.freeCoins, 'source: bonusRound freeCoins');
             setBalance(serverResult.freeCoins);
             storeCoin(serverResult.freeCoins);
             lastServerCoinsRef.current = serverResult.freeCoins;
@@ -905,11 +910,14 @@ export default function LuckyDropPage() {
           const sCoins = serverResult.totalCoins ?? serverResult.coinsRemaining;
           if (pendingBallsRef.current === 0) {
             const final = lastServerCoinsRef.current >= 0 ? lastServerCoinsRef.current : sCoins;
+            console.log('[balance-debug] setBalance at line 903 (settle, last ball), value:', final, 'source: lastServerCoinsRef or sCoins, prev:', prev, 'totalCoins:', serverResult.totalCoins, 'coinsRemaining:', serverResult.coinsRemaining, 'lastServerCoinsRef:', lastServerCoinsRef.current);
             storeCoin(final);
             lastServerCoinsRef.current = -1;
             return final;
           }
-          return Math.min(prev, sCoins);
+          const val = Math.min(prev, sCoins);
+          console.log('[balance-debug] setBalance at line 903 (settle, more balls pending), value:', val, 'source: Math.min(prev, sCoins), prev:', prev, 'sCoins:', sCoins, 'totalCoins:', serverResult.totalCoins, 'coinsRemaining:', serverResult.coinsRemaining);
+          return val;
         });
       };
 
@@ -918,8 +926,12 @@ export default function LuckyDropPage() {
       // API failed — restore the local deduction
       console.error("Drop API error:", err.message);
       pendingBallsRef.current--;
-      setBalance((prev) => prev + currentBet);
+      setBalance((prev) => {
+        console.log('[balance-debug] setBalance at line 929 (error restore), value:', prev + currentBet, 'source: error rollback, prev:', prev, 'currentBet:', currentBet);
+        return prev + currentBet;
+      });
       if (pendingBallsRef.current === 0 && lastServerCoinsRef.current >= 0) {
+        console.log('[balance-debug] setBalance at line 931 (error final), value:', lastServerCoinsRef.current, 'source: lastServerCoinsRef after error');
         setBalance(lastServerCoinsRef.current);
         storeCoin(lastServerCoinsRef.current);
         lastServerCoinsRef.current = -1;
@@ -1102,6 +1114,7 @@ export default function LuckyDropPage() {
           // Refresh coin balance
           ensureActiveTransaction().then((tx) => {
             const coins = tx.totalCoins ?? tx.coinsRemaining;
+            console.log('[balance-debug] setBalance at line 1103 (attack complete), value:', coins, 'source: ensureActiveTransaction, totalCoins:', tx.totalCoins, 'coinsRemaining:', tx.coinsRemaining);
             setBalance(coins);
             storeCoin(coins);
           }).catch(() => {});
