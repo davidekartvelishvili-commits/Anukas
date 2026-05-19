@@ -87,7 +87,7 @@ function CountdownText({ seconds, className, style }: { seconds: number; classNa
   return <span className={className} style={style}>{display}</span>;
 }
 
-const categories = ["All", "Cafe", "Restaurant", "Store", "Entertainment"];
+const categories = ["All", "Cafe", "Restaurant", "Grocery", "Entertainment", "Game Lounge", "Autoservice"];
 
 /* Deal shape used by existing render code */
 interface Deal {
@@ -660,8 +660,16 @@ export default function PromosPage() {
 
           {/* ── 5b. Partner Merchants grouped by category ── */}
           {(() => {
+            const categoryMap: Record<string, string> = {
+              "All": "", "Cafe": "cafe", "Restaurant": "restaurant", "Grocery": "grocery",
+              "Entertainment": "entertainment", "Game Lounge": "game_lounge", "Autoservice": "autoservice",
+            };
+            const filterCat = categoryMap[activeCategory] || "";
+            const filtered = activeCategory === "All"
+              ? partnerMerchants
+              : partnerMerchants.filter((m) => m.category === filterCat);
             const grouped: Record<string, typeof partnerMerchants> = {};
-            partnerMerchants.forEach((m) => {
+            filtered.forEach((m) => {
               const cat = m.category || "other";
               if (!grouped[cat]) grouped[cat] = [];
               grouped[cat].push(m);
