@@ -16,7 +16,7 @@ import { publicRoute } from "./routes/public.js";
 import { AppError } from "./utils/errors.js";
 import { getEnv } from "./utils/env.js";
 import { getDb } from "./db/client.js";
-import { merchants, merchantBranches } from "./db/schema.js";
+import { merchants, merchantBranches, merchantReviews, users } from "./db/schema.js";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -460,6 +460,53 @@ async function runStartupMigrations() {
       }
     }
   } catch (e: any) { console.error("[startup] branch seed error:", e.message); }
+
+  // One-time: seed realistic reviews for merchants
+  try {
+    const existingReviews = await db.select().from(merchantReviews).limit(1);
+    if (existingReviews.length === 0) {
+      // Get some real users to attribute reviews to
+      const realUsers = await db.select({ id: users.id, name: users.name }).from(users).limit(6);
+      if (realUsers.length >= 2) {
+        const [mcD] = await db.select({ id: merchants.id }).from(merchants).where(eq(merchants.businessName, "McDonald's")).limit(1);
+        const [kv] = await db.select({ id: merchants.id }).from(merchants).where(eq(merchants.businessName, "Kvarts Coffee")).limit(1);
+
+        if (mcD) {
+          const mcdReviews = [
+            { rating: 5, comment: "ძალიან გემრიელი ბურგერებია, მომსახურებაც შესანიშნავი იყო. ყოველთვის სიამოვნებით ვსტუმრობ!" },
+            { rating: 4, comment: "კარტოფილი ფრი ისეთივე გემრიელია როგორც ყოველთვის. სწრაფი მომსახურება, სუფთა გარემო." },
+            { rating: 5, comment: "საუკეთესო ფასტფუდი თბილისში. ბავშვებს განსაკუთრებით უყვართ, ოჯახური გარემოა." },
+          ];
+          for (let i = 0; i < mcdReviews.length && i < realUsers.length; i++) {
+            await db.insert(merchantReviews).values({
+              id: nanoid(), merchantId: mcD.id, userId: realUsers[i].id,
+              paymentTransactionId: `seed-mcd-${i}`, rating: mcdReviews[i].rating, comment: mcdReviews[i].comment,
+            });
+          }
+          const avgMcd = mcdReviews.reduce((s, r) => s + r.rating, 0) / mcdReviews.length;
+          await db.update(merchants).set({ rating: Math.round(avgMcd * 10) / 10 }).where(eq(merchants.id, mcD.id));
+          console.log("[startup] seeded McDonald's reviews");
+        }
+
+        if (kv) {
+          const kvReviews = [
+            { rating: 5, comment: "საოცარი ყავაა! ბარისტები ძალიან პროფესიონალები არიან, ატმოსფეროც ძალიან სასიამოვნოა." },
+            { rating: 5, comment: "თბილისის საუკეთესო ყავა! ლატე უბრალოდ ზეციურია, ინტერიერიც მშვენიერია." },
+            { rating: 4, comment: "ძალიან კარგი ადგილია მეგობრებთან შესახვედრად. ყავა ყოველთვის ხარისხიანია." },
+          ];
+          for (let i = 0; i < kvReviews.length && i < realUsers.length; i++) {
+            await db.insert(merchantReviews).values({
+              id: nanoid(), merchantId: kv.id, userId: realUsers[i].id,
+              paymentTransactionId: `seed-kv-${i}`, rating: kvReviews[i].rating, comment: kvReviews[i].comment,
+            });
+          }
+          const avgKv = kvReviews.reduce((s, r) => s + r.rating, 0) / kvReviews.length;
+          await db.update(merchants).set({ rating: Math.round(avgKv * 10) / 10 }).where(eq(merchants.id, kv.id));
+          console.log("[startup] seeded Kvarts Coffee reviews");
+        }
+      }
+    }
+  } catch (e: any) { console.error("[startup] review seed error:", e.message); }
 
   console.log("[startup] migrations applied");
 }
