@@ -548,6 +548,31 @@ export default function MerchantsPage() {
                                     </p>
                                   </div>
 
+                                  {/* Rating */}
+                                  <div>
+                                    <p className="text-[11px] mb-1" style={{ color: "#666" }}>რეიტინგი</p>
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      min="0"
+                                      max="10"
+                                      defaultValue={detail.merchant?.rating || 0}
+                                      onBlur={async (e) => {
+                                        const val = parseFloat(e.target.value);
+                                        if (isNaN(val)) return;
+                                        try {
+                                          await updateMerchant(detail.merchant.id, { rating: Math.min(10, Math.max(0, val)) });
+                                          showToast("რეიტინგი შენახულია");
+                                          const refreshed = await getMerchant(detail.merchant.id) as any;
+                                          const prods = await getMerchantProducts(detail.merchant.id) as any;
+                                          setDetail({ ...refreshed, products: prods.products || [] });
+                                        } catch { showToast("შეცდომა", "error"); }
+                                      }}
+                                      className="w-full rounded-[6px] px-2 py-1.5 text-[13px] outline-none"
+                                      style={{ background: "#0F0F0F", color: "#F9E741", border: "1px solid #252525", width: 70 }}
+                                    />
+                                  </div>
+
                                   {detail.merchant?.commissionEnabled !== false && (
                                     <div>
                                       <p className="text-[11px] mb-1" style={{ color: "#666" }}>{"\u10EF\u10D0\u10DB\u10E3\u10E0\u10D8 \u10D9\u10DD\u10DB\u10D8\u10E1\u10D8\u10D0"}</p>

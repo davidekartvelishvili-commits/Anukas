@@ -172,6 +172,7 @@ export const merchants = sqliteTable("merchants", {
   isActive: integer("is_active", { mode: "boolean" }).default(false).notNull(),
   isVerified: integer("is_verified", { mode: "boolean" }).default(false).notNull(),
   showOnPromos: integer("show_on_promos", { mode: "boolean" }).default(false).notNull(),
+  rating: real("rating").default(0),
   contactPerson: text("contact_person"),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
   approvedAt: text("approved_at"),

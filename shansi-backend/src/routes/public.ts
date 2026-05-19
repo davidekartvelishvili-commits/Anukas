@@ -50,6 +50,7 @@ publicRoute.get("/partner-merchants", async (c) => {
     category: merchants.category,
     logoUrl: merchants.logoUrl,
     merchantCode: merchants.merchantCode,
+    rating: merchants.rating,
   }).from(merchants).where(and(eq(merchants.isActive, true), eq(merchants.showOnPromos, true)));
 
   // Enrich with products

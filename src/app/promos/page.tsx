@@ -175,7 +175,7 @@ export default function PromosPage() {
   const [flashDealsAll, setFlashDealsAll] = useState<Deal[]>([]);
   const [partnerPromos, setPartnerPromos] = useState<Partner[]>([]);
   const [recentWins, setRecentWins] = useState<Win[]>([]);
-  const [partnerMerchants, setPartnerMerchants] = useState<{ id: string; businessName: string; businessNameKa: string | null; category: string; logoUrl: string | null; products?: { id: string; name: string; price: number; imageUrl: string | null; sortOrder?: number }[] }[]>([]);
+  const [partnerMerchants, setPartnerMerchants] = useState<{ id: string; businessName: string; businessNameKa: string | null; category: string; logoUrl: string | null; rating?: number; products?: { id: string; name: string; price: number; imageUrl: string | null; sortOrder?: number }[] }[]>([]);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
@@ -670,11 +670,27 @@ export default function PromosPage() {
                             <h3 className="text-white text-[16px] font-bold truncate" style={{ fontFamily: "var(--font-outfit)" }}>
                               {m.businessName}
                             </h3>
-                            {m.businessNameKa && (
-                              <p className="text-[12px] truncate" style={{ color: "#9CA3AF", fontFamily: "var(--font-dm-sans)" }}>
-                                {m.businessNameKa}
-                              </p>
-                            )}
+                            <div className="flex items-center gap-1.5">
+                              {m.businessNameKa && (
+                                <span className="text-[12px] truncate" style={{ color: "#9CA3AF", fontFamily: "var(--font-dm-sans)" }}>
+                                  {m.businessNameKa}
+                                </span>
+                              )}
+                              {m.rating && m.rating > 0 && (
+                                <>
+                                  {m.businessNameKa && <span className="text-[10px]" style={{ color: "#555" }}>·</span>}
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
+                                    <circle cx="12" cy="12" r="10" fill="#F9E741" />
+                                    <circle cx="8.5" cy="10" r="1.2" fill="#1A1A1A" />
+                                    <circle cx="15.5" cy="10" r="1.2" fill="#1A1A1A" />
+                                    <path d="M8 15c1.5 2 6.5 2 8 0" stroke="#1A1A1A" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                                  </svg>
+                                  <span className="text-[12px] font-bold" style={{ color: "#F9E741", fontFamily: "var(--font-dm-sans)" }}>
+                                    {m.rating.toFixed(1)}
+                                  </span>
+                                </>
+                              )}
+                            </div>
                           </div>
                           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                             <path d="M7 4l6 6-6 6" />
