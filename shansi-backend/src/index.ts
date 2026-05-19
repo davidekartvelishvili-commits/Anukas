@@ -466,6 +466,9 @@ async function runStartupMigrations() {
         console.log("[startup] seeded Kvarts Coffee branch");
       }
     }
+    // Fix CHIKA Georgian name
+    await (db as any).run(sql`UPDATE merchants SET business_name_ka = 'ჭიქა რუსთაველი' WHERE business_name = 'CHIKA Rustaveli'`);
+
     // Seed CHIKA Rustaveli — approve, enable promos, add branch, products, reviews
     const [chika] = await db.select({ id: merchants.id, isActive: merchants.isActive }).from(merchants).where(eq(merchants.businessName, "CHIKA Rustaveli")).limit(1);
     if (chika) {
