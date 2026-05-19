@@ -795,9 +795,11 @@ export default function LuckyDropPage() {
 
     // Fire API immediately (parallel — no queue)
     playGame("plinko", currentBet).then((serverResult: any) => {
+      // Use totalCoins (sum of all active transactions) if available, fallback to coinsRemaining
+      const serverCoins = serverResult.totalCoins ?? serverResult.coinsRemaining;
       // Always keep the LOWEST server balance (most up-to-date after all deductions)
-      if (lastServerCoinsRef.current < 0 || serverResult.coinsRemaining < lastServerCoinsRef.current) {
-        lastServerCoinsRef.current = serverResult.coinsRemaining;
+      if (lastServerCoinsRef.current < 0 || serverCoins < lastServerCoinsRef.current) {
+        lastServerCoinsRef.current = serverCoins;
       }
 
       // Handle bonus round: coins hit 0, then bonus coins added after a delay
@@ -899,13 +901,14 @@ export default function LuckyDropPage() {
         // the lowest known server value; if this is the last ball, snap
         // to the exact server value and reset bookkeeping.
         setBalance((prev) => {
+          const sCoins = serverResult.totalCoins ?? serverResult.coinsRemaining;
           if (pendingBallsRef.current === 0) {
-            const final = lastServerCoinsRef.current;
+            const final = lastServerCoinsRef.current >= 0 ? lastServerCoinsRef.current : sCoins;
             storeCoin(final);
             lastServerCoinsRef.current = -1;
             return final;
           }
-          return Math.min(prev, serverResult.coinsRemaining);
+          return Math.min(prev, sCoins);
         });
       };
 

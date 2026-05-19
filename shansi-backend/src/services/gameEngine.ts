@@ -443,7 +443,17 @@ async function _playGameInner(
     freeCoins,
     bonusGamesLeft,
     transactionComplete,
+    totalCoins: 0,
   };
+
+  // Calculate total coins across all active transactions
+  try {
+    const allTx = await db.select({ cr: transactions.coinsRemaining }).from(transactions)
+      .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))));
+    result.totalCoins = allTx.reduce((sum, t) => sum + (t.cr || 0), 0);
+  } catch {}
+
+  return result;
 }
 
 // ═══════════════════════════════════════
