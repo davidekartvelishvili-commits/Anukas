@@ -1108,8 +1108,8 @@ admin.post("/merchants/:id/products", adminMiddleware, async (c) => {
   await db.insert(merchantProducts).values({
     id,
     merchantId,
-    name: body.name,
-    price: body.price,
+    name: body.name || "",
+    price: body.price || 0,
     imageUrl: body.image_url || null,
     sortOrder: body.sort_order || 0,
   });

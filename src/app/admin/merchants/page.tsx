@@ -777,10 +777,8 @@ export default function MerchantsPage() {
                                               </button>
                                               <button
                                                 onClick={async () => {
-                                                  if (productForm.size === "big" && !productForm.name) { showToast("შეავსეთ სახელი", "error"); return; }
-                                                  if (!productForm.price) { showToast("შეავსეთ ფასი", "error"); return; }
-                                                  const price = parseFloat(productForm.price);
-                                                  if (isNaN(price)) { showToast("არასწორი ფასი", "error"); return; }
+                                                  const price = productForm.price ? parseFloat(productForm.price) : 0;
+                                                  if (productForm.price && isNaN(price)) { showToast("არასწორი ფასი", "error"); return; }
                                                   try {
                                                     if (editingProduct) {
                                                       await updateMerchantProduct(detail.merchant.id, editingProduct.id, {
