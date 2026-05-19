@@ -491,7 +491,8 @@ async function runStartupMigrations() {
       // Branch
       const existingBranches = await db.select().from(merchantBranches).where(eq(merchantBranches.merchantId, chika.id)).limit(1);
       if (existingBranches.length === 0) {
-        await db.insert(merchantBranches).values({ id: nanoid(), merchantId: chika.id, name: "CHIKA Rustaveli", address: "მერაბ კოსტავას ქ. 9", lat: 41.7103, lng: 44.7932 });
+        await db.delete(merchantBranches).where(eq(merchantBranches.merchantId, chika.id));
+        await db.insert(merchantBranches).values({ id: nanoid(), merchantId: chika.id, name: "ჭიქა რუსთაველი", address: "მერაბ კოსტავას ქ. 9", lat: 41.7051, lng: 44.7896 });
         console.log("[startup] seeded CHIKA branch");
       }
 
