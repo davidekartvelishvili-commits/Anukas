@@ -15,7 +15,24 @@
       "Read(//c/Users/T0Y40RB0YS/desktop/cashbackapp/shansi-backend/**)",
       "Bash(grep -r \"NEXT_PUBLIC_API_URL\" /c/Users/T0Y40RB0YS/desktop/cashbackapp/.env* /c/Users/T0Y40RB0YS/desktop/cashbackapp/.vercel/)",
       "Bash(grep -r \"NEXT_PUBLIC_API_URL\" /c/Users/T0Y40RB0YS/desktop/cashbackapp/next.config*)",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Success:', d.get\\('success'\\)\\); print\\('Has token:', bool\\(d.get\\('token'\\)\\)\\)\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Success:', d.get\\('success'\\)\\); print\\('Has token:', bool\\(d.get\\('token'\\)\\)\\)\")",
+      "Bash(npx create-video@latest shansi-animation)",
+      "Bash(npx create-video@latest:*)",
+      "Bash(npm install:*)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(awk 'NR<213 || NR>405' /Users/david/CashbackApp/src/app/village/page.tsx)",
+      "Bash(mv /tmp/village_new.tsx /Users/david/CashbackApp/src/app/village/page.tsx)",
+      "Bash(ls /Users/david/Desktop/*rugby* /Users/david/Desktop/*Rugby*)",
+      "Bash(python3:*)",
+      "Bash(awk '/function loop\\\\\\(\\\\\\)/,/^    loop\\\\\\(\\\\\\);/' /Users/david/CashbackApp/src/app/games/lucky-drop/page.tsx)",
+      "Bash(ls shansi-backend/package*)",
+      "Bash(ls -la /Users/david/CashbackApp/.env*)",
+      "Bash(grep -n \"NEXT_PUBLIC_API_URL\" /Users/david/CashbackApp/src/**/*.ts*)",
+      "Bash(git -C /Users/david/CashbackApp add shansi-backend/src/socket/gameLoop.ts)",
+      "Bash(git -C /Users/david/CashbackApp commit -m ' *)",
+      "Bash(git -C /Users/david/CashbackApp push)",
+      "Bash(ffmpeg -y -f lavfi -i \"anullsrc=r=44100:cl=mono\" -t 1 -b:a 32k /Users/david/CashbackApp/public/audio/clouds_whoosh.mp3)",
+      "Bash(ffmpeg -y -f lavfi -i \"anullsrc=r=44100:cl=mono\" -t 1 -b:a 32k /Users/david/CashbackApp/public/audio/wood_burn.mp3)"
     ]
   }
 }
