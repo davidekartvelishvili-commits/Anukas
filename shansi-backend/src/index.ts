@@ -17,7 +17,7 @@ import { AppError } from "./utils/errors.js";
 import { getEnv } from "./utils/env.js";
 import { getDb } from "./db/client.js";
 import { merchants, merchantBranches, merchantReviews, merchantProducts, users } from "./db/schema.js";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
 // Run schema migrations at startup so newly added columns/tables exist
