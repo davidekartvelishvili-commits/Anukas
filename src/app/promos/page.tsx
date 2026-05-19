@@ -175,7 +175,7 @@ export default function PromosPage() {
   const [flashDealsAll, setFlashDealsAll] = useState<Deal[]>([]);
   const [partnerPromos, setPartnerPromos] = useState<Partner[]>([]);
   const [recentWins, setRecentWins] = useState<Win[]>([]);
-  const [partnerMerchants, setPartnerMerchants] = useState<{ id: string; businessName: string; businessNameKa: string | null; category: string; logoUrl: string | null; rating?: number; products?: { id: string; name: string; price: number; imageUrl: string | null; sortOrder?: number }[] }[]>([]);
+  const [partnerMerchants, setPartnerMerchants] = useState<{ id: string; businessName: string; businessNameKa: string | null; category: string; logoUrl: string | null; rating?: number; address?: string | null; products?: { id: string; name: string; price: number; imageUrl: string | null; sortOrder?: number }[] }[]>([]);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
@@ -687,6 +687,21 @@ export default function PromosPage() {
                                   </svg>
                                   <span className="text-[12px] font-bold" style={{ color: "#F9E741", fontFamily: "var(--font-dm-sans)" }}>
                                     {m.rating.toFixed(1)}
+                                  </span>
+                                </>
+                              )}
+                              {m.address && (
+                                <>
+                                  <span className="text-[10px]" style={{ color: "#555" }}>·</span>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
+                                    <circle cx="12" cy="5" r="3" fill="#9CA3AF" />
+                                    <path d="M12 10v4" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
+                                    <path d="M12 14l-4 7" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
+                                    <path d="M12 14l4 7" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
+                                    <path d="M7 12l5 2 5-2" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                                  </svg>
+                                  <span className="text-[12px]" style={{ color: "#9CA3AF", fontFamily: "var(--font-dm-sans)" }}>
+                                    {m.address}
                                   </span>
                                 </>
                               )}
