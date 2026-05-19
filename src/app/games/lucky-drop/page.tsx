@@ -795,6 +795,7 @@ export default function LuckyDropPage() {
 
     // Fire API immediately (parallel — no queue)
     playGame("plinko", currentBet).then((serverResult: any) => {
+      console.log("[lucky-drop] serverResult:", { totalCoins: serverResult.totalCoins, coinsRemaining: serverResult.coinsRemaining, totalWin: serverResult.totalWin });
       // Use totalCoins (sum of all active transactions) if available, fallback to coinsRemaining
       const serverCoins = serverResult.totalCoins ?? serverResult.coinsRemaining;
       // Always keep the LOWEST server balance (most up-to-date after all deductions)
@@ -1100,8 +1101,9 @@ export default function LuckyDropPage() {
           setAttackCards(0);
           // Refresh coin balance
           ensureActiveTransaction().then((tx) => {
-            setBalance(tx.coinsRemaining);
-            storeCoin(tx.coinsRemaining);
+            const coins = tx.totalCoins ?? tx.coinsRemaining;
+            setBalance(coins);
+            storeCoin(coins);
           }).catch(() => {});
           // Continue any remaining queued animations
           playNextAnim();

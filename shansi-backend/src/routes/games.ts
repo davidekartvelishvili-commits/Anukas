@@ -233,10 +233,14 @@ games.get("/active-transaction", async (c) => {
     return c.json({ success: true, hasActiveTransaction: false, coinsRemaining: 0, totalCashWon: 0, guaranteedMinimum: 0, isBonusRound: false, paymentAmount: 0 });
   }
 
+  // Sum coins across ALL active transactions
+  const totalCoins = activeTxList.reduce((sum, t) => sum + (t.coinsRemaining || 0), 0);
+
   return c.json({
     success: true,
     hasActiveTransaction: true,
     coinsRemaining: activeTx.coinsRemaining,
+    totalCoins,
     totalCashWon: activeTx.totalCashWon,
     guaranteedMinimum: activeTx.guaranteedMinimum,
     isBonusRound: activeTx.status === "bonus_round",
