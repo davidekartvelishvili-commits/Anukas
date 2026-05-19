@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { referralConfig, systemConfig, tickets, gameHistory, users, pageViews, merchants, merchantProducts, merchantBranches } from "../db/schema.js";
+import { referralConfig, systemConfig, tickets, gameHistory, users, pageViews, merchants, merchantProducts, merchantBranches, merchantReviews } from "../db/schema.js";
 import { nanoid } from "nanoid";
 import { desc, and, gt, sql } from "drizzle-orm";
 
@@ -62,6 +62,28 @@ publicRoute.get("/partner-merchants", async (c) => {
   }));
 
   return c.json({ success: true, merchants: enriched });
+});
+
+// GET /public/merchants/:id — merchant detail with products, branches, reviews
+publicRoute.get("/merchants/:id", async (c) => {
+  const id = c.req.param("id") as string;
+  const db = getDb();
+  const [merchant] = await db.select().from(merchants).where(eq(merchants.id, id)).limit(1);
+  if (!merchant) return c.json({ success: false, message: "Not found" }, 404);
+
+  const products = await db.select().from(merchantProducts).where(and(eq(merchantProducts.merchantId, id), eq(merchantProducts.isActive, true))).orderBy(merchantProducts.sortOrder);
+  const branches = await db.select().from(merchantBranches).where(eq(merchantBranches.merchantId, id));
+  const reviews = await db.select({
+    id: merchantReviews.id,
+    rating: merchantReviews.rating,
+    comment: merchantReviews.comment,
+    createdAt: merchantReviews.createdAt,
+    userName: users.name,
+  }).from(merchantReviews).innerJoin(users, eq(merchantReviews.userId, users.id)).where(eq(merchantReviews.merchantId, id)).orderBy(desc(merchantReviews.createdAt)).limit(50);
+
+  const avgRating = reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
+
+  return c.json({ success: true, merchant: { ...merchant, avgRating, reviewCount: reviews.length }, products, branches, reviews });
 });
 
 // GET /public/tickets — active tickets for home page strip

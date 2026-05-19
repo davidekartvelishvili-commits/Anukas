@@ -3,7 +3,7 @@ import { z } from "zod";
 import { eq, and, or, desc, sql } from "drizzle-orm";
 import type { AppEnv } from "../types.js";
 import { getDb } from "../db/client.js";
-import { users, transactions, referrals, referralConfig, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, gameConfig, gameHistory, promoCodeUses, promoCodes, tickets, userTickets } from "../db/schema.js";
+import { users, transactions, referrals, referralConfig, merchants, paymentTransactions, withdrawals, systemConfig, pendingPayments, gameConfig, gameHistory, promoCodeUses, promoCodes, tickets, userTickets, merchantReviews } from "../db/schema.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { BadRequestError } from "../utils/errors.js";
 import { nanoid } from "nanoid";
@@ -474,6 +474,70 @@ user.get("/tickets/my", async (c) => {
     };
   }));
   return c.json({ success: true, tickets: enriched });
+});
+
+// POST /user/merchants/:id/review — submit a review (one per payment transaction)
+user.post("/merchants/:id/review", authMiddleware, async (c) => {
+  const merchantId = c.req.param("id") as string;
+  const userId = c.get("userId") as string;
+  const body = await c.req.json();
+  const { rating, comment, payment_transaction_id } = body;
+
+  if (!rating || rating < 1 || rating > 5) throw new BadRequestError("რეიტინგი უნდა იყოს 1-5");
+  if (!payment_transaction_id) throw new BadRequestError("გადახდა არ არის მითითებული");
+
+  const db = getDb();
+
+  // Verify the payment transaction belongs to this user and merchant
+  const [tx] = await db.select().from(paymentTransactions)
+    .where(and(
+      eq(paymentTransactions.id, payment_transaction_id),
+      eq(paymentTransactions.userId, userId),
+      eq(paymentTransactions.merchantId, merchantId),
+    )).limit(1);
+
+  if (!tx) throw new BadRequestError("ეს გადახდა ვერ მოიძებნა");
+
+  // Check if review already exists for this transaction
+  const [existing] = await db.select().from(merchantReviews)
+    .where(eq(merchantReviews.paymentTransactionId, payment_transaction_id)).limit(1);
+
+  if (existing) throw new BadRequestError("ამ გადახდაზე უკვე დატოვეთ შეფასება");
+
+  const id = nanoid();
+  await db.insert(merchantReviews).values({
+    id, merchantId, userId, paymentTransactionId: payment_transaction_id,
+    rating: Math.round(rating), comment: comment || null,
+  });
+
+  // Update merchant average rating
+  const allReviews = await db.select({ rating: merchantReviews.rating }).from(merchantReviews).where(eq(merchantReviews.merchantId, merchantId));
+  const avg = allReviews.reduce((s, r) => s + r.rating, 0) / allReviews.length;
+  await db.update(merchants).set({ rating: Math.round(avg * 10) / 10 }).where(eq(merchants.id, merchantId));
+
+  return c.json({ success: true, message: "შეფასება დატოვებულია" });
+});
+
+// GET /user/merchants/:id/can-review — check which transactions can be reviewed
+user.get("/merchants/:id/can-review", authMiddleware, async (c) => {
+  const merchantId = c.req.param("id") as string;
+  const userId = c.get("userId") as string;
+  const db = getDb();
+
+  // Get all user's completed payments at this merchant
+  const payments = await db.select({ id: paymentTransactions.id, amount: paymentTransactions.amount, createdAt: paymentTransactions.createdAt })
+    .from(paymentTransactions)
+    .where(and(eq(paymentTransactions.userId, userId), eq(paymentTransactions.merchantId, merchantId), eq(paymentTransactions.status, "completed")))
+    .orderBy(desc(paymentTransactions.createdAt));
+
+  // Get already reviewed transaction IDs
+  const reviewed = await db.select({ txId: merchantReviews.paymentTransactionId })
+    .from(merchantReviews).where(eq(merchantReviews.userId, userId));
+  const reviewedIds = new Set(reviewed.map(r => r.txId));
+
+  const unreviewedPayments = payments.filter(p => !reviewedIds.has(p.id));
+
+  return c.json({ success: true, canReview: unreviewedPayments.length > 0, unreviewedPayments });
 });
 
 export default user;

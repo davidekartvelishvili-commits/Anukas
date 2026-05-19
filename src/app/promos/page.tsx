@@ -690,7 +690,7 @@ export default function PromosPage() {
                     return (
                       <div key={m.id}>
                         {/* Header: logo + name + arrow — no card background */}
-                        <div className="flex items-center gap-3 mb-3 cursor-pointer active:opacity-70 transition-opacity">
+                        <div className="flex items-center gap-3 mb-3 cursor-pointer active:opacity-70 transition-opacity" onClick={() => router.push(`/place/${m.id}`)}>
                           <div
                             className="w-[44px] h-[44px] rounded-[12px] overflow-hidden flex items-center justify-center shrink-0"
                             style={{ background: m.logoUrl ? "#FFFFFF" : bg.bgColor }}

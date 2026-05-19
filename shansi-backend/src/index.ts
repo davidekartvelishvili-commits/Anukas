@@ -51,6 +51,15 @@ async function runStartupMigrations() {
     sql`ALTER TABLE merchants ADD COLUMN logo_url TEXT`,
     sql`ALTER TABLE merchants ADD COLUMN show_on_promos INTEGER NOT NULL DEFAULT 0`,
     sql`ALTER TABLE merchants ADD COLUMN rating REAL DEFAULT 0`,
+    sql`CREATE TABLE IF NOT EXISTS merchant_reviews (
+      id TEXT PRIMARY KEY,
+      merchant_id TEXT NOT NULL REFERENCES merchants(id),
+      user_id TEXT NOT NULL REFERENCES users(id),
+      payment_transaction_id TEXT NOT NULL,
+      rating INTEGER NOT NULL,
+      comment TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     sql`CREATE TABLE IF NOT EXISTS merchant_branches (
       id TEXT PRIMARY KEY,
       merchant_id TEXT NOT NULL REFERENCES merchants(id),

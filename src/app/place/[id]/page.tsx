@@ -1,513 +1,407 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Icon from "@/components/Icon";
+import { useRouter, useParams } from "next/navigation";
+import AuthGuard from "@/components/AuthGuard";
+import { apiFetch } from "@/services/api";
 
-/* ───────── SVG ICONS ───────── */
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const toRad = (d: number) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
-function HeartIcon({ filled, size = 20 }: { filled: boolean; size?: number }) {
+function formatDistance(meters: number): string {
+  if (meters >= 1000) return `${(meters / 1000).toFixed(1)} კმ`;
+  return `${Math.round(meters)} მ`;
+}
+
+function StarRating({ rating, size = 16 }: { rating: number; size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill={filled ? "#FF5757" : "none"} stroke={filled ? "#FF5757" : "#F1F5F9"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M10 17.5s-7-4.5-7-9a4 4 0 017-2.5 4 4 0 017 2.5c0 4.5-7 9-7 9z" />
-    </svg>
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <svg key={i} width={size} height={size} viewBox="0 0 24 24" fill={i <= rating ? "#F9E741" : "#333"} stroke="none">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+        </svg>
+      ))}
+    </div>
   );
 }
 
-function ShareIcon({ color = "#F1F5F9", size = 18 }: { color?: string; size?: number }) {
+function InteractiveStarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="13" cy="4" r="2.5" />
-      <circle cx="5" cy="9" r="2.5" />
-      <circle cx="13" cy="14" r="2.5" />
-      <path d="M7.3 10.2l3.4 2.6M10.7 5.2L7.3 7.8" />
-    </svg>
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <button key={i} onClick={() => onChange(i)} className="transition-transform active:scale-110">
+          <svg width={32} height={32} viewBox="0 0 24 24" fill={i <= value ? "#F9E741" : "#333"} stroke="none">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+          </svg>
+        </button>
+      ))}
+    </div>
   );
 }
 
-function PhoneIcon({ color = "#00E88F", size = 16 }: { color?: string; size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 2.5H4.5A1.5 1.5 0 003 4v8a1.5 1.5 0 001.5 1.5h7A1.5 1.5 0 0013 12V4a1.5 1.5 0 00-1.5-1.5H10" />
-      <path d="M6 2.5h4v1.5a.5.5 0 01-.5.5h-3a.5.5 0 01-.5-.5V2.5z" />
-      <circle cx="8" cy="11" r="0.5" fill={color} />
-    </svg>
-  );
-}
-
-function MapPinIcon({ color = "#3B82F6" }: { color?: string }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.3" strokeLinecap="round">
-      <path d="M8 1.5C5.8 1.5 4 3.3 4 5.5 4 8.5 8 14 8 14s4-5.5 4-8.5C12 3.3 10.2 1.5 8 1.5z" />
-      <circle cx="8" cy="5.5" r="1.5" />
-    </svg>
-  );
-}
-
-function ClockIcon({ color = "#FFB800" }: { color?: string }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.3" strokeLinecap="round">
-      <circle cx="8" cy="8" r="5.5" />
-      <path d="M8 5v3l2 2" />
-    </svg>
-  );
-}
-
-function UsersIcon({ color = "#94A3B8" }: { color?: string }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.3" strokeLinecap="round">
-      <circle cx="6" cy="5" r="2.5" />
-      <path d="M1 14c0-2.76 2.24-5 5-5s5 2.24 5 5" />
-      <circle cx="12" cy="5.5" r="2" />
-      <path d="M15 14a4 4 0 00-3-3.87" />
-    </svg>
-  );
-}
-
-function MenuIcon({ color = "#00E88F" }: { color?: string }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round">
-      <path d="M3 5h12M3 9h8M3 13h10" />
-    </svg>
-  );
-}
-
-function NavigateIcon({ color = "#3B82F6" }: { color?: string }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 6l5-4 5 4M8 2v10" />
-      <circle cx="8" cy="13.5" r="1" fill={color} />
-    </svg>
-  );
-}
-
-function CrownSmallIcon({ color = "#FFD700" }: { color?: string }) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <path d="M1.5 10l1.5-5 3 2.5L7 2l1 5.5 3-2.5 1.5 5H1.5z" fill={color} fillOpacity="0.3" stroke={color} strokeWidth="1" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function StarFull({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 14 14" fill="#FFB800">
-      <path d="M7 1l1.8 3.6 4 .6-2.9 2.8.7 4L7 10.3 3.4 12l.7-4L1.2 5.2l4-.6L7 1z" />
-    </svg>
-  );
-}
-
-function StarHalf({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 14 14">
-      <defs>
-        <linearGradient id="halfStar">
-          <stop offset="50%" stopColor="#FFB800" />
-          <stop offset="50%" stopColor="#1C2539" />
-        </linearGradient>
-      </defs>
-      <path d="M7 1l1.8 3.6 4 .6-2.9 2.8.7 4L7 10.3 3.4 12l.7-4L1.2 5.2l4-.6L7 1z" fill="url(#halfStar)" stroke="#FFB800" strokeWidth="0.5" />
-    </svg>
-  );
-}
-
-function StarEmpty({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 14 14" fill="#1C2539" stroke="#475569" strokeWidth="0.8">
-      <path d="M7 1l1.8 3.6 4 .6-2.9 2.8.7 4L7 10.3 3.4 12l.7-4L1.2 5.2l4-.6L7 1z" />
-    </svg>
-  );
-}
-
-function Spinner() {
-  return (
-    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-    </svg>
-  );
-}
-
-/* ───────── COMPONENTS ───────── */
-
-function RatingStars({ rating }: { rating: number }) {
-  const stars = [];
-  for (let i = 1; i <= 5; i++) {
-    if (rating >= i) stars.push(<StarFull key={i} />);
-    else if (rating >= i - 0.5) stars.push(<StarHalf key={i} />);
-    else stars.push(<StarEmpty key={i} />);
-  }
-  return <div className="flex items-center gap-0.5">{stars}</div>;
-}
-
-/* ───────── MOCK DATA ───────── */
-
-const PLACE = {
-  id: 1,
-  name: "Stamba Café",
-  category: "კაფე",
-  color: "#1A3A2E",
-  address: "მერაბ კოსტავას 14, თბილისი",
-  hours: "09:00 — 00:00",
-  phone: "+995 32 202 0101",
-  distance: "600მ",
-  chance: 75,
-  rating: 4.6,
-  reviewCount: 234,
-  isOpen: true,
-  checkins: 1847,
-  description: "Stamba Hotel-ის ქვედა სართულზე მდებარე კაფე, რომელიც ცნობილია უნიკალური ინტერიერით, ხარისხიანი ყავით და სპეციალური სეზონური მენიუთი. იდეალური ადგილი როგორც საქმიანი შეხვედრებისთვის, ასევე მეგობრებთან დასასვენებლად.",
-  tags: ["ყავა", "ბრანჩი", "დესერტი", "Wi-Fi", "ტერასა", "ბარი"],
-  level: 2,
-  levelName: "ვერცხლი",
-  levelColor: "#A8A9AD",
-};
-
-interface MenuItem {
-  id: number;
-  name: string;
-  category: string;
-  price: number;
-  popular: boolean;
-}
-
-const MENU_CATEGORIES = ["ყველა", "ყავა", "საუზმე", "დესერტი", "სასმელი"];
-
-const MENU: MenuItem[] = [
-  { id: 1, name: "კაპუჩინო", category: "ყავა", price: 8.50, popular: true },
-  { id: 2, name: "ესპრესო", category: "ყავა", price: 5.00, popular: false },
-  { id: 3, name: "ლატე", category: "ყავა", price: 9.00, popular: false },
-  { id: 4, name: "ავოკადო ტოსტი", category: "საუზმე", price: 14.50, popular: true },
-  { id: 5, name: "გრანოლა ბოულ", category: "საუზმე", price: 12.00, popular: false },
-  { id: 6, name: "ჩიზქეიქი", category: "დესერტი", price: 11.00, popular: true },
-  { id: 7, name: "ტირამისუ", category: "დესერტი", price: 13.50, popular: false },
-  { id: 8, name: "ლემონეიდი", category: "სასმელი", price: 7.00, popular: false },
-];
-
-const RECENT_WINS = [
-  { id: 1, name: "ნინო მ.", percent: 80, jackpot: false, time: "14 წთ წინ" },
-  { id: 2, name: "დავით კ.", percent: 100, jackpot: true, time: "1 სთ წინ" },
-  { id: 3, name: "მარიამ ბ.", percent: 45, jackpot: false, time: "2 სთ წინ" },
-  { id: 4, name: "გიორგი ლ.", percent: 20, jackpot: false, time: "3 სთ წინ" },
-];
-
-/* ───────── MAIN ───────── */
-
-export default function PlacePage() {
+export default function MerchantDetailPage() {
   const router = useRouter();
-  const [liked, setLiked] = useState(false);
-  const [menuCat, setMenuCat] = useState("ყველა");
-  const [checkinState, setCheckinState] = useState<"idle" | "loading" | "success">("idle");
-  const [visible, setVisible] = useState(false);
+  const params = useParams();
+  const merchantId = params.id as string;
+
+  const [merchant, setMerchant] = useState<any>(null);
+  const [products, setProducts] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
+  const [nearestDist, setNearestDist] = useState<string | null>(null);
+
+  // Review form
+  const [canReview, setCanReview] = useState(false);
+  const [unreviewedPayments, setUnreviewedPayments] = useState<any[]>([]);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [selectedTxId, setSelectedTxId] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setVisible(true), 50);
-    return () => clearTimeout(t);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {}, { enableHighAccuracy: false, timeout: 5000 }
+      );
+    }
   }, []);
 
-  const filteredMenu = menuCat === "ყველა" ? MENU : MENU.filter((m) => m.category === menuCat);
+  useEffect(() => {
+    if (!merchantId) return;
+    (async () => {
+      try {
+        const data = await apiFetch<any>(`/public/merchants/${merchantId}`);
+        if (data.success) {
+          setMerchant(data.merchant);
+          setProducts(data.products || []);
+          setBranches(data.branches || []);
+          setReviews(data.reviews || []);
+        }
+      } catch {}
+      finally { setLoading(false); }
+    })();
 
-  const handleCheckin = () => {
-    setCheckinState("loading");
-    setTimeout(() => {
-      setCheckinState("success");
-      // Navigate to spin game after success
-      setTimeout(() => router.push("/game?spin=new"), 1200);
-    }, 1500);
+    // Check if user can review
+    apiFetch<any>(`/user/merchants/${merchantId}/can-review`).then((data) => {
+      if (data.success) {
+        setCanReview(data.canReview);
+        setUnreviewedPayments(data.unreviewedPayments || []);
+        if (data.unreviewedPayments?.length > 0) setSelectedTxId(data.unreviewedPayments[0].id);
+      }
+    }).catch(() => {});
+  }, [merchantId]);
+
+  // Calculate nearest branch distance
+  useEffect(() => {
+    if (!userLoc || branches.length === 0) return;
+    let min = Infinity;
+    for (const b of branches) {
+      const d = haversineDistance(userLoc.lat, userLoc.lng, b.lat, b.lng);
+      if (d < min) min = d;
+    }
+    setNearestDist(formatDistance(min));
+  }, [userLoc, branches]);
+
+  const submitReview = async () => {
+    if (!reviewRating || !selectedTxId) return;
+    setSubmittingReview(true);
+    try {
+      const res = await apiFetch<any>(`/user/merchants/${merchantId}/review`, {
+        method: "POST",
+        body: JSON.stringify({ rating: reviewRating, comment: reviewComment, payment_transaction_id: selectedTxId }),
+      });
+      if (res.success) {
+        setShowReviewForm(false);
+        setReviewRating(0);
+        setReviewComment("");
+        // Refresh
+        const data = await apiFetch<any>(`/public/merchants/${merchantId}`);
+        if (data.success) {
+          setMerchant(data.merchant);
+          setReviews(data.reviews || []);
+        }
+        const canData = await apiFetch<any>(`/user/merchants/${merchantId}/can-review`);
+        if (canData.success) {
+          setCanReview(canData.canReview);
+          setUnreviewedPayments(canData.unreviewedPayments || []);
+        }
+      }
+    } catch (e: any) {
+      alert(e.message || "შეცდომა");
+    }
+    finally { setSubmittingReview(false); }
   };
 
-  const stagger = (i: number) => ({
-    opacity: visible ? 1 : 0,
-    transform: visible ? "translateY(0)" : "translateY(20px)",
-    transition: `all 0.45s ease-out ${i * 0.08}s`,
-  });
+  if (loading) return (
+    <div className="min-h-[100dvh] bg-black flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-[#F9E741] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (!merchant) return (
+    <div className="min-h-[100dvh] bg-black flex items-center justify-center">
+      <p className="text-white">მერჩანტი ვერ მოიძებნა</p>
+    </div>
+  );
+
+  const bigProducts = products.filter(p => p.sortOrder === 0 || p.sortOrder === undefined || p.sortOrder === null);
+  const heroProduct = bigProducts[0];
 
   return (
-    <main className="min-h-[100dvh] bg-[#0A0F1C] pb-[100px]">
+    <AuthGuard>
+      <style>{`html, body { background: #000 !important; }`}</style>
+      <main className="min-h-[100dvh] bg-black pb-24">
+        {/* Hero */}
+        <div className="relative w-full" style={{ height: 280 }}>
+          {heroProduct?.imageUrl ? (
+            <img src={heroProduct.imageUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full" style={{ background: "linear-gradient(135deg, #1C1C1E 0%, #2A2A2E 100%)" }} />
+          )}
+          <div className="absolute inset-0" style={{ background: "linear-gradient(transparent 40%, rgba(0,0,0,0.9) 100%)" }} />
 
-      {/* ══════ HERO ══════ */}
-      <div className="relative h-[220px] overflow-hidden">
-        {/* Background color */}
-        <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${PLACE.color}, ${PLACE.color}CC)` }} />
-        {/* Gradient overlay */}
-        <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(10,15,28,0.6) 0%, transparent 40%, transparent 60%, rgba(10,15,28,0.85) 100%)" }} />
-
-        {/* Top bar */}
-        <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 z-10" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" }}>
-          <button onClick={() => router.back()} className="w-[38px] h-[38px] rounded-[12px] flex items-center justify-center backdrop-blur-md transition-all duration-200 active:scale-95" style={{ background: "rgba(10,15,28,0.5)" }}>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#F1F5F9" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4L6 9l5 5" /></svg>
+          {/* Back button */}
+          <button
+            onClick={() => router.back()}
+            className="absolute top-[calc(env(safe-area-inset-top,0px)+12px)] left-4 w-[40px] h-[40px] rounded-full flex items-center justify-center"
+            style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(10px)" }}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#FFF" strokeWidth="2" strokeLinecap="round"><path d="M13 4l-6 6 6 6" /></svg>
           </button>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setLiked(!liked)} className="w-[38px] h-[38px] rounded-[12px] flex items-center justify-center backdrop-blur-md transition-all duration-200 active:scale-95" style={{ background: "rgba(10,15,28,0.5)" }}>
-              <HeartIcon filled={liked} />
-            </button>
-            <button className="w-[38px] h-[38px] rounded-[12px] flex items-center justify-center backdrop-blur-md transition-all duration-200 active:scale-95" style={{ background: "rgba(10,15,28,0.5)" }}>
-              <ShareIcon />
-            </button>
-          </div>
-        </div>
 
-        {/* Bottom info */}
-        <div className="absolute bottom-4 left-5 right-5 z-10">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold" style={{ fontFamily: "var(--font-dm-sans)", background: PLACE.isOpen ? "rgba(0,232,143,0.2)" : "rgba(255,87,87,0.2)", color: PLACE.isOpen ? "#00E88F" : "#FF5757", border: `1px solid ${PLACE.isOpen ? "rgba(0,232,143,0.3)" : "rgba(255,87,87,0.3)"}` }}>
-              {PLACE.isOpen ? "ღიაა" : "დაკეტილია"}
-            </span>
-            <span className="text-[12px] text-[#CBD5E1]" style={{ fontFamily: "var(--font-dm-sans)" }}>{PLACE.category}</span>
-          </div>
-          <h1 className="text-[26px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>{PLACE.name}</h1>
-        </div>
-      </div>
-
-      <div className="max-w-[430px] mx-auto px-5">
-
-        {/* ══════ STAT CARDS ══════ */}
-        <div className="grid grid-cols-3 gap-2 -mt-5 mb-5 relative z-10" style={stagger(0)}>
-          {/* Rating */}
-          <div className="rounded-[14px] p-3 flex flex-col items-center" style={{ background: "#141B2D", border: "1px solid #1C2539" }}>
-            <RatingStars rating={PLACE.rating} />
-            <span className="text-[18px] font-bold text-[#F1F5F9] mt-1.5" style={{ fontFamily: "var(--font-outfit)" }}>{PLACE.rating}</span>
-            <span className="text-[10px] text-[#475569] mt-0.5" style={{ fontFamily: "var(--font-dm-sans)" }}>{PLACE.reviewCount} შეფასება</span>
-          </div>
-
-          {/* Distance */}
-          <div className="rounded-[14px] p-3 flex flex-col items-center" style={{ background: "#141B2D", border: "1px solid #1C2539" }}>
-            <MapPinIcon color="#3B82F6" />
-            <span className="text-[18px] font-bold text-[#F1F5F9] mt-1.5" style={{ fontFamily: "var(--font-outfit)" }}>{PLACE.distance}</span>
-            <span className="text-[10px] text-[#475569] mt-0.5" style={{ fontFamily: "var(--font-dm-sans)" }}>მანძილი</span>
-          </div>
-
-          {/* Chance */}
-          <div className="rounded-[14px] p-3 flex flex-col items-center" style={{ background: "#0F2922", border: "1px solid rgba(0,232,143,0.12)" }}>
-            <Icon name="spin" size={16} color="#00E88F" />
-            <span className="text-[18px] font-bold text-[#00E88F] mt-1.5" style={{ fontFamily: "var(--font-outfit)" }}>{PLACE.chance}%</span>
-            <span className="text-[10px] text-[#475569] mt-0.5" style={{ fontFamily: "var(--font-dm-sans)" }}>ქეშბექის შანსი</span>
-          </div>
-        </div>
-
-        {/* ══════ LEVEL BONUS ══════ */}
-        <div className="flex items-center gap-3 p-3.5 rounded-[12px] mb-5" style={{ ...stagger(1), background: "#141B2D", border: "1px solid #1C2539" }}>
-          <div className="w-[32px] h-[32px] rounded-[10px] flex items-center justify-center shrink-0" style={{ background: `${PLACE.levelColor}20` }}>
-            <Icon name="flame" size={16} color={PLACE.levelColor} />
-          </div>
-          <p className="text-[13px] text-[#CBD5E1] leading-tight" style={{ fontFamily: "var(--font-dm-sans)" }}>
-            შენი <span style={{ color: PLACE.levelColor }} className="font-semibold">{PLACE.levelName}</span> ლეველით მოგების შანსი{" "}
-            <span className="text-[#00E88F] font-bold">{PLACE.chance}%</span>-ია
-          </p>
-        </div>
-
-        {/* ══════ DESCRIPTION ══════ */}
-        <p className="text-[14px] text-[#CBD5E1] leading-[1.6] mb-4" style={{ ...stagger(2), fontFamily: "var(--font-dm-sans)" }}>
-          {PLACE.description}
-        </p>
-
-        {/* ══════ TAGS ══════ */}
-        <div className="flex flex-wrap gap-2 mb-5" style={stagger(2)}>
-          {PLACE.tags.map((tag) => (
-            <span key={tag} className="px-3 py-1 rounded-full text-[12px] text-[#94A3B8] font-medium" style={{ fontFamily: "var(--font-dm-sans)", background: "#141B2D", border: "1px solid #1C2539" }}>
-              {tag}
-            </span>
-          ))}
-        </div>
-
-        {/* ══════ INFO ROWS ══════ */}
-        <div className="rounded-[16px] overflow-hidden mb-5" style={{ ...stagger(3), background: "#141B2D", border: "1px solid #1C2539" }}>
-          {/* Address */}
-          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid #1C2539" }}>
-            <div className="flex items-center gap-3">
-              <div className="w-[32px] h-[32px] rounded-[8px] flex items-center justify-center shrink-0" style={{ background: "rgba(59,130,246,0.1)" }}>
-                <MapPinIcon />
-              </div>
-              <span className="text-[14px] text-[#CBD5E1]" style={{ fontFamily: "var(--font-dm-sans)" }}>{PLACE.address}</span>
-            </div>
-            <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(PLACE.address)}`} target="_blank" rel="noopener noreferrer" className="text-[12px] text-[#3B82F6] font-semibold hover:underline shrink-0 ml-2" style={{ fontFamily: "var(--font-dm-sans)" }}>რუკა</a>
-          </div>
-
-          {/* Hours */}
-          <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: "1px solid #1C2539" }}>
-            <div className="w-[32px] h-[32px] rounded-[8px] flex items-center justify-center shrink-0" style={{ background: "rgba(255,184,0,0.1)" }}>
-              <ClockIcon />
-            </div>
-            <span className="text-[14px] text-[#CBD5E1]" style={{ fontFamily: "var(--font-dm-sans)" }}>{PLACE.hours}</span>
-          </div>
-
-          {/* Phone */}
-          <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: "1px solid #1C2539" }}>
-            <div className="w-[32px] h-[32px] rounded-[8px] flex items-center justify-center shrink-0" style={{ background: "rgba(0,232,143,0.1)" }}>
-              <PhoneIcon />
-            </div>
-            <span className="text-[14px] text-[#CBD5E1]" style={{ fontFamily: "var(--font-dm-sans)" }}>{PLACE.phone}</span>
-          </div>
-
-          {/* Check-ins */}
-          <div className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="w-[32px] h-[32px] rounded-[8px] flex items-center justify-center shrink-0" style={{ background: "rgba(148,163,184,0.1)" }}>
-                <UsersIcon />
-              </div>
-              <span className="text-[14px] text-[#CBD5E1]" style={{ fontFamily: "var(--font-dm-sans)" }}>ჩეკინი</span>
-            </div>
-            <span className="text-[14px] text-[#94A3B8] font-semibold" style={{ fontFamily: "var(--font-outfit)" }}>{PLACE.checkins.toLocaleString()}</span>
-          </div>
-        </div>
-
-        {/* ══════ ACTION BUTTONS ══════ */}
-        <div className="grid grid-cols-3 gap-2.5 mb-6" style={stagger(4)}>
-          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(PLACE.address)}`} target="_blank" rel="noopener noreferrer" className="h-[44px] rounded-[12px] flex items-center justify-center gap-1.5 text-[13px] font-semibold text-[#3B82F6] transition-all duration-200 active:scale-95" style={{ fontFamily: "var(--font-dm-sans)", background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)" }}>
-            <NavigateIcon />
-            მისვლა
-          </a>
-          <a href={`tel:${PLACE.phone.replace(/\s/g, "")}`} className="h-[44px] rounded-[12px] flex items-center justify-center gap-1.5 text-[13px] font-semibold text-[#94A3B8] transition-all duration-200 active:scale-95" style={{ fontFamily: "var(--font-dm-sans)", background: "#141B2D", border: "1px solid #1C2539" }}>
-            <PhoneIcon color="#94A3B8" />
-            დარეკვა
-          </a>
-          <button onClick={() => { if (navigator.share) navigator.share({ title: PLACE.name, text: PLACE.description, url: window.location.href }); }} className="h-[44px] rounded-[12px] flex items-center justify-center gap-1.5 text-[13px] font-semibold text-[#94A3B8] transition-all duration-200 active:scale-95" style={{ fontFamily: "var(--font-dm-sans)", background: "#141B2D", border: "1px solid #1C2539" }}>
-            <ShareIcon color="#94A3B8" size={14} />
-            გაზიარება
-          </button>
-        </div>
-
-        {/* ══════ MENU ══════ */}
-        <div className="mb-6" style={stagger(5)}>
-          <div className="flex items-center gap-2 mb-3">
-            <MenuIcon />
-            <span className="text-[16px] text-[#F1F5F9] font-semibold" style={{ fontFamily: "var(--font-outfit)" }}>მენიუ</span>
-          </div>
-
-          {/* Category pills */}
-          <div className="flex gap-2 overflow-x-auto pb-1 mb-3 scrollbar-hide">
-            {MENU_CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setMenuCat(cat)}
-                className="shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-all duration-200 active:scale-95"
-                style={{
-                  fontFamily: "var(--font-dm-sans)",
-                  background: menuCat === cat ? "#00E88F" : "#141B2D",
-                  color: menuCat === cat ? "#0A0F1C" : "#94A3B8",
-                  border: `1px solid ${menuCat === cat ? "#00E88F" : "#1C2539"}`,
-                }}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          {/* Menu items */}
-          <div className="flex flex-col gap-2">
-            {filteredMenu.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between p-3 rounded-[12px]"
-                style={{ background: "#141B2D", border: "1px solid #1C2539" }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-[36px] h-[36px] rounded-[10px] flex items-center justify-center shrink-0" style={{ background: "rgba(0,232,143,0.08)" }}>
-                    <span className="text-[14px] font-bold text-[#00E88F]" style={{ fontFamily: "var(--font-outfit)" }}>
-                      {item.name[0]}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[14px] text-[#F1F5F9] font-medium" style={{ fontFamily: "var(--font-dm-sans)" }}>{item.name}</span>
-                      {item.popular && (
-                        <span className="px-1.5 py-px rounded-[4px] text-[9px] font-bold text-[#FFD700]" style={{ fontFamily: "var(--font-outfit)", background: "rgba(255,215,0,0.15)" }}>
-                          TOP
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[11px] text-[#475569]" style={{ fontFamily: "var(--font-dm-sans)" }}>{item.category}</span>
-                  </div>
-                </div>
-                <span className="text-[15px] font-bold text-[#F1F5F9]" style={{ fontFamily: "var(--font-outfit)" }}>
-                  {item.price.toFixed(2)}₾
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ══════ RECENT WINS ══════ */}
-        <div className="mb-6" style={stagger(6)}>
-          <div className="flex items-center gap-2 mb-3">
-            <Icon name="spin" size={18} color="#FFB800" />
-            <span className="text-[16px] text-[#F1F5F9] font-semibold" style={{ fontFamily: "var(--font-outfit)" }}>ბოლო მოგებები აქ</span>
-          </div>
-
-          <div className="rounded-[16px] overflow-hidden" style={{ background: "#141B2D", border: "1px solid #1C2539" }}>
-            {RECENT_WINS.map((win, i) => (
-              <div
-                key={win.id}
-                className="flex items-center justify-between px-4 py-3"
-                style={{ borderBottom: i < RECENT_WINS.length - 1 ? "1px solid #1C2539" : "none" }}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-[28px] h-[28px] rounded-[8px] flex items-center justify-center" style={{ background: win.jackpot ? "rgba(255,215,0,0.1)" : "rgba(0,232,143,0.08)" }}>
-                    {win.jackpot ? <CrownSmallIcon /> : <Icon name="check" size={14} color="#00E88F" />}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[14px] text-[#F1F5F9] font-medium" style={{ fontFamily: "var(--font-dm-sans)" }}>{win.name}</span>
-                      {win.jackpot && (
-                        <span className="px-1.5 py-px rounded-[4px] text-[9px] font-bold text-[#FFD700]" style={{ fontFamily: "var(--font-outfit)", background: "rgba(255,215,0,0.15)" }}>
-                          JACKPOT
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[11px] text-[#475569]" style={{ fontFamily: "var(--font-dm-sans)" }}>{win.time}</span>
-                  </div>
-                </div>
-                <span className="text-[14px] font-bold" style={{ fontFamily: "var(--font-outfit)", color: win.jackpot ? "#FFD700" : "#00E88F" }}>
-                  {win.percent}%
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ══════ FIXED BOTTOM CHECK-IN ══════ */}
-      <div className="fixed bottom-0 left-0 right-0 z-50">
-        <div className="h-[24px]" style={{ background: "linear-gradient(to bottom, transparent, #0A0F1C)" }} />
-        <div className="bg-[#0A0F1C] px-5 pb-[max(16px,env(safe-area-inset-bottom,16px))]">
-          <div className="max-w-[430px] mx-auto">
-            {checkinState === "success" ? (
-              <div
-                className="w-full h-[56px] rounded-[16px] flex items-center justify-center gap-2.5"
-                style={{ background: "rgba(0,232,143,0.08)", border: "1px solid rgba(0,232,143,0.2)" }}
-              >
-                <div className="animate-checkinSuccess">
-                  <Icon name="check" size={22} color="#00E88F" />
-                </div>
-                <span className="text-[16px] font-bold text-[#00E88F]" style={{ fontFamily: "var(--font-outfit)" }}>
-                  ჩეკინი წარმატებულია
-                </span>
-              </div>
+          {/* Logo floating over hero */}
+          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-[80px] h-[80px] rounded-[20px] overflow-hidden shadow-xl" style={{ background: "#FFF", border: "3px solid #000" }}>
+            {merchant.logoUrl ? (
+              <img src={merchant.logoUrl} alt="" className="w-full h-full object-cover" />
             ) : (
-              <button
-                onClick={handleCheckin}
-                disabled={checkinState === "loading"}
-                className={`w-full h-[56px] rounded-[16px] text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.97] ${checkinState === "idle" ? "animate-checkinPulse" : ""}`}
-                style={{
-                  fontFamily: "var(--font-outfit)",
-                  background: "linear-gradient(135deg, #00E88F, #00C777)",
-                  color: "#0A0F1C",
-                  boxShadow: "0 4px 24px rgba(0,232,143,0.35)",
-                }}
-              >
-                {checkinState === "loading" ? (
-                  <Spinner />
-                ) : (
-                  <>
-                    <Icon name="scan" size={20} color="#0A0F1C" />
-                    ჩეკინი — მოიგე {PLACE.chance}%-მდე
-                  </>
-                )}
-              </button>
+              <div className="w-full h-full flex items-center justify-center" style={{ background: "#F9E741" }}>
+                <span className="text-[28px] font-bold" style={{ color: "#000" }}>{merchant.businessName.charAt(0)}</span>
+              </div>
             )}
           </div>
         </div>
-      </div>
-    </main>
+
+        <div className="max-w-[430px] mx-auto px-4">
+          {/* Merchant info */}
+          <div className="text-center mt-14 mb-6">
+            <h1 className="text-white text-[24px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
+              {merchant.businessName}
+            </h1>
+            {merchant.businessNameKa && (
+              <p className="text-[14px] mt-1" style={{ color: "#9CA3AF", fontFamily: "var(--font-dm-sans)" }}>
+                {merchant.businessNameKa}
+              </p>
+            )}
+
+            {/* Stats row */}
+            <div className="flex items-center justify-center gap-3 mt-3 flex-wrap">
+              {(merchant.avgRating > 0 || merchant.rating > 0) && (
+                <div className="flex items-center gap-1.5">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" fill="#F9E741" />
+                    <circle cx="8.5" cy="10" r="1.2" fill="#1A1A1A" />
+                    <circle cx="15.5" cy="10" r="1.2" fill="#1A1A1A" />
+                    <path d="M8 15c1.5 2 6.5 2 8 0" stroke="#1A1A1A" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                  </svg>
+                  <span className="text-[14px] font-bold" style={{ color: "#F9E741" }}>
+                    {(merchant.avgRating || merchant.rating || 0).toFixed(1)}
+                  </span>
+                  {merchant.reviewCount > 0 && (
+                    <span className="text-[12px]" style={{ color: "#666" }}>({merchant.reviewCount})</span>
+                  )}
+                </div>
+              )}
+              {nearestDist && (
+                <>
+                  <span className="text-[12px]" style={{ color: "#555" }}>·</span>
+                  <div className="flex items-center gap-1">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="5" r="3" fill="#9CA3AF" />
+                      <path d="M12 10v4" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M12 14l-4 7" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M12 14l4 7" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M7 12l5 2 5-2" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    </svg>
+                    <span className="text-[13px]" style={{ color: "#9CA3AF" }}>{nearestDist}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Products */}
+          {products.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-white text-[18px] font-bold mb-3" style={{ fontFamily: "var(--font-outfit)" }}>
+                პროდუქტები
+              </h2>
+              <div className="grid grid-cols-2 gap-2">
+                {products.map((p) => (
+                  <div key={p.id} className="rounded-[14px] overflow-hidden relative" style={{ height: p.sortOrder === 1 ? 130 : 180 }}>
+                    {p.imageUrl ? (
+                      <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center" style={{ background: "#1C1C1E" }}>
+                        <span className="text-[32px]">🍽</span>
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 left-0 right-0 px-3 py-2" style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.85))" }}>
+                      {p.name && (
+                        <p className="text-white text-[12px] font-semibold truncate" style={{ fontFamily: "var(--font-dm-sans)" }}>
+                          {p.name}
+                        </p>
+                      )}
+                      <span className="text-[13px] font-bold" style={{ color: "#F9E741" }}>₾{p.price?.toFixed(2)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Reviews */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-white text-[18px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>
+                შეფასებები {reviews.length > 0 && <span className="text-[14px] font-normal" style={{ color: "#666" }}>({reviews.length})</span>}
+              </h2>
+              {canReview && !showReviewForm && (
+                <button
+                  onClick={() => setShowReviewForm(true)}
+                  className="text-[12px] px-4 py-1.5 rounded-full font-bold"
+                  style={{ background: "#F9E741", color: "#000" }}
+                >
+                  + შეფასება
+                </button>
+              )}
+            </div>
+
+            {/* Review form */}
+            {showReviewForm && (
+              <div className="rounded-[14px] p-4 mb-4" style={{ background: "#1C1C1E" }}>
+                <p className="text-[13px] font-bold text-white mb-3">დატოვე შეფასება</p>
+
+                {unreviewedPayments.length > 1 && (
+                  <div className="mb-3">
+                    <label className="text-[11px] mb-1 block" style={{ color: "#666" }}>გადახდა</label>
+                    <select
+                      value={selectedTxId}
+                      onChange={(e) => setSelectedTxId(e.target.value)}
+                      className="w-full rounded-[8px] px-3 py-2 text-[13px] outline-none"
+                      style={{ background: "#0F0F0F", color: "#FFF", border: "1px solid #252525" }}
+                    >
+                      {unreviewedPayments.map((tx) => (
+                        <option key={tx.id} value={tx.id}>₾{tx.amount?.toFixed(2)} — {new Date(tx.createdAt).toLocaleDateString("ka-GE")}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="mb-3">
+                  <label className="text-[11px] mb-1 block" style={{ color: "#666" }}>რეიტინგი</label>
+                  <InteractiveStarRating value={reviewRating} onChange={setReviewRating} />
+                </div>
+
+                <div className="mb-3">
+                  <label className="text-[11px] mb-1 block" style={{ color: "#666" }}>კომენტარი (არასავალდებულო)</label>
+                  <textarea
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="რა მოგეწონათ?"
+                    rows={3}
+                    className="w-full rounded-[8px] px-3 py-2 text-[13px] outline-none resize-none"
+                    style={{ background: "#0F0F0F", color: "#FFF", border: "1px solid #252525" }}
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setShowReviewForm(false); setReviewRating(0); setReviewComment(""); }}
+                    className="flex-1 py-2.5 rounded-[8px] text-[13px]"
+                    style={{ background: "#0F0F0F", color: "#999", border: "1px solid #252525" }}
+                  >
+                    გაუქმება
+                  </button>
+                  <button
+                    onClick={submitReview}
+                    disabled={!reviewRating || submittingReview}
+                    className="flex-1 py-2.5 rounded-[8px] text-[13px] font-bold"
+                    style={{ background: reviewRating ? "#F9E741" : "#333", color: reviewRating ? "#000" : "#666" }}
+                  >
+                    {submittingReview ? "..." : "გაგზავნა"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Review list */}
+            {reviews.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {reviews.map((r) => (
+                  <div key={r.id} className="rounded-[12px] p-4" style={{ background: "#1C1C1E" }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-[28px] h-[28px] rounded-full flex items-center justify-center" style={{ background: "#2A2A2E" }}>
+                          <span className="text-[11px] font-bold text-white">{(r.userName || "?").charAt(0)}</span>
+                        </div>
+                        <span className="text-[13px] font-semibold text-white">{r.userName || "მომხმარებელი"}</span>
+                      </div>
+                      <span className="text-[11px]" style={{ color: "#666" }}>
+                        {new Date(r.createdAt).toLocaleDateString("ka-GE")}
+                      </span>
+                    </div>
+                    <StarRating rating={r.rating} size={14} />
+                    {r.comment && (
+                      <p className="text-[13px] mt-2" style={{ color: "#CCC", lineHeight: 1.5 }}>{r.comment}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[13px]" style={{ color: "#555" }}>შეფასებები ჯერ არ არის</p>
+            )}
+          </div>
+
+          {/* Branches */}
+          {branches.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-white text-[18px] font-bold mb-3" style={{ fontFamily: "var(--font-outfit)" }}>
+                ფილიალები
+              </h2>
+              <div className="flex flex-col gap-2">
+                {branches.map((b, i) => {
+                  const dist = userLoc ? formatDistance(haversineDistance(userLoc.lat, userLoc.lng, b.lat, b.lng)) : null;
+                  return (
+                    <div key={i} className="flex items-center gap-3 p-3 rounded-[12px]" style={{ background: "#1C1C1E" }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F9E741" strokeWidth="2" strokeLinecap="round" className="shrink-0">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1118 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-white truncate">{b.name}</p>
+                        {b.address && <p className="text-[11px]" style={{ color: "#666" }}>{b.address}</p>}
+                      </div>
+                      {dist && (
+                        <span className="text-[12px] font-semibold shrink-0" style={{ color: "#9CA3AF" }}>{dist}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </AuthGuard>
   );
 }
