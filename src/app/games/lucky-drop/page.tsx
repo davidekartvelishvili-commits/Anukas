@@ -794,7 +794,7 @@ export default function LuckyDropPage() {
     const currentBet = betAmount;
 
     // Fire API immediately (parallel — no queue)
-    playGame("plinko").then((serverResult: any) => {
+    playGame("plinko", currentBet).then((serverResult: any) => {
       // Always keep the LOWEST server balance (most up-to-date after all deductions)
       if (lastServerCoinsRef.current < 0 || serverResult.coinsRemaining < lastServerCoinsRef.current) {
         lastServerCoinsRef.current = serverResult.coinsRemaining;

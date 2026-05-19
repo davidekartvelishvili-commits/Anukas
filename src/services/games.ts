@@ -39,10 +39,10 @@ export async function ensureActiveTransaction(): Promise<{ coinsRemaining: numbe
   return { coinsRemaining: 0 };
 }
 
-export async function playGame(gameType: "slot" | "plinko" | "chicken_rush"): Promise<GameResult> {
+export async function playGame(gameType: "slot" | "plinko" | "chicken_rush", betAmount?: number): Promise<GameResult> {
   const data = await apiFetch<{ result: GameResult }>("/games/play", {
     method: "POST",
-    body: JSON.stringify({ gameType }),
+    body: JSON.stringify({ gameType, betAmount }),
   });
   return data.result;
 }
