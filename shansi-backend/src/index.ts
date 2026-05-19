@@ -432,23 +432,28 @@ async function runStartupMigrations() {
   try {
     const [mcD] = await db.select({ id: merchants.id }).from(merchants).where(eq(merchants.businessName, "McDonald's")).limit(1);
     if (mcD) {
-      const existing = await db.select().from(merchantBranches).where(eq(merchantBranches.merchantId, mcD.id)).limit(1);
-      if (existing.length === 0) {
-        const branches = [
-          { name: "McDonald's Eristavi", address: "3 Eristavi St", lat: 41.7068, lng: 44.7734 },
-          { name: "McDonald's Rustaveli", address: "24 Rustaveli Ave", lat: 41.6975, lng: 44.8015 },
-          { name: "McDonald's Vake", address: "36 Chavchavadze Ave", lat: 41.7088, lng: 44.7587 },
-          { name: "McDonald's Saburtalo", address: "41 Vazha-Pshavela Ave", lat: 41.7275, lng: 44.7471 },
-          { name: "McDonald's Gldani", address: "30 Khizanishvili St", lat: 41.7795, lng: 44.8135 },
-          { name: "McDonald's East Point", address: "East Point Mall", lat: 41.7260, lng: 44.8584 },
-          { name: "McDonald's Marjanishvili", address: "1 Marjanishvili St", lat: 41.6921, lng: 44.7977 },
-          { name: "McDonald's Isani", address: "Isani Metro", lat: 41.6920, lng: 44.8227 },
-        ];
-        for (const b of branches) {
-          await db.insert(merchantBranches).values({ id: nanoid(), merchantId: mcD.id, ...b });
-        }
-        console.log("[startup] seeded McDonald's branches");
+      // Delete old branches and re-seed with correct addresses
+      await db.delete(merchantBranches).where(eq(merchantBranches.merchantId, mcD.id));
+      const branches = [
+        { name: "McDonald's — კაკაბაძეების", address: "ძმები კაკაბაძეების ქ. 1", lat: 41.6970, lng: 44.8013 },
+        { name: "McDonald's — Galleria", address: "შოთა რუსთაველის გამზირი 2/4, Galleria Tbilisi", lat: 41.6934, lng: 44.8015 },
+        { name: "McDonald's — მარჯანიშვილი", address: "კოტე მარჯანიშვილის ქუჩა", lat: 41.6921, lng: 44.7977 },
+        { name: "McDonald's — წერეთელი", address: "აკაკი წერეთლის გამზირი 18", lat: 41.7175, lng: 44.7833 },
+        { name: "McDonald's — კოსტავა", address: "მერაბ კოსტავას ქუჩა", lat: 41.7145, lng: 44.7725 },
+        { name: "McDonald's — ვაკე", address: "დიმიტრი არაყიშვილის ქ. 3", lat: 41.7088, lng: 44.7587 },
+        { name: "McDonald's Riverside", address: "ლევან გოთუას ქ. 7", lat: 41.7210, lng: 44.7620 },
+        { name: "McDonald's — გლდანი", address: "ომარ ხიზანიშვილის ქ. 5", lat: 41.7795, lng: 44.8135 },
+        { name: "McDonald's — ბალანჩინი", address: "გიორგი ბალანჩინის ქ. 11", lat: 41.7260, lng: 44.7470 },
+        { name: "McDonald's — East Point", address: "ალექსანდრე თვალჭრელიძის ქ. 2, East Point", lat: 41.7260, lng: 44.8584 },
+        { name: "McDonald's — ნავთლუღი", address: "ნავთლუღის ქ. 8ა", lat: 41.7350, lng: 44.8420 },
+        { name: "McDonald's — ორხევი", address: "ორხევის დასახლება", lat: 41.7580, lng: 44.7280 },
+        { name: "McDonald's — აღმაშენებელი", address: "დავით აღმაშენებლის ხეივანი", lat: 41.6880, lng: 44.8100 },
+        { name: "McDonald's — ქავთარაძე", address: "პეტრე ქავთარაძის ქ. 1", lat: 41.7320, lng: 44.7680 },
+      ];
+      for (const b of branches) {
+        await db.insert(merchantBranches).values({ id: nanoid(), merchantId: mcD.id, ...b });
       }
+      console.log("[startup] seeded McDonald's branches (14 locations)");
     }
     // Seed Kvarts Coffee branch
     const [kv] = await db.select({ id: merchants.id }).from(merchants).where(eq(merchants.businessName, "Kvarts Coffee")).limit(1);
