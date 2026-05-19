@@ -460,7 +460,8 @@ async function runStartupMigrations() {
     if (kv) {
       const existing = await db.select().from(merchantBranches).where(eq(merchantBranches.merchantId, kv.id)).limit(1);
       if (existing.length === 0) {
-        await db.insert(merchantBranches).values({ id: nanoid(), merchantId: kv.id, name: "Kvarts Coffee Rustaveli", address: "26 Rustaveli Ave", lat: 41.6969, lng: 44.8010 });
+        await db.delete(merchantBranches).where(eq(merchantBranches.merchantId, kv.id));
+        await db.insert(merchantBranches).values({ id: nanoid(), merchantId: kv.id, name: "Kvarts Coffee", address: "შოთა რუსთაველის გამზირი 26", lat: 41.7005, lng: 44.7955 });
         console.log("[startup] seeded Kvarts Coffee branch");
       }
     }

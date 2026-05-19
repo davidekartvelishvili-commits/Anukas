@@ -246,7 +246,7 @@ export default function MerchantDetailPage() {
             {nearestBranch && (
               <button
                 onClick={() => {
-                  const url = `https://www.google.com/maps/dir/?api=1&destination=${nearestBranch.lat},${nearestBranch.lng}&travelmode=walking`;
+                  const url = `https://www.google.com/maps/dir/?api=1&destination=${nearestBranch.lat},${nearestBranch.lng}`;
                   window.open(url, "_blank");
                 }}
                 className="mt-4 px-8 py-3 rounded-full text-[14px] font-bold flex items-center gap-2 mx-auto active:scale-[0.95] transition-transform"
@@ -414,7 +414,7 @@ export default function MerchantDetailPage() {
                       className="flex items-center gap-3 p-3 rounded-[12px] cursor-pointer active:scale-[0.98] transition-transform"
                       style={{ background: "#1C1C1E" }}
                       onClick={() => {
-                        const url = `https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}&travelmode=walking`;
+                        const url = `https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}`;
                         window.open(url, "_blank");
                       }}
                     >
