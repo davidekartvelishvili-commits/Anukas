@@ -60,6 +60,7 @@ games.post("/play", async (c) => {
         freeCoins: result.freeCoins,
         bonusGamesLeft: result.bonusGamesLeft,
         transactionComplete: result.transactionComplete,
+        totalCoins: result.totalCoins,
         rewards, // { shield?, card? } — present only if a milestone fired
       },
     });
