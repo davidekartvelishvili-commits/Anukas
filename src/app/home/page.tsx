@@ -5,8 +5,11 @@ import { useRouter } from "next/navigation";
 import { getCoinBalance, getCashBalance, exchange as doExchange, seedTestUser } from "@/services/balance";
 import { getMe, getStoredToken } from "@/services/auth";
 import { apiFetch } from "@/services/api";
+import dynamic from "next/dynamic";
 import AuthGuard from "@/components/AuthGuard";
 import Ticket, { type TicketData } from "@/components/Ticket";
+
+const MysteryCube = dynamic(() => import("@/components/MysteryCube"), { ssr: false });
 
 /* ───────── ICONS ───────── */
 
@@ -462,42 +465,8 @@ export default function HomePage() {
               </p>
             </div>
             {/* Cube visual */}
-            <div className="absolute right-2 bottom-2 w-[180px] h-[180px] flex items-center justify-center" style={{ perspective: "400px" }}>
-              <div
-                className="relative w-[120px] h-[120px]"
-                style={{
-                  transformStyle: "preserve-3d",
-                  transform: "rotateX(-15deg) rotateY(25deg)",
-                  animation: "rotateSlow 12s linear infinite",
-                }}
-              >
-                {/* Front — ₾ */}
-                <div className="absolute inset-0 rounded-[14px] flex items-center justify-center" style={{ background: "linear-gradient(135deg, #1A1A1A, #2D2D2D)", border: "2px solid #3A3A3A", transform: "translateZ(60px)", backfaceVisibility: "hidden", boxShadow: "0 0 20px rgba(77,201,246,0.3)" }}>
-                  <div className="absolute inset-1 rounded-[12px] border border-[#4dc9f6] opacity-20" />
-                  <span className="text-[40px] font-black text-[#FFE500]" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 0 20px rgba(255,229,0,0.5)" }}>₾</span>
-                </div>
-                {/* Right — ? */}
-                <div className="absolute inset-0 rounded-[14px] flex items-center justify-center" style={{ background: "linear-gradient(135deg, #1A1A1A, #222)", border: "2px solid #333", transform: "rotateY(90deg) translateZ(60px)", backfaceVisibility: "hidden", boxShadow: "0 0 15px rgba(255,184,0,0.2)" }}>
-                  <div className="absolute inset-1 rounded-[12px] border border-[#FFB800] opacity-15" />
-                  <div className="absolute top-2 left-1 w-1 h-[80%] rounded-full bg-[#4dc9f6] opacity-30" />
-                  <span className="text-[40px] font-black text-[#FFB800]" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 0 20px rgba(255,184,0,0.4)" }}>?</span>
-                </div>
-                {/* Back — ₾ */}
-                <div className="absolute inset-0 rounded-[14px] flex items-center justify-center" style={{ background: "#1A1A1A", border: "2px solid #333", transform: "rotateY(180deg) translateZ(60px)", backfaceVisibility: "hidden", boxShadow: "0 0 15px rgba(0,232,143,0.2)" }}>
-                  <div className="absolute inset-1 rounded-[12px] border border-[#00E88F] opacity-15" />
-                  <span className="text-[40px] font-black text-[#00E88F]" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 0 20px rgba(0,232,143,0.4)" }}>₾</span>
-                </div>
-                {/* Left — ? */}
-                <div className="absolute inset-0 rounded-[14px] flex items-center justify-center" style={{ background: "linear-gradient(135deg, #222, #1A1A1A)", border: "2px solid #333", transform: "rotateY(-90deg) translateZ(60px)", backfaceVisibility: "hidden", boxShadow: "0 0 15px rgba(168,85,247,0.2)" }}>
-                  <div className="absolute inset-1 rounded-[12px] border border-[#A855F7] opacity-15" />
-                  <div className="absolute top-2 right-1 w-1 h-[80%] rounded-full bg-[#4dc9f6] opacity-30" />
-                  <span className="text-[40px] font-black text-[#A855F7]" style={{ fontFamily: "var(--font-outfit)", textShadow: "0 0 20px rgba(168,85,247,0.4)" }}>?</span>
-                </div>
-                {/* Top */}
-                <div className="absolute inset-0 rounded-[14px]" style={{ background: "#222", border: "2px solid #3A3A3A", transform: "rotateX(90deg) translateZ(60px)", backfaceVisibility: "hidden" }} />
-                {/* Bottom */}
-                <div className="absolute inset-0 rounded-[14px]" style={{ background: "#111", border: "2px solid #222", transform: "rotateX(-90deg) translateZ(60px)", backfaceVisibility: "hidden" }} />
-              </div>
+            <div className="absolute right-2 bottom-2 w-[180px] h-[180px]">
+              <MysteryCube interactive={false} />
             </div>
           </div>
           )}
