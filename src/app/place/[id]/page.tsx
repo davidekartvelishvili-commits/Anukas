@@ -57,6 +57,7 @@ export default function MerchantDetailPage() {
   const [loading, setLoading] = useState(true);
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [nearestDist, setNearestDist] = useState<string | null>(null);
+  const [nearestBranch, setNearestBranch] = useState<{ lat: number; lng: number } | null>(null);
 
   // Review form
   const [canReview, setCanReview] = useState(false);
@@ -105,11 +106,13 @@ export default function MerchantDetailPage() {
   useEffect(() => {
     if (!userLoc || branches.length === 0) return;
     let min = Infinity;
+    let closest: { lat: number; lng: number } | null = null;
     for (const b of branches) {
       const d = haversineDistance(userLoc.lat, userLoc.lng, b.lat, b.lng);
-      if (d < min) min = d;
+      if (d < min) { min = d; closest = { lat: b.lat, lng: b.lng }; }
     }
     setNearestDist(formatDistance(min));
+    setNearestBranch(closest);
   }, [userLoc, branches]);
 
   const submitReview = async () => {
@@ -237,6 +240,23 @@ export default function MerchantDetailPage() {
                 </>
               )}
             </div>
+
+            {/* Let's go button */}
+            {nearestBranch && (
+              <button
+                onClick={() => {
+                  const url = `https://www.google.com/maps/dir/?api=1&destination=${nearestBranch.lat},${nearestBranch.lng}&travelmode=walking`;
+                  window.open(url, "_blank");
+                }}
+                className="mt-4 px-8 py-3 rounded-full text-[14px] font-bold flex items-center gap-2 mx-auto active:scale-[0.95] transition-transform"
+                style={{ background: "#F9E741", color: "#1A1A1A" }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 11l19-9-9 19-2-8-8-2z" />
+                </svg>
+                წავიდეთ!
+              </button>
+            )}
           </div>
 
           {/* Products */}
@@ -382,7 +402,15 @@ export default function MerchantDetailPage() {
                 {branches.map((b, i) => {
                   const dist = userLoc ? formatDistance(haversineDistance(userLoc.lat, userLoc.lng, b.lat, b.lng)) : null;
                   return (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-[12px]" style={{ background: "#1C1C1E" }}>
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 p-3 rounded-[12px] cursor-pointer active:scale-[0.98] transition-transform"
+                      style={{ background: "#1C1C1E" }}
+                      onClick={() => {
+                        const url = `https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}&travelmode=walking`;
+                        window.open(url, "_blank");
+                      }}
+                    >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F9E741" strokeWidth="2" strokeLinecap="round" className="shrink-0">
                         <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1118 0z" />
                         <circle cx="12" cy="10" r="3" />
@@ -394,6 +422,9 @@ export default function MerchantDetailPage() {
                       {dist && (
                         <span className="text-[12px] font-semibold shrink-0" style={{ color: "#9CA3AF" }}>{dist}</span>
                       )}
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" className="shrink-0">
+                        <path d="M3 11l19-9-9 19-2-8-8-2z" />
+                      </svg>
                     </div>
                   );
                 })}
