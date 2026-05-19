@@ -16,7 +16,7 @@ import { publicRoute } from "./routes/public.js";
 import { AppError } from "./utils/errors.js";
 import { getEnv } from "./utils/env.js";
 import { getDb } from "./db/client.js";
-import { merchants, merchantBranches, merchantReviews, users } from "./db/schema.js";
+import { merchants, merchantBranches, merchantReviews, merchantProducts, users } from "./db/schema.js";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -465,6 +465,48 @@ async function runStartupMigrations() {
         console.log("[startup] seeded Kvarts Coffee branch");
       }
     }
+    // Seed CHIKA Rustaveli — approve, enable promos, add branch, products, reviews
+    const [chika] = await db.select({ id: merchants.id, isActive: merchants.isActive }).from(merchants).where(eq(merchants.businessName, "CHIKA Rustaveli")).limit(1);
+    if (chika) {
+      // Approve if not active
+      if (!chika.isActive) {
+        const [maxCode] = await db.select({ code: merchants.merchantCode }).from(merchants).orderBy(desc(merchants.merchantCode)).limit(1);
+        const maxNum = maxCode?.code ? parseInt(maxCode.code.replace("SH-", "")) : 0;
+        await db.update(merchants).set({
+          isActive: true,
+          showOnPromos: true,
+          rating: 4.5,
+          merchantCode: `SH-${String(maxNum + 1).padStart(5, "0")}`,
+          approvedAt: new Date().toISOString(),
+        }).where(eq(merchants.id, chika.id));
+        console.log("[startup] approved CHIKA Rustaveli");
+      }
+      // Ensure showOnPromos is on
+      await db.update(merchants).set({ showOnPromos: true, rating: 4.5 }).where(eq(merchants.id, chika.id));
+
+      // Branch
+      const existingBranches = await db.select().from(merchantBranches).where(eq(merchantBranches.merchantId, chika.id)).limit(1);
+      if (existingBranches.length === 0) {
+        await db.insert(merchantBranches).values({ id: nanoid(), merchantId: chika.id, name: "CHIKA Rustaveli", address: "მერაბ კოსტავას ქ. 9", lat: 41.7103, lng: 44.7932 });
+        console.log("[startup] seeded CHIKA branch");
+      }
+
+      // Products
+      const existingProducts = await db.select().from(merchantProducts).where(eq(merchantProducts.merchantId, chika.id)).limit(1);
+      if (existingProducts.length === 0) {
+        const chikaProducts = [
+          { name: "ავოკადო ტოსტი", price: 14.90, sortOrder: 0 },
+          { name: "პანკეიკი", price: 12.50, sortOrder: 0 },
+          { name: "", price: 8.90, sortOrder: 1 },
+          { name: "", price: 6.50, sortOrder: 1 },
+          { name: "ბენედიქტი", price: 16.90, sortOrder: 0 },
+        ];
+        for (const p of chikaProducts) {
+          await db.insert(merchantProducts).values({ id: nanoid(), merchantId: chika.id, name: p.name, price: p.price, sortOrder: p.sortOrder });
+        }
+        console.log("[startup] seeded CHIKA products");
+      }
+    }
   } catch (e: any) { console.error("[startup] branch seed error:", e.message); }
 
   // One-time: seed realistic reviews for merchants
@@ -509,6 +551,26 @@ async function runStartupMigrations() {
           const avgKv = kvReviews.reduce((s, r) => s + r.rating, 0) / kvReviews.length;
           await db.update(merchants).set({ rating: Math.round(avgKv * 10) / 10 }).where(eq(merchants.id, kv.id));
           console.log("[startup] seeded Kvarts Coffee reviews");
+        }
+
+        // CHIKA reviews
+        const [chika] = await db.select({ id: merchants.id }).from(merchants).where(eq(merchants.businessName, "CHIKA Rustaveli")).limit(1);
+        if (chika && realUsers.length >= 5) {
+          const chikaReviews = [
+            { rating: 5, comment: "საუკეთესო ბრანჩის ადგილია თბილისში! ავოკადო ტოსტი უბრალოდ განსაკუთრებულია, ატმოსფეროც ძალიან მყუდრო და სასიამოვნოა." },
+            { rating: 4, comment: "პანკეიკები ძალიან გემრიელია, ყავაც კარგი ხარისხისაა. სტუდენტებისთვის იდეალური ადგილია." },
+            { rating: 5, comment: "მეგობრებთან ერთად ხშირად მოვდივართ, ყოველთვის კმაყოფილები ვრჩებით. მომსახურება სწრაფი და თბილია." },
+          ];
+          for (let i = 0; i < chikaReviews.length; i++) {
+            const userIdx = (i + 3) % realUsers.length;
+            await db.insert(merchantReviews).values({
+              id: nanoid(), merchantId: chika.id, userId: realUsers[userIdx].id,
+              paymentTransactionId: `seed-chika-${i}`, rating: chikaReviews[i].rating, comment: chikaReviews[i].comment,
+            });
+          }
+          const avgChika = chikaReviews.reduce((s, r) => s + r.rating, 0) / chikaReviews.length;
+          await db.update(merchants).set({ rating: Math.round(avgChika * 10) / 10 }).where(eq(merchants.id, chika.id));
+          console.log("[startup] seeded CHIKA reviews");
         }
       }
     }
