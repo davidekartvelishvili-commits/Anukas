@@ -56,7 +56,7 @@ publicRoute.get("/partner-merchants", async (c) => {
 
   // Enrich with products and branches
   const enriched = await Promise.all(results.map(async (m) => {
-    const products = await db.select().from(merchantProducts).where(and(eq(merchantProducts.merchantId, m.id), eq(merchantProducts.isActive, true))).orderBy(merchantProducts.sortOrder);
+    const products = await db.select().from(merchantProducts).where(and(eq(merchantProducts.merchantId, m.id), eq(merchantProducts.isActive, true))).orderBy(merchantProducts.position);
     const branches = await db.select({ lat: merchantBranches.lat, lng: merchantBranches.lng, name: merchantBranches.name }).from(merchantBranches).where(eq(merchantBranches.merchantId, m.id));
     return { ...m, products, branches };
   }));
@@ -71,7 +71,7 @@ publicRoute.get("/merchants/:id", async (c) => {
   const [merchant] = await db.select().from(merchants).where(eq(merchants.id, id)).limit(1);
   if (!merchant) return c.json({ success: false, message: "Not found" }, 404);
 
-  const products = await db.select().from(merchantProducts).where(and(eq(merchantProducts.merchantId, id), eq(merchantProducts.isActive, true))).orderBy(merchantProducts.sortOrder);
+  const products = await db.select().from(merchantProducts).where(and(eq(merchantProducts.merchantId, id), eq(merchantProducts.isActive, true))).orderBy(merchantProducts.position);
   const branches = await db.select().from(merchantBranches).where(eq(merchantBranches.merchantId, id));
   const reviews = await db.select({
     id: merchantReviews.id,

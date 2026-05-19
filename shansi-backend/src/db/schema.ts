@@ -206,6 +206,7 @@ export const merchantProducts = sqliteTable("merchant_products", {
   price: real("price").notNull(),
   imageUrl: text("image_url"),
   sortOrder: integer("sort_order").default(0).notNull(),
+  position: integer("position").default(0).notNull(),
   isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
 });

@@ -1095,7 +1095,7 @@ admin.patch("/merchants/:id", adminMiddleware, async (c) => {
 admin.get("/merchants/:id/products", adminMiddleware, async (c) => {
   const merchantId = c.req.param("id") as string;
   const db = getDb();
-  const products = await db.select().from(merchantProducts).where(eq(merchantProducts.merchantId, merchantId)).orderBy(merchantProducts.sortOrder);
+  const products = await db.select().from(merchantProducts).where(eq(merchantProducts.merchantId, merchantId)).orderBy(merchantProducts.position);
   return c.json({ success: true, products });
 });
 
@@ -1126,6 +1126,7 @@ admin.patch("/merchants/:mid/products/:pid", adminMiddleware, async (c) => {
   if (body.price !== undefined) updates.price = body.price;
   if (body.image_url !== undefined) updates.imageUrl = body.image_url;
   if (body.sort_order !== undefined) updates.sortOrder = body.sort_order;
+  if (body.position !== undefined) updates.position = body.position;
   if (body.is_active !== undefined) updates.isActive = body.is_active;
   if (Object.keys(updates).length > 0) {
     await db.update(merchantProducts).set(updates).where(eq(merchantProducts.id, pid));

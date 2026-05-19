@@ -816,8 +816,49 @@ export default function MerchantsPage() {
                                       {/* Product list */}
                                       {detail.products && detail.products.length > 0 ? (
                                         <div className="space-y-2">
-                                          {detail.products.map((p: any) => (
-                                            <div key={p.id} className="flex items-center gap-3 p-3 rounded-[10px]" style={{ background: "#0F0F0F", border: "1px solid #1A1A1A" }}>
+                                          {detail.products.map((p: any, idx: number) => (
+                                            <div key={p.id} className="flex items-center gap-2 p-3 rounded-[10px]" style={{ background: "#0F0F0F", border: "1px solid #1A1A1A" }}>
+                                              {/* Position number */}
+                                              <span className="text-[11px] font-mono w-[18px] text-center shrink-0" style={{ color: "#555" }}>{idx + 1}</span>
+                                              {/* Up/Down arrows */}
+                                              <div className="flex flex-col gap-0.5 shrink-0">
+                                                <button
+                                                  disabled={idx === 0}
+                                                  onClick={async () => {
+                                                    const products = [...detail.products];
+                                                    const prev = products[idx - 1];
+                                                    const curr = products[idx];
+                                                    try {
+                                                      // Swap sort_order values with adjacent items using index as position
+                                                      await updateMerchantProduct(detail.merchant.id, curr.id, { position: idx - 1 });
+                                                      await updateMerchantProduct(detail.merchant.id, prev.id, { position: idx });
+                                                      await refreshProducts(detail.merchant.id);
+                                                    } catch { showToast("შეცდომა", "error"); }
+                                                  }}
+                                                  className="w-[22px] h-[16px] rounded flex items-center justify-center"
+                                                  style={{ background: idx === 0 ? "#0A0A0A" : "#1C1C1E", border: "1px solid #252525" }}
+                                                >
+                                                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke={idx === 0 ? "#333" : "#999"} strokeWidth="2" strokeLinecap="round"><path d="M2 6l3-3 3 3" /></svg>
+                                                </button>
+                                                <button
+                                                  disabled={idx === detail.products.length - 1}
+                                                  onClick={async () => {
+                                                    const products = [...detail.products];
+                                                    const next = products[idx + 1];
+                                                    const curr = products[idx];
+                                                    try {
+                                                      await updateMerchantProduct(detail.merchant.id, curr.id, { position: idx + 1 });
+                                                      await updateMerchantProduct(detail.merchant.id, next.id, { position: idx });
+                                                      await refreshProducts(detail.merchant.id);
+                                                    } catch { showToast("შეცდომა", "error"); }
+                                                  }}
+                                                  className="w-[22px] h-[16px] rounded flex items-center justify-center"
+                                                  style={{ background: idx === detail.products.length - 1 ? "#0A0A0A" : "#1C1C1E", border: "1px solid #252525" }}
+                                                >
+                                                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke={idx === detail.products.length - 1 ? "#333" : "#999"} strokeWidth="2" strokeLinecap="round"><path d="M2 4l3 3 3-3" /></svg>
+                                                </button>
+                                              </div>
+                                              {/* Image */}
                                               <div className="w-[50px] h-[50px] rounded-[10px] overflow-hidden shrink-0 flex items-center justify-center" style={{ background: "#1C1C1E" }}>
                                                 {p.imageUrl ? (
                                                   <img src={p.imageUrl} alt="" className="w-full h-full object-cover" />
@@ -825,21 +866,29 @@ export default function MerchantsPage() {
                                                   <span className="text-[18px]">🍽</span>
                                                 )}
                                               </div>
+                                              {/* Info */}
                                               <div className="flex-1 min-w-0">
-                                                <p className="text-[13px] font-semibold truncate" style={{ color: "#FFF" }}>{p.name}</p>
-                                                <p className="text-[12px] font-bold" style={{ color: "#F9E741" }}>{p.price?.toFixed(2)} ₾</p>
+                                                <p className="text-[13px] font-semibold truncate" style={{ color: "#FFF" }}>{p.name || "—"}</p>
+                                                <div className="flex items-center gap-2">
+                                                  <p className="text-[12px] font-bold" style={{ color: "#F9E741" }}>{p.price > 0 ? `${p.price.toFixed(2)} ₾` : "—"}</p>
+                                                  <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: p.sortOrder === 1 ? "#333" : "#1a3a1a", color: p.sortOrder === 1 ? "#999" : "#4ade80" }}>
+                                                    {p.sortOrder === 1 ? "პატარა" : "დიდი"}
+                                                  </span>
+                                                </div>
                                               </div>
+                                              {/* Edit */}
                                               <button
                                                 onClick={() => {
                                                   setEditingProduct(p);
                                                   setProductForm({ name: p.name, price: String(p.price), image_url: p.imageUrl || "", size: (p.sortOrder === 1 ? "small" : "big") });
                                                   setShowProductForm(true);
                                                 }}
-                                                className="text-[11px] px-3 py-1.5 rounded-[6px] font-semibold"
+                                                className="text-[11px] px-2 py-1.5 rounded-[6px] font-semibold"
                                                 style={{ background: "#1C1C1E", color: "#F9E741", border: "1px solid #252525" }}
                                               >
                                                 ✏️
                                               </button>
+                                              {/* Delete */}
                                               <button
                                                 onClick={async () => {
                                                   if (!confirm("წაშლა?")) return;
