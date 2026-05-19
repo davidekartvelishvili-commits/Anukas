@@ -427,6 +427,14 @@ async function _playGameInner(
   const [userAfter] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   const [finalTx] = await db.select().from(transactions).where(eq(transactions.id, activeTx.id)).limit(1);
 
+  // Calculate total coins across all active transactions
+  let totalCoins = 0;
+  try {
+    const allActiveTxForTotal = await db.select({ cr: transactions.coinsRemaining }).from(transactions)
+      .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))));
+    totalCoins = allActiveTxForTotal.reduce((sum: number, t: any) => sum + (t.cr || 0), 0);
+  } catch {}
+
   return {
     won: totalWin > 0,
     winAmount: totalWin,
@@ -444,17 +452,8 @@ async function _playGameInner(
     freeCoins,
     bonusGamesLeft,
     transactionComplete,
-    totalCoins: 0,
+    totalCoins,
   };
-
-  // Calculate total coins across all active transactions
-  try {
-    const allActiveTxForTotal = await db.select({ cr: transactions.coinsRemaining }).from(transactions)
-      .where(and(eq(transactions.userId, userId), or(eq(transactions.status, "active"), eq(transactions.status, "bonus_round"))));
-    result.totalCoins = allActiveTxForTotal.reduce((sum: number, t: any) => sum + (t.cr || 0), 0);
-  } catch {}
-
-  return result;
 }
 
 // ═══════════════════════════════════════
