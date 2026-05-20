@@ -20,6 +20,7 @@ export default function MerchantRegisterPage() {
   const [success, setSuccess] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
   const [error, setError] = useState("");
+  const [tooltip, setTooltip] = useState<string | null>(null);
   const [form, setForm] = useState({
     business_name: "",
     business_name_ka: "",
@@ -137,14 +138,40 @@ export default function MerchantRegisterPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* 2-col grid on desktop */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[12px] text-[#999] mb-1.5 font-medium">ბიზნესის სახელი *</label>
+                  <div className="relative">
+                    <label
+                      className="block text-[12px] text-[#999] mb-1.5 font-medium cursor-pointer"
+                      onClick={() => setTooltip(tooltip === "name" ? null : "name")}
+                    >
+                      ბიზნესის სახელი *
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" className="inline ml-1 -mt-0.5">
+                        <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
+                      </svg>
+                    </label>
+                    {tooltip === "name" && (
+                      <div
+                        className="absolute z-10 left-0 top-[22px] rounded-[10px] px-3 py-2.5 text-[12px] max-w-[240px]"
+                        style={{
+                          background: "rgba(40,40,40,0.95)",
+                          backdropFilter: "blur(8px)",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          color: "#CCC",
+                        }}
+                      >
+                        ამ სახელით გამოჩნდება შენი ბიზნესი პლატფორმაზე
+                        <button
+                          onClick={() => setTooltip(null)}
+                          className="absolute top-1 right-2 text-[#666] text-[14px]"
+                        >×</button>
+                      </div>
+                    )}
                     <input
                       type="text"
                       value={form.business_name}
                       onChange={(e) => update("business_name", e.target.value)}
                       placeholder="My Business"
                       className={inputClass}
+                      onFocus={() => setTooltip(null)}
                     />
                   </div>
                   <div>
