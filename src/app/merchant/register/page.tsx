@@ -150,7 +150,8 @@ export default function MerchantRegisterPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[12px] text-[#999] mb-1.5 font-medium">ბიზნესის სახელი ქართულად</label>
+                    <label className="block text-[12px] text-[#999] mb-1 font-medium">ბიზნესის სახელი ქართულად</label>
+                    <p className="text-[11px] mb-1.5" style={{ color: "#555" }}>ქართულენოვანი მომხმარებლებისთვის ასე გამოჩნდება</p>
                     <input
                       type="text"
                       value={form.business_name_ka}
@@ -163,7 +164,8 @@ export default function MerchantRegisterPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[12px] text-[#999] mb-1.5 font-medium">კატეგორია</label>
+                    <label className="block text-[12px] text-[#999] mb-1 font-medium">კატეგორია</label>
+                    <p className="text-[11px] mb-1.5" style={{ color: "#555" }}>აირჩიე რომელ კატეგორიას მიეკუთვნება შენი ობიექტი</p>
                     <div className="relative">
                       <select
                         value={form.category}
@@ -179,7 +181,8 @@ export default function MerchantRegisterPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[12px] text-[#999] mb-1.5 font-medium">ტელეფონი *</label>
+                    <label className="block text-[12px] text-[#999] mb-1 font-medium">ტელეფონი *</label>
+                    <p className="text-[11px] mb-1.5" style={{ color: "#555" }}>ამ ნომერზე დაგიკავშირდებიან დამტკიცებისთვის</p>
                     <input
                       type="tel"
                       value={form.phone}
@@ -192,7 +195,8 @@ export default function MerchantRegisterPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[12px] text-[#999] mb-1.5 font-medium">ელ-ფოსტა</label>
+                    <label className="block text-[12px] text-[#999] mb-1 font-medium">ელ-ფოსტა</label>
+                    <p className="text-[11px] mb-1.5" style={{ color: "#555" }}>შეტყობინებები და ანგარიშები გამოგეგზავნება აქ</p>
                     <input
                       type="email"
                       value={form.email}
@@ -202,7 +206,8 @@ export default function MerchantRegisterPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[12px] text-[#999] mb-1.5 font-medium">საკონტაქტო პირი</label>
+                    <label className="block text-[12px] text-[#999] mb-1 font-medium">საკონტაქტო პირი</label>
+                    <p className="text-[11px] mb-1.5" style={{ color: "#555" }}>ვის უნდა დავუკავშირდეთ საჭიროების შემთხვევაში</p>
                     <input
                       type="text"
                       value={form.contact_person}
@@ -214,7 +219,8 @@ export default function MerchantRegisterPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[12px] text-[#999] mb-1.5 font-medium">მისამართი</label>
+                  <label className="block text-[12px] text-[#999] mb-1 font-medium">მისამართი</label>
+                  <p className="text-[11px] mb-1.5" style={{ color: "#555" }}>ობიექტის ფიზიკური მისამართი, რომ მომხმარებლებმა გიპოვონ</p>
                   <input
                     type="text"
                     value={form.address}
