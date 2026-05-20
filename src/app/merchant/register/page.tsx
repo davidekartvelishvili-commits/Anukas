@@ -18,6 +18,7 @@ export default function MerchantRegisterPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [activeSlide, setActiveSlide] = useState(0);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     business_name: "",
@@ -66,42 +67,37 @@ export default function MerchantRegisterPage() {
     <div className="min-h-screen bg-black text-white" style={{ fontFamily: "var(--font-dm-sans)" }}>
       <div className="min-h-screen flex flex-col lg:flex-row">
 
-        {/* Left side — branding (desktop only) */}
-        <div className="hidden lg:flex lg:w-[45%] xl:w-[50%] relative items-center justify-center" style={{ background: "linear-gradient(135deg, #1A1A1A 0%, #0A0A0A 100%)" }}>
-          <div className="max-w-[420px] px-10">
-            {/* Logo */}
-            <div className="flex items-center gap-3 mb-10">
-              <img src="/images/shansi-logo.png" alt="Shansi" width={44} height={44} className="select-none" draggable={false} />
-              <span className="text-[28px] font-extrabold text-white tracking-[-0.02em]" style={{ fontFamily: "var(--font-outfit)" }}>
-                Shansi
-              </span>
-            </div>
-
-            <h2
-              className="text-[36px] xl:text-[42px] font-extrabold text-white leading-[1.15] mb-5"
-              style={{ fontFamily: "var(--font-outfit)" }}
-            >
-              გახდი Shansi-ს<br />პარტნიორი
-            </h2>
-            <p className="text-[16px] leading-[1.7] mb-8" style={{ color: "#9CA3AF" }}>
-              შემოუერთდი Shansi-ს პარტნიორთა ქსელს და მიიღე მეტი მომხმარებელი.
-              შენი ბიზნესი გამოჩნდება ათასობით აქტიური მომხმარებლის წინაშე.
-            </p>
-
-            {/* Stats */}
-            <div className="flex gap-8">
-              <div>
-                <p className="text-[28px] font-bold" style={{ color: "#F9E741", fontFamily: "var(--font-outfit)" }}>1000+</p>
-                <p className="text-[13px]" style={{ color: "#666" }}>აქტიური მომხმარებელი</p>
-              </div>
-              <div>
-                <p className="text-[28px] font-bold" style={{ color: "#F9E741", fontFamily: "var(--font-outfit)" }}>50+</p>
-                <p className="text-[13px]" style={{ color: "#666" }}>პარტნიორი ობიექტი</p>
-              </div>
-            </div>
-
-            {/* Decorative accent */}
-            <div className="absolute bottom-10 left-10 right-10 h-[1px]" style={{ background: "linear-gradient(90deg, transparent, rgba(249,231,65,0.15), transparent)" }} />
+        {/* Left side — ad images slideshow (desktop only) */}
+        <div
+          className="hidden lg:flex lg:w-[45%] xl:w-[50%] relative items-center justify-center cursor-pointer select-none"
+          style={{ background: "#0A0A0A" }}
+          onClick={() => setActiveSlide((prev) => (prev + 1) % 2)}
+        >
+          <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+            {["/images/merchant-ads/slide1.png", "/images/merchant-ads/slide2.png"].map((src, i) => (
+              <img
+                key={i}
+                src={src}
+                alt=""
+                className="absolute max-w-[90%] max-h-[90%] object-contain transition-all duration-500 ease-in-out"
+                style={{
+                  opacity: activeSlide === i ? 1 : 0,
+                  transform: activeSlide === i ? "scale(1)" : "scale(0.95)",
+                }}
+                draggable={false}
+              />
+            ))}
+          </div>
+          {/* Dots */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+            {[0, 1].map((i) => (
+              <button
+                key={i}
+                onClick={(e) => { e.stopPropagation(); setActiveSlide(i); }}
+                className="w-[8px] h-[8px] rounded-full transition-all duration-300"
+                style={{ background: activeSlide === i ? "#F9E741" : "rgba(255,255,255,0.2)" }}
+              />
+            ))}
           </div>
         </div>
 
