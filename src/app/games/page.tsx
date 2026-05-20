@@ -166,11 +166,14 @@ export default function GamesPage() {
   const [mode, setMode] = useState<"cash" | "coins">("coins");
   const [showCashNotif, setShowCashNotif] = useState(false);
   const [activeGameTypes, setActiveGameTypes] = useState<string[]>(["slot", "plinko", "chicken_rush"]);
+  const [gender, setGender] = useState("Male");
 
   useEffect(() => {
     setCoins(getCoinBalance());
     setCash(getCashBalance());
     setPlayedGames(getPlayedGames());
+    const savedGender = typeof window !== "undefined" ? localStorage.getItem("user-gender") : null;
+    if (savedGender) setGender(savedGender);
     if (getStoredToken()) {
       apiFetch("/games/config").then((data: any) => {
         if (data?.games) {
@@ -205,6 +208,8 @@ export default function GamesPage() {
 
   const favoriteGames = playedGames.map((id) => getGame(id)).filter((g): g is NonNullable<typeof g> => !!g && (!g.gameType || activeGameTypes.includes(g.gameType)));
 
+  const avatarSrc = gender === "Female" ? "/images/profile-avatar-female.png" : gender === "Other" ? "/images/profile-avatar-other.png" : "/images/profile-avatar.png";
+
   return (
     <AuthGuard>
       <style>{`html, body { background: #000000 !important; }`}</style>
@@ -235,12 +240,16 @@ export default function GamesPage() {
               </button>
             </div>
             <div className="flex-1 flex justify-end">
-              <div className="w-[44px] h-[44px] rounded-full overflow-hidden flex items-center justify-center" style={{ background: "#1C1C1E" }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <circle cx="9" cy="9" r="4" fill="#FFD700" />
-                  <circle cx="15" cy="9" r="4" fill="#FFD700" opacity="0.7" />
-                  <circle cx="12" cy="15" r="4" fill="#FFD700" opacity="0.5" />
-                </svg>
+              <div
+                className="w-[48px] h-[48px] rounded-full overflow-hidden cursor-pointer active:scale-[0.95] transition-transform"
+                style={{ background: "linear-gradient(135deg, #C4E0F9, #E8D5F5)" }}
+                onClick={() => router.push("/profile")}
+              >
+                <img
+                  src={avatarSrc}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
               </div>
             </div>
           </div>

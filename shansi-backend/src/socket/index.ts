@@ -176,12 +176,23 @@ function handleDisconnect(socket: Socket, io: IOServer): void {
 
   const room = findRoomByUser(userData.userId);
   if (!room) {
-    removeFromQueue(socket.id);
+    // Was the player in the matchmaking queue? Refund their wager.
+    const entry = removeFromQueue(socket.id);
+    if (entry && entry.wager > 0) {
+      addCoins(entry.userId, entry.wager).catch(() => {});
+    }
     socketToUser.delete(socket.id);
     return;
   }
 
   if (room.status === "waiting") {
+    // Game never started. Refund every player still in the room
+    // (typically just the host who hasn't been joined yet).
+    if (room.wager > 0) {
+      for (const p of room.players) {
+        addCoins(p.userId, room.wager).catch(() => {});
+      }
+    }
     stopGameLoop(room.id);
     deleteRoom(room.id);
     socketToUser.delete(socket.id);
@@ -218,9 +229,11 @@ function handleDisconnect(socket: Socket, io: IOServer): void {
       return;
     }
 
-    // Only one player disconnected — start the warning → robot flow
+    // Only one player disconnected — start the warning → robot flow.
+    // Event name + payload shape MUST match the client listener in
+    // src/app/games/air-hockey/page.tsx ("opponentDisconnected").
     const warningTimer = setTimeout(() => {
-      io.to(room.id).emit("playerDisconnecting", { side, timeLeft: 10 });
+      io.to(room.id).emit("opponentDisconnected", { countdown: 10 });
     }, 5000);
 
     const robotTimer = setTimeout(() => {
@@ -352,6 +365,9 @@ export function setupSocketServer(httpServer: any): void {
     }
 
     // ── createRoom ──
+    // Deducts the wager up front. If the user can't afford it we bail
+    // before creating the room. The wager is refunded if the room is
+    // abandoned before a second player joins (see leaveRoom + disconnect).
     socket.on("createRoom", async (data: {
       wager: number;
       goalTarget: number;
@@ -361,6 +377,13 @@ export function setupSocketServer(httpServer: any): void {
       if (!uid) { socket.emit("error", { message: "Not authenticated" }); return; }
 
       try {
+        if (data.wager > 0) {
+          const ok = await deductCoins(uid, data.wager);
+          if (!ok) {
+            socket.emit("error", { message: "Not enough coins" });
+            return;
+          }
+        }
         const displayName = getDisplayName(socket);
         const room = createRoom(
           { socketId: socket.id, userId: uid, displayName },
@@ -371,11 +394,18 @@ export function setupSocketServer(httpServer: any): void {
         socket.join(room.id);
         socket.emit("roomCreated", { roomId: room.id, pin: room.pin });
       } catch (e: any) {
+        // Best-effort refund if room creation throws after deduction
+        if (data.wager > 0) {
+          try { await addCoins(uid, data.wager); } catch {}
+        }
         socket.emit("error", { message: e.message || "Failed to create room" });
       }
     });
 
     // ── joinRoom ──
+    // Validates the room first (so a bad code doesn't cost coins),
+    // then deducts the wager before joining. The wager is part of the
+    // pot — winner takes 2x.
     socket.on("joinRoom", async (data: {
       roomId: string;
       pin?: string;
@@ -385,6 +415,28 @@ export function setupSocketServer(httpServer: any): void {
 
       try {
         const displayName = getDisplayName(socket);
+
+        // Pre-flight: room must exist, be waiting, have a slot, and PIN matches
+        const target = rooms.get(data.roomId);
+        if (!target || target.status !== "waiting" || target.players.length >= 2 || (target.isPrivate && target.pin !== data.pin)) {
+          socket.emit("joinError", { message: "Cannot join room. Check room ID and PIN." });
+          return;
+        }
+        // Prevent self-join (also handled in roomManager.joinRoom but cheaper here)
+        if (target.players.some((p) => p.userId === uid)) {
+          socket.emit("joinError", { message: "You are already in this room." });
+          return;
+        }
+
+        // Deduct wager BEFORE joining so we don't charge on a failed join
+        if (target.wager > 0) {
+          const ok = await deductCoins(uid, target.wager);
+          if (!ok) {
+            socket.emit("joinError", { message: "Not enough coins" });
+            return;
+          }
+        }
+
         const room = joinRoom(
           { socketId: socket.id, userId: uid, displayName },
           data.roomId,
@@ -392,6 +444,10 @@ export function setupSocketServer(httpServer: any): void {
         );
 
         if (!room) {
+          // Race: room was filled/closed between our check and join. Refund.
+          if (target.wager > 0) {
+            try { await addCoins(uid, target.wager); } catch {}
+          }
           socket.emit("joinError", { message: "Cannot join room. Check room ID and PIN." });
           return;
         }
@@ -415,6 +471,8 @@ export function setupSocketServer(httpServer: any): void {
     });
 
     // ── joinQueue ──
+    // Deducts the wager up front. Refunded on leaveQueue or disconnect
+    // before a match is found.
     socket.on("joinQueue", async (data: {
       wager: number;
       goalTarget: number;
@@ -423,6 +481,14 @@ export function setupSocketServer(httpServer: any): void {
       if (!uid) { socket.emit("error", { message: "Not authenticated" }); return; }
 
       try {
+        if (data.wager > 0) {
+          const ok = await deductCoins(uid, data.wager);
+          if (!ok) {
+            socket.emit("error", { message: "Not enough coins" });
+            return;
+          }
+        }
+
         const displayName = getDisplayName(socket);
         socketToUser.set(socket.id, { userId: uid, displayName });
 
@@ -438,13 +504,20 @@ export function setupSocketServer(httpServer: any): void {
           beginGame(matchedRoom, io);
         }
       } catch (e: any) {
+        if (data.wager > 0) {
+          try { await addCoins(uid, data.wager); } catch {}
+        }
         socket.emit("error", { message: e.message || "Failed to join queue" });
       }
     });
 
-    // ── leaveQueue ──
-    socket.on("leaveQueue", () => {
-      removeFromQueue(socket.id);
+    // ── leaveQueue ── refund wager if the player was actually queued
+    socket.on("leaveQueue", async () => {
+      const entry = removeFromQueue(socket.id);
+      if (entry && entry.wager > 0) {
+        try { await addCoins(entry.userId, entry.wager); } catch {}
+      }
+      socket.emit("queueCancelled");
     });
 
     // ── paddleMove — velocity computed server-side from position deltas ──
@@ -472,9 +545,11 @@ export function setupSocketServer(httpServer: any): void {
       const player = room.players.find((p) => p.socketId === socket.id);
       if (!player) return;
 
-      // Per-player cooldown 80ms
+      // Per-player cooldown 30ms — long enough to prevent same-collision
+      // double-counting (one tick is ~16.67ms) but doesn't punish rapid
+      // back-and-forth swings.
       const now = Date.now();
-      if (player.lastHitTime && now - player.lastHitTime < 80) return;
+      if (player.lastHitTime && now - player.lastHitTime < 30) return;
       player.lastHitTime = now;
 
       handleClientHit(room.id, data.nx, data.ny, data.pvx, data.pvy, data.puckX, data.puckY);

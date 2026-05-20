@@ -1,19 +1,19 @@
 import type { Server as IOServer } from "socket.io";
+import {
+  FIELD_W,
+  FIELD_H,
+  PUCK_RADIUS,
+  PADDLE_RADIUS,
+  CENTER_LINE,
+  GOAL_WIDTH,
+  MAX_PUCK_SPEED,
+  FRICTION,
+  WALL_RESTITUTION,
+  PADDLE_TRANSFER,
+} from "../shared/gameConstants.js";
 
-// ── Physics constants — MATCH BOT MODE exactly (both run at 60fps now) ──
+// ── Server-only physics constants (no client equivalent) ──
 
-const FIELD_W = 1.0;
-const FIELD_H = 1.5;
-const PUCK_RADIUS = 0.04;
-const PADDLE_RADIUS = 0.09;
-const CENTER_LINE = FIELD_H / 2;
-const GOAL_WIDTH = 0.28;
-
-const MAX_PUCK_SPEED = 0.036;
-const FRICTION = 0.997;
-const WALL_RESTITUTION = 0.85;
-const PADDLE_RESTITUTION = 0.85;
-const PADDLE_TRANSFER = 0.2;
 const MAX_PADDLE_DELTA = 0.012;
 
 const TICK_MS = 1000 / 60;     // 60fps physics
@@ -54,6 +54,9 @@ interface ActiveGame {
   robotSides: Set<"bottom" | "top">;
   tickCount: number; // for broadcast throttling
   lastTickTime: number;
+  // Per-side timestamp of the last swept collision — prevents the tick
+  // collision from double-hitting the same swing.
+  lastHit: { bottom: number; top: number };
 }
 
 export const activeGames: Map<string, ActiveGame> = new Map();
@@ -173,9 +176,92 @@ function checkAndResolveAt(puck: PuckState, paddle: PaddleState, px: number, py:
 }
 
 /** Main collision entry — direct distance check only.
- *  Fast swipes are handled by client-reported 'hit' events. */
+ *  Fast swipes are handled by sweptPaddleCollision (invoked from updatePaddle). */
 function handlePaddleCollision(puck: PuckState, paddle: PaddleState): void {
   checkAndResolveAt(puck, paddle, paddle.x, paddle.y);
+}
+
+/**
+ * Swept paddle collision: detects whether the line segment from the
+ * paddle's current position to its new position passes within
+ * (puck.r + paddle.r) of the puck. Catches fast swipes that the
+ * tick-based point check misses (paddle teleports past the puck between
+ * two ticks).
+ *
+ * If a hit is detected, the puck is pushed out from the closest point
+ * on the segment and given an impulse derived from the swipe vector +
+ * the puck's incoming velocity. Returns true when a hit was applied.
+ */
+function sweptPaddleCollision(
+  paddle: PaddleState,
+  newX: number,
+  newY: number,
+  puck: PuckState,
+): boolean {
+  const ax = paddle.x, ay = paddle.y;
+  const bx = newX,    by = newY;
+  const abx = bx - ax, aby = by - ay;
+  const ab2 = abx * abx + aby * aby;
+
+  // Find closest point on segment AB to puck center
+  let t = 0;
+  if (ab2 > 0) {
+    t = clamp(((puck.x - ax) * abx + (puck.y - ay) * aby) / ab2, 0, 1);
+  }
+  const cx = ax + t * abx;
+  const cy = ay + t * aby;
+  const dx = puck.x - cx;
+  const dy = puck.y - cy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const minDist = puck.r + paddle.r;
+  if (dist >= minDist) return false;
+
+  // Normal: from closest point on segment toward puck center. If the
+  // puck is dead-on the segment (dist === 0), use the swipe's reverse
+  // direction so the puck gets pushed back toward where the paddle came
+  // from rather than nowhere.
+  let nx: number, ny: number;
+  if (dist === 0) {
+    if (ab2 > 0) {
+      const len = Math.sqrt(ab2);
+      nx = -abx / len;
+      ny = -aby / len;
+    } else {
+      nx = 0; ny = -1;
+    }
+  } else {
+    nx = dx / dist;
+    ny = dy / dist;
+  }
+
+  // Push puck just outside the swept envelope
+  puck.x = cx + nx * minDist * 1.15;
+  puck.y = cy + ny * minDist * 1.15;
+
+  // Impulse — same shape as checkAndResolveAt, paddle velocity comes
+  // from the full swipe vector (clamped). PADDLE_TRANSFER + RESTITUTION
+  // match the existing tick collision so puck behaviour stays consistent.
+  const pvx = clamp(abx, -MAX_PADDLE_DELTA, MAX_PADDLE_DELTA);
+  const pvy = clamp(aby, -MAX_PADDLE_DELTA, MAX_PADDLE_DELTA);
+  const relVN = (puck.vx - pvx) * nx + (puck.vy - pvy) * ny;
+
+  if (relVN >= 0) {
+    puck.vx += nx * 0.01;
+    puck.vy += ny * 0.01;
+  } else {
+    const RESTITUTION = 0.75;
+    const impulse = -(1 + RESTITUTION) * relVN;
+    puck.vx += impulse * nx + pvx * PADDLE_TRANSFER;
+    puck.vy += impulse * ny + pvy * PADDLE_TRANSFER;
+  }
+
+  const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+  if (speed > MAX_PUCK_SPEED) {
+    puck.vx = (puck.vx / speed) * MAX_PUCK_SPEED;
+    puck.vy = (puck.vy / speed) * MAX_PUCK_SPEED;
+  }
+
+  return true;
 }
 
 // ── Robot AI ──
@@ -326,6 +412,7 @@ export function startGameLoop(
     robotSides: new Set(),
     tickCount: 0,
     lastTickTime: Date.now(),
+    lastHit: { bottom: 0, top: 0 },
   };
   activeGames.set(roomId, game);
 
@@ -353,6 +440,16 @@ export function updatePaddle(
   const newY = side === "bottom"
     ? clamp(y, CENTER_LINE + PADDLE_RADIUS, FIELD_H - PADDLE_RADIUS)
     : clamp(y, PADDLE_RADIUS, CENTER_LINE - PADDLE_RADIUS);
+
+  // Swept collision: catches fast swipes the tick-based check misses.
+  // Runs only when the game is actively playing and the same side
+  // hasn't already hit the puck in the last 30ms.
+  const now = Date.now();
+  if (game.state.status === "playing" && now - game.lastHit[side] > 30) {
+    if (sweptPaddleCollision(paddle, newX, newY, game.state.puck)) {
+      game.lastHit[side] = now;
+    }
+  }
 
   // Server-side velocity: average of current + previous delta for smoothing.
   // Uses raw position delta (not time-based) to avoid network timing issues.
