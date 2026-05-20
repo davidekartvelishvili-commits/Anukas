@@ -115,7 +115,7 @@ export default function MerchantRegisterPage() {
             {/* Header */}
             <div className="mb-8">
               <h1 className="text-[20px] lg:text-[24px] font-bold mb-2 leading-[1.3]" style={{ fontFamily: "var(--font-outfit)" }}>
-                დაამატე ობიექტი ჩვენს პლატფორმაზე უფასოდ და გაზარდე ობიექტის ცნობადობა
+                დაამატე ობიექტი უფასოდ, გაზარდე ცნობადობა
               </h1>
             </div>
 
