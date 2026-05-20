@@ -73,16 +73,15 @@ export default function MerchantRegisterPage() {
           style={{ background: "#0A0A0A" }}
           onClick={() => setActiveSlide((prev) => (prev + 1) % 2)}
         >
-          <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+          <div className="relative w-full h-full overflow-hidden">
             {["/images/merchant-ads/slide1.png", "/images/merchant-ads/slide2.png"].map((src, i) => (
               <img
                 key={i}
                 src={src}
                 alt=""
-                className="absolute max-w-[90%] max-h-[90%] object-contain transition-all duration-500 ease-in-out"
+                className="absolute inset-0 w-full h-full object-cover transition-all duration-500 ease-in-out"
                 style={{
                   opacity: activeSlide === i ? 1 : 0,
-                  transform: activeSlide === i ? "scale(1)" : "scale(0.95)",
                 }}
                 draggable={false}
               />
