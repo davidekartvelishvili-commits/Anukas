@@ -114,12 +114,9 @@ export default function MerchantRegisterPage() {
 
             {/* Header */}
             <div className="mb-8">
-              <h1 className="text-[24px] lg:text-[28px] font-bold mb-2" style={{ fontFamily: "var(--font-outfit)" }}>
-                მერჩანტის რეგისტრაცია
+              <h1 className="text-[20px] lg:text-[24px] font-bold mb-2 leading-[1.3]" style={{ fontFamily: "var(--font-outfit)" }}>
+                დაამატე ობიექტი ჩვენს პლატფორმაზე უფასოდ და გაზარდე ობიექტის ცნობადობა
               </h1>
-              <p className="text-[14px]" style={{ color: "#999" }}>
-                შეავსეთ ფორმა და გახდით Shansi-ს პარტნიორი
-              </p>
             </div>
 
             {success ? (
