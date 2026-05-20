@@ -213,9 +213,11 @@ export function addToQueue(entry: QueueEntry): Room | null {
   return tryMatch();
 }
 
-export function removeFromQueue(socketId: string): void {
+export function removeFromQueue(socketId: string): QueueEntry | null {
   const idx = matchmakingQueue.findIndex((e) => e.socketId === socketId);
-  if (idx !== -1) matchmakingQueue.splice(idx, 1);
+  if (idx === -1) return null;
+  const [entry] = matchmakingQueue.splice(idx, 1);
+  return entry;
 }
 
 function tryMatch(): Room | null {

@@ -7,7 +7,11 @@ import AuthGuard from "@/components/AuthGuard";
 import type { GameState } from "@/components/air-hockey/AirHockeyEngine";
 import type { MultiplayerGameConfig } from "@/components/air-hockey/LobbyScreen";
 import { FIELD_W, FIELD_H } from "@/components/air-hockey/AirHockeyEngine";
-import { FIELD_H as MP_FIELD_H } from "@/shared/gameConstants";
+import {
+  FIELD_H as MP_FIELD_H,
+  PUCK_RADIUS as MP_PUCK_RADIUS,
+  PADDLE_RADIUS as MP_PADDLE_RADIUS,
+} from "@/shared/gameConstants";
 
 type Difficulty = "easy" | "medium" | "hard";
 type GoalTarget = 5 | 10 | 15 | 20;
@@ -230,7 +234,9 @@ export default function AirHockeyPage() {
   const lastServerPuckPosRef = useRef({ x: 0.5, y: 0.75 });
   const prevPaddleEnginePosRef = useRef({ x: 0, y: 0 });
   const hitCooldownRef = useRef(false);
-  const CLIENT_HIT_MIN_DIST = 0.04 + 0.09; // PUCK_RADIUS + PADDLE_RADIUS (server values)
+  // Derived from the shared constants so it never drifts from the server's
+  // actual collision distance.
+  const CLIENT_HIT_MIN_DIST = MP_PUCK_RADIUS + MP_PADDLE_RADIUS;
 
   const handlePlayerMove = useCallback((x: number, y: number) => {
     if (multiplayer) {
@@ -267,14 +273,16 @@ export default function AirHockeyPage() {
         });
 
         hitCooldownRef.current = true;
-        setTimeout(() => { hitCooldownRef.current = false; }, 80);
+        setTimeout(() => { hitCooldownRef.current = false; }, 30);
       }
 
       prevPaddleEnginePosRef.current = { x: engineX, y: engineY };
 
-      // Send position only — server computes velocity from deltas
+      // Send position at ~60Hz so server tick always has fresh data.
+      // Server tick also runs at 60Hz, so anything slower means stale
+      // paddle position on the authoritative side.
       const now = performance.now();
-      if (now - lastPaddleSendRef.current > 33) {
+      if (now - lastPaddleSendRef.current > 16) {
         lastPaddleSendRef.current = now;
         import("@/services/socket").then(({ getSocket }) => {
           getSocket().emit("paddleMove", { x, y: engineY });
