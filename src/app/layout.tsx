@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Outfit, DM_Sans } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 import { LanguageProvider } from "@/context/LanguageContext";
 
@@ -110,20 +109,8 @@ export default function RootLayout({
         <meta name="theme-color" content="#000000" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         {/* Note: OG / Twitter meta tags are emitted by generateMetadata() so admin-uploaded image takes priority */}
-        {/* Meta Pixel — must be inline in head, not deferred */}
-        <script dangerouslySetInnerHTML={{ __html: `
-          !function(f,b,e,v,n,t,s)
-          {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-          n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-          if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-          n.queue=[];t=b.createElement(e);t.async=!0;
-          t.src=v;s=b.getElementsByTagName(e)[0];
-          s.parentNode.insertBefore(t,s)}(window, document,'script',
-          'https://connect.facebook.net/en_US/fbevents.js');
-          fbq('init', '2177327599789445');
-          fbq('init', '2077512643172992');
-          fbq('track', 'PageView');
-        `}} />
+        {/* Meta Pixel */}
+        <script dangerouslySetInnerHTML={{ __html: `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','2077512643172992');fbq('init','2177327599789445');fbq('track','PageView');` }} />
         <noscript>
           <img height="1" width="1" style={{ display: "none" }} src="https://www.facebook.com/tr?id=2177327599789445&ev=PageView&noscript=1" alt="" />
           <img height="1" width="1" style={{ display: "none" }} src="https://www.facebook.com/tr?id=2077512643172992&ev=PageView&noscript=1" alt="" />
