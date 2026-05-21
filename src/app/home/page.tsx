@@ -8,6 +8,7 @@ import { apiFetch } from "@/services/api";
 import dynamic from "next/dynamic";
 import AuthGuard from "@/components/AuthGuard";
 import Ticket, { type TicketData } from "@/components/Ticket";
+import { useTranslation } from "@/context/LanguageContext";
 
 const MysteryCube = dynamic(() => import("@/components/MysteryCube"), { ssr: false });
 
@@ -96,6 +97,7 @@ function useCountdown(hours: number) {
 
 export default function HomePage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [showBalanceModal, setShowBalanceModal] = useState(false);
@@ -259,7 +261,7 @@ export default function HomePage() {
           {/* ── Featured Games ── */}
           <div style={stagger(1)}>
             <h2 className="text-[22px] font-bold text-white mb-4" style={{ fontFamily: "var(--font-outfit)" }}>
-              Featured Games
+              {t("home.featuredGames")}
             </h2>
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
               {ALL_GAMES.filter(g => activeGameTypes.includes(g.gameType)).map((game) => (
@@ -323,7 +325,7 @@ export default function HomePage() {
             <div className="flex items-center gap-3">
               <TrophyIcon />
               <span className="text-[17px] font-bold text-[#1A1A1A]" style={{ fontFamily: "var(--font-outfit)" }}>
-                Today&apos;s Promo Inbox
+                {t("home.todaysPromos")}
               </span>
             </div>
             {!promoSeenToday && promoCount > 0 && (
@@ -341,7 +343,7 @@ export default function HomePage() {
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#22C55E" }} />
                 <h3 className="text-[14px] font-bold" style={{ color: "#F1F5F9", fontFamily: "var(--font-outfit)" }}>
-                  Live Wins
+                  {t("home.liveWins")}
                 </h3>
               </div>
               <div className="flex flex-col gap-1.5">
@@ -396,7 +398,7 @@ export default function HomePage() {
           {liveTickets.length > 0 && (
             <div className="mt-6" style={stagger(3)}>
               <h2 className="text-[22px] font-bold text-white mb-4" style={{ fontFamily: "var(--font-outfit)" }}>
-                Shansi Drops
+                {t("home.shansiDrops")}
               </h2>
             </div>
           )}
@@ -458,7 +460,7 @@ export default function HomePage() {
           >
             <div className="p-5 relative z-10">
               <p className="text-[15px] font-semibold text-[#1A1A1A] opacity-80" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                Mystery Box
+                {t("home.mysteryBox")}
               </p>
               <p className="text-[36px] font-black text-[#1A1A1A] mt-1 tracking-tight" style={{ fontFamily: "var(--font-outfit)" }}>
                 {countdown}
@@ -486,12 +488,12 @@ export default function HomePage() {
             }}
           >
             {[
-              { label: "Home", idx: 0, icon: (a: boolean) => (
+              { label: t("home"), idx: 0, icon: (a: boolean) => (
                 <svg width="22" height="22" viewBox="0 0 22 22" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 11l8-7 8 7" /><path d="M5 9.5v8a1 1 0 001 1h3v-4h4v4h3a1 1 0 001-1v-8" />
                 </svg>
               )},
-              { label: "Games", idx: 1, icon: (a: boolean) => (
+              { label: t("games"), idx: 1, icon: (a: boolean) => (
                 <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
                   <circle cx="7" cy="7" r="2.2" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.5" />
                   <circle cx="15" cy="7" r="2.2" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.5" />
@@ -499,7 +501,7 @@ export default function HomePage() {
                   <circle cx="15" cy="15" r="2.2" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.5" />
                 </svg>
               )},
-              { label: "Scan", idx: 2, icon: (a: boolean) => (
+              { label: t("scan"), idx: 2, icon: (a: boolean) => (
                 <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M2 7V4a2 2 0 012-2h3" />
                   <path d="M15 2h3a2 2 0 012 2v3" />
@@ -564,7 +566,7 @@ export default function HomePage() {
               className="text-white text-[20px] font-bold text-center mb-6"
               style={{ fontFamily: "var(--font-outfit)" }}
             >
-              Select an Option
+              {t("home.selectOption")}
             </h3>
 
             {/* Options */}
@@ -594,7 +596,7 @@ export default function HomePage() {
                   className="text-white text-[14px] font-semibold"
                   style={{ fontFamily: "var(--font-dm-sans)" }}
                 >
-                  Exchange
+                  {t("home.exchange")}
                 </span>
               </button>
 
@@ -619,7 +621,7 @@ export default function HomePage() {
                   className="text-[#999] text-[14px] font-semibold"
                   style={{ fontFamily: "var(--font-dm-sans)" }}
                 >
-                  Redeem Balance
+                  {t("home.redeemBalance")}
                 </span>
               </button>
             </div>
@@ -649,7 +651,7 @@ export default function HomePage() {
             <div className="w-[36px] h-[5px] rounded-full bg-white/30 mx-auto mb-5" />
 
             <h3 className="text-white text-[20px] font-bold text-center mb-6" style={{ fontFamily: "var(--font-outfit)" }}>
-              Exchange
+              {t("home.exchange")}
             </h3>
 
             {/* Cash input line */}
@@ -690,7 +692,7 @@ export default function HomePage() {
 
             {/* Rate */}
             <p className="text-[13px] text-[#999] text-center mb-5" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              1₾ Cash = 100 Coin
+              {t("home.exchangeRate")}
             </p>
 
             {/* Exchange button */}
@@ -708,7 +710,7 @@ export default function HomePage() {
               className="mx-auto block px-10 py-8 rounded-full text-[16px] font-bold transition-all active:scale-[0.97] disabled:opacity-40"
               style={{ background: "#F9E741", color: "#000", fontFamily: "var(--font-outfit)" }}
             >
-              Exchange
+              {t("home.exchange")}
             </button>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import { apiFetch } from "@/services/api";
+import { useTranslation } from "@/context/LanguageContext";
 
 interface ApiOffer {
   id: string;
@@ -87,7 +88,7 @@ function CountdownText({ seconds, className, style }: { seconds: number; classNa
   return <span className={className} style={style}>{display}</span>;
 }
 
-const categories = ["All", "Cafe", "Restaurant", "Grocery", "Entertainment", "Game Lounge", "Autoservice"];
+const categoryKeys = ["All", "Cafe", "Restaurant", "Grocery", "Entertainment", "Game Lounge", "Autoservice"];
 
 /* Deal shape used by existing render code */
 interface Deal {
@@ -183,6 +184,7 @@ function getNearestBranchDistance(branches: { lat: number; lng: number }[], user
 
 export default function PromosPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [mounted, setMounted] = useState(false);
   const [activeCategory, setActiveCategory] = useState("All");
   const [featuredIdx, setFeaturedIdx] = useState(0);
@@ -204,8 +206,8 @@ export default function PromosPage() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 50);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setMounted(true), 50);
+    return () => clearTimeout(timer);
   }, []);
 
   // Get user location
@@ -413,7 +415,7 @@ export default function PromosPage() {
               className="text-white text-[20px] font-bold"
               style={{ fontFamily: "var(--font-outfit)" }}
             >
-              Today&apos;s Promos
+              {t("promos.todaysPromos")}
             </h1>
             {(() => {
               const total = featuredDeals.length + flashDealsAll.length + partnerPromos.length;
@@ -430,7 +432,17 @@ export default function PromosPage() {
 
           {/* ── 2. Category pills ── */}
           <div className="flex gap-2 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide" style={stagger(1)}>
-            {categories.map((cat) => (
+            {categoryKeys.map((cat) => {
+              const categoryLabelsMap: Record<string, string> = {
+                "All": t("promos.all"),
+                "Cafe": t("promos.cafe"),
+                "Restaurant": t("promos.restaurant"),
+                "Grocery": t("promos.grocery"),
+                "Entertainment": t("promos.entertainment"),
+                "Game Lounge": t("promos.gameLounges"),
+                "Autoservice": t("promos.autoservice"),
+              };
+              return (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
@@ -443,10 +455,11 @@ export default function PromosPage() {
                   className={`text-[14px] font-semibold ${activeCategory === cat ? "text-[#1A1A1A]" : "text-[#9CA3AF]"}`}
                   style={{ fontFamily: "var(--font-dm-sans)" }}
                 >
-                  {cat}
+                  {categoryLabelsMap[cat] || cat}
                 </span>
               </button>
-            ))}
+              );
+            })}
           </div>
 
           {/* ── 3. Featured promo hero (swipeable 3D) ── */}
@@ -527,7 +540,7 @@ export default function PromosPage() {
                 className="text-[#1A1A1A] text-[16px] font-bold"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
-                {isSpinning ? "SPINNING..." : "SPIN"}
+                {isSpinning ? t("promos.spinning") : t("promos.spin")}
               </span>
             </button>
           </div>
@@ -540,7 +553,7 @@ export default function PromosPage() {
               className="text-white text-[22px] font-bold mb-4"
               style={{ fontFamily: "var(--font-outfit)" }}
             >
-              Flash Deals
+              {t("promos.flashDeals")}
             </h2>
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide mb-6">
               {flashDeals.map((deal) => (
@@ -593,7 +606,7 @@ export default function PromosPage() {
               className="text-white text-[22px] font-bold mb-4"
               style={{ fontFamily: "var(--font-outfit)" }}
             >
-              Partner Promos
+              {t("promos.partnerPromos")}
             </h2>
             <div className="flex flex-col mb-6">
               {filteredPartners.map((promo, i) => (
@@ -675,13 +688,13 @@ export default function PromosPage() {
               grouped[cat].push(m);
             });
             const categoryLabels: Record<string, string> = {
-              cafe: "Cafes",
-              restaurant: "Restaurants",
-              grocery: "Grocery",
-              entertainment: "Entertainment",
-              game_lounge: "Game Lounges",
-              autoservice: "Autoservice",
-              other: "Other",
+              cafe: t("promos.cafe"),
+              restaurant: t("promos.restaurant"),
+              grocery: t("promos.grocery"),
+              entertainment: t("promos.entertainment"),
+              game_lounge: t("promos.gameLounges"),
+              autoservice: t("promos.autoservice"),
+              other: t("promos.other"),
             };
             return Object.entries(grouped).map(([cat, items]) => (
               <div key={cat} style={stagger(5)} className="mb-6">
@@ -850,7 +863,7 @@ export default function PromosPage() {
               className="text-white text-[22px] font-bold mb-4"
               style={{ fontFamily: "var(--font-outfit)" }}
             >
-              Recent Wins
+              {t("promos.recentWins")}
             </h2>
             <div className="flex flex-col gap-2 mb-6">
               {recentWins.map((win) => (
@@ -922,12 +935,12 @@ export default function PromosPage() {
             }}
           >
             {[
-              { label: "Home", idx: 0, icon: (a: boolean) => (
+              { label: t("home"), idx: 0, icon: (a: boolean) => (
                 <svg width="22" height="22" viewBox="0 0 22 22" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 11l8-7 8 7" /><path d="M5 9.5v8a1 1 0 001 1h3v-4h4v4h3a1 1 0 001-1v-8" />
                 </svg>
               )},
-              { label: "Games", idx: 1, icon: (a: boolean) => (
+              { label: t("games"), idx: 1, icon: (a: boolean) => (
                 <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
                   <circle cx="7" cy="7" r="2.2" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.5" />
                   <circle cx="15" cy="7" r="2.2" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.5" />
@@ -935,7 +948,7 @@ export default function PromosPage() {
                   <circle cx="15" cy="15" r="2.2" fill={a ? "#FFF" : "none"} stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.5" />
                 </svg>
               )},
-              { label: "Scan", idx: 2, icon: (a: boolean) => (
+              { label: t("scan"), idx: 2, icon: (a: boolean) => (
                 <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke={a ? "#FFF" : "rgba(255,255,255,0.4)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M2 7V4a2 2 0 012-2h3" />
                   <path d="M15 2h3a2 2 0 012 2v3" />

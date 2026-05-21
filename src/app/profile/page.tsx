@@ -4,10 +4,12 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getMe, getStoredUser, getUserActivity } from "@/services/auth";
 import { getMyReferral, getReferralConfigPublic, updateMyReferralCode } from "@/services/referral";
+import { useTranslation } from "@/context/LanguageContext";
 import AuthGuard from "@/components/AuthGuard";
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [mounted, setMounted] = useState(false);
   const [showBalanceModal, setShowBalanceModal] = useState(false);
   const [showCardNotif, setShowCardNotif] = useState(false);
@@ -104,8 +106,8 @@ export default function ProfilePage() {
     }).catch(() => {});
     const saved = localStorage.getItem("user-gender");
     if (saved) setGender(saved);
-    const t = setTimeout(() => setMounted(true), 50);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setMounted(true), 50);
+    return () => clearTimeout(timer);
   }, []);
 
   const avatarSrc = gender === "Female" ? "/images/profile-avatar-female.png" : gender === "Other" ? "/images/profile-avatar-other.png" : "/images/profile-avatar.png";
@@ -197,7 +199,7 @@ export default function ProfilePage() {
                 <path d="M7 0.5l1.76 3.57 3.94.57-2.85 2.78.67 3.93L7 9.46l-3.52 1.89.67-3.93L1.3 4.64l3.94-.57L7 0.5z" />
               </svg>
               <span className="text-[12px] font-bold" style={{ color: "#F9E741", fontFamily: "var(--font-outfit)" }}>
-                Level 1
+                {t("profile.level")} 1
               </span>
             </div>
           </div>
@@ -302,7 +304,7 @@ export default function ProfilePage() {
               className="text-white text-[22px] font-bold mb-3 text-center"
               style={{ fontFamily: "var(--font-outfit)" }}
             >
-              Give {refConfig.signupRewardLari} ₾, Earn Coins 🎉
+              {t("profile.giveEarn")} 🎉
             </h2>
             <p
               className="text-[#999] text-[15px] text-center mb-6 leading-relaxed"
@@ -338,12 +340,12 @@ export default function ProfilePage() {
             {/* Referral totals */}
             <div className="flex items-center gap-6 mb-6">
               <div className="text-center">
-                <p className="text-[11px] uppercase tracking-wider" style={{ color: "#666", fontFamily: "var(--font-dm-sans)" }}>Referrals</p>
+                <p className="text-[11px] uppercase tracking-wider" style={{ color: "#666", fontFamily: "var(--font-dm-sans)" }}>{t("profile.referrals")}</p>
                 <p className="text-white text-[20px] font-bold" style={{ fontFamily: "var(--font-outfit)" }}>{refTotal}</p>
               </div>
               <div className="w-[1px] h-8" style={{ background: "rgba(255,255,255,0.1)" }} />
               <div className="text-center">
-                <p className="text-[11px] uppercase tracking-wider" style={{ color: "#666", fontFamily: "var(--font-dm-sans)" }}>Coins earned</p>
+                <p className="text-[11px] uppercase tracking-wider" style={{ color: "#666", fontFamily: "var(--font-dm-sans)" }}>{t("profile.coinsEarned")}</p>
                 <p className="text-[20px] font-bold" style={{ color: "#FFE500", fontFamily: "var(--font-outfit)" }}>{refCoinsEarned.toLocaleString()}</p>
               </div>
             </div>
@@ -354,7 +356,7 @@ export default function ProfilePage() {
                 className="text-[#888] text-[15px]"
                 style={{ fontFamily: "var(--font-dm-sans)" }}
               >
-                Code:
+                {t("profile.code")}:
               </span>
               <span
                 className="text-white text-[17px] font-bold tracking-wide"
@@ -412,7 +414,7 @@ export default function ProfilePage() {
                 className="text-black text-[17px] font-bold"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
-                Share
+                {t("profile.share")}
               </span>
             </button>
           </div>
@@ -424,7 +426,7 @@ export default function ProfilePage() {
                 className="text-white text-[22px] font-bold"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
-                All Activity
+                {t("profile.allActivity")}
               </h2>
               <div className="relative">
                 <button
@@ -452,20 +454,20 @@ export default function ProfilePage() {
                         animation: "fadeIn 0.15s ease-out",
                       }}
                     >
-                      {["All Activity", "Rewards", "Redemptions"].map((cat) => (
+                      {[{ key: "All Activity", label: t("profile.allActivity") }, { key: "Rewards", label: t("profile.rewards") }, { key: "Redemptions", label: t("profile.redemptions") }].map(({ key, label }) => (
                         <button
-                          key={cat}
-                          onClick={() => { setActiveFilter(cat); setShowFilter(false); }}
+                          key={key}
+                          onClick={() => { setActiveFilter(key); setShowFilter(false); }}
                           className="w-full text-left px-4 py-3 transition-all duration-150"
                           style={{
-                            background: activeFilter === cat ? "rgba(255,255,255,0.1)" : "transparent",
+                            background: activeFilter === key ? "rgba(255,255,255,0.1)" : "transparent",
                           }}
                         >
                           <span
-                            className={`text-[15px] font-medium ${activeFilter === cat ? "text-white" : "text-[#999]"}`}
+                            className={`text-[15px] font-medium ${activeFilter === key ? "text-white" : "text-[#999]"}`}
                             style={{ fontFamily: "var(--font-dm-sans)" }}
                           >
-                            {cat}
+                            {label}
                           </span>
                         </button>
                       ))}
@@ -489,7 +491,7 @@ export default function ProfilePage() {
                 return <div className="py-8 flex justify-center"><div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#FFD700", borderTopColor: "transparent" }} /></div>;
               }
               if (filtered.length === 0) {
-                return <p className="py-8 text-center text-[14px]" style={{ color: "#666" }}>აქტივობა არ არის</p>;
+                return <p className="py-8 text-center text-[14px]" style={{ color: "#666" }}>{t("profile.noActivity")}</p>;
               }
 
               const timeAgo = (date: string) => {
@@ -568,7 +570,7 @@ export default function ProfilePage() {
               className="text-white text-[22px] font-bold text-center mb-3"
               style={{ fontFamily: "var(--font-outfit)" }}
             >
-              Edit Referral Code
+              {t("profile.editReferralCode")}
             </h3>
 
             {/* Description */}

@@ -90,7 +90,7 @@ export default function SettingsPage() {
               className="text-white text-[18px] font-bold"
               style={{ fontFamily: "var(--font-outfit)" }}
             >
-              Settings
+              {t("settings")}
             </h1>
           </div>
 
@@ -124,7 +124,7 @@ export default function SettingsPage() {
               className="text-white text-[20px] font-bold mb-4"
               style={{ fontFamily: "var(--font-outfit)" }}
             >
-              My Info
+              {t("settings.myInfo")}
             </h2>
 
             {/* Gender selector */}
@@ -132,18 +132,18 @@ export default function SettingsPage() {
               className="flex items-center rounded-full p-1 mb-4"
               style={{ background: "#1C1C1E" }}
             >
-              {["Male", "Female", "Other"].map((g) => (
+              {([{ key: "Male", label: t("settings.male") }, { key: "Female", label: t("settings.female") }, { key: "Other", label: t("settings.other") }]).map(({ key, label }) => (
                 <button
-                  key={g}
-                  onClick={() => handleGender(g)}
+                  key={key}
+                  onClick={() => handleGender(key)}
                   className="flex-1 py-3 rounded-full text-center transition-all duration-200"
-                  style={{ background: gender === g ? "#FFFFFF" : "transparent" }}
+                  style={{ background: gender === key ? "#FFFFFF" : "transparent" }}
                 >
                   <span
-                    className={`text-[15px] font-semibold ${gender === g ? "text-black" : "text-[#888]"}`}
+                    className={`text-[15px] font-semibold ${gender === key ? "text-black" : "text-[#888]"}`}
                     style={{ fontFamily: "var(--font-dm-sans)" }}
                   >
-                    {g}
+                    {label}
                   </span>
                 </button>
               ))}
@@ -154,7 +154,7 @@ export default function SettingsPage() {
               <button
                 onClick={() => {
                   if (!canChangeName()) {
-                    setNameError("You can change username once per 24 hours");
+                    setNameError(t("settings.changeUsername"));
                     setTimeout(() => setNameError(""), 3000);
                     return;
                   }
@@ -288,7 +288,7 @@ export default function SettingsPage() {
                   className="text-white text-[18px] font-bold text-left"
                   style={{ fontFamily: "var(--font-outfit)" }}
                 >
-                  Audio Settings
+                  {t("settings.audioSettings")}
                 </h3>
                 <p
                   className="text-[#888] text-[14px] text-left mt-0.5"
@@ -317,7 +317,7 @@ export default function SettingsPage() {
                   className="text-white text-[18px] font-bold text-left"
                   style={{ fontFamily: "var(--font-outfit)" }}
                 >
-                  Security & Easy Access
+                  {t("settings.security")}
                 </h3>
                 <p
                   className="text-[#888] text-[14px] text-left mt-0.5"
@@ -346,7 +346,7 @@ export default function SettingsPage() {
                   className="text-white text-[18px] font-bold text-left"
                   style={{ fontFamily: "var(--font-outfit)" }}
                 >
-                  Referral Code
+                  {t("settings.referralCode")}
                 </h3>
                 <p
                   className="text-[#888] text-[14px] text-left mt-0.5"
@@ -398,7 +398,7 @@ export default function SettingsPage() {
                 className="text-[#EF4444] text-[18px] font-bold"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
-                Log Out
+                {t("logOut")}
               </h3>
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M7 4l6 6-6 6" />
