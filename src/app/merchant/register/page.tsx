@@ -4,6 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { registerMerchant } from "@/services/merchant";
 
+declare global {
+  interface Window {
+    fbq?: (...args: any[]) => void;
+  }
+}
+
 const CATEGORIES = [
   { value: "cafe", label: "კაფე" },
   { value: "restaurant", label: "რესტორანი" },
@@ -55,6 +61,9 @@ export default function MerchantRegisterPage() {
         contact_person: form.contact_person || undefined,
       });
       setSuccess(true);
+      if (typeof window !== "undefined" && window.fbq) {
+        window.fbq("track", "CompleteRegistration");
+      }
     } catch (err: any) {
       setError(err.message || "შეცდომა, სცადეთ თავიდან");
     } finally {
