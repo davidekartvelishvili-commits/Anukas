@@ -121,10 +121,12 @@ export default function RootLayout({
           s.parentNode.insertBefore(t,s)}(window, document,'script',
           'https://connect.facebook.net/en_US/fbevents.js');
           fbq('init', '2177327599789445');
+          fbq('init', '2077512643172992');
           fbq('track', 'PageView');
         `}</Script>
         <noscript>
           <img height="1" width="1" style={{ display: "none" }} src="https://www.facebook.com/tr?id=2177327599789445&ev=PageView&noscript=1" alt="" />
+          <img height="1" width="1" style={{ display: "none" }} src="https://www.facebook.com/tr?id=2077512643172992&ev=PageView&noscript=1" alt="" />
         </noscript>
       </head>
       <body
