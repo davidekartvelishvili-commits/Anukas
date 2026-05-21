@@ -88,9 +88,11 @@ merchant.post("/register", async (c) => {
   const isValid = await verifyOtp(phone, otp_code);
   if (!isValid) throw new BadRequestError("არასწორი კოდი, სცადეთ თავიდან");
 
-  // Check if phone already registered
-  const [existing] = await db.select().from(merchants).where(eq(merchants.phone, phone)).limit(1);
-  if (existing) throw new BadRequestError("ეს ტელეფონი უკვე რეგისტრირებულია");
+  // Check if phone already registered (skip for test number)
+  if (!phone.includes("599474491")) {
+    const [existing] = await db.select().from(merchants).where(eq(merchants.phone, phone)).limit(1);
+    if (existing) throw new BadRequestError("ეს ტელეფონი უკვე რეგისტრირებულია");
+  }
 
   const id = nanoid();
   await db.insert(merchants).values({
