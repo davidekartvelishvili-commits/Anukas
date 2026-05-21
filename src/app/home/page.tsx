@@ -97,7 +97,7 @@ function useCountdown(hours: number) {
 
 export default function HomePage() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [showBalanceModal, setShowBalanceModal] = useState(false);
