@@ -3,66 +3,82 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-/* ───────── 3D FLOATING ITEMS — matching coverd.us positions exactly ───────── */
-/* 9 items scattered around edges, very large, some partially off-screen */
+/* ───────── ITEM CONFIG ───────── */
 
-const FLOATING_ITEMS = [
-  // Top-left: airplane — large, angled, partially off left edge
-  { src: "/images/onboarding/airplane.png",      left: "2%",   top: "10%",  size: 220, rotate: -20, delay: 0.2,  duration: 6.0 },
-  // Top-center: stethoscope
-  { src: "/images/onboarding/stethoscope.png",   left: "28%",  top: "2%",   size: 85,  rotate: 10,  delay: 0,    duration: 5.6 },
-  // Top-right: cards
-  { src: "/images/onboarding/cards.png",         left: "60%",  top: "5%",   size: 190, rotate: -12, delay: 0.6,  duration: 6.4 },
-  // Right: piggy bank
-  { src: "/images/onboarding/piggy-bank-pink.png",    left: "82%",  top: "14%",  size: 210, rotate: 15,  delay: 0.4,  duration: 5.8 },
-  // Center-left below headline: sushi
-  { src: "/images/onboarding/sushi.png",         left: "18%",  top: "58%",  size: 120, rotate: -8,  delay: 1.0,  duration: 6.2 },
-  // Center-right: ring
-  { src: "/images/onboarding/ring.png",          left: "55%",  top: "72%",  size: 110, rotate: 20,  delay: 1.4,  duration: 5.4 },
-  // Bottom-right: sneaker
-  { src: "/images/onboarding/sneaker.png",       left: "70%",  top: "64%",  size: 200, rotate: -18, delay: 0.8,  duration: 6.6 },
-  // Far-left edge: building
-  { src: "/images/onboarding/building.png",      left: "-5%",  top: "48%",  size: 180, rotate: 5,   delay: 1.2,  duration: 5.5 },
-  // Bottom-left: ali-nino
-  { src: "/images/onboarding/ali-nino.png",      left: "22%",  top: "78%",  size: 160, rotate: -6,  delay: 0.6,  duration: 6.0 },
+interface FloatingItem {
+  src: string;
+  x: number;
+  y: number;
+  width: number;
+  rotation: number;
+  depth: number;
+  zIndex: number;
+}
+
+const ITEMS: FloatingItem[] = [
+  { src: "/images/onboarding/sushi.png",       x: -5,  y: 2,   width: 110, rotation: -15, depth: 1.8, zIndex: 5 },
+  { src: "/images/onboarding/airplane.png",    x: 20,  y: -5,  width: 120, rotation: -10, depth: 1.2, zIndex: 4 },
+  { src: "/images/onboarding/yoga-mat.png",    x: 48,  y: 5,   width: 100, rotation: 22,  depth: 0.8, zIndex: 2 },
+  { src: "/images/onboarding/sneaker.png",     x: 55,  y: 30,  width: 130, rotation: 8,   depth: 1.6, zIndex: 7 },
+  { src: "/images/onboarding/stethoscope.png", x: -3,  y: 35,  width: 105, rotation: -5,  depth: 1.3, zIndex: 6 },
+  { src: "/images/onboarding/building.png",    x: 30,  y: 45,  width: 100, rotation: 5,   depth: 1.0, zIndex: 3 },
+  { src: "/images/onboarding/piggy-bank.png",  x: 60,  y: 60,  width: 110, rotation: -6,  depth: 2.0, zIndex: 7 },
+  { src: "/images/onboarding/suitcase.png",   x: 35,  y: 68,  width: 115, rotation: 12,  depth: 1.4, zIndex: 5 },
+  { src: "/images/onboarding/ring.png",      x: 65,  y: -2,  width: 95,  rotation: -10, depth: 0.9, zIndex: 3 },
+  { src: "/images/onboarding/golfball.png", x: -2,  y: 55,  width: 80,  rotation: 0,   depth: 1.7, zIndex: 4 },
+  { src: "/images/onboarding/cards.png",   x: 42,  y: 25,  width: 120, rotation: -8,  depth: 1.1, zIndex: 3 },
+  { src: "/images/onboarding/ali-nino.png", x: 10,  y: 75,  width: 105, rotation: 10,  depth: 1.5, zIndex: 6 },
 ];
 
-/* ───────── TRANSACTION ROWS — 3 scrolling rows like coverd.us ───────── */
+/* ───────── ENTRANCE ANIMATION ───────── */
 
-// Row 1: largest cards, slowest scroll
-const TRX_ROW_1 = [
-  { src: "/images/trx-nike.png",          scale: 1.7,  rotate: -1, gap: 60 },
-];
+const CAROUSEL_DURATION = 4000;       // 4s carousel phase
+const STAGGER_DELAY = 100;            // 100ms between each item falling
+const CAROUSEL_RADIUS = 160;          // circle radius in px
+const CAROUSEL_SPEED = 0.001178;      // radians per ms — 3/4 circle in CAROUSEL_DURATION
 
-// Row 2: medium cards, medium scroll
-const TRX_ROW_2 = [
-  { src: "/images/trx-zara-amex.png",     scale: 1.15, rotate: 2,  gap: 35 },
-  { src: "/images/trx-coffeelab-amex.png", scale: 1.0,  rotate: -2, gap: 50 },
-  { src: "/images/trx-cavea.png",         scale: 1.2,  rotate: 1,  gap: 30 },
-  { src: "/images/trx-nike.png",          scale: 1.1,  rotate: -1, gap: 45 },
-];
+/* ───────── LOGO ───────── */
 
-// Row 3: smallest cards, fastest scroll
-const TRX_ROW_3 = [
-  { src: "/images/trx-coffeelab-visa.png", scale: 0.85, rotate: -1, gap: 30 },
-  { src: "/images/trx-zara-visa.png",     scale: 0.95, rotate: 2,  gap: 40 },
-  { src: "/images/trx-zara-amex.png",     scale: 0.8,  rotate: -2, gap: 25 },
-  { src: "/images/trx-nike.png",          scale: 0.9,  rotate: 1,  gap: 35 },
-  { src: "/images/trx-cavea.png",         scale: 0.85, rotate: -1, gap: 30 },
-];
+function ShansiLogo() {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/images/shansi-logo.png"
+      alt="Shansi"
+      width={52}
+      height={52}
+      className="select-none"
+      draggable={false}
+    />
+  );
+}
 
-/* ───────── MAIN PAGE ───────── */
+/* ───────── PHYSICS STATE (per item) ───────── */
 
-export default function SecondLandingPage() {
+interface PhysicsBody {
+  // Position offset from initial CSS position
+  x: number;
+  y: number;
+  // Velocity
+  vx: number;
+  vy: number;
+  // Rotation (degrees, accumulated; cosmos-style 360° spins on impact)
+  r: number;
+  // Rotational velocity (degrees per frame)
+  vr: number;
+}
+
+/* ───────── MAIN ───────── */
+
+export default function WelcomePage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [videoPlaying, setVideoPlaying] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const trxRef = useRef<HTMLDivElement>(null);
-  const trxWrapRef = useRef<HTMLDivElement>(null);
+  const [gyroGranted, setGyroGranted] = useState(false);
+  const userTapped = useRef(false);
 
+  // Capture ?ref=CODE from share link → store for the signup flow
+  // Capture ?callbackUrl= from AuthGuard redirect → persist for post-login
   useEffect(() => {
-    setMounted(true);
     if (typeof window === "undefined") return;
     try {
       const params = new URLSearchParams(window.location.search);
@@ -74,6 +90,7 @@ export default function SecondLandingPage() {
       if (cb) {
         localStorage.setItem("auth_callback_url", cb);
       }
+      // Track page view
       const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
       fetch(`${API}/public/track`, {
         method: "POST",
@@ -90,538 +107,647 @@ export default function SecondLandingPage() {
     } catch {}
   }, []);
 
+  const rawTilt = useRef({ x: 0, y: 0 });
+  const smoothTilt = useRef({ x: 0, y: 0 });
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const rafRef = useRef<number>(0);
+
+  // Physics bodies — one per item
+  const bodies = useRef<PhysicsBody[]>(ITEMS.map(() => ({ x: 0, y: 0, vx: 0, vy: 0, r: 0, vr: 0 })));
+
+  // Entrance animation state
+  const animPhase = useRef<"carousel" | "falling" | "settled">("carousel");
+  const animStartTime = useRef<number>(0);
+  const itemScale = useRef<number[]>(ITEMS.map(() => 1));
+  const hasBouncedFloor = useRef<boolean[]>(ITEMS.map(() => false));
+  const itemReleased = useRef<boolean[]>(ITEMS.map(() => false));
+  const itemFrozen = useRef<boolean[]>(ITEMS.map(() => false));
+
+  // Drag state
+  const draggingIdx = useRef<number | null>(null);
+  const dragPrev = useRef({ x: 0, y: 0 });
+  const dragVel = useRef({ x: 0, y: 0 });
+
+  const SENSITIVITY = 0.8;
+  const MAX_GYRO = 40;
+  const FRICTION = 0.96;
+  const COLLISION_RESPONSE = 0.5;
+  const BOUNCE = 0.6;
+
   useEffect(() => {
-    let ticking = false;
-    const updatePosition = () => {
-      const sentinel = trxRef.current;
-      const wrap = trxWrapRef.current;
-      if (!sentinel || !wrap) return;
+    setMounted(true);
+    animStartTime.current = performance.now();
 
-      const rect = sentinel.getBoundingClientRect();
-      const vh = window.innerHeight;
-      // Animation starts when sentinel top enters bottom of viewport
-      // Animation ends when sentinel top reaches 20% from top of viewport
-      const start = vh;       // sentinel.top == vh → progress 0
-      const end = vh * 0.2;   // sentinel.top == vh*0.2 → progress 1
-      const progress = Math.min(1, Math.max(0, (start - rect.top) / (start - end)));
-
-      const translateX = (1 - progress) * 100;
-      wrap.style.transform = `translateX(${translateX}%)`;
-      wrap.style.opacity = `${progress}`;
-      ticking = false;
+    // Get the center of an item in screen coordinates
+    const getCenter = (idx: number): { x: number; y: number } => {
+      const el = itemRefs.current[idx];
+      if (!el) return { x: 0, y: 0 };
+      const parent = el.parentElement?.getBoundingClientRect();
+      const pw = parent?.width || window.innerWidth;
+      const ph = parent?.height || window.innerHeight;
+      const item = ITEMS[idx];
+      const body = bodies.current[idx];
+      return {
+        x: (item.x / 100) * pw + item.width / 2 + body.x,
+        y: ((45 + item.y * 0.55) / 100) * ph + item.width / 2 + body.y,
+      };
     };
 
-    const handleScroll = () => {
-      if (!ticking) {
-        ticking = true;
-        requestAnimationFrame(updatePosition);
+    // Compute the carousel offset for an item (offset from its base position to its circle slot)
+    const getCarouselOffset = (idx: number, elapsed: number) => {
+      const sw = window.innerWidth;
+      const sh = window.innerHeight;
+      const item = ITEMS[idx];
+      // Circle center: horizontally centered, vertically ~30% from top (near the title)
+      const cx = sw / 2;
+      const cy = sh * 0.38;
+      // Item base position (matches CSS)
+      const baseX = (item.x / 100) * sw;
+      const baseY = ((45 + item.y * 0.55) / 100) * sh;
+      // Angle for this item in the circle, rotating clockwise over time
+      const angle = (idx / ITEMS.length) * Math.PI * 2 + elapsed * CAROUSEL_SPEED;
+      const targetX = cx + CAROUSEL_RADIUS * Math.cos(angle) - item.width / 2;
+      const targetY = cy + CAROUSEL_RADIUS * Math.sin(angle) - item.width / 2;
+      return { x: targetX - baseX, y: targetY - baseY };
+    };
+
+    // ── Main physics loop at 60fps ──
+    const loop = () => {
+      const now = performance.now();
+      const elapsed = now - animStartTime.current;
+
+      // Lerp gyro
+      smoothTilt.current.x += (rawTilt.current.x - smoothTilt.current.x) * 0.1;
+      smoothTilt.current.y += (rawTilt.current.y - smoothTilt.current.y) * 0.1;
+      const sx = smoothTilt.current.x;
+      const sy = smoothTilt.current.y;
+
+      const n = ITEMS.length;
+
+      // ── PHASE: Carousel (first 2 seconds) ──
+      if (animPhase.current === "carousel") {
+        if (elapsed >= CAROUSEL_DURATION) {
+          // Transition to EXPLOSION — blast items outward from the carousel center
+          const sw = window.innerWidth;
+          const sh = window.innerHeight;
+          for (let i = 0; i < n; i++) {
+            const off = getCarouselOffset(i, elapsed);
+            bodies.current[i].x = off.x;
+            bodies.current[i].y = off.y;
+
+            // Outward direction = item's current offset from center, plus some jitter
+            const item = ITEMS[i];
+            const baseX = (item.x / 100) * sw;
+            const baseY = ((45 + item.y * 0.55) / 100) * sh;
+            const absX = baseX + off.x;
+            const absY = baseY + off.y;
+            const dx = absX - sw / 2;
+            const dy = absY - sh * 0.38; // carousel center Y
+            const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+            // Explosion speed — varies per item for organic feel
+            const speed = 22 + Math.random() * 14; // px/frame
+            const jitter = (Math.random() - 0.5) * 0.25; // small angle offset
+            const cos = dx / dist, sin = dy / dist;
+            // Rotate by jitter
+            const rc = Math.cos(jitter), rs = Math.sin(jitter);
+            const vxDir = cos * rc - sin * rs;
+            const vyDir = sin * rc + cos * rs;
+            bodies.current[i].vx = vxDir * speed;
+            bodies.current[i].vy = vyDir * speed;
+            // Random spin from the blast
+            bodies.current[i].vr = (Math.random() - 0.5) * 18;
+
+            itemScale.current[i] = 1.25; // pulse out on explosion
+            hasBouncedFloor.current[i] = false;
+            itemReleased.current[i] = true; // all released at once — no stagger
+            itemFrozen.current[i] = false;
+          }
+          animPhase.current = "falling";
+        } else {
+          // Position all items on the rotating circle
+          for (let i = 0; i < n; i++) {
+            const off = getCarouselOffset(i, elapsed);
+            bodies.current[i].x = off.x;
+            bodies.current[i].y = off.y;
+          }
+        }
       }
+
+      // ── PHASE: Explosion (items blast outward from carousel center, then settle) ──
+      if (animPhase.current === "falling") {
+        const WALL_BOUNCE_FALL = 0.5;
+        let allSettled = true;
+
+        const screenW = window.innerWidth;
+        const screenH = window.innerHeight;
+
+        for (let i = 0; i < n; i++) {
+          const b = bodies.current[i];
+          const item = ITEMS[i];
+
+          // Skip frozen items — they've settled
+          if (itemFrozen.current[i]) {
+            continue;
+          }
+
+          // Air friction — slows the blast gradually (no gravity, zero-G feel)
+          b.vx *= 0.965;
+          b.vy *= 0.965;
+
+          b.x += b.vx;
+          b.y += b.vy;
+
+          // Angular motion + friction
+          b.r += b.vr;
+          b.vr *= 0.94;
+
+          // Absolute position for wall checks
+          const baseX = (item.x / 100) * screenW;
+          const baseY = ((45 + item.y * 0.55) / 100) * screenH;
+          const absLeft = baseX + b.x;
+          const absRight = absLeft + item.width;
+          const absTop = baseY + b.y;
+          const absBottom = absTop + item.width;
+
+          // Wall bounces — keep items on screen (no floor, it's 4 walls)
+          if (absLeft < -10) {
+            b.x = -10 - baseX;
+            b.vx = Math.abs(b.vx) * WALL_BOUNCE_FALL;
+          }
+          if (absRight > screenW + 10) {
+            b.x = screenW + 10 - item.width - baseX;
+            b.vx = -Math.abs(b.vx) * WALL_BOUNCE_FALL;
+          }
+          if (absTop < -10) {
+            b.y = -10 - baseY;
+            b.vy = Math.abs(b.vy) * WALL_BOUNCE_FALL;
+          }
+          if (absBottom > screenH + 10) {
+            b.y = screenH + 10 - item.width - baseY;
+            b.vy = -Math.abs(b.vy) * WALL_BOUNCE_FALL;
+          }
+
+          // Scale settle: 1.25 → 1.0
+          if (itemScale.current[i] > 1.001) {
+            itemScale.current[i] += (1.0 - itemScale.current[i]) * 0.08;
+          } else {
+            itemScale.current[i] = 1;
+          }
+
+          // Freeze once motion is essentially zero — wherever the item ends up is fine
+          const speedSq = b.vx * b.vx + b.vy * b.vy;
+          if (speedSq < 0.08 && Math.abs(b.vr) < 0.25) {
+            b.vx = 0;
+            b.vy = 0;
+            b.vr = 0;
+            itemFrozen.current[i] = true;
+            itemScale.current[i] = 1;
+            continue;
+          }
+
+          allSettled = false;
+        }
+
+        // Collision between falling items
+        for (let i = 0; i < n; i++) {
+          if (!itemReleased.current[i]) continue;
+          for (let j = i + 1; j < n; j++) {
+            if (!itemReleased.current[j]) continue;
+            const ci = getCenter(i);
+            const cj = getCenter(j);
+            const dx = cj.x - ci.x;
+            const dy = cj.y - ci.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const minDist = ITEMS[i].width * 0.35 + ITEMS[j].width * 0.35;
+            if (dist < minDist && dist > 0.5) {
+              const nx = dx / dist;
+              const ny = dy / dist;
+              const bi = bodies.current[i];
+              const bj = bodies.current[j];
+              const dvDotN = (bj.vx - bi.vx) * nx + (bj.vy - bi.vy) * ny;
+              if (dvDotN < 0) {
+                const impulse = -dvDotN * 0.4;
+                bi.vx -= nx * impulse;
+                bi.vy -= ny * impulse;
+                bj.vx += nx * impulse;
+                bj.vy += ny * impulse;
+              }
+              const overlap = (minDist - dist) * 0.5;
+              bi.x -= nx * overlap;
+              bi.y -= ny * overlap;
+              bj.x += nx * overlap;
+              bj.y += ny * overlap;
+            }
+          }
+        }
+
+        if (allSettled) {
+          animPhase.current = "settled";
+        }
+      }
+
+      // ── PHASE: Settled (normal physics) ──
+      if (animPhase.current === "settled") {
+        // ── Apply velocity + friction to non-dragged items ──
+        for (let i = 0; i < n; i++) {
+          const b = bodies.current[i];
+          if (draggingIdx.current === i) {
+            // While dragging: no inertia damping (direct follow). Rotation settles quickly.
+            b.vr *= 0.85;
+            if (Math.abs(b.vr) < 0.08) b.vr = 0;
+            b.r += b.vr;
+            continue;
+          }
+          b.x += b.vx;
+          b.y += b.vy;
+          b.vx *= FRICTION;
+          b.vy *= FRICTION;
+          if (Math.abs(b.vx) < 0.05) b.vx = 0;
+          if (Math.abs(b.vy) < 0.05) b.vy = 0;
+          // Rotation — strong angular friction so items don't keep spinning like a top
+          b.r += b.vr;
+          b.vr *= 0.93;
+          if (Math.abs(b.vr) < 0.08) b.vr = 0;
+        }
+
+        // ── Collision detection + momentum transfer ──
+        for (let i = 0; i < n; i++) {
+          for (let j = i + 1; j < n; j++) {
+            const ci = getCenter(i);
+            const cj = getCenter(j);
+            const dx = cj.x - ci.x;
+            const dy = cj.y - ci.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const ri = ITEMS[i].width * 0.35;
+            const rj = ITEMS[j].width * 0.35;
+            const minDist = ri + rj;
+
+            if (dist < minDist && dist > 0.5) {
+              const nx = dx / dist;
+              const ny = dy / dist;
+              const overlap = minDist - dist;
+
+              const bi = bodies.current[i];
+              const bj = bodies.current[j];
+
+              const dvx = bj.vx - bi.vx;
+              const dvy = bj.vy - bi.vy;
+              const dvDotN = dvx * nx + dvy * ny;
+
+              if (dvDotN < 0) {
+                const speed = Math.abs(dvDotN);
+                if (speed > 1.5 && userTapped.current && navigator.vibrate) {
+                  navigator.vibrate(Math.min(30, Math.round(speed * 4)));
+                }
+                const impulse = -(1 + BOUNCE) * dvDotN * COLLISION_RESPONSE;
+
+                if (draggingIdx.current === i) {
+                  bj.vx += nx * impulse * 2;
+                  bj.vy += ny * impulse * 2;
+                } else if (draggingIdx.current === j) {
+                  bi.vx -= nx * impulse * 2;
+                  bi.vy -= ny * impulse * 2;
+                } else {
+                  bi.vx -= nx * impulse;
+                  bi.vy -= ny * impulse;
+                  bj.vx += nx * impulse;
+                  bj.vy += ny * impulse;
+                }
+
+                // ── Gentle angular impulse — natural, subtle rotation on collision (not a fidget spinner) ──
+                const tx = -ny, ty = nx;
+                const tangential = dvx * tx + dvy * ty;
+                // Small multiplier + low cap so the spin is a subtle rotation, not a full spin
+                const spinMagnitude = Math.min(3.5, Math.abs(tangential) * 0.5);
+                const spinDir = tangential >= 0 ? 1 : -1;
+                if (draggingIdx.current !== j) bj.vr += spinDir * spinMagnitude;
+                if (draggingIdx.current !== i) bi.vr -= spinDir * spinMagnitude;
+              }
+
+              const sep = overlap * 0.5;
+              if (draggingIdx.current === i) {
+                bj.x += nx * overlap;
+                bj.y += ny * overlap;
+              } else if (draggingIdx.current === j) {
+                bi.x -= nx * overlap;
+                bi.y -= ny * overlap;
+              } else {
+                bi.x -= nx * sep;
+                bi.y -= ny * sep;
+                bj.x += nx * sep;
+                bj.y += ny * sep;
+              }
+            }
+          }
+        }
+
+        // ── Wall bouncing ──
+        const screenW = window.innerWidth;
+        const screenH = window.innerHeight;
+        for (let i = 0; i < n; i++) {
+          const item = ITEMS[i];
+          const b = bodies.current[i];
+          const baseX = (item.x / 100) * screenW;
+          const baseY = ((45 + item.y * 0.55) / 100) * screenH;
+          const actualLeft = baseX + b.x;
+          const actualRight = actualLeft + item.width;
+          const actualTop = baseY + b.y;
+          const actualBottom = actualTop + item.width;
+
+          const wallVibrate = (v: number) => {
+            if (Math.abs(v) > 2 && userTapped.current && navigator.vibrate) {
+              navigator.vibrate(Math.min(20, Math.round(Math.abs(v) * 3)));
+            }
+          };
+
+          // Wall-bounce angular impulse — very gentle, only noticeable on corner/glancing hits
+          const addSpinFromWall = (tangential: number) => {
+            const mag = Math.min(2.5, Math.abs(tangential) * 0.35);
+            b.vr += (tangential >= 0 ? 1 : -1) * mag;
+          };
+
+          if (actualLeft < -10) {
+            b.x = -10 - baseX;
+            wallVibrate(b.vx);
+            addSpinFromWall(b.vy); // vertical motion at left wall → spin
+            b.vx = Math.abs(b.vx) * BOUNCE;
+          }
+          if (actualRight > screenW + 10) {
+            b.x = screenW + 10 - item.width - baseX;
+            wallVibrate(b.vx);
+            addSpinFromWall(-b.vy);
+            b.vx = -Math.abs(b.vx) * BOUNCE;
+          }
+          if (actualTop < -10) {
+            b.y = -10 - baseY;
+            wallVibrate(b.vy);
+            addSpinFromWall(-b.vx);
+            b.vy = Math.abs(b.vy) * BOUNCE;
+          }
+          if (actualBottom > screenH + 10) {
+            b.y = screenH + 10 - item.width - baseY;
+            wallVibrate(b.vy);
+            addSpinFromWall(b.vx);
+            b.vy = -Math.abs(b.vy) * BOUNCE;
+          }
+        }
+      }
+
+      // ── Apply transforms ──
+      ITEMS.forEach((item, idx) => {
+        const el = itemRefs.current[idx];
+        if (!el) return;
+        const b = bodies.current[idx];
+        const scale = itemScale.current[idx];
+        // Only apply gyro/parallax after settling
+        const useGyro = animPhase.current === "settled";
+        const gyroX = useGyro ? Math.max(-MAX_GYRO, Math.min(MAX_GYRO, sx * item.depth * 30 * SENSITIVITY)) : 0;
+        const gyroY = useGyro ? Math.max(-MAX_GYRO, Math.min(MAX_GYRO, sy * item.depth * 18 * SENSITIVITY)) : 0;
+        const gyroDr = useGyro ? sx * item.depth * 3 : 0;
+        const totalX = gyroX + b.x;
+        const totalY = gyroY + b.y;
+        // Total rotation = original resting angle + gyro tilt + accumulated spin from collisions/walls
+        const totalRotation = item.rotation + gyroDr + b.r;
+        el.style.transform = `translate3d(${totalX}px, ${totalY}px, 0) rotate(${totalRotation}deg) scale(${scale})`;
+      });
+
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+
+    // ── Gyroscope ──
+    const onOrientation = (e: DeviceOrientationEvent) => {
+      rawTilt.current.x = Math.max(-1, Math.min(1, (e.gamma || 0) / 25));
+      rawTilt.current.y = Math.max(-1, Math.min(1, ((e.beta || 0) - 45) / 25));
     };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    // Run once on mount
-    updatePosition();
-    return () => window.removeEventListener("scroll", handleScroll);
+    // ── Mouse parallax (desktop) ──
+    const onMouse = (e: MouseEvent) => {
+      if (draggingIdx.current !== null) return; // don't mix mouse parallax with drag
+      rawTilt.current.x = (e.clientX / window.innerWidth - 0.5) * 2;
+      rawTilt.current.y = (e.clientY / window.innerHeight - 0.5) * 2;
+    };
+
+    const isIOS = typeof DeviceOrientationEvent !== "undefined" &&
+      typeof (DeviceOrientationEvent as any).requestPermission === "function";
+    if (!isIOS && typeof DeviceOrientationEvent !== "undefined") {
+      window.addEventListener("deviceorientation", onOrientation);
+    }
+    window.addEventListener("mousemove", onMouse);
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      window.removeEventListener("deviceorientation", onOrientation);
+      window.removeEventListener("mousemove", onMouse);
+    };
   }, []);
+
+  // ── iOS gyroscope permission ──
+  const requestGyro = () => {
+    if (gyroGranted) return;
+    const DOE = typeof DeviceOrientationEvent !== "undefined" ? DeviceOrientationEvent : null;
+    if (DOE && typeof (DOE as any).requestPermission === "function") {
+      (DOE as any).requestPermission().then((p: string) => {
+        if (p === "granted") {
+          setGyroGranted(true);
+          window.addEventListener("deviceorientation", (e: DeviceOrientationEvent) => {
+            rawTilt.current.x = Math.max(-1, Math.min(1, (e.gamma || 0) / 25));
+            rawTilt.current.y = Math.max(-1, Math.min(1, ((e.beta || 0) - 45) / 25));
+          });
+        }
+      }).catch(() => {});
+    }
+  };
+
+  // ── Drag handlers ──
+  const startDrag = (idx: number, cx: number, cy: number) => {
+    userTapped.current = true;
+    if (animPhase.current !== "settled") return;
+    draggingIdx.current = idx;
+    dragPrev.current = { x: cx, y: cy };
+    dragVel.current = { x: 0, y: 0 };
+    bodies.current[idx].vx = 0;
+    bodies.current[idx].vy = 0;
+    const el = itemRefs.current[idx];
+    if (el) el.style.zIndex = "30";
+  };
+
+  const moveDrag = (idx: number, cx: number, cy: number) => {
+    if (draggingIdx.current !== idx) return;
+    const dx = cx - dragPrev.current.x;
+    const dy = cy - dragPrev.current.y;
+    // Track velocity (smoothed)
+    dragVel.current.x = dragVel.current.x * 0.5 + dx * 0.5;
+    dragVel.current.y = dragVel.current.y * 0.5 + dy * 0.5;
+    // Move body directly
+    bodies.current[idx].x += dx;
+    bodies.current[idx].y += dy;
+    dragPrev.current = { x: cx, y: cy };
+  };
+
+  const endDrag = (idx: number) => {
+    if (draggingIdx.current !== idx) return;
+    // Apply inertia — fling velocity
+    bodies.current[idx].vx = dragVel.current.x * 1.5;
+    bodies.current[idx].vy = dragVel.current.y * 1.5;
+    draggingIdx.current = null;
+    const el = itemRefs.current[idx];
+    if (el) el.style.zIndex = String(ITEMS[idx].zIndex);
+  };
 
   return (
     <>
       <style>{`
-        html, html body {
-          background: #F9E741 !important;
-          overflow: auto !important;
-          overflow-x: hidden !important;
-          overflow-y: scroll !important;
-          height: auto !important;
-          max-height: none !important;
-          position: static !important;
-          overscroll-behavior: auto !important;
+        html, body {
+          background: #FFE500 !important;
+          overflow: hidden !important;
+          height: 100%;
+          overscroll-behavior: none;
         }
-
-        @font-face {
-          font-family: 'DachiTheLynx';
-          src: url('/fonts/DachiTheLynx.otf') format('opentype');
-          font-weight: normal;
-          font-style: normal;
-          font-display: swap;
-        }
-
-        @keyframes floatBob {
-          0%, 100% { transform: translateY(0) rotate(var(--rot)); }
-          50%      { transform: translateY(-18px) rotate(var(--rot)); }
-        }
-
-        @keyframes itemPop {
-          0%   { opacity: 0; transform: scale(0.3) rotate(var(--rot)); }
-          70%  { opacity: 1; transform: scale(1.05) rotate(var(--rot)); }
-          100% { opacity: 1; transform: scale(1) rotate(var(--rot)); }
-        }
-
-        @keyframes heroUp {
-          from { opacity: 0; transform: translateY(36px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .hero-in-d1  { animation: heroUp 0.7s ease-out 0.10s forwards; opacity: 0; }
-        .hero-in-d2  { animation: heroUp 0.7s ease-out 0.22s forwards; opacity: 0; }
-        .hero-in-d3  { animation: heroUp 0.7s ease-out 0.34s forwards; opacity: 0; }
-
-        @keyframes scrollRow {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .trx-row-1 { animation: scrollRow 35s linear infinite; }
-        .trx-row-2 { animation: scrollRow 28s linear infinite; }
-        .trx-row-3 { animation: scrollRow 20s linear infinite; }
-
       `}</style>
+      {/* Override theme-color for Safari status bar + URL bar */}
+      <meta name="theme-color" content="#FFE500" />
 
-      <meta name="theme-color" content="#F9E741" />
+      <main
+        className="fixed inset-0 flex flex-col overflow-hidden"
+        style={{
+          background: "#FFE500",
+          touchAction: "none",
+          overscrollBehavior: "none",
+        }}
+        onClick={() => { userTapped.current = true; requestGyro(); }}
+      >
+        {/* ── Top bar ── */}
+        <div
+          className="flex justify-end px-5 pt-3 relative z-50"
+          style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)", pointerEvents: "none" }}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); router.push("/auth?mode=login"); }}
+            className="text-[16px] font-bold text-[#1A1A1A] active:opacity-50 transition-opacity"
+            style={{ fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif", pointerEvents: "auto" }}
+          >
+            Log In
+          </button>
+        </div>
 
-      <div className="min-h-screen" style={{ background: "#F9E741" }}>
+        {/* ── Logo ── */}
+        <div
+          className="flex justify-center mt-24 relative z-50"
+          style={{
+            opacity: mounted ? 1 : 0,
+            transform: mounted ? "scale(1)" : "scale(0.8)",
+            transition: "all 0.5s ease-out 0.1s",
+            pointerEvents: "none",
+          }}
+        >
+          <ShansiLogo />
+        </div>
 
-        {/* ═══════════ HERO — full viewport, everything lives here ═══════════ */}
-        <section className="relative flex flex-col" style={{ background: "#F9E741", minHeight: "100vh" }}>
+        {/* ── Title — centered, one line, edge to edge ── */}
+        <div
+          className="px-3 mt-3 relative z-50 text-center"
+          style={{
+            opacity: mounted ? 1 : 0,
+            transform: mounted ? "translateY(0)" : "translateY(24px)",
+            transition: "all 0.6s ease-out 0.15s",
+            pointerEvents: "none",
+          }}
+        >
+          <h1
+            className="text-[#1A1A1A] leading-[1] tracking-[0.04em] whitespace-nowrap"
+            style={{
+              fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif",
+              fontWeight: 900,
+              fontSize: "clamp(30px, 9.5vw, 52px)",
+            }}
+          >
+            Welcome to Shansi!
+          </h1>
+        </div>
 
-          {/* ── Top bar: just logo + button, NO header bar, z-index BELOW items ── */}
-          <div className="relative z-10 w-full px-5 sm:px-10 pt-5 flex items-center justify-between">
-            {/* Logo */}
-            <div className="flex items-center gap-2.5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/shansi-logo.png"
-                alt="Shansi"
-                width={36}
-                height={36}
-                className="select-none"
-                draggable={false}
-              />
-              <span
-                className="text-[22px] font-extrabold text-[#1A1A1A] tracking-[-0.02em]"
-                style={{ fontFamily: "var(--font-outfit)" }}
-              >
-                Shansi
-              </span>
-            </div>
-
-            {/* Center nav links — matching coverd */}
-            <div className="hidden md:flex items-center gap-6">
-              {["Home", "About", "Careers", "Support"].map((link, i) => (
-                <button
-                  key={link}
-                  onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-                  className="text-[15px] font-semibold text-[#1A1A1A] px-5 py-1.5 rounded-full transition-all duration-200"
-                  style={{
-                    fontFamily: "var(--font-outfit)",
-                    border: i === 0 ? "2px solid #1A1A1A" : "2px solid transparent",
-                  }}
-                  onMouseEnter={(e) => { if (i !== 0) e.currentTarget.style.border = "2px solid #1A1A1A"; }}
-                  onMouseLeave={(e) => { if (i !== 0) e.currentTarget.style.border = "2px solid transparent"; }}
-                >
-                  {link}
-                </button>
-              ))}
-            </div>
-
-            {/* CTA button */}
-            <button
-              onClick={() => router.push("/auth")}
-              className="px-7 py-3 rounded-full text-[15px] font-bold text-white transition-all duration-200 hover:scale-[1.04] active:scale-[0.96]"
-              style={{
-                fontFamily: "var(--font-outfit)",
-                background: "#1A1A1A",
-              }}
-            >
-              Get Started
-            </button>
-          </div>
-
-          {/* ── 3D floating objects — z-20, they float OVER the nav bar ── */}
-          {FLOATING_ITEMS.map((item, i) => (
+        {/* ── Floating items — full screen, physics-driven ── */}
+        <div className="absolute inset-0 overflow-hidden" style={{ zIndex: 1 }}>
+          {ITEMS.map((item, idx) => (
             <div
-              key={i}
-              className="absolute pointer-events-none select-none hidden md:block"
+              key={idx}
+              ref={(el) => { itemRefs.current[idx] = el; }}
+              className="absolute will-change-transform touch-none cursor-grab active:cursor-grabbing"
               style={{
-                left: item.left,
-                top: item.top,
-                width: item.size,
-                height: item.size,
-                zIndex: 40,
-                // @ts-expect-error CSS custom property
-                "--rot": `${item.rotate}deg`,
-                animation: mounted
-                  ? `itemPop 0.5s ease-out ${item.delay}s forwards, floatBob ${item.duration}s ease-in-out ${item.delay + 0.5}s infinite`
-                  : "none",
-                opacity: 0,
-                filter: "drop-shadow(0 12px 30px rgba(0,0,0,0.12))",
+                left: `${item.x}%`,
+                top: `${45 + item.y * 0.55}%`,
+                width: item.width,
+                zIndex: item.zIndex,
+                transform: `translate3d(0, 0, 0) rotate(${item.rotation}deg)`,
+                filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.15))",
               }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.src}
-                alt=""
-                width={item.size}
-                height={item.size}
-                className="w-full h-full object-contain"
-                draggable={false}
-              />
-            </div>
-          ))}
-
-          {/* ── Tablet: slightly smaller ── */}
-          {FLOATING_ITEMS.map((item, i) => (
-            <div
-              key={`t-${i}`}
-              className="absolute pointer-events-none select-none hidden sm:block md:hidden"
-              style={{
-                left: item.left,
-                top: item.top,
-                width: item.size * 0.6,
-                height: item.size * 0.6,
-                zIndex: 40,
-                // @ts-expect-error CSS custom property
-                "--rot": `${item.rotate}deg`,
-                animation: mounted
-                  ? `itemPop 0.5s ease-out ${item.delay}s forwards, floatBob ${item.duration}s ease-in-out ${item.delay + 0.5}s infinite`
-                  : "none",
-                opacity: 0,
-                filter: "drop-shadow(0 8px 20px rgba(0,0,0,0.10))",
+              onTouchStart={(e) => {
+                e.stopPropagation();
+                startDrag(idx, e.touches[0].clientX, e.touches[0].clientY);
+              }}
+              onTouchMove={(e) => {
+                moveDrag(idx, e.touches[0].clientX, e.touches[0].clientY);
+              }}
+              onTouchEnd={() => endDrag(idx)}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                startDrag(idx, e.clientX, e.clientY);
+                const onMove = (ev: MouseEvent) => moveDrag(idx, ev.clientX, ev.clientY);
+                const onUp = () => {
+                  endDrag(idx);
+                  window.removeEventListener("mousemove", onMove);
+                  window.removeEventListener("mouseup", onUp);
+                };
+                window.addEventListener("mousemove", onMove);
+                window.addEventListener("mouseup", onUp);
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={item.src}
                 alt=""
-                width={Math.round(item.size * 0.6)}
-                height={Math.round(item.size * 0.6)}
-                className="w-full h-full object-contain"
+                width={item.width}
+                height={item.width}
+                className="w-full h-auto object-contain select-none pointer-events-none"
                 draggable={false}
+                style={{
+                  opacity: mounted ? 1 : 0,
+                  transition: `opacity 0.5s ease-out ${0.3 + idx * 0.06}s`,
+                }}
               />
             </div>
           ))}
+        </div>
 
-          {/* ── Mobile: only 5 items, much smaller ── */}
-          {FLOATING_ITEMS.filter((_, i) => [0, 3, 4, 6, 8].includes(i)).map((item, i) => (
-            <div
-              key={`m-${i}`}
-              className="absolute pointer-events-none select-none sm:hidden"
-              style={{
-                left: item.left,
-                top: item.top,
-                width: item.size * 0.38,
-                height: item.size * 0.38,
-                zIndex: 40,
-                // @ts-expect-error CSS custom property
-                "--rot": `${item.rotate}deg`,
-                animation: mounted
-                  ? `itemPop 0.5s ease-out ${item.delay}s forwards, floatBob ${item.duration}s ease-in-out ${item.delay + 0.5}s infinite`
-                  : "none",
-                opacity: 0,
-                filter: "drop-shadow(0 5px 12px rgba(0,0,0,0.08))",
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.src}
-                alt=""
-                width={Math.round(item.size * 0.38)}
-                height={Math.round(item.size * 0.38)}
-                className="w-full h-full object-contain"
-                draggable={false}
-              />
-            </div>
-          ))}
+        {/* ── Spacer ── */}
+        <div className="flex-1" />
 
-          {/* ── Headline — center, z-30 so text is always readable ── */}
-          <div className="flex-1 flex items-center justify-center relative z-30 pointer-events-none" style={{ marginTop: "-6vh" }}>
-            <div className="text-center max-w-[900px] mx-auto px-6 pointer-events-auto">
-              <h1
-                className={`text-[#1A1A1A] leading-[0.95] tracking-[-0.03em] ${mounted ? "hero-in-d1" : "opacity-0"}`}
-                style={{
-                  fontFamily: "'DachiTheLynx', var(--font-outfit)",
-                  fontWeight: 900,
-                  fontStyle: "italic",
-                  fontSize: "clamp(40px, 8.5vw, 84px)",
-                }}
-              >
-                გამოიყენე SHANSI
-              </h1>
-              <h2
-                className={`text-[#1A1A1A] leading-[1.0] tracking-[-0.02em] mt-2 ${mounted ? "hero-in-d2" : "opacity-0"}`}
-                style={{
-                  fontFamily: "'DachiTheLynx', var(--font-outfit)",
-                  fontWeight: 900,
-                  fontStyle: "italic",
-                  fontSize: "clamp(34px, 7vw, 72px)",
-                }}
-              >
-                აქციე ხარჯი მოგებად
-              </h2>
-            </div>
-          </div>
-
-        </section>
-
-        {/* ═══════════ VIDEO SECTION — right below hero, like coverd ═══════════ */}
-        <section className="relative z-30 px-6 md:px-10 -mt-12" style={{ background: "transparent" }}>
-          <div className="max-w-[1200px] mx-auto relative">
-            {/* Suitcase overlapping top-left of video — floating */}
-            <div
-              className="absolute pointer-events-none select-none hidden md:block"
-              style={{
-                left: -60,
-                top: -70,
-                width: 180,
-                height: 180,
-                zIndex: 40,
-                // @ts-expect-error CSS custom property
-                "--rot": "-6deg",
-                animation: "floatBob 6s ease-in-out infinite",
-                filter: "drop-shadow(0 10px 25px rgba(0,0,0,0.12))",
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/onboarding/suitcase.png" alt="" width={180} height={180} className="w-full h-full object-contain" draggable={false} />
-            </div>
-            <div
-              className="relative overflow-hidden cursor-pointer"
-              style={{
-                borderRadius: 20,
-                boxShadow: "0 12px 50px rgba(0,0,0,0.15)",
-                aspectRatio: "16 / 9",
-                background: "#1A1A1A",
-              }}
-              onClick={() => {
-                if (videoRef.current) {
-                  if (videoPlaying) {
-                    videoRef.current.pause();
-                    setVideoPlaying(false);
-                  } else {
-                    videoRef.current.play();
-                    setVideoPlaying(true);
-                  }
-                }
-              }}
-            >
-              <video
-                ref={videoRef}
-                src="/images/shansi-demo.mp4"
-                playsInline
-                preload="metadata"
-                controls={videoPlaying}
-                style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
-                onEnded={() => setVideoPlaying(false)}
-              />
-              {/* Play button overlay */}
-              {!videoPlaying && (
-                <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.25)" }}>
-                  <div
-                    className="flex items-center justify-center transition-transform duration-200 hover:scale-110"
-                    style={{
-                      width: 80,
-                      height: 80,
-                      borderRadius: "50%",
-                      background: "#F9E741",
-                      boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
-                    }}
-                  >
-                    <svg width="32" height="36" viewBox="0 0 32 36" fill="none">
-                      <path d="M30 18L2 34V2L30 18Z" fill="#1A1A1A" />
-                    </svg>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Tagline below video */}
-            <p
-              className="text-center mt-16 md:mt-20 px-4"
-              style={{
-                fontFamily: "'DachiTheLynx', var(--font-outfit)",
-                fontWeight: 700,
-                fontStyle: "italic",
-                fontSize: "clamp(24px, 4vw, 44px)",
-                color: "#1a1a2e",
-                lineHeight: 1.3,
-              }}
-            >
-              პარტნიორ ობიექტებთან გადახდისას გამოიყენე SHANSI და დაიბრუნე 100%-მდე ქეშბექი
-            </p>
-
-            {/* Sentinel — stays in flow to track scroll position */}
-            <div ref={trxRef} className="mt-28 md:mt-36" style={{ height: 0 }} />
-            {/* Transactions — 3 rows, scroll-linked slide from right */}
-            <div
-              ref={trxWrapRef}
-              className="mb-16 md:mb-24 flex flex-col gap-16 md:gap-24 select-none"
-              style={{ transform: "translateX(100%)", opacity: 0, willChange: "transform, opacity" }}
-            >
-              {/* Row 1: 3 transactions */}
-              <div className="flex items-end gap-16 md:gap-24">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/images/trx-cavea-mc.png"
-                  alt=""
-                  className="h-auto pointer-events-none"
-                  style={{
-                    width: 400,
-                    transform: "rotate(-1deg)",
-                    filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
-                  }}
-                  draggable={false}
-                />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/images/trx-nike-mc.png"
-                  alt=""
-                  className="h-auto pointer-events-none"
-                  style={{
-                    width: 210,
-                    transform: "rotate(2deg)",
-                    filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
-                  }}
-                  draggable={false}
-                />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/images/trx-zara-mc.png"
-                  alt=""
-                  className="h-auto pointer-events-none"
-                  style={{
-                    width: 300,
-                    transform: "rotate(-1.5deg)",
-                    filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
-                  }}
-                  draggable={false}
-                />
-              </div>
-              {/* Row 2: Bolt — centered */}
-              <div className="flex justify-center" style={{ marginTop: -40 }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/images/trx-bolt-amex.png"
-                  alt=""
-                  className="h-auto pointer-events-none"
-                  style={{
-                    width: 400,
-                    transform: "rotate(-1deg)",
-                    filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
-                  }}
-                  draggable={false}
-                />
-              </div>
-              {/* Row 3: Zara Visa — left side, under Cavea */}
-              <div className="flex justify-start" style={{ marginTop: -60 }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/images/trx-zara-visa2.png"
-                  alt=""
-                  className="h-auto pointer-events-none"
-                  style={{
-                    width: 280,
-                    transform: "rotate(1deg)",
-                    filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.08))",
-                  }}
-                  draggable={false}
-                />
-              </div>
-            </div>
-
-            {/* App mockup */}
-            <div className="mt-12 md:mt-16 flex justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/app-mockup.png"
-                alt="Shansi App"
-                className="pointer-events-none"
-                style={{
-                  width: 340,
-                  filter: "drop-shadow(0 12px 40px rgba(0,0,0,0.15))",
-                }}
-                draggable={false}
-              />
-            </div>
-          </div>
-        </section>
-
-
-        {/* ═══════════ HOW IT WORKS ═══════════ */}
-        <section className="py-20 md:py-28 px-6" style={{ background: "#F9E741" }}>
-          <div className="max-w-[1100px] mx-auto">
-            <div className="text-center mb-14">
-              <h2
-                className="text-[32px] sm:text-[44px] md:text-[52px] font-extrabold text-[#1A1A1A] leading-[1.1] mb-4"
-                style={{ fontFamily: "'DachiTheLynx', var(--font-outfit)", fontStyle: "italic" }}
-              >
-                როგორ გამოვიყენოთ პლატფორმა?
-              </h2>
-              <p
-                className="text-[16px] sm:text-[18px] text-[#1A1A1A]/60 max-w-[480px] mx-auto"
-                style={{ fontFamily: "var(--font-dm-sans)" }}
-              >
-                3 მარტივი მოქმედებით დაიბრუნეთ გადახდილი თანხა
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-6 md:gap-8">
-              {[
-                { img: "/images/app-mockup.png", step: "01", title: "დაასკანერე QR კოდი",   desc: "ეწვიეთ პარტნიორ ობიექტს და დაასკანერეთ QR კოდი თქვენი შენაძენის დასაფიქსირებლად.", imgSize: 70 },
-                { img: "/images/app-slots.png", step: "02", title: "ითამაშე თამაშები",   desc: "გამოიყენე შენი ბილეთები და ითამაშე — სლოტები, პლინკო, ჩიქენ რაში. ყოველი შენაძენი თამაშის ბილეთია.", imgSize: 120 },
-                { img: "/images/app-cashback.png", step: "03", title: "მოიგე ქეშბექი", desc: "დაიბრუნე შენაძენის 100%-მდე თანხა. გამოიტანე ნებისმიერ დროს, ყოველგვარი პირობების გარეშე.", imgSize: 200 },
-              ].map((s, i) => (
-                <div
-                  key={i}
-                  className="relative rounded-3xl p-8 md:p-10 text-center transition-transform duration-200 hover:scale-[1.02]"
-                  style={{ background: "white", boxShadow: "0 2px 20px rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.06)", outline: "none", overflow: "visible" }}
-                >
-                  <span
-                    className="absolute top-4 right-6 text-[48px] font-black text-[#1A1A1A]/[0.04] select-none"
-                    style={{ fontFamily: "var(--font-outfit)" }}
-                  >
-                    {s.step}
-                  </span>
-                  <div className="mb-5 flex justify-center items-end" style={{ height: 100, overflow: "visible" }}>
-                    {s.img && (
-                      <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={s.img}
-                          alt=""
-                          className="pointer-events-none select-none"
-                          style={{ width: s.imgSize, marginTop: -40, filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.10))" }}
-                          draggable={false}
-                        />
-                      </>
-                    )}
-                  </div>
-                  <h3 className="text-[20px] font-bold text-[#1A1A1A] mb-3" style={{ fontFamily: "var(--font-outfit)" }}>
-                    {s.title}
-                  </h3>
-                  <p className="text-[14px] text-[#1A1A1A]/55 leading-[1.6]" style={{ fontFamily: "var(--font-dm-sans)" }}>
-                    {s.desc}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════════ FOOTER ═══════════ */}
-        <footer className="py-8 px-6" style={{ background: "#1A1A1A" }}>
-          <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row items-center justify-between gap-5">
-            <div className="flex items-center gap-2.5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/shansi-logo.png" alt="Shansi" width={24} height={24} className="select-none brightness-0 invert" />
-              <span className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>Shansi</span>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-6 text-[13px] text-white/50" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="hover:text-white transition-colors">Home</button>
-              <button onClick={() => router.push("/auth")} className="hover:text-white transition-colors">Sign Up</button>
-              <button onClick={() => router.push("/auth?mode=login")} className="hover:text-white transition-colors">Log In</button>
-            </div>
-            <p className="text-[12px] text-white/30" style={{ fontFamily: "var(--font-dm-sans)" }}>&copy; 2026 Shansi. All rights reserved.</p>
-          </div>
-        </footer>
-      </div>
+        {/* ── Sign up button ── */}
+        <div
+          className="relative flex justify-center mb-6"
+          style={{
+            zIndex: 40,
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)",
+            opacity: mounted ? 1 : 0,
+            transform: mounted ? "translateY(0)" : "translateY(16px)",
+            transition: "all 0.5s ease-out 0.3s",
+            pointerEvents: "none",
+          }}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); router.push("/auth"); }}
+            className="w-[145px] h-[66px] rounded-[33px] bg-[#1A1A1A] text-white text-[17px] font-bold active:scale-[0.96] transition-transform duration-150"
+            style={{
+              fontFamily: "var(--font-outfit), system-ui, -apple-system, sans-serif",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+              pointerEvents: "auto",
+            }}
+          >
+            Sign up
+          </button>
+        </div>
+      </main>
     </>
   );
 }
