@@ -3,10 +3,13 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { logout } from "@/services/auth";
+import { useTranslation } from "@/context/LanguageContext";
+import type { Locale } from "@/context/LanguageContext";
 import AuthGuard from "@/components/AuthGuard";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { t, locale, setLocale } = useTranslation();
   const [mounted, setMounted] = useState(false);
   const [gender, setGender] = useState("Male");
   const [username, setUsername] = useState("Cashback_User");
@@ -356,6 +359,30 @@ export default function SettingsPage() {
                 <path d="M7 4l6 6-6 6" />
               </svg>
             </button>
+          </div>
+
+          {/* ── Language ── */}
+          <div style={stagger(4)}>
+            <h3 className="text-white text-[18px] font-bold mb-3" style={{ fontFamily: "var(--font-outfit)" }}>
+              {t("language")}
+            </h3>
+            <div className="flex gap-2">
+              {([["ka", "🇬🇪", "ქართული"], ["en", "🇬🇧", "English"]] as const).map(([code, flag, label]) => (
+                <button
+                  key={code}
+                  onClick={() => setLocale(code as Locale)}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-[12px] text-[14px] font-semibold transition-all active:scale-[0.97]"
+                  style={{
+                    background: locale === code ? "#F9E741" : "#1C1C1E",
+                    color: locale === code ? "#000" : "#999",
+                    border: locale === code ? "2px solid #F9E741" : "2px solid #2A2A2E",
+                  }}
+                >
+                  <span className="text-[18px]">{flag}</span>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* ── Divider ── */}

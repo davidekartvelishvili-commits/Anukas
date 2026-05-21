@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/context/LanguageContext";
 
 /* ───────── 3D FLOATING ITEMS — matching coverd.us positions exactly ───────── */
 /* 9 items scattered around edges, very large, some partially off-screen */
@@ -55,6 +56,7 @@ const TRX_ROW_3 = [
 
 export default function SecondLandingPage() {
   const router = useRouter();
+  const { t, locale, setLocale } = useTranslation();
   const [mounted, setMounted] = useState(false);
   const [videoPlaying, setVideoPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -222,17 +224,24 @@ export default function SecondLandingPage() {
               ))}
             </div>
 
-            {/* CTA button */}
-            <button
-              onClick={() => router.push("/auth")}
-              className="px-7 py-3 rounded-full text-[15px] font-bold text-white transition-all duration-200 hover:scale-[1.04] active:scale-[0.96]"
-              style={{
-                fontFamily: "var(--font-outfit)",
-                background: "#1A1A1A",
-              }}
-            >
-              Get Started
-            </button>
+            <div className="flex items-center gap-3">
+              {/* Language toggle */}
+              <button
+                onClick={() => setLocale(locale === "ka" ? "en" : "ka")}
+                className="px-3 py-2.5 rounded-full text-[13px] font-bold transition-all duration-200 hover:scale-[1.04] active:scale-[0.96]"
+                style={{ fontFamily: "var(--font-outfit)", background: "rgba(26,26,26,0.1)", border: "2px solid #1A1A1A", color: "#1A1A1A" }}
+              >
+                {locale === "ka" ? "EN" : "GE"}
+              </button>
+              {/* CTA button */}
+              <button
+                onClick={() => router.push("/auth")}
+                className="px-7 py-3 rounded-full text-[15px] font-bold text-white transition-all duration-200 hover:scale-[1.04] active:scale-[0.96]"
+                style={{ fontFamily: "var(--font-outfit)", background: "#1A1A1A" }}
+              >
+                {t("landing.getStarted")}
+              </button>
+            </div>
           </div>
 
           {/* ── 3D floating objects — z-20, they float OVER the nav bar ── */}
