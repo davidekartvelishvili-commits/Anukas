@@ -4,9 +4,11 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { verifyOtp, sendOtp, setupPin } from "@/services/auth";
+import { useTranslation } from "@/context/LanguageContext";
 
 function VerifyContent() {
   const router = useRouter();
+  const { t } = useTranslation();
   const searchParams = useSearchParams();
   const phoneRaw = searchParams.get("phone") || "";
   const isLoginMode = searchParams.get("mode") === "login";
@@ -162,7 +164,7 @@ function VerifyContent() {
 
     if (pinStep === "confirm") {
       if (code !== firstPin) {
-        setPinError("\u10DE\u10D8\u10DC\u10D4\u10D1\u10D8 \u10D0\u10E0 \u10D4\u10E0\u10D7\u10DB\u10D0\u10DC\u10D4\u10D7\u10D8. \u10E1\u10EA\u10D0\u10D3\u10D4\u10D7 \u10D7\u10D0\u10D5\u10D8\u10D3\u10D0\u10DC.");
+        setPinError(t("auth.pinsDoNotMatch"));
         setPin(["", "", "", "", "", ""]);
         setTimeout(() => pinRefs.current[0]?.focus(), 200);
         return;
@@ -236,7 +238,7 @@ function VerifyContent() {
               className="flex-1 text-center text-[16px] font-semibold text-white pr-8"
               style={{ fontFamily: "var(--font-outfit), system-ui, sans-serif" }}
             >
-              {"\u10DE\u10D8\u10DC \u10D9\u10DD\u10D3\u10D8"}
+              {t("auth.pinCode")}
             </span>
           </div>
 
@@ -258,8 +260,8 @@ function VerifyContent() {
               style={{ fontFamily: "var(--font-outfit), system-ui, sans-serif" }}
             >
               {pinStep === "create"
-                ? "\u10E8\u10D4\u10E5\u10DB\u10D4\u10DC\u10D8 \u10DE\u10D8\u10DC \u10D9\u10DD\u10D3\u10D8"
-                : "\u10D2\u10D0\u10D8\u10DB\u10D4\u10DD\u10E0\u10D4\u10D7 \u10DE\u10D8\u10DC \u10D9\u10DD\u10D3\u10D8"}
+                ? t("auth.createPinCode")
+                : t("auth.confirmPinCode")}
             </h1>
 
             <p
@@ -267,8 +269,8 @@ function VerifyContent() {
               style={{ fontFamily: "var(--font-dm-sans), system-ui, sans-serif" }}
             >
               {pinStep === "create"
-                ? "\u10E8\u10D4\u10D8\u10E7\u10D5\u10D0\u10DC\u10D4\u10D7 6-\u10DC\u10D8\u10E8\u10DC\u10D0 \u10DE\u10D8\u10DC \u10D9\u10DD\u10D3\u10D8"
-                : "\u10E8\u10D4\u10D8\u10E7\u10D5\u10D0\u10DC\u10D4\u10D7 \u10DE\u10D8\u10DC \u10D9\u10DD\u10D3\u10D8 \u10D7\u10D0\u10D5\u10D8\u10D3\u10D0\u10DC"}
+                ? t("auth.enter6DigitPin")
+                : t("auth.reenter6DigitPin")}
             </p>
 
             {/* PIN inputs */}
@@ -362,7 +364,7 @@ function VerifyContent() {
             className="flex-1 text-center text-[16px] font-semibold text-white pr-8"
             style={{ fontFamily: "var(--font-outfit), system-ui, sans-serif" }}
           >
-            Create account
+            {t("auth.createAccount")}
           </span>
         </div>
 
@@ -373,7 +375,7 @@ function VerifyContent() {
             className="text-[32px] sm:text-[36px] font-bold text-white text-center leading-[1.15]"
             style={{ fontFamily: "var(--font-outfit), system-ui, sans-serif" }}
           >
-            Verify your<br />phone number
+            {t("auth.verifyYourPhone")}
           </h1>
 
           {/* Subtitle */}
@@ -381,7 +383,7 @@ function VerifyContent() {
             className="text-[15px] text-[#9CA3AF] mt-3 text-center leading-[1.4]"
             style={{ fontFamily: "var(--font-dm-sans), system-ui, sans-serif" }}
           >
-            Enter 6-digit code sent to
+            {t("auth.enterCodeSentTo")}
           </p>
           <p
             className="text-[15px] text-white font-medium text-center mt-0.5"
@@ -417,7 +419,7 @@ function VerifyContent() {
         <div className="px-6 mt-6 shrink-0">
           <input
             type="text"
-            placeholder={"\u10E0\u10D4\u10E4\u10D4\u10E0\u10D0\u10DA \u10D9\u10DD\u10D3\u10D8 (\u10D0\u10E0\u10D0\u10E1\u10D0\u10D5\u10D0\u10DA\u10D3\u10D4\u10D1\u10E3\u10DA\u10DD)"}
+            placeholder={t("auth.referralCode")}
             value={referralCode}
             onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
             className="w-full px-4 py-3 rounded-[12px] text-[14px] text-white placeholder-[#666] outline-none text-center"
@@ -429,11 +431,11 @@ function VerifyContent() {
           />
           {referralCode ? (
             <p className="text-[11px] text-center mt-1.5" style={{ color: "#22C55E", fontFamily: "var(--font-dm-sans)" }}>
-              ✓ {"\u10E0\u10D4\u10E4\u10D4\u10E0\u10D0\u10DA\u10D8 \u10D9\u10DD\u10D3\u10D8 \u10D2\u10D0\u10DB\u10DD\u10E7\u10D4\u10DC\u10D4\u10D1\u10E3\u10DA\u10D8\u10D0"}
+              ✓ {t("auth.referralApplied")}
             </p>
           ) : (
             <p className="text-[11px] text-center mt-1.5" style={{ color: "#666666", fontFamily: "var(--font-dm-sans)" }}>
-              {"\u10DB\u10D0\u10D2: SHANSI-A7B3K9"}
+              {t("auth.referralExample")}
             </p>
           )}
         </div>
@@ -462,7 +464,7 @@ function VerifyContent() {
             className="text-[16px] font-semibold text-white active:opacity-50 transition-opacity"
             style={{ fontFamily: "var(--font-outfit), system-ui, sans-serif" }}
           >
-            Resend Code
+            {t("auth.resendCode")}
           </button>
         </div>
 

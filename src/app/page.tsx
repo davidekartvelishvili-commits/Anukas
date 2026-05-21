@@ -207,9 +207,14 @@ export default function SecondLandingPage() {
 
             {/* Center nav links — matching coverd */}
             <div className="hidden md:flex items-center gap-6">
-              {["Home", "About", "Careers", "Support"].map((link, i) => (
+              {[
+                { key: "landing.navHome", fallback: "Home" },
+                { key: "landing.navAbout", fallback: "About" },
+                { key: "landing.navCareers", fallback: "Careers" },
+                { key: "landing.navSupport", fallback: "Support" },
+              ].map((link, i) => (
                 <button
-                  key={link}
+                  key={link.key}
                   onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
                   className="text-[15px] font-semibold text-[#1A1A1A] px-5 py-1.5 rounded-full transition-all duration-200"
                   style={{
@@ -219,7 +224,7 @@ export default function SecondLandingPage() {
                   onMouseEnter={(e) => { if (i !== 0) e.currentTarget.style.border = "2px solid #1A1A1A"; }}
                   onMouseLeave={(e) => { if (i !== 0) e.currentTarget.style.border = "2px solid transparent"; }}
                 >
-                  {link}
+                  {t(link.key)}
                 </button>
               ))}
             </div>
@@ -316,8 +321,8 @@ export default function SecondLandingPage() {
               style={{
                 left: item.left,
                 top: item.top,
-                width: item.size * 0.38,
-                height: item.size * 0.38,
+                width: item.size * 0.55,
+                height: item.size * 0.55,
                 zIndex: 40,
                 // @ts-expect-error CSS custom property
                 "--rot": `${item.rotate}deg`,
@@ -332,8 +337,8 @@ export default function SecondLandingPage() {
               <img
                 src={item.src}
                 alt=""
-                width={Math.round(item.size * 0.38)}
-                height={Math.round(item.size * 0.38)}
+                width={Math.round(item.size * 0.55)}
+                height={Math.round(item.size * 0.55)}
                 className="w-full h-full object-contain"
                 draggable={false}
               />
@@ -352,7 +357,7 @@ export default function SecondLandingPage() {
                   fontSize: "clamp(40px, 8.5vw, 84px)",
                 }}
               >
-                გამოიყენე SHANSI
+                {t("landing.heroTitle")}
               </h1>
               <h2
                 className={`text-[#1A1A1A] leading-[1.0] tracking-[-0.02em] mt-2 ${mounted ? "hero-in-d2" : "opacity-0"}`}
@@ -363,7 +368,7 @@ export default function SecondLandingPage() {
                   fontSize: "clamp(34px, 7vw, 72px)",
                 }}
               >
-                აქციე ხარჯი მოგებად
+                {t("landing.heroSubtitle")}
               </h2>
             </div>
           </div>
@@ -453,7 +458,7 @@ export default function SecondLandingPage() {
                 lineHeight: 1.3,
               }}
             >
-              პარტნიორ ობიექტებთან გადახდისას გამოიყენე SHANSI და დაიბრუნე 100%-მდე ქეშბექი
+              {t("landing.tagline")}
             </p>
 
             {/* Sentinel — stays in flow to track scroll position */}
@@ -561,21 +566,21 @@ export default function SecondLandingPage() {
                 className="text-[32px] sm:text-[44px] md:text-[52px] font-extrabold text-[#1A1A1A] leading-[1.1] mb-4"
                 style={{ fontFamily: "'DachiTheLynx', var(--font-outfit)", fontStyle: "italic" }}
               >
-                როგორ გამოვიყენოთ პლატფორმა?
+                {t("landing.howItWorks")}
               </h2>
               <p
                 className="text-[16px] sm:text-[18px] text-[#1A1A1A]/60 max-w-[480px] mx-auto"
                 style={{ fontFamily: "var(--font-dm-sans)" }}
               >
-                3 მარტივი მოქმედებით დაიბრუნეთ გადახდილი თანხა
+                {t("landing.howItWorksDesc")}
               </p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-6 md:gap-8">
               {[
-                { img: "/images/app-mockup.png", step: "01", title: "დაასკანერე QR კოდი",   desc: "ეწვიეთ პარტნიორ ობიექტს და დაასკანერეთ QR კოდი თქვენი შენაძენის დასაფიქსირებლად.", imgSize: 70 },
-                { img: "/images/app-slots.png", step: "02", title: "ითამაშე თამაშები",   desc: "გამოიყენე შენი ბილეთები და ითამაშე — სლოტები, პლინკო, ჩიქენ რაში. ყოველი შენაძენი თამაშის ბილეთია.", imgSize: 120 },
-                { img: "/images/app-cashback.png", step: "03", title: "მოიგე ქეშბექი", desc: "დაიბრუნე შენაძენის 100%-მდე თანხა. გამოიტანე ნებისმიერ დროს, ყოველგვარი პირობების გარეშე.", imgSize: 200 },
+                { img: "/images/app-mockup.png", step: "01", title: t("landing.step1"),   desc: t("landing.step1Desc"), imgSize: 70 },
+                { img: "/images/app-slots.png", step: "02", title: t("landing.step2"),   desc: t("landing.step2Desc"), imgSize: 120 },
+                { img: "/images/app-cashback.png", step: "03", title: t("landing.step3"), desc: t("landing.step3Desc"), imgSize: 200 },
               ].map((s, i) => (
                 <div
                   key={i}
@@ -623,11 +628,11 @@ export default function SecondLandingPage() {
               <span className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-outfit)" }}>Shansi</span>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-6 text-[13px] text-white/50" style={{ fontFamily: "var(--font-dm-sans)" }}>
-              <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="hover:text-white transition-colors">Home</button>
-              <button onClick={() => router.push("/auth")} className="hover:text-white transition-colors">Sign Up</button>
-              <button onClick={() => router.push("/auth?mode=login")} className="hover:text-white transition-colors">Log In</button>
+              <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="hover:text-white transition-colors">{t("footer.home")}</button>
+              <button onClick={() => router.push("/auth")} className="hover:text-white transition-colors">{t("footer.signUp")}</button>
+              <button onClick={() => router.push("/auth?mode=login")} className="hover:text-white transition-colors">{t("footer.logIn")}</button>
             </div>
-            <p className="text-[12px] text-white/30" style={{ fontFamily: "var(--font-dm-sans)" }}>&copy; 2026 Shansi. All rights reserved.</p>
+            <p className="text-[12px] text-white/30" style={{ fontFamily: "var(--font-dm-sans)" }}>{t("footer.rights")}</p>
           </div>
         </footer>
       </div>

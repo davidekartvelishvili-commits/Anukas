@@ -4,9 +4,11 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { sendOtp, pinLogin, checkPhone, verifyBiometric } from "@/services/auth";
+import { useTranslation } from "@/context/LanguageContext";
 
 function AuthContent() {
   const router = useRouter();
+  const { t } = useTranslation();
   const searchParams = useSearchParams();
   const isLogin = searchParams.get("mode") === "login";
   const isPinMode = searchParams.get("pin") === "true";
@@ -17,7 +19,7 @@ function AuthContent() {
   const [focused, setFocused] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
-  const [infoMsg, setInfoMsg] = useState(msgParam === "registered" ? "This number is already registered. Please log in." : "");
+  const [infoMsg, setInfoMsg] = useState(msgParam === "registered" ? t("auth.alreadyRegistered") : "");
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Face ID state
@@ -76,7 +78,7 @@ function AuthContent() {
         return;
       }
       if (isLogin && !check.exists) {
-        setSendError("Account not found. Please sign up first.");
+        setSendError(t("auth.accountNotFound"));
         setSending(false);
         return;
       }
@@ -147,10 +149,10 @@ function AuthContent() {
         </div>
 
         <h2 className="text-white text-[22px] font-bold mb-2" style={{ fontFamily: "var(--font-outfit)" }}>
-          Enter PIN
+          {t("auth.enterPin")}
         </h2>
         <p className="text-[#6B7280] text-[14px] mb-8" style={{ fontFamily: "var(--font-dm-sans)" }}>
-          Enter your 6-digit PIN to log in
+          {t("auth.enterPinDesc")}
         </p>
 
         <div className="flex gap-4 mb-6">
@@ -176,7 +178,7 @@ function AuthContent() {
         />
 
         <button onClick={() => pinRef.current?.focus()} className="text-[13px] text-[#6B7280] mb-8" style={{ fontFamily: "var(--font-dm-sans)" }}>
-          Tap to enter PIN
+          {t("auth.tapToEnterPin")}
         </button>
 
         <button
@@ -184,7 +186,7 @@ function AuthContent() {
           className="text-[14px] font-semibold active:opacity-50"
           style={{ color: "#9CA3AF", fontFamily: "var(--font-outfit)" }}
         >
-          Use phone number instead
+          {t("auth.usePhoneInstead")}
         </button>
       </div>
       </>
@@ -220,7 +222,7 @@ function AuthContent() {
           className="flex-1 text-center text-[16px] font-semibold text-white pr-8"
           style={{ fontFamily: "var(--font-outfit), system-ui, sans-serif" }}
         >
-          {isLogin ? "Log In" : "Create account"}
+          {isLogin ? t("auth.logIn") : t("auth.createAccount")}
         </span>
       </div>
 
@@ -231,7 +233,7 @@ function AuthContent() {
           className="text-[32px] sm:text-[36px] font-bold text-white text-center leading-[1.15]"
           style={{ fontFamily: "var(--font-outfit), system-ui, sans-serif" }}
         >
-          Enter your<br />phone number
+          {t("auth.enterPhone")}
         </h1>
 
         {/* Subtitle */}
@@ -239,7 +241,7 @@ function AuthContent() {
           className="text-[15px] text-[#9CA3AF] mt-3 text-center"
           style={{ fontFamily: "var(--font-dm-sans), system-ui, sans-serif" }}
         >
-          {isLogin ? "Enter your phone to log in" : "Used to create your account"}
+          {isLogin ? t("auth.enterPhoneToLogin") : t("auth.usedToCreate")}
         </p>
 
         {/* Info message (e.g. already registered) */}
@@ -273,7 +275,7 @@ function AuthContent() {
             onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            placeholder="Phone number"
+            placeholder={t("auth.phoneNumber")}
             className="flex-1 bg-transparent text-[17px] text-white placeholder-[#4B5563] outline-none"
             style={{ fontFamily: "var(--font-dm-sans), system-ui, sans-serif" }}
           />
@@ -286,11 +288,10 @@ function AuthContent() {
           className="text-[13px] text-[#6B7280] text-center leading-[1.5] mb-4"
           style={{ fontFamily: "var(--font-dm-sans), system-ui, sans-serif" }}
         >
-          By clicking Continue, you confirm that you are
-          at least 18 years old and that you agree to our{" "}
-          <span className="underline text-[#9CA3AF]">Terms of Service</span>{" "}
-          and{" "}
-          <span className="underline text-[#9CA3AF]">Privacy Policy</span>.
+          {t("auth.termsText")}{" "}
+          <span className="underline text-[#9CA3AF]">{t("auth.termsOfService")}</span>{" "}
+          {t("auth.and")}{" "}
+          <span className="underline text-[#9CA3AF]">{t("auth.privacyPolicy")}</span>.
         </p>
 
         {sendError && (
@@ -308,7 +309,7 @@ function AuthContent() {
             cursor: isValid && !sending ? "pointer" : "not-allowed",
           }}
         >
-          {sending ? "Sending..." : "Continue"}
+          {sending ? t("auth.sending") : t("auth.continue")}
         </button>
 
       </div>
@@ -354,10 +355,10 @@ function AuthContent() {
           </div>
 
           <h2 className="text-white text-[22px] font-bold mb-2" style={{ fontFamily: "var(--font-outfit)" }}>
-            {faceScanning ? "Scanning..." : "Face not recognized"}
+            {faceScanning ? t("auth.scanning") : t("auth.faceNotRecognized")}
           </h2>
           <p className="text-[#6B7280] text-[14px] mb-6" style={{ fontFamily: "var(--font-dm-sans)" }}>
-            {faceScanning ? "Hold your face in the frame" : `Attempt ${faceAttempts}/3`}
+            {faceScanning ? t("auth.holdFace") : t("auth.attempt").replace("{current}", String(faceAttempts))}
           </p>
 
           {!faceScanning && faceAttempts < 3 && (
@@ -366,7 +367,7 @@ function AuthContent() {
               className="px-10 py-4 rounded-[32px] text-[16px] font-bold active:scale-[0.97] transition-transform"
               style={{ background: "#FFE500", color: "#000", fontFamily: "var(--font-outfit)" }}
             >
-              Try Again
+              {t("auth.tryAgain")}
             </button>
           )}
 
@@ -403,10 +404,10 @@ function AuthContent() {
           </div>
 
           <h2 className="text-white text-[22px] font-bold mb-2" style={{ fontFamily: "var(--font-outfit)" }}>
-            Enter PIN
+            {t("auth.enterPin")}
           </h2>
           <p className="text-[#6B7280] text-[14px] mb-8" style={{ fontFamily: "var(--font-dm-sans)" }}>
-            Face ID failed. Enter your 6-digit PIN
+            {t("auth.faceIdFailed")}
           </p>
 
           {/* PIN dots */}
@@ -443,7 +444,7 @@ function AuthContent() {
             className="text-[13px] text-[#6B7280]"
             style={{ fontFamily: "var(--font-dm-sans)" }}
           >
-            Tap to enter PIN
+            {t("auth.tapToEnterPin")}
           </button>
         </div>
       )}
