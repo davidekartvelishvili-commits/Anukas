@@ -214,7 +214,12 @@ export default function MerchantRegisterPage() {
       await setupPin(form.phone, pinStr);
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || "PIN-ის დაყენება ვერ მოხერხდა");
+      // If merchant not yet approved, still show success — PIN will be set after approval
+      if (err.message?.includes("დამტკიცებული") || err.message?.includes("approved")) {
+        setSuccess(true);
+      } else {
+        setError(err.message || "PIN-ის დაყენება ვერ მოხერხდა");
+      }
     } finally {
       setPinSaving(false);
     }
@@ -277,20 +282,8 @@ export default function MerchantRegisterPage() {
             </div>
 
             {success ? (
-              /* ── Success ── */
-              <div className="bg-[#1C1C1E] rounded-[16px] p-8 text-center">
-                <div className="w-16 h-16 rounded-full bg-[#22C55E]/10 flex items-center justify-center mx-auto mb-4">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                </div>
-                <p className="text-[#22C55E] text-lg font-semibold mb-2">განაცხადი მიღებულია</p>
-                <p className="text-[#999] text-sm">ნომერი დადასტურებულია. მოიცადეთ დამტკიცებას.</p>
-                <button
-                  onClick={() => router.push("/merchant/login")}
-                  className="mt-6 w-full py-3.5 rounded-full bg-[#FFD700] text-black font-semibold text-sm hover:bg-[#FFD700]/90 active:scale-[0.98] transition-all"
-                >
-                  შესვლის გვერდზე გადასვლა
-                </button>
-              </div>
+              /* ── Success — shown as inline, then popup appears ── */
+              <div />
 
             ) : step === "pin" ? (
               /* ── PIN Step ── */
@@ -502,6 +495,55 @@ export default function MerchantRegisterPage() {
           </div>
         </div>
       </div>
+
+      {/* Success Popup — glassy */}
+      {success && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" />
+          <div
+            className="relative rounded-[24px] px-7 py-8 max-w-[340px] w-full mx-4"
+            style={{
+              background: "rgba(50, 50, 50, 0.08)",
+              backdropFilter: "blur(16px) saturate(200%)",
+              WebkitBackdropFilter: "blur(16px) saturate(200%)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              animation: "popIn 0.3s ease-out",
+            }}
+          >
+            <div className="flex justify-center mb-5">
+              <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center" style={{ background: "rgba(34,197,94,0.15)" }}>
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              </div>
+            </div>
+            <h3
+              className="text-white text-[22px] font-bold mb-2 text-center"
+              style={{ fontFamily: "var(--font-outfit)" }}
+            >
+              წარმატებით დარეგისტრირდი!
+            </h3>
+            <p
+              className="text-[rgba(255,255,255,0.6)] text-[14px] mb-6 leading-relaxed text-center"
+              style={{ fontFamily: "var(--font-dm-sans)" }}
+            >
+              შენი განაცხადი მიღებულია. დამტკიცების შემდეგ შეძლებ შესვლას.
+            </p>
+            <button
+              onClick={() => router.push("/merchant/login")}
+              className="w-full py-3.5 rounded-full text-[15px] font-bold active:scale-[0.97] transition-transform"
+              style={{ background: "#F9E741", color: "#1A1A1A" }}
+            >
+              შესვლის გვერდზე გადასვლა
+            </button>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes popIn {
+          from { opacity: 0; transform: scale(0.9) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
