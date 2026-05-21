@@ -43,7 +43,7 @@ export default function MerchantRegisterPage() {
 
   // Auto-advance slideshow
   useEffect(() => {
-    const iv = setInterval(() => setActiveSlide((p) => (p + 1) % 2), 5000);
+    const iv = setInterval(() => setActiveSlide((p) => (p + 1) % 3), 5000);
     return () => clearInterval(iv);
   }, []);
 
@@ -182,7 +182,7 @@ export default function MerchantRegisterPage() {
           onClick={() => setActiveSlide((prev) => (prev + 1) % 2)}
         >
           <div className="relative w-full h-full overflow-hidden">
-            {["/images/merchant-ads/slide1.png", "/images/merchant-ads/slide2.png"].map((src, i) => (
+            {["/images/merchant-ads/slide1.png", "/images/merchant-ads/slide2.png", "/images/merchant-ads/slide3.png"].map((src, i) => (
               <img
                 key={i}
                 src={src}
@@ -194,7 +194,7 @@ export default function MerchantRegisterPage() {
             ))}
           </div>
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
-            {[0, 1].map((i) => (
+            {[0, 1, 2].map((i) => (
               <button
                 key={i}
                 onClick={(e) => { e.stopPropagation(); setActiveSlide(i); }}
