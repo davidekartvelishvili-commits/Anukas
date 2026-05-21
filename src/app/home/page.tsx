@@ -112,6 +112,7 @@ export default function HomePage() {
   const [liveTickets, setLiveTickets] = useState<TicketData[]>([]);
   const [recentWins, setRecentWins] = useState<{ id: string; name: string; coins: number; game: string; createdAt: string }[]>([]);
   const countdown = useCountdown(15.58);
+  const [showComingSoon, setShowComingSoon] = useState(false);
 
   // "Seen" tracking — hide badge after user visits /promos on a given day
   const todayKey = () => {
@@ -609,7 +610,7 @@ export default function HomePage() {
                 }}
                 onClick={() => {
                   setShowBalanceModal(false);
-                  router.push("/redeem");
+                  setShowComingSoon(true);
                 }}
               >
                 <div className="w-[52px] h-[52px] rounded-full bg-[#3A3A3C] flex items-center justify-center">
@@ -726,6 +727,50 @@ export default function HomePage() {
           to { opacity: 1; transform: scale(1); }
         }
       `}</style>
+
+      {/* Coming Soon Popup */}
+      {showComingSoon && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          onClick={() => setShowComingSoon(false)}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative rounded-[20px] px-6 py-7 max-w-[320px] w-full"
+            style={{
+              background: "rgba(50, 50, 50, 0.08)",
+              backdropFilter: "blur(12px) saturate(200%)",
+              WebkitBackdropFilter: "blur(12px) saturate(200%)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              animation: "fadeIn 0.2s ease-out",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-center mb-4">
+              <span className="text-[40px]">🚀</span>
+            </div>
+            <h3
+              className="text-white text-[20px] font-bold mb-2 text-center"
+              style={{ fontFamily: "var(--font-outfit)" }}
+            >
+              {t("home.comingSoon")}
+            </h3>
+            <p
+              className="text-[rgba(255,255,255,0.6)] text-[14px] mb-5 leading-relaxed text-center"
+              style={{ fontFamily: "var(--font-dm-sans)" }}
+            >
+              {locale === "ka" ? "ეს ფუნქცია მალე ხელმისაწვდომი იქნება!" : "This feature will be available soon!"}
+            </p>
+            <button
+              onClick={() => setShowComingSoon(false)}
+              className="w-full py-3 rounded-full text-[14px] font-bold"
+              style={{ background: "#F9E741", color: "#1A1A1A" }}
+            >
+              {locale === "ka" ? "გასაგებია" : "Got it"}
+            </button>
+          </div>
+        </div>
+      )}
     </AuthGuard>
   );
 }
