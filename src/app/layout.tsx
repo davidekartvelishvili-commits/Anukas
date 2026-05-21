@@ -110,8 +110,8 @@ export default function RootLayout({
         <meta name="theme-color" content="#000000" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         {/* Note: OG / Twitter meta tags are emitted by generateMetadata() so admin-uploaded image takes priority */}
-        {/* Meta Pixel */}
-        <Script id="meta-pixel" strategy="afterInteractive">{`
+        {/* Meta Pixel — must be inline in head, not deferred */}
+        <script dangerouslySetInnerHTML={{ __html: `
           !function(f,b,e,v,n,t,s)
           {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
           n.callMethod.apply(n,arguments):n.queue.push(arguments)};
@@ -123,7 +123,7 @@ export default function RootLayout({
           fbq('init', '2177327599789445');
           fbq('init', '2077512643172992');
           fbq('track', 'PageView');
-        `}</Script>
+        `}} />
         <noscript>
           <img height="1" width="1" style={{ display: "none" }} src="https://www.facebook.com/tr?id=2177327599789445&ev=PageView&noscript=1" alt="" />
           <img height="1" width="1" style={{ display: "none" }} src="https://www.facebook.com/tr?id=2077512643172992&ev=PageView&noscript=1" alt="" />
