@@ -9,7 +9,9 @@ import { getDb } from "../db/client.js";
 import { merchants, paymentTransactions, pendingPayments, users, transactions, systemConfig, gameConfig, tickets, userTickets } from "../db/schema.js";
 import { merchantMiddleware } from "../middleware/merchant.js";
 import { getEnv } from "../utils/env.js";
-import { BadRequestError } from "../utils/errors.js";
+import { BadRequestError, RateLimitError } from "../utils/errors.js";
+import { sendOtp, verifyOtp } from "../services/otp.js";
+import { otpRateLimits } from "../db/schema.js";
 
 const merchant = new Hono<MerchantEnv>();
 
@@ -17,15 +19,61 @@ const merchant = new Hono<MerchantEnv>();
 // PUBLIC ROUTES (no auth)
 // ══════════════════════════════════════
 
-// POST /merchant/register
+// POST /merchant/send-otp — send OTP to merchant phone
+merchant.post("/send-otp", async (c) => {
+  const body = await c.req.json();
+  const phone = body.phone?.trim();
+  if (!phone || phone.length < 5) throw new BadRequestError("ტელეფონის ნომერი სავალდებულოა");
+
+  const db = getDb();
+
+  // Rate limit: 5 attempts per 10 minutes
+  const rlKey = `merchant:${phone}`;
+  const [rl] = await db.select().from(otpRateLimits).where(eq(otpRateLimits.phone, rlKey)).limit(1);
+  const now = new Date();
+  const windowMs = 10 * 60 * 1000;
+
+  if (rl) {
+    const ws = new Date(rl.windowStart);
+    if (now.getTime() - ws.getTime() < windowMs && rl.attempts >= 5) {
+      throw new RateLimitError("ძალიან ბევრი მცდელობა, სცადეთ 10 წუთში");
+    }
+    if (now.getTime() - ws.getTime() >= windowMs) {
+      await db.update(otpRateLimits).set({ attempts: 1, windowStart: now.toISOString() }).where(eq(otpRateLimits.phone, rlKey));
+    } else {
+      await db.update(otpRateLimits).set({ attempts: rl.attempts + 1 }).where(eq(otpRateLimits.phone, rlKey));
+    }
+  } else {
+    await db.insert(otpRateLimits).values({ phone: rlKey, attempts: 1, windowStart: now.toISOString() });
+  }
+
+  await sendOtp(phone);
+  return c.json({ success: true, message: "კოდი გაიგზავნა" });
+});
+
+// POST /merchant/verify-otp — verify OTP code
+merchant.post("/verify-otp", async (c) => {
+  const body = await c.req.json();
+  const phone = body.phone?.trim();
+  const code = body.code?.trim();
+  if (!phone || !code) throw new BadRequestError("ტელეფონი და კოდი სავალდებულოა");
+
+  const isValid = await verifyOtp(phone, code);
+  if (!isValid) throw new BadRequestError("არასწორი კოდი");
+
+  return c.json({ success: true, verified: true });
+});
+
+// POST /merchant/register — requires OTP verification first
 const registerSchema = z.object({
-  business_name: z.string().min(1),
-  business_name_ka: z.string().optional(),
-  category: z.string().min(1),
-  phone: z.string().min(5),
-  email: z.string().email().optional(),
-  address: z.string().optional(),
-  contact_person: z.string().optional(),
+  business_name: z.string().min(1, "ბიზნესის სახელი სავალდებულოა"),
+  business_name_ka: z.string().min(1, "ქართული სახელი სავალდებულოა"),
+  category: z.string().min(1, "კატეგორია სავალდებულოა"),
+  phone: z.string().min(5, "ტელეფონი სავალდებულოა"),
+  email: z.string().email("არასწორი ელ-ფოსტა"),
+  address: z.string().min(1, "მისამართი სავალდებულოა"),
+  contact_person: z.string().min(1, "საკონტაქტო პირი სავალდებულოა"),
+  otp_code: z.string().min(4, "OTP კოდი სავალდებულოა"),
 });
 
 merchant.post("/register", async (c) => {
@@ -34,7 +82,11 @@ merchant.post("/register", async (c) => {
   if (!parsed.success) throw new BadRequestError(parsed.error.errors[0].message);
 
   const db = getDb();
-  const { business_name, business_name_ka, category, phone, email, address, contact_person } = parsed.data;
+  const { business_name, business_name_ka, category, phone, email, address, contact_person, otp_code } = parsed.data;
+
+  // Verify OTP
+  const isValid = await verifyOtp(phone, otp_code);
+  if (!isValid) throw new BadRequestError("არასწორი კოდი, სცადეთ თავიდან");
 
   // Check if phone already registered
   const [existing] = await db.select().from(merchants).where(eq(merchants.phone, phone)).limit(1);
@@ -44,12 +96,13 @@ merchant.post("/register", async (c) => {
   await db.insert(merchants).values({
     id,
     businessName: business_name,
-    businessNameKa: business_name_ka || null,
+    businessNameKa: business_name_ka,
     category,
     phone,
-    email: email || null,
-    address: address || null,
-    contactPerson: contact_person || null,
+    email,
+    address,
+    contactPerson: contact_person,
+    isVerified: true,
   });
 
   return c.json({ success: true, message: "განაცხადი მიღებულია, მოიცადეთ დამტკიცებას" });

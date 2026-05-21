@@ -15,9 +15,18 @@ async function merchantFetch<T = any>(path: string, options: RequestInit = {}): 
   return data;
 }
 
+export async function sendMerchantOtp(phone: string) {
+  return merchantFetch("/merchant/send-otp", { method: "POST", body: JSON.stringify({ phone }) });
+}
+
+export async function verifyMerchantOtp(phone: string, code: string) {
+  return merchantFetch("/merchant/verify-otp", { method: "POST", body: JSON.stringify({ phone, code }) });
+}
+
 export async function registerMerchant(data: {
-  business_name: string; business_name_ka?: string; category: string;
-  phone: string; email?: string; address?: string; contact_person?: string;
+  business_name: string; business_name_ka: string; category: string;
+  phone: string; email: string; address: string; contact_person: string;
+  otp_code: string;
 }) {
   return merchantFetch("/merchant/register", { method: "POST", body: JSON.stringify(data) });
 }
