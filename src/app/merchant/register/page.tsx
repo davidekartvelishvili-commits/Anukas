@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { registerMerchant, sendMerchantOtp } from "@/services/merchant";
+import { registerMerchant, sendMerchantOtp, setupPin } from "@/services/merchant";
 
 declare global {
   interface Window {
@@ -26,11 +26,17 @@ export default function MerchantRegisterPage() {
   const [success, setSuccess] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
   const [error, setError] = useState("");
-  const [step, setStep] = useState<"form" | "otp">("form");
+  const [step, setStep] = useState<"form" | "otp" | "pin">("form");
   const [otpCode, setOtpCode] = useState(["", "", "", "", "", ""]);
   const [otpSending, setOtpSending] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [pin, setPin] = useState(["", "", "", ""]);
+  const [pinConfirm, setPinConfirm] = useState(["", "", "", ""]);
+  const [pinStep, setPinStep] = useState<"enter" | "confirm">("enter");
+  const [pinSaving, setPinSaving] = useState(false);
+  const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const pinConfirmRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [form, setForm] = useState({
     business_name: "",
     business_name_ka: "",
@@ -156,10 +162,12 @@ export default function MerchantRegisterPage() {
         contact_person: form.contact_person,
         otp_code: code,
       });
-      setSuccess(true);
       if (typeof window !== "undefined" && window.fbq) {
         window.fbq("track", "CompleteRegistration");
       }
+      setStep("pin");
+      setError("");
+      setTimeout(() => pinRefs.current[0]?.focus(), 100);
     } catch (err: any) {
       setError(err.message || "შეცდომა, სცადეთ თავიდან");
       setOtpCode(["", "", "", "", "", ""]);
@@ -168,6 +176,57 @@ export default function MerchantRegisterPage() {
       setLoading(false);
     }
   };
+
+  const handlePinChange = (refs: React.MutableRefObject<(HTMLInputElement | null)[]>, state: string[], setState: (v: string[]) => void, index: number, value: string) => {
+    if (value.length > 1) value = value.slice(-1);
+    if (value && !/^\d$/.test(value)) return;
+    const newPin = [...state];
+    newPin[index] = value;
+    setState(newPin);
+    setError("");
+    if (value && index < 3) refs.current[index + 1]?.focus();
+  };
+
+  const handlePinKeyDown = (refs: React.MutableRefObject<(HTMLInputElement | null)[]>, state: string[], index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !state[index] && index > 0) refs.current[index - 1]?.focus();
+  };
+
+  const submitPin = async () => {
+    const pinStr = pin.join("");
+    const confirmStr = pinConfirm.join("");
+    if (pinStep === "enter") {
+      if (pinStr.length !== 4) { setError("შეიყვანეთ 4-ნიშნა PIN"); return; }
+      setPinStep("confirm");
+      setPinConfirm(["", "", "", ""]);
+      setError("");
+      setTimeout(() => pinConfirmRefs.current[0]?.focus(), 100);
+      return;
+    }
+    if (confirmStr !== pinStr) {
+      setError("PIN-ები არ ემთხვევა, სცადეთ თავიდან");
+      setPinConfirm(["", "", "", ""]);
+      pinConfirmRefs.current[0]?.focus();
+      return;
+    }
+    setPinSaving(true);
+    setError("");
+    try {
+      await setupPin(form.phone, pinStr);
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message || "PIN-ის დაყენება ვერ მოხერხდა");
+    } finally {
+      setPinSaving(false);
+    }
+  };
+
+  // Auto-submit PIN on 4th digit
+  useEffect(() => {
+    if (step !== "pin") return;
+    if (pinStep === "enter" && pin.every(d => d)) submitPin();
+    if (pinStep === "confirm" && pinConfirm.every(d => d)) submitPin();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin, pinConfirm, pinStep, step]);
 
   const inputClass = "w-full bg-[#1C1C1E] rounded-[10px] px-4 py-3.5 text-white placeholder-[#555] outline-none border border-[#2A2A2E] focus:border-[#FFD700]/50 transition-colors text-[14px]";
 
@@ -231,6 +290,59 @@ export default function MerchantRegisterPage() {
                 >
                   შესვლის გვერდზე გადასვლა
                 </button>
+              </div>
+
+            ) : step === "pin" ? (
+              /* ── PIN Step ── */
+              <div>
+                <div className="mb-8">
+                  <h1 className="text-[22px] font-bold mb-2" style={{ fontFamily: "var(--font-outfit)" }}>
+                    {pinStep === "enter" ? "დააყენე PIN კოდი" : "გაიმეორე PIN კოდი"}
+                  </h1>
+                  <p className="text-[14px]" style={{ color: "#999" }}>
+                    {pinStep === "enter" ? "შეიყვანე 4-ნიშნა PIN კოდი შესვლისთვის" : "ხელახლა შეიყვანე იგივე PIN კოდი"}
+                  </p>
+                </div>
+
+                <div className="flex gap-4 justify-center mb-6">
+                  {(pinStep === "enter" ? pin : pinConfirm).map((digit, i) => (
+                    <input
+                      key={`${pinStep}-${i}`}
+                      ref={(el) => { (pinStep === "enter" ? pinRefs : pinConfirmRefs).current[i] = el; }}
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handlePinChange(
+                        pinStep === "enter" ? pinRefs : pinConfirmRefs,
+                        pinStep === "enter" ? pin : pinConfirm,
+                        pinStep === "enter" ? setPin : setPinConfirm,
+                        i, e.target.value
+                      )}
+                      onKeyDown={(e) => handlePinKeyDown(
+                        pinStep === "enter" ? pinRefs : pinConfirmRefs,
+                        pinStep === "enter" ? pin : pinConfirm,
+                        i, e
+                      )}
+                      className="w-[56px] h-[60px] text-center text-[24px] font-bold rounded-[12px] outline-none transition-colors"
+                      style={{
+                        background: "#1C1C1E",
+                        color: "#FFF",
+                        border: digit ? "2px solid #FFD700" : "2px solid #2A2A2E",
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {pinSaving && (
+                  <div className="flex justify-center mb-4">
+                    <div className="w-6 h-6 border-2 border-[#FFD700] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+
+                {error && (
+                  <p className="text-red-400 text-sm text-center bg-red-400/10 rounded-[10px] py-2.5 mb-4">{error}</p>
+                )}
               </div>
 
             ) : step === "otp" ? (

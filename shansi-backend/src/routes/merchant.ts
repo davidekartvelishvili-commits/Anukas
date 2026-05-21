@@ -142,7 +142,6 @@ merchant.post("/setup-pin", async (c) => {
   const db = getDb();
   const m = await findMerchantByIdentifier(parsed.data.identifier);
   if (!m) throw new BadRequestError("მერჩანტი ვერ მოიძებნა");
-  if (!m.isActive) throw new BadRequestError("მერჩანტი ჯერ არ არის დამტკიცებული");
   if (m.pinHash) throw new BadRequestError("PIN უკვე დაყენებულია. გამოიყენეთ პარამეტრები შესაცვლელად");
 
   const hash = await bcrypt.hash(parsed.data.pin, 10);
