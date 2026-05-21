@@ -44,7 +44,7 @@ merchant.post("/send-otp", async (c) => {
       await db.update(otpRateLimits).set({ attempts: rl.attempts + 1 }).where(eq(otpRateLimits.phone, rlKey));
     }
   } else {
-    await db.insert(otpRateLimits).values({ phone: rlKey, attempts: 1, windowStart: now.toISOString() });
+    await db.insert(otpRateLimits).values({ id: nanoid(), phone: rlKey, attempts: 1, windowStart: now.toISOString() });
   }
 
   await sendOtp(phone);
