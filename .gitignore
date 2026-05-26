@@ -16,3 +16,5 @@ public/uploads/
 shansi-backend/node_modules/
 shansi-backend/dist/
 shansi-backend/.env
+.vercel
+.env*
