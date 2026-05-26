@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import localFont from "next/font/local";
 
 const dachiFont = localFont({
@@ -72,159 +72,254 @@ const activities = [
   { emoji: "🤸", name: "ტანვარჯიში" },
 ];
 
+// Food item type
+interface FoodItem {
+  name: string;
+  calories: number;
+  carbs: number;
+  fat: number;
+  protein: number;
+  portion: string;
+  meal: string;
+  time: string;
+}
+
 // Bottom sheet modal for adding food
 function AddFoodSheet({
   open,
   onClose,
+  onAdd,
+  currentMeal,
 }: {
   open: boolean;
   onClose: () => void;
+  onAdd: (item: FoodItem) => void;
+  currentMeal: string;
 }) {
+  const [mode, setMode] = useState<"menu" | "text" | "result">("menu");
+  const [textInput, setTextInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<FoodItem | null>(null);
+  const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reset when closed
+  useEffect(() => {
+    if (!open) {
+      setTimeout(() => {
+        setMode("menu");
+        setTextInput("");
+        setResult(null);
+        setError("");
+      }, 300);
+    }
+  }, [open]);
+
+  async function analyzeFood(text?: string, image?: string) {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/analyze-food", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, image }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+        setLoading(false);
+        return;
+      }
+      // Handle array (multiple items) - take first for now
+      const item = Array.isArray(data) ? data[0] : data;
+      const now = new Date();
+      setResult({
+        ...item,
+        meal: currentMeal,
+        time: `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`,
+      });
+      setMode("result");
+    } catch {
+      setError("შეცდომა. სცადე თავიდან.");
+    }
+    setLoading(false);
+  }
+
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      analyzeFood(undefined, reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  }
+
   if (!open) return null;
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/40 z-40 transition-opacity"
-        onClick={onClose}
-      />
-      {/* Sheet */}
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
       <div className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto animate-slideUp">
         <div className="bg-white rounded-t-[24px] px-5 pt-3 pb-10">
-          {/* Handle */}
           <div className="flex justify-center mb-5">
             <div className="w-10 h-[5px] rounded-full bg-[#ddd]" />
           </div>
 
-          {/* Header */}
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-[22px] font-extrabold text-[#2d2d2d]">
-              დაამატე საკვები
+              {mode === "result" ? "ნაპოვნია" : "დაამატე საკვები"}
             </h3>
             <button
               onClick={onClose}
               className="w-9 h-9 rounded-full bg-[#f0f0f0] flex items-center justify-center"
             >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#666"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2.5" strokeLinecap="round">
                 <path d="M18 6L6 18M6 6l12 12" />
               </svg>
             </button>
           </div>
 
-          {/* Options */}
-          <div className="flex flex-col gap-3">
-            {/* Text search */}
-            <button className="flex items-center gap-4 p-4 rounded-2xl border border-[#FFE0B2] bg-[#FFF8F0]">
-              <div className="w-[52px] h-[52px] rounded-[16px] bg-[#F57C00] flex items-center justify-center shrink-0">
-                <svg
-                  width="26"
-                  height="26"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#fff"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M4 6h16M4 12h10M4 18h14" />
-                  <circle cx="19" cy="12" r="3" />
-                </svg>
-              </div>
-              <div className="text-left">
-                <span className="text-[17px] font-bold text-[#2d2d2d] block">
-                  ტექსტით
-                </span>
-                <span className="text-[13px] text-[#999]">ჩაწერე</span>
-              </div>
-            </button>
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageUpload}
+          />
 
-            {/* Camera */}
-            <button className="flex items-center gap-4 p-4 rounded-2xl border border-[#BBDEFB] bg-[#F0F7FF]">
-              <div className="w-[52px] h-[52px] rounded-[16px] bg-[#42A5F5] flex items-center justify-center shrink-0">
-                <svg
-                  width="26"
-                  height="26"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#fff"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
-                  <circle cx="12" cy="13" r="4" />
-                </svg>
-              </div>
-              <div className="text-left">
-                <span className="text-[17px] font-bold text-[#2d2d2d] block">
-                  კამერა
-                </span>
-                <span className="text-[13px] text-[#999]">გადაულე ფოტო</span>
-              </div>
-            </button>
+          {/* Loading */}
+          {loading && (
+            <div className="flex flex-col items-center py-10">
+              <div className="w-10 h-10 border-4 border-[#4CAF50] border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-[15px] text-[#888]">Claude ანალიზს აკეთებს...</p>
+            </div>
+          )}
 
-            {/* Gallery */}
-            <button className="flex items-center gap-4 p-4 rounded-2xl border border-[#D1C4E9] bg-[#F5F0FF]">
-              <div className="w-[52px] h-[52px] rounded-[16px] bg-[#7E57C2] flex items-center justify-center shrink-0">
-                <svg
-                  width="26"
-                  height="26"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#fff"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M4 12l5-5 5 5" />
-                  <path d="M12 7v10" />
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                </svg>
-              </div>
-              <div className="text-left">
-                <span className="text-[17px] font-bold text-[#2d2d2d] block">
-                  გალერეა
-                </span>
-                <span className="text-[13px] text-[#999]">
-                  ატვირთე ფოტო
-                </span>
-              </div>
-            </button>
+          {/* Error */}
+          {error && !loading && (
+            <div className="text-center py-6">
+              <p className="text-[15px] text-red-500 mb-4">{error}</p>
+              <button
+                onClick={() => { setError(""); setMode("menu"); }}
+                className="px-6 py-2.5 rounded-xl bg-[#f0f0f0] text-[14px] font-bold text-[#555]"
+              >
+                თავიდან სცადე
+              </button>
+            </div>
+          )}
 
-            {/* Favorites */}
-            <button className="flex items-center gap-4 p-4 rounded-2xl border border-[#C8E6C9] bg-[#F0FFF0]">
-              <div className="w-[52px] h-[52px] rounded-[16px] bg-[#4CAF50] flex items-center justify-center shrink-0">
-                <svg
-                  width="26"
-                  height="26"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#fff"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+          {/* Menu mode */}
+          {mode === "menu" && !loading && !error && (
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => setMode("text")}
+                className="flex items-center gap-4 p-4 rounded-2xl border border-[#FFE0B2] bg-[#FFF8F0]"
+              >
+                <div className="w-[52px] h-[52px] rounded-[16px] bg-[#F57C00] flex items-center justify-center shrink-0">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 6h16M4 12h10M4 18h14" />
+                    <circle cx="19" cy="12" r="3" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <span className="text-[17px] font-bold text-[#2d2d2d] block">ტექსტით</span>
+                  <span className="text-[13px] text-[#999]">ჩაწერე</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-4 p-4 rounded-2xl border border-[#BBDEFB] bg-[#F0F7FF]"
+              >
+                <div className="w-[52px] h-[52px] rounded-[16px] bg-[#42A5F5] flex items-center justify-center shrink-0">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <span className="text-[17px] font-bold text-[#2d2d2d] block">კამერა / გალერეა</span>
+                  <span className="text-[13px] text-[#999]">გადაიღე ან ატვირთე ფოტო</span>
+                </div>
+              </button>
+            </div>
+          )}
+
+          {/* Text input mode */}
+          {mode === "text" && !loading && !error && (
+            <div>
+              <p className="text-[14px] text-[#888] mb-3">
+                ჩაწერე რა შეჭამე (მაგ: &quot;ხაჭაპური&quot;, &quot;2 კვერცხი და პური&quot;)
+              </p>
+              <textarea
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                placeholder="მაგ: ერთი თეფში ხინკალი, სალათი..."
+                className="w-full p-4 rounded-2xl border border-[#e0e0e0] text-[16px] text-[#2d2d2d] resize-none outline-none focus:border-[#4CAF50] transition-colors"
+                rows={3}
+                autoFocus
+              />
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => setMode("menu")}
+                  className="flex-1 py-3 rounded-2xl border border-[#e0e0e0] text-[15px] font-bold text-[#888]"
                 >
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M12 8v8M8 12h8" />
-                </svg>
+                  უკან
+                </button>
+                <button
+                  onClick={() => textInput.trim() && analyzeFood(textInput)}
+                  disabled={!textInput.trim()}
+                  className="flex-1 py-3 rounded-2xl bg-[#4CAF50] text-[15px] font-bold text-white disabled:opacity-40"
+                >
+                  გაანალიზე
+                </button>
               </div>
-              <div className="text-left">
-                <span className="text-[17px] font-bold text-[#2d2d2d] block">
-                  ფავორიტები
-                </span>
-                <span className="text-[13px] text-[#999]">შენი კერძები</span>
+            </div>
+          )}
+
+          {/* Result mode */}
+          {mode === "result" && result && !loading && (
+            <div>
+              <div className="bg-[#f9f9f9] rounded-2xl p-4 mb-4">
+                <p className="text-[18px] font-bold text-[#2d2d2d] mb-1">{result.name}</p>
+                <p className="text-[13px] text-[#999] mb-3">{result.portion}</p>
+                <div className="flex justify-between">
+                  <div className="text-center">
+                    <p className="text-[22px] font-bold text-[#4CAF50]">{result.calories}</p>
+                    <p className="text-[11px] text-[#999]">კკალ</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[22px] font-bold text-[#E8A0BF]">{result.carbs}გ</p>
+                    <p className="text-[11px] text-[#999]">ნახშირწყ.</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[22px] font-bold text-[#90B8DE]">{result.fat}გ</p>
+                    <p className="text-[11px] text-[#999]">ცხიმი</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[22px] font-bold text-[#E8D5A0]">{result.protein}გ</p>
+                    <p className="text-[11px] text-[#999]">ცილა</p>
+                  </div>
+                </div>
               </div>
-            </button>
-          </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setMode("menu"); setResult(null); }}
+                  className="flex-1 py-3 rounded-2xl border border-[#e0e0e0] text-[15px] font-bold text-[#888]"
+                >
+                  გაუქმება
+                </button>
+                <button
+                  onClick={() => { onAdd(result); onClose(); }}
+                  className="flex-1 py-3 rounded-2xl bg-[#4CAF50] text-[15px] font-bold text-white"
+                >
+                  დამატება
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -762,6 +857,8 @@ export default function CaloriesPage() {
   const [waterMl, setWaterMl] = useState(0);
   const [weight, setWeight] = useState(65.0);
   const [showAddFood, setShowAddFood] = useState(false);
+  const [currentMeal, setCurrentMeal] = useState("საუზმე");
+  const [foods, setFoods] = useState<FoodItem[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [regime, setRegime] = useState<"standard" | "fast">("standard");
@@ -777,6 +874,7 @@ export default function CaloriesPage() {
           if (saved.regime) setRegime(saved.regime);
           if (typeof saved.waterMl === "number") setWaterMl(saved.waterMl);
           if (typeof saved.weight === "number") setWeight(saved.weight);
+          if (Array.isArray(saved.foods)) setFoods(saved.foods);
         }
       })
       .catch(() => {})
@@ -786,11 +884,21 @@ export default function CaloriesPage() {
   // Save to server whenever data changes
   useEffect(() => {
     if (!loaded) return;
-    saveToServer({ profile, regime, waterMl, weight });
-  }, [profile, regime, waterMl, weight, loaded]);
+    saveToServer({ profile, regime, waterMl, weight, foods });
+  }, [profile, regime, waterMl, weight, foods, loaded]);
 
   const goalCalories = calculateCalories(profile, regime);
   const macros = calculateMacros(goalCalories);
+  const consumed = foods.reduce(
+    (acc, f) => ({
+      calories: acc.calories + f.calories,
+      carbs: acc.carbs + f.carbs,
+      fat: acc.fat + f.fat,
+      protein: acc.protein + f.protein,
+    }),
+    { calories: 0, carbs: 0, fat: 0, protein: 0 }
+  );
+  const remaining = Math.max(0, goalCalories - consumed.calories);
   const waterGoal = Math.round((Number(profile.weight) || 60) * 33);
   const waterPercent = Math.round((waterMl / waterGoal) * 100);
 
@@ -881,14 +989,14 @@ export default function CaloriesPage() {
             <CircularProgress
               size={200}
               strokeWidth={10}
-              progress={0}
+              progress={goalCalories ? Math.min(100, (consumed.calories / goalCalories) * 100) : 0}
               color="#4CAF50"
               bgColor="#e8e8e8"
             />
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-sm text-[#b0b0b0]">დაგრჩა</span>
               <span className="text-[46px] font-bold text-[#4CAF50] leading-[52px]">
-                {goalCalories}
+                {remaining}
               </span>
               <span className="text-sm text-[#b0b0b0] -mt-0.5">კკალ</span>
             </div>
@@ -911,7 +1019,7 @@ export default function CaloriesPage() {
                 <span className="text-[13px] text-[#999]">მიღებული</span>
               </div>
               <span className="text-[38px] font-bold text-[#2d2d2d] leading-[44px]">
-                0
+                {consumed.calories}
               </span>
               <span className="text-[13px] text-[#b0b0b0] -mt-0.5">კკალ</span>
             </div>
@@ -949,13 +1057,13 @@ export default function CaloriesPage() {
                 <CircularProgress
                   size={82}
                   strokeWidth={6}
-                  progress={0}
+                  progress={macros.carbs ? Math.min(100, (consumed.carbs / macros.carbs) * 100) : 0}
                   color="#E8A0BF"
                   bgColor="#F5DFE9"
                 />
                 <div className="absolute flex flex-col items-center">
                   <span className="text-[20px] font-bold text-[#2d2d2d] leading-6">
-                    0
+                    {consumed.carbs}
                   </span>
                   <span className="text-[11px] text-[#aaa] -mt-px">
                     / {macros.carbs}გ
@@ -970,13 +1078,13 @@ export default function CaloriesPage() {
                 <CircularProgress
                   size={82}
                   strokeWidth={6}
-                  progress={0}
+                  progress={macros.fat ? Math.min(100, (consumed.fat / macros.fat) * 100) : 0}
                   color="#90B8DE"
                   bgColor="#DAEAF8"
                 />
                 <div className="absolute flex flex-col items-center">
                   <span className="text-[20px] font-bold text-[#2d2d2d] leading-6">
-                    0
+                    {consumed.fat}
                   </span>
                   <span className="text-[11px] text-[#aaa] -mt-px">
                     / {macros.fat}გ
@@ -991,13 +1099,13 @@ export default function CaloriesPage() {
                 <CircularProgress
                   size={82}
                   strokeWidth={6}
-                  progress={0}
+                  progress={macros.protein ? Math.min(100, (consumed.protein / macros.protein) * 100) : 0}
                   color="#E8D5A0"
                   bgColor="#F5EDDA"
                 />
                 <div className="absolute flex flex-col items-center">
                   <span className="text-[20px] font-bold text-[#2d2d2d] leading-6">
-                    0
+                    {consumed.protein}
                   </span>
                   <span className="text-[11px] text-[#aaa] -mt-px">
                     / {macros.protein}გ
@@ -1015,22 +1123,26 @@ export default function CaloriesPage() {
           { emoji: "🍲", title: "სადილი", bg: "#FFF3E0" },
           { emoji: "🥗", title: "ვახშამი", bg: "#F1F8E9" },
           { emoji: "🥜", title: "სნეკი", bg: "#FFF3E0" },
-        ].map((meal) => (
-          <div
-            key={meal.title}
-            className="bg-white rounded-[18px] px-4 py-4 mb-2.5 flex items-center shadow-sm"
-          >
-            <div
-              className="w-[50px] h-[50px] rounded-[15px] flex items-center justify-center"
-              style={{ backgroundColor: meal.bg }}
-            >
-              <span className="text-[26px]">{meal.emoji}</span>
-            </div>
-            <span className="text-lg font-bold text-[#2d2d2d] ml-3.5 flex-1">
-              {meal.title}
-            </span>
-            <button
-              onClick={() => setShowAddFood(true)}
+        ].map((meal) => {
+          const mealFoods = foods.filter((f) => f.meal === meal.title);
+          const mealCals = mealFoods.reduce((s, f) => s + f.calories, 0);
+          return (
+          <div key={meal.title} className="bg-white rounded-[18px] px-4 py-4 mb-2.5 shadow-sm">
+            <div className="flex items-center">
+              <div
+                className="w-[50px] h-[50px] rounded-[15px] flex items-center justify-center"
+                style={{ backgroundColor: meal.bg }}
+              >
+                <span className="text-[26px]">{meal.emoji}</span>
+              </div>
+              <div className="ml-3.5 flex-1">
+                <span className="text-lg font-bold text-[#2d2d2d] block">{meal.title}</span>
+                {mealCals > 0 && (
+                  <span className="text-[12px] text-[#999]">{mealCals} კკალ</span>
+                )}
+              </div>
+              <button
+                onClick={() => { setCurrentMeal(meal.title); setShowAddFood(true); }}
               className="w-9 h-9 rounded-full border-[1.5px] border-[#e0e0e0] flex items-center justify-center"
             >
               <svg
@@ -1045,8 +1157,22 @@ export default function CaloriesPage() {
                 <path d="M12 5v14M5 12h14" />
               </svg>
             </button>
+            </div>
+            {/* Show added foods for this meal */}
+            {mealFoods.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-[#f0f0f0]">
+                {mealFoods.map((f, i) => (
+                  <div key={i} className="flex items-center justify-between py-1.5">
+                    <span className="text-[13px] text-[#555] flex-1">{f.name}</span>
+                    <span className="text-[12px] text-[#999] mr-2">{f.portion}</span>
+                    <span className="text-[13px] font-semibold text-[#2d2d2d]">{f.calories} კკალ</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        ))}
+          );
+        })}
 
         {/* Water Section */}
         <div className="bg-white rounded-[20px] p-5 mt-1.5 mb-3 shadow-sm">
@@ -1208,7 +1334,12 @@ export default function CaloriesPage() {
       </div>
 
       {/* Sheets */}
-      <AddFoodSheet open={showAddFood} onClose={() => setShowAddFood(false)} />
+      <AddFoodSheet
+        open={showAddFood}
+        onClose={() => setShowAddFood(false)}
+        currentMeal={currentMeal}
+        onAdd={(item) => setFoods((prev) => [...prev, item])}
+      />
       <SettingsSheet
         open={showSettings}
         onClose={() => setShowSettings(false)}
