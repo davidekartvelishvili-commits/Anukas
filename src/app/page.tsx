@@ -476,7 +476,7 @@ function calculateCalories(
 
   // Goal adjustment
   if (profile.goal === "წონის დაკლება") {
-    const deficit = localRegime === "fast" ? 750 : 500;
+    const deficit = regime === "fast" ? 750 : 500;
     return tdee - deficit;
   }
   return tdee; // შენარჩუნება — no deficit regardless of regime
