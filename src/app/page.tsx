@@ -735,29 +735,6 @@ function ProfilePage({
   );
 }
 
-// localStorage helpers
-const STORAGE_KEY = "anukas-calories-data";
-
-function loadSavedData() {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return null;
-}
-
-function saveData(data: {
-  profile: ProfileData;
-  regime: "standard" | "fast";
-  waterMl: number;
-  weight: number;
-}) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch {}
-}
-
 const defaultProfile: ProfileData = {
   age: "34",
   gender: "მამრობითი",
@@ -766,6 +743,19 @@ const defaultProfile: ProfileData = {
   goal: "წონის დაკლება",
   activityLevel: "საშუალო (3-5 დღე/კვირაში ვარჯიში)",
 };
+
+// Save to server (debounced via ref)
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+function saveToServer(data: Record<string, unknown>) {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    fetch("/api/data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).catch(() => {});
+  }, 500);
+}
 
 export default function CaloriesPage() {
   const [loaded, setLoaded] = useState(false);
@@ -777,22 +767,26 @@ export default function CaloriesPage() {
   const [regime, setRegime] = useState<"standard" | "fast">("standard");
   const [profile, setProfile] = useState<ProfileData>(defaultProfile);
 
-  // Load saved data on mount
+  // Load saved data from server on mount
   useEffect(() => {
-    const saved = loadSavedData();
-    if (saved) {
-      if (saved.profile) setProfile(saved.profile);
-      if (saved.regime) setRegime(saved.regime);
-      if (typeof saved.waterMl === "number") setWaterMl(saved.waterMl);
-      if (typeof saved.weight === "number") setWeight(saved.weight);
-    }
-    setLoaded(true);
+    fetch("/api/data")
+      .then((r) => r.json())
+      .then((saved) => {
+        if (saved) {
+          if (saved.profile) setProfile(saved.profile);
+          if (saved.regime) setRegime(saved.regime);
+          if (typeof saved.waterMl === "number") setWaterMl(saved.waterMl);
+          if (typeof saved.weight === "number") setWeight(saved.weight);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
   }, []);
 
-  // Save whenever data changes
+  // Save to server whenever data changes
   useEffect(() => {
     if (!loaded) return;
-    saveData({ profile, regime, waterMl, weight });
+    saveToServer({ profile, regime, waterMl, weight });
   }, [profile, regime, waterMl, weight, loaded]);
 
   const goalCalories = calculateCalories(profile, regime);
