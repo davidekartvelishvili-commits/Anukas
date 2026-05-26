@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import localFont from "next/font/local";
 
 const dachiFont = localFont({
@@ -735,26 +735,79 @@ function ProfilePage({
   );
 }
 
+// localStorage helpers
+const STORAGE_KEY = "anukas-calories-data";
+
+function loadSavedData() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function saveData(data: {
+  profile: ProfileData;
+  regime: "standard" | "fast";
+  waterMl: number;
+  weight: number;
+}) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+const defaultProfile: ProfileData = {
+  age: "34",
+  gender: "მამრობითი",
+  height: "165",
+  weight: "60",
+  goal: "წონის დაკლება",
+  activityLevel: "საშუალო (3-5 დღე/კვირაში ვარჯიში)",
+};
+
 export default function CaloriesPage() {
+  const [loaded, setLoaded] = useState(false);
   const [waterMl, setWaterMl] = useState(0);
   const [weight, setWeight] = useState(65.0);
   const [showAddFood, setShowAddFood] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [regime, setRegime] = useState<"standard" | "fast">("standard");
-  const [profile, setProfile] = useState<ProfileData>({
-    age: "34",
-    gender: "მამრობითი",
-    height: "165",
-    weight: "60",
-    goal: "წონის დაკლება",
-    activityLevel: "საშუალო (3-5 დღე/კვირაში ვარჯიში)",
-  });
+  const [profile, setProfile] = useState<ProfileData>(defaultProfile);
+
+  // Load saved data on mount
+  useEffect(() => {
+    const saved = loadSavedData();
+    if (saved) {
+      if (saved.profile) setProfile(saved.profile);
+      if (saved.regime) setRegime(saved.regime);
+      if (typeof saved.waterMl === "number") setWaterMl(saved.waterMl);
+      if (typeof saved.weight === "number") setWeight(saved.weight);
+    }
+    setLoaded(true);
+  }, []);
+
+  // Save whenever data changes
+  useEffect(() => {
+    if (!loaded) return;
+    saveData({ profile, regime, waterMl, weight });
+  }, [profile, regime, waterMl, weight, loaded]);
 
   const goalCalories = calculateCalories(profile, regime);
   const macros = calculateMacros(goalCalories);
-  const waterGoal = Math.round((Number(profile.weight) || 60) * 33); // 33ml per kg
+  const waterGoal = Math.round((Number(profile.weight) || 60) * 33);
   const waterPercent = Math.round((waterMl / waterGoal) * 100);
+
+  // Show loading spinner until localStorage is read
+  if (!loaded) {
+    return (
+      <div className="min-h-screen bg-[#f5f5f5] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#4CAF50] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (showProfile) {
     return (
