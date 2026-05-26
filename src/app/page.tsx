@@ -235,16 +235,24 @@ function AddFoodSheet({
 function SettingsSheet({
   open,
   onClose,
-  goalCalories,
+  profile,
+  regime,
+  onSave,
 }: {
   open: boolean;
   onClose: () => void;
-  goalCalories: number;
+  profile: ProfileData;
+  regime: "standard" | "fast";
+  onSave: (goal: string, regime: "standard" | "fast") => void;
 }) {
   const [weightGoalType, setWeightGoalType] = useState<
     "კლება" | "შენარჩუნება"
-  >("კლება");
-  const [regime, setRegime] = useState<"standard" | "fast">("standard");
+  >(profile.goal === "შენარჩუნება" ? "შენარჩუნება" : "კლება");
+  const [localRegime, setLocalRegime] = useState(regime);
+
+  // Recalculate preview calories based on local selections
+  const previewProfile = { ...profile, goal: weightGoalType === "კლება" ? "წონის დაკლება" : "შენარჩუნება" };
+  const previewCalories = calculateCalories(previewProfile, localRegime);
 
   if (!open) return null;
 
@@ -312,9 +320,9 @@ function SettingsSheet({
               </p>
               <div className="flex rounded-2xl border border-[#e0e0e0] overflow-hidden mb-5">
                 <button
-                  onClick={() => setRegime("standard")}
+                  onClick={() => setLocalRegime("standard")}
                   className={`flex-1 py-3 px-3 flex flex-col items-center rounded-2xl transition-colors ${
-                    regime === "standard"
+                    localRegime === "standard"
                       ? "bg-[#8BC34A] text-white -m-px z-10 border border-[#7CB342]"
                       : "text-[#888]"
                   }`}
@@ -325,7 +333,7 @@ function SettingsSheet({
                       height="14"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke={regime === "standard" ? "#fff" : "#888"}
+                      stroke={localRegime === "standard" ? "#fff" : "#888"}
                       strokeWidth="2"
                       strokeLinecap="round"
                     >
@@ -336,16 +344,16 @@ function SettingsSheet({
                   </div>
                   <span
                     className={`text-[11px] ${
-                      regime === "standard" ? "text-white/80" : "text-[#aaa]"
+                      localRegime === "standard" ? "text-white/80" : "text-[#aaa]"
                     }`}
                   >
                     კვირაში 0.5 კგ
                   </span>
                 </button>
                 <button
-                  onClick={() => setRegime("fast")}
+                  onClick={() => setLocalRegime("fast")}
                   className={`flex-1 py-3 px-3 flex flex-col items-center rounded-2xl transition-colors ${
-                    regime === "fast"
+                    localRegime === "fast"
                       ? "bg-[#8BC34A] text-white -m-px z-10 border border-[#7CB342]"
                       : "text-[#888]"
                   }`}
@@ -356,7 +364,7 @@ function SettingsSheet({
                       height="14"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke={regime === "fast" ? "#fff" : "#888"}
+                      stroke={localRegime === "fast" ? "#fff" : "#888"}
                       strokeWidth="2"
                       strokeLinecap="round"
                     >
@@ -366,7 +374,7 @@ function SettingsSheet({
                   </div>
                   <span
                     className={`text-[11px] ${
-                      regime === "fast" ? "text-white/80" : "text-[#aaa]"
+                      localRegime === "fast" ? "text-white/80" : "text-[#aaa]"
                     }`}
                   >
                     კვირაში 0.8 - 1 კგ
@@ -395,7 +403,7 @@ function SettingsSheet({
             </div>
             <span className="text-[15px] text-[#888] flex-1">სულ:</span>
             <span className="text-[32px] font-bold text-[#2d2d2d] leading-none">
-              {goalCalories}
+              {previewCalories}
             </span>
             <span className="text-[15px] text-[#888] ml-2">კკალ</span>
           </div>
@@ -412,7 +420,11 @@ function SettingsSheet({
               გაუქმება
             </button>
             <button
-              onClick={onClose}
+              onClick={() => {
+                const newGoal = weightGoalType === "კლება" ? "წონის დაკლება" : "შენარჩუნება";
+                onSave(newGoal, localRegime);
+                onClose();
+              }}
               className="flex-1 py-3.5 rounded-2xl bg-[#4CAF50] text-[16px] font-bold text-white"
             >
               შენახვა
@@ -436,7 +448,11 @@ interface ProfileData {
 }
 
 // Mifflin-St Jeor calorie calculator
-function calculateCalories(profile: ProfileData): number {
+// regime: "standard" = -500 kcal (0.5kg/week), "fast" = -750 kcal (0.8-1kg/week)
+function calculateCalories(
+  profile: ProfileData,
+  regime: "standard" | "fast"
+): number {
   const age = Number(profile.age) || 0;
   const h = Number(profile.height) || 0;
   const w = Number(profile.weight) || 0;
@@ -451,7 +467,7 @@ function calculateCalories(profile: ProfileData): number {
   }
 
   // Activity multiplier
-  let multiplier = 1.55; // default საშუალო
+  let multiplier = 1.55;
   if (profile.activityLevel.startsWith("მცირე")) multiplier = 1.375;
   else if (profile.activityLevel.startsWith("საშუალო")) multiplier = 1.55;
   else if (profile.activityLevel.startsWith("მაღალი")) multiplier = 1.725;
@@ -459,8 +475,11 @@ function calculateCalories(profile: ProfileData): number {
   const tdee = Math.round(bmr * multiplier);
 
   // Goal adjustment
-  if (profile.goal === "წონის დაკლება") return tdee - 500;
-  return tdee; // შენარჩუნება
+  if (profile.goal === "წონის დაკლება") {
+    const deficit = localRegime === "fast" ? 750 : 500;
+    return tdee - deficit;
+  }
+  return tdee; // შენარჩუნება — no deficit regardless of regime
 }
 
 // Macro split from calories (50% carbs, 20% fat, 30% protein)
@@ -722,6 +741,7 @@ export default function CaloriesPage() {
   const [showAddFood, setShowAddFood] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [regime, setRegime] = useState<"standard" | "fast">("standard");
   const [profile, setProfile] = useState<ProfileData>({
     age: "34",
     gender: "მამრობითი",
@@ -731,7 +751,7 @@ export default function CaloriesPage() {
     activityLevel: "საშუალო (3-5 დღე/კვირაში ვარჯიში)",
   });
 
-  const goalCalories = calculateCalories(profile);
+  const goalCalories = calculateCalories(profile, regime);
   const macros = calculateMacros(goalCalories);
   const waterGoal = Math.round((Number(profile.weight) || 60) * 33); // 33ml per kg
   const waterPercent = Math.round((waterMl / waterGoal) * 100);
@@ -1142,7 +1162,16 @@ export default function CaloriesPage() {
 
       {/* Sheets */}
       <AddFoodSheet open={showAddFood} onClose={() => setShowAddFood(false)} />
-      <SettingsSheet open={showSettings} onClose={() => setShowSettings(false)} goalCalories={goalCalories} />
+      <SettingsSheet
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        profile={profile}
+        regime={regime}
+        onSave={(newGoal, newRegime) => {
+          setProfile((p) => ({ ...p, goal: newGoal }));
+          setRegime(newRegime);
+        }}
+      />
 
       {/* FAB */}
       <button
