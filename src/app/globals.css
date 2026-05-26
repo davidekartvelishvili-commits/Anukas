@@ -21,3 +21,17 @@ body {
   background: var(--color-bg);
   font-family: var(--font-dm-sans), sans-serif;
 }
+
+/* Bottom sheet slide up */
+@keyframes slideUp {
+  0% {
+    transform: translateY(100%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out forwards;
+}

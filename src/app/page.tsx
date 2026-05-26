@@ -72,9 +72,169 @@ const activities = [
   { emoji: "🤸", name: "ტანვარჯიში" },
 ];
 
+// Bottom sheet modal for adding food
+function AddFoodSheet({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/40 z-40 transition-opacity"
+        onClick={onClose}
+      />
+      {/* Sheet */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto animate-slideUp">
+        <div className="bg-white rounded-t-[24px] px-5 pt-3 pb-10">
+          {/* Handle */}
+          <div className="flex justify-center mb-5">
+            <div className="w-10 h-[5px] rounded-full bg-[#ddd]" />
+          </div>
+
+          {/* Header */}
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-[22px] font-extrabold text-[#2d2d2d]">
+              დაამატე საკვები
+            </h3>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-full bg-[#f0f0f0] flex items-center justify-center"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#666"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Options */}
+          <div className="flex flex-col gap-3">
+            {/* Text search */}
+            <button className="flex items-center gap-4 p-4 rounded-2xl border border-[#FFE0B2] bg-[#FFF8F0]">
+              <div className="w-[52px] h-[52px] rounded-[16px] bg-[#F57C00] flex items-center justify-center shrink-0">
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M4 6h16M4 12h10M4 18h14" />
+                  <circle cx="19" cy="12" r="3" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <span className="text-[17px] font-bold text-[#2d2d2d] block">
+                  ტექსტით
+                </span>
+                <span className="text-[13px] text-[#999]">ჩაწერე</span>
+              </div>
+            </button>
+
+            {/* Camera */}
+            <button className="flex items-center gap-4 p-4 rounded-2xl border border-[#BBDEFB] bg-[#F0F7FF]">
+              <div className="w-[52px] h-[52px] rounded-[16px] bg-[#42A5F5] flex items-center justify-center shrink-0">
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <span className="text-[17px] font-bold text-[#2d2d2d] block">
+                  კამერა
+                </span>
+                <span className="text-[13px] text-[#999]">გადაულე ფოტო</span>
+              </div>
+            </button>
+
+            {/* Gallery */}
+            <button className="flex items-center gap-4 p-4 rounded-2xl border border-[#D1C4E9] bg-[#F5F0FF]">
+              <div className="w-[52px] h-[52px] rounded-[16px] bg-[#7E57C2] flex items-center justify-center shrink-0">
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M4 12l5-5 5 5" />
+                  <path d="M12 7v10" />
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <span className="text-[17px] font-bold text-[#2d2d2d] block">
+                  გალერეა
+                </span>
+                <span className="text-[13px] text-[#999]">
+                  ატვირთე ფოტო
+                </span>
+              </div>
+            </button>
+
+            {/* Favorites */}
+            <button className="flex items-center gap-4 p-4 rounded-2xl border border-[#C8E6C9] bg-[#F0FFF0]">
+              <div className="w-[52px] h-[52px] rounded-[16px] bg-[#4CAF50] flex items-center justify-center shrink-0">
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 8v8M8 12h8" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <span className="text-[17px] font-bold text-[#2d2d2d] block">
+                  ფავორიტები
+                </span>
+                <span className="text-[13px] text-[#999]">შენი კერძები</span>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function CaloriesPage() {
   const [waterMl, setWaterMl] = useState(0);
   const [weight, setWeight] = useState(65.0);
+  const [showAddFood, setShowAddFood] = useState(false);
   const waterGoal = 2145;
   const waterPercent = Math.round((waterMl / waterGoal) * 100);
 
@@ -289,7 +449,10 @@ export default function CaloriesPage() {
             <span className="text-lg font-bold text-[#2d2d2d] ml-3.5 flex-1">
               {meal.title}
             </span>
-            <button className="w-9 h-9 rounded-full border-[1.5px] border-[#e0e0e0] flex items-center justify-center">
+            <button
+              onClick={() => setShowAddFood(true)}
+              className="w-9 h-9 rounded-full border-[1.5px] border-[#e0e0e0] flex items-center justify-center"
+            >
               <svg
                 width="16"
                 height="16"
@@ -464,8 +627,14 @@ export default function CaloriesPage() {
         </div>
       </div>
 
+      {/* Add Food Sheet */}
+      <AddFoodSheet open={showAddFood} onClose={() => setShowAddFood(false)} />
+
       {/* FAB */}
-      <button className="fixed bottom-24 right-6 w-[62px] h-[62px] rounded-full bg-[#4CAF50] flex items-center justify-center shadow-lg shadow-green-800/35 z-10 max-w-md">
+      <button
+        onClick={() => setShowAddFood(true)}
+        className="fixed bottom-24 right-6 w-[62px] h-[62px] rounded-full bg-[#4CAF50] flex items-center justify-center shadow-lg shadow-green-800/35 z-10 max-w-md"
+      >
         <svg
           width="30"
           height="30"
