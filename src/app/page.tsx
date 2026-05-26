@@ -240,7 +240,7 @@ function SettingsSheet({
   onClose: () => void;
 }) {
   const [weightGoalType, setWeightGoalType] = useState<
-    "კლება" | "შენარჩუნება" | "მატება"
+    "კლება" | "შენარჩუნება"
   >("კლება");
   const [regime, setRegime] = useState<"standard" | "fast">("standard");
 
@@ -287,7 +287,7 @@ function SettingsSheet({
             წონის მიზანი
           </p>
           <div className="flex rounded-2xl border border-[#e0e0e0] overflow-hidden mb-5">
-            {(["კლება", "შენარჩუნება", "მატება"] as const).map((type) => (
+            {(["კლება", "შენარჩუნება"] as const).map((type) => (
               <button
                 key={type}
                 onClick={() => setWeightGoalType(type)}
@@ -395,10 +395,6 @@ function SettingsSheet({
             <span className="text-[32px] font-bold text-[#2d2d2d] leading-none">
               {weightGoalType === "შენარჩუნება"
                 ? 2273
-                : weightGoalType === "მატება"
-                ? regime === "fast"
-                  ? 2773
-                  : 2523
                 : regime === "fast"
                 ? 1676
                 : 1976}
