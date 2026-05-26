@@ -302,73 +302,77 @@ function SettingsSheet({
             ))}
           </div>
 
-          {/* Regime */}
-          <p className="text-[15px] font-semibold text-[#2d2d2d] mb-2.5">
-            რეჟიმი
-          </p>
-          <div className="flex rounded-2xl border border-[#e0e0e0] overflow-hidden mb-5">
-            <button
-              onClick={() => setRegime("standard")}
-              className={`flex-1 py-3 px-3 flex flex-col items-center rounded-2xl transition-colors ${
-                regime === "standard"
-                  ? "bg-[#8BC34A] text-white -m-px z-10 border border-[#7CB342]"
-                  : "text-[#888]"
-              }`}
-            >
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={regime === "standard" ? "#fff" : "#888"}
-                  strokeWidth="2"
-                  strokeLinecap="round"
+          {/* Regime - only shown for კლება and მატება */}
+          {weightGoalType !== "შენარჩუნება" && (
+            <>
+              <p className="text-[15px] font-semibold text-[#2d2d2d] mb-2.5">
+                რეჟიმი
+              </p>
+              <div className="flex rounded-2xl border border-[#e0e0e0] overflow-hidden mb-5">
+                <button
+                  onClick={() => setRegime("standard")}
+                  className={`flex-1 py-3 px-3 flex flex-col items-center rounded-2xl transition-colors ${
+                    regime === "standard"
+                      ? "bg-[#8BC34A] text-white -m-px z-10 border border-[#7CB342]"
+                      : "text-[#888]"
+                  }`}
                 >
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M12 6v6l4 2" />
-                </svg>
-                <span className="text-[14px] font-bold">სტანდარტული</span>
-              </div>
-              <span
-                className={`text-[11px] ${
-                  regime === "standard" ? "text-white/80" : "text-[#aaa]"
-                }`}
-              >
-                კვირაში 0.5 კგ
-              </span>
-            </button>
-            <button
-              onClick={() => setRegime("fast")}
-              className={`flex-1 py-3 px-3 flex flex-col items-center rounded-2xl transition-colors ${
-                regime === "fast"
-                  ? "bg-[#8BC34A] text-white -m-px z-10 border border-[#7CB342]"
-                  : "text-[#888]"
-              }`}
-            >
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={regime === "fast" ? "#fff" : "#888"}
-                  strokeWidth="2"
-                  strokeLinecap="round"
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={regime === "standard" ? "#fff" : "#888"}
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 6v6l4 2" />
+                    </svg>
+                    <span className="text-[14px] font-bold">სტანდარტული</span>
+                  </div>
+                  <span
+                    className={`text-[11px] ${
+                      regime === "standard" ? "text-white/80" : "text-[#aaa]"
+                    }`}
+                  >
+                    კვირაში 0.5 კგ
+                  </span>
+                </button>
+                <button
+                  onClick={() => setRegime("fast")}
+                  className={`flex-1 py-3 px-3 flex flex-col items-center rounded-2xl transition-colors ${
+                    regime === "fast"
+                      ? "bg-[#8BC34A] text-white -m-px z-10 border border-[#7CB342]"
+                      : "text-[#888]"
+                  }`}
                 >
-                  <path d="M13 2L3 14h9l-1 10 10-12h-9l1-10z" />
-                </svg>
-                <span className="text-[14px] font-bold">სწრაფი</span>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={regime === "fast" ? "#fff" : "#888"}
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    >
+                      <path d="M13 2L3 14h9l-1 10 10-12h-9l1-10z" />
+                    </svg>
+                    <span className="text-[14px] font-bold">სწრაფი</span>
+                  </div>
+                  <span
+                    className={`text-[11px] ${
+                      regime === "fast" ? "text-white/80" : "text-[#aaa]"
+                    }`}
+                  >
+                    კვირაში 0.8 - 1 კგ
+                  </span>
+                </button>
               </div>
-              <span
-                className={`text-[11px] ${
-                  regime === "fast" ? "text-white/80" : "text-[#aaa]"
-                }`}
-              >
-                კვირაში 0.8 - 1 კგ
-              </span>
-            </button>
-          </div>
+            </>
+          )}
 
           {/* Daily limit */}
           <p className="text-[15px] font-semibold text-[#2d2d2d] mb-2.5">
@@ -389,7 +393,15 @@ function SettingsSheet({
             </div>
             <span className="text-[15px] text-[#888] flex-1">სულ:</span>
             <span className="text-[32px] font-bold text-[#2d2d2d] leading-none">
-              1976
+              {weightGoalType === "შენარჩუნება"
+                ? 2273
+                : weightGoalType === "მატება"
+                ? regime === "fast"
+                  ? 2773
+                  : 2523
+                : regime === "fast"
+                ? 1676
+                : 1976}
             </span>
             <span className="text-[15px] text-[#888] ml-2">კკალ</span>
           </div>
