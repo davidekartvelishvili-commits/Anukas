@@ -428,11 +428,11 @@ function SettingsSheet({
 
 // Profile page
 function ProfilePage({ onBack }: { onBack: () => void }) {
-  const [age, setAge] = useState(34);
+  const [age, setAge] = useState("34");
   const [gender, setGender] = useState("მამრობითი");
   const [showGender, setShowGender] = useState(false);
-  const [height, setHeight] = useState(165);
-  const [profileWeight, setProfileWeight] = useState(60);
+  const [height, setHeight] = useState("165");
+  const [profileWeight, setProfileWeight] = useState("60");
   const [goal, setGoal] = useState("წონის დაკლება");
   const [showGoal, setShowGoal] = useState(false);
   const [activityLevel, setActivityLevel] = useState("საშუალო (3-5 დღე/კვირაში ვარჯიში)");
@@ -481,9 +481,9 @@ function ProfilePage({ onBack }: { onBack: () => void }) {
             <div className="flex-1">
               <span className="text-[12px] text-[#999] block">ასაკი</span>
               <input
-                type="number"
+                inputMode="numeric"
                 value={age}
-                onChange={(e) => setAge(Number(e.target.value))}
+                onChange={(e) => setAge(e.target.value.replace(/[^0-9]/g, ""))}
                 className="text-[18px] font-bold text-[#2d2d2d] bg-transparent outline-none w-20"
               />
             </div>
@@ -536,9 +536,9 @@ function ProfilePage({ onBack }: { onBack: () => void }) {
             <div className="flex-1">
               <span className="text-[12px] text-[#999] block">სიმაღლე</span>
               <input
-                type="number"
+                inputMode="numeric"
                 value={height}
-                onChange={(e) => setHeight(Number(e.target.value))}
+                onChange={(e) => setHeight(e.target.value.replace(/[^0-9]/g, ""))}
                 className="text-[18px] font-bold text-[#2d2d2d] bg-transparent outline-none w-20"
               />
             </div>
@@ -555,9 +555,9 @@ function ProfilePage({ onBack }: { onBack: () => void }) {
             <div className="flex-1">
               <span className="text-[12px] text-[#999] block">წონა</span>
               <input
-                type="number"
+                inputMode="numeric"
                 value={profileWeight}
-                onChange={(e) => setProfileWeight(Number(e.target.value))}
+                onChange={(e) => setProfileWeight(e.target.value.replace(/[^0-9]/g, ""))}
                 className="text-[18px] font-bold text-[#2d2d2d] bg-transparent outline-none w-20"
               />
             </div>
