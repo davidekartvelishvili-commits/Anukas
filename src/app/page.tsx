@@ -235,9 +235,11 @@ function AddFoodSheet({
 function SettingsSheet({
   open,
   onClose,
+  goalCalories,
 }: {
   open: boolean;
   onClose: () => void;
+  goalCalories: number;
 }) {
   const [weightGoalType, setWeightGoalType] = useState<
     "კლება" | "შენარჩუნება"
@@ -393,11 +395,7 @@ function SettingsSheet({
             </div>
             <span className="text-[15px] text-[#888] flex-1">სულ:</span>
             <span className="text-[32px] font-bold text-[#2d2d2d] leading-none">
-              {weightGoalType === "შენარჩუნება"
-                ? 2273
-                : regime === "fast"
-                ? 1676
-                : 1976}
+              {goalCalories}
             </span>
             <span className="text-[15px] text-[#888] ml-2">კკალ</span>
           </div>
@@ -427,15 +425,70 @@ function SettingsSheet({
 }
 
 // Profile page
-function ProfilePage({ onBack }: { onBack: () => void }) {
-  const [age, setAge] = useState("34");
-  const [gender, setGender] = useState("მამრობითი");
+// Profile data type
+interface ProfileData {
+  age: string;
+  gender: string;
+  height: string;
+  weight: string;
+  goal: string;
+  activityLevel: string;
+}
+
+// Mifflin-St Jeor calorie calculator
+function calculateCalories(profile: ProfileData): number {
+  const age = Number(profile.age) || 0;
+  const h = Number(profile.height) || 0;
+  const w = Number(profile.weight) || 0;
+  if (!age || !h || !w) return 1976; // fallback
+
+  // BMR (Mifflin-St Jeor)
+  let bmr: number;
+  if (profile.gender === "მამრობითი") {
+    bmr = 10 * w + 6.25 * h - 5 * age + 5;
+  } else {
+    bmr = 10 * w + 6.25 * h - 5 * age - 161;
+  }
+
+  // Activity multiplier
+  let multiplier = 1.55; // default საშუალო
+  if (profile.activityLevel.startsWith("მცირე")) multiplier = 1.375;
+  else if (profile.activityLevel.startsWith("საშუალო")) multiplier = 1.55;
+  else if (profile.activityLevel.startsWith("მაღალი")) multiplier = 1.725;
+
+  const tdee = Math.round(bmr * multiplier);
+
+  // Goal adjustment
+  if (profile.goal === "წონის დაკლება") return tdee - 500;
+  return tdee; // შენარჩუნება
+}
+
+// Macro split from calories (50% carbs, 20% fat, 30% protein)
+function calculateMacros(calories: number) {
+  return {
+    carbs: Math.round((calories * 0.5) / 4),
+    fat: Math.round((calories * 0.2) / 9),
+    protein: Math.round((calories * 0.3) / 4),
+  };
+}
+
+function ProfilePage({
+  onBack,
+  profile,
+  onSave,
+}: {
+  onBack: () => void;
+  profile: ProfileData;
+  onSave: (data: ProfileData) => void;
+}) {
+  const [age, setAge] = useState(profile.age);
+  const [gender, setGender] = useState(profile.gender);
   const [showGender, setShowGender] = useState(false);
-  const [height, setHeight] = useState("165");
-  const [profileWeight, setProfileWeight] = useState("60");
-  const [goal, setGoal] = useState("წონის დაკლება");
+  const [height, setHeight] = useState(profile.height);
+  const [profileWeight, setProfileWeight] = useState(profile.weight);
+  const [goal, setGoal] = useState(profile.goal);
   const [showGoal, setShowGoal] = useState(false);
-  const [activityLevel, setActivityLevel] = useState("საშუალო (3-5 დღე/კვირაში ვარჯიში)");
+  const [activityLevel, setActivityLevel] = useState(profile.activityLevel);
   const [showActivity, setShowActivity] = useState(false);
 
   const genderOptions = ["მამრობითი", "მდედრობითი"];
@@ -646,7 +699,10 @@ function ProfilePage({ onBack }: { onBack: () => void }) {
 
         {/* Save button */}
         <button
-          onClick={onBack}
+          onClick={() => {
+            onSave({ age, gender, height, weight: profileWeight, goal, activityLevel });
+            onBack();
+          }}
           className="w-full py-4 rounded-2xl bg-[#8BC34A] text-white text-[17px] font-bold flex items-center justify-center gap-2"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -666,13 +722,28 @@ export default function CaloriesPage() {
   const [showAddFood, setShowAddFood] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const waterGoal = 2145;
+  const [profile, setProfile] = useState<ProfileData>({
+    age: "34",
+    gender: "მამრობითი",
+    height: "165",
+    weight: "60",
+    goal: "წონის დაკლება",
+    activityLevel: "საშუალო (3-5 დღე/კვირაში ვარჯიში)",
+  });
+
+  const goalCalories = calculateCalories(profile);
+  const macros = calculateMacros(goalCalories);
+  const waterGoal = Math.round((Number(profile.weight) || 60) * 33); // 33ml per kg
   const waterPercent = Math.round((waterMl / waterGoal) * 100);
 
   if (showProfile) {
     return (
       <div className={`${dachiFont.variable} max-w-md mx-auto`}>
-        <ProfilePage onBack={() => setShowProfile(false)} />
+        <ProfilePage
+          profile={profile}
+          onSave={(data) => setProfile(data)}
+          onBack={() => setShowProfile(false)}
+        />
       </div>
     );
   }
@@ -750,7 +821,7 @@ export default function CaloriesPage() {
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-sm text-[#b0b0b0]">დაგრჩა</span>
               <span className="text-[46px] font-bold text-[#4CAF50] leading-[52px]">
-                1976
+                {goalCalories}
               </span>
               <span className="text-sm text-[#b0b0b0] -mt-0.5">კკალ</span>
             </div>
@@ -794,7 +865,7 @@ export default function CaloriesPage() {
                 <span className="text-[13px] text-[#999]">მიზანი</span>
               </div>
               <span className="text-[38px] font-bold text-[#2d2d2d] leading-[44px]">
-                1976
+                {goalCalories}
               </span>
               <span className="text-[13px] text-[#b0b0b0] -mt-0.5">კკალ</span>
             </div>
@@ -820,7 +891,7 @@ export default function CaloriesPage() {
                     0
                   </span>
                   <span className="text-[11px] text-[#aaa] -mt-px">
-                    / 246გ
+                    / {macros.carbs}გ
                   </span>
                 </div>
               </div>
@@ -841,7 +912,7 @@ export default function CaloriesPage() {
                     0
                   </span>
                   <span className="text-[11px] text-[#aaa] -mt-px">
-                    / 51გ
+                    / {macros.fat}გ
                   </span>
                 </div>
               </div>
@@ -862,7 +933,7 @@ export default function CaloriesPage() {
                     0
                   </span>
                   <span className="text-[11px] text-[#aaa] -mt-px">
-                    / 133გ
+                    / {macros.protein}გ
                   </span>
                 </div>
               </div>
@@ -1071,7 +1142,7 @@ export default function CaloriesPage() {
 
       {/* Sheets */}
       <AddFoodSheet open={showAddFood} onClose={() => setShowAddFood(false)} />
-      <SettingsSheet open={showSettings} onClose={() => setShowSettings(false)} />
+      <SettingsSheet open={showSettings} onClose={() => setShowSettings(false)} goalCalories={goalCalories} />
 
       {/* FAB */}
       <button
