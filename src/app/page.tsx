@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import localFont from "next/font/local";
 
 const dachiFont = localFont({
-  src: "../fonts/DachiTheLynx.otf",
+  src: "./fonts/DachiTheLynx.otf",
   variable: "--font-dachi",
 });
 
