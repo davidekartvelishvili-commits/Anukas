@@ -426,13 +426,205 @@ function SettingsSheet({
   );
 }
 
+// Profile page
+function ProfilePage({ onBack }: { onBack: () => void }) {
+  const [tab, setTab] = useState<"პირადი ინფორმაცია" | "გამოწერა">(
+    "პირადი ინფორმაცია"
+  );
+
+  return (
+    <div className="min-h-screen bg-[#f5f5f5] flex flex-col">
+      {/* Header */}
+      <div className="flex items-center px-5 py-4 bg-white">
+        <button
+          onClick={onBack}
+          className="w-11 h-11 rounded-full border border-[#e0e0e0] flex items-center justify-center mr-4"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#333"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+        <h1 className="text-[22px] font-extrabold text-[#2d2d2d] flex-1 text-center mr-[60px]">
+          პროფილი
+        </h1>
+      </div>
+
+      {/* Tabs */}
+      <div className="px-5 pt-4 pb-2 bg-white">
+        <div className="flex rounded-full bg-[#f0f0f0] p-1">
+          {(["პირადი ინფორმაცია", "გამოწერა"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex-1 py-2.5 rounded-full text-[13px] font-bold transition-colors ${
+                tab === t
+                  ? "bg-[#4CAF50] text-white shadow-sm"
+                  : "text-[#888]"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto px-5 pt-4 pb-8">
+        {tab === "პირადი ინფორმაცია" ? (
+          <>
+            {/* Body data */}
+            <p className="text-[14px] font-bold text-[#999] mb-3 uppercase tracking-wide">
+              სხეულის მონაცემები
+            </p>
+            <div className="bg-white rounded-2xl overflow-hidden mb-6 shadow-sm">
+              {/* Age */}
+              <div className="flex items-center px-4 py-4 border-b border-[#f0f0f0]">
+                <div className="w-10 h-10 rounded-xl bg-[#E8F5E9] flex items-center justify-center mr-3">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <path d="M16 2v4M8 2v4M3 10h18" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <span className="text-[12px] text-[#999] block">ასაკი</span>
+                  <span className="text-[18px] font-bold text-[#2d2d2d]">34</span>
+                </div>
+                <span className="text-[14px] text-[#bbb]">წ</span>
+              </div>
+              {/* Gender */}
+              <div className="flex items-center px-4 py-4 border-b border-[#f0f0f0]">
+                <div className="w-10 h-10 rounded-xl bg-[#E8F5E9] flex items-center justify-center mr-3">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" />
+                    <circle cx="17" cy="7" r="4" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <span className="text-[12px] text-[#999] block">სქესი</span>
+                  <span className="text-[18px] font-bold text-[#2d2d2d]">მამრობითი</span>
+                </div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </div>
+              {/* Height */}
+              <div className="flex items-center px-4 py-4 border-b border-[#f0f0f0]">
+                <div className="w-10 h-10 rounded-xl bg-[#E8F5E9] flex items-center justify-center mr-3">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M8 21h8M12 3v18M17 8l-5-5-5 5" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <span className="text-[12px] text-[#999] block">სიმაღლე</span>
+                  <span className="text-[18px] font-bold text-[#2d2d2d]">165</span>
+                </div>
+                <span className="text-[14px] text-[#bbb]">სმ</span>
+              </div>
+              {/* Weight */}
+              <div className="flex items-center px-4 py-4">
+                <div className="w-10 h-10 rounded-xl bg-[#E8F5E9] flex items-center justify-center mr-3">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 18L18 6M8 6h2v2M16 18h-2v-2" />
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <span className="text-[12px] text-[#999] block">წონა</span>
+                  <span className="text-[18px] font-bold text-[#2d2d2d]">60</span>
+                </div>
+                <span className="text-[14px] text-[#bbb]">კგ</span>
+              </div>
+            </div>
+
+            {/* Goals */}
+            <p className="text-[14px] font-bold text-[#999] mb-3 uppercase tracking-wide">
+              მიზნები
+            </p>
+            <div className="bg-white rounded-2xl overflow-hidden mb-8 shadow-sm">
+              {/* Goal */}
+              <div className="flex items-center px-4 py-4 border-b border-[#f0f0f0]">
+                <div className="w-10 h-10 rounded-xl bg-[#E8F5E9] flex items-center justify-center mr-3">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="6" />
+                    <circle cx="12" cy="12" r="2" fill="#4CAF50" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <span className="text-[12px] text-[#999] block">მიზანი</span>
+                  <span className="text-[16px] font-bold text-[#2d2d2d]">წონის დაკლება</span>
+                </div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </div>
+              {/* Activity level */}
+              <div className="flex items-center px-4 py-4">
+                <div className="w-10 h-10 rounded-xl bg-[#E8F5E9] flex items-center justify-center mr-3">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round">
+                    <path d="M13 2L3 14h9l-1 10 10-12h-9l1-10z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <span className="text-[12px] text-[#999] block">აქტიურობის დონე</span>
+                  <span className="text-[14px] font-bold text-[#2d2d2d]">საშუალო (3-5 დღე/კვირაში ვარჯიში)</span>
+                </div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Save button */}
+            <button
+              onClick={onBack}
+              className="w-full py-4 rounded-2xl bg-[#8BC34A] text-white text-[17px] font-bold flex items-center justify-center gap-2"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
+                <path d="M17 21v-8H7v8M7 3v5h8" />
+              </svg>
+              შენახვა
+            </button>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20">
+            <span className="text-[48px] mb-4">👑</span>
+            <p className="text-[18px] font-bold text-[#2d2d2d] mb-2">გამოწერა</p>
+            <p className="text-[14px] text-[#999] text-center">მალე დაემატება</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function CaloriesPage() {
   const [waterMl, setWaterMl] = useState(0);
   const [weight, setWeight] = useState(65.0);
   const [showAddFood, setShowAddFood] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const waterGoal = 2145;
   const waterPercent = Math.round((waterMl / waterGoal) * 100);
+
+  if (showProfile) {
+    return (
+      <div className={`${dachiFont.variable} max-w-md mx-auto`}>
+        <ProfilePage onBack={() => setShowProfile(false)} />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -446,7 +638,10 @@ export default function CaloriesPage() {
         >
           ანუკას კალორიები
         </h1>
-        <button className="w-11 h-11 rounded-full border-[1.5px] border-gray-300 flex items-center justify-center bg-white">
+        <button
+          onClick={() => setShowProfile(true)}
+          className="w-11 h-11 rounded-full border-[1.5px] border-gray-300 flex items-center justify-center bg-white"
+        >
           <svg
             width="22"
             height="22"
