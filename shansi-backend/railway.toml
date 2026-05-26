@@ -1,7 +1,0 @@
-[build]
-builder = "dockerfile"
-
-[deploy]
-region = "europe-west"
-healthcheckPath = "/health"
-restartPolicyType = "on_failure"
