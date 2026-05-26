@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+// Try multiple models in order of preference
+const MODELS = [
+  "gemini-2.0-flash",
+  "gemini-2.0-flash-lite",
+  "gemini-1.5-flash",
+];
+
+function geminiUrl(model: string) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+}
 
 const SYSTEM_PROMPT = `You are a Georgian-speaking nutritionist AI. The user will describe food they ate (in Georgian or English) or send a photo of food.
 
@@ -51,24 +61,49 @@ export async function POST(req: NextRequest) {
       parts.push({ text: text || "" });
     }
 
-    const response = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 1024,
-        },
-      }),
+    const body = JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 1024,
+      },
     });
 
-    if (!response.ok) {
-      const err = await response.text();
-      return NextResponse.json({ error: `Gemini error: ${err}` }, { status: 500 });
+    let data = null;
+    let lastError = "";
+
+    // Try each model, with one retry per model
+    for (const model of MODELS) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await fetch(geminiUrl(model), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+        });
+
+        if (response.ok) {
+          data = await response.json();
+          break;
+        }
+
+        lastError = await response.text();
+
+        // If rate limited, wait and retry
+        if (response.status === 429 && attempt === 0) {
+          await new Promise((r) => setTimeout(r, 5000));
+          continue;
+        }
+        break; // other error, try next model
+      }
+      if (data) break;
     }
 
-    const data = await response.json();
+    if (!data) {
+      return NextResponse.json(
+        { error: "სერვისი დროებით მიუწვდომელია. სცადე რამდენიმე წამში." },
+        { status: 429 }
+      );
+    }
     const responseText =
       data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
