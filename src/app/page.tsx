@@ -231,10 +231,198 @@ function AddFoodSheet({
   );
 }
 
+// Settings bottom sheet
+function SettingsSheet({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [weightGoalType, setWeightGoalType] = useState<
+    "კლება" | "შენარჩუნება" | "მატება"
+  >("კლება");
+  const [regime, setRegime] = useState<"standard" | "fast">("standard");
+
+  if (!open) return null;
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 bg-black/40 z-40"
+        onClick={onClose}
+      />
+      <div className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto animate-slideUp">
+        <div className="bg-white rounded-t-[24px] px-5 pt-3 pb-8">
+          {/* Handle */}
+          <div className="flex justify-center mb-5">
+            <div className="w-10 h-[5px] rounded-full bg-[#ddd]" />
+          </div>
+
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-[22px] font-extrabold text-[#2d2d2d]">
+              კალორიების რედაქტირება
+            </h3>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-full bg-[#f0f0f0] flex items-center justify-center"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#666"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Weight goal type */}
+          <p className="text-[15px] font-semibold text-[#2d2d2d] mb-2.5">
+            წონის მიზანი
+          </p>
+          <div className="flex rounded-2xl border border-[#e0e0e0] overflow-hidden mb-5">
+            {(["კლება", "შენარჩუნება", "მატება"] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => setWeightGoalType(type)}
+                className={`flex-1 py-3 text-[14px] font-semibold transition-colors ${
+                  weightGoalType === type
+                    ? "bg-[#E8F5E9] text-[#4CAF50] border border-[#4CAF50] rounded-2xl -m-px z-10"
+                    : "text-[#888]"
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+
+          {/* Regime */}
+          <p className="text-[15px] font-semibold text-[#2d2d2d] mb-2.5">
+            რეჟიმი
+          </p>
+          <div className="flex rounded-2xl border border-[#e0e0e0] overflow-hidden mb-5">
+            <button
+              onClick={() => setRegime("standard")}
+              className={`flex-1 py-3 px-3 flex flex-col items-center rounded-2xl transition-colors ${
+                regime === "standard"
+                  ? "bg-[#8BC34A] text-white -m-px z-10 border border-[#7CB342]"
+                  : "text-[#888]"
+              }`}
+            >
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={regime === "standard" ? "#fff" : "#888"}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 6v6l4 2" />
+                </svg>
+                <span className="text-[14px] font-bold">სტანდარტული</span>
+              </div>
+              <span
+                className={`text-[11px] ${
+                  regime === "standard" ? "text-white/80" : "text-[#aaa]"
+                }`}
+              >
+                კვირაში 0.5 კგ
+              </span>
+            </button>
+            <button
+              onClick={() => setRegime("fast")}
+              className={`flex-1 py-3 px-3 flex flex-col items-center rounded-2xl transition-colors ${
+                regime === "fast"
+                  ? "bg-[#8BC34A] text-white -m-px z-10 border border-[#7CB342]"
+                  : "text-[#888]"
+              }`}
+            >
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={regime === "fast" ? "#fff" : "#888"}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <path d="M13 2L3 14h9l-1 10 10-12h-9l1-10z" />
+                </svg>
+                <span className="text-[14px] font-bold">სწრაფი</span>
+              </div>
+              <span
+                className={`text-[11px] ${
+                  regime === "fast" ? "text-white/80" : "text-[#aaa]"
+                }`}
+              >
+                კვირაში 0.8 - 1 კგ
+              </span>
+            </button>
+          </div>
+
+          {/* Daily limit */}
+          <p className="text-[15px] font-semibold text-[#2d2d2d] mb-2.5">
+            დღიური ლიმიტი
+          </p>
+          <div className="flex items-center p-4 rounded-2xl border border-[#e0e0e0] mb-2">
+            <div className="w-10 h-10 rounded-full bg-[#FFF3E0] flex items-center justify-center mr-3">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="#FF6B35"
+                stroke="#FF6B35"
+                strokeWidth="1"
+              >
+                <path d="M12 22c4.97 0 8-3.582 8-8 0-4.418-4-8-4-8s0 4-4 4c-2 0-2-2-2-2S6 11.582 6 14c0 4.418 2.03 8 6 8z" />
+              </svg>
+            </div>
+            <span className="text-[15px] text-[#888] flex-1">სულ:</span>
+            <span className="text-[32px] font-bold text-[#2d2d2d] leading-none">
+              1976
+            </span>
+            <span className="text-[15px] text-[#888] ml-2">კკალ</span>
+          </div>
+          <p className="text-[12px] text-[#aaa] text-center mb-5">
+            ცვლილება ავტომატურად გადაითვლის მაკროებს
+          </p>
+
+          {/* Buttons */}
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 py-3.5 rounded-2xl border border-[#e0e0e0] text-[16px] font-bold text-[#2d2d2d]"
+            >
+              გაუქმება
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 py-3.5 rounded-2xl bg-[#4CAF50] text-[16px] font-bold text-white"
+            >
+              შენახვა
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function CaloriesPage() {
   const [waterMl, setWaterMl] = useState(0);
   const [weight, setWeight] = useState(65.0);
   const [showAddFood, setShowAddFood] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const waterGoal = 2145;
   const waterPercent = Math.round((waterMl / waterGoal) * 100);
 
@@ -278,7 +466,7 @@ export default function CaloriesPage() {
               დღეს
             </h2>
             <span className="flex-1 flex justify-end">
-              <button>
+              <button onClick={() => setShowSettings(true)}>
                 <svg
                   width="24"
                   height="24"
@@ -627,8 +815,9 @@ export default function CaloriesPage() {
         </div>
       </div>
 
-      {/* Add Food Sheet */}
+      {/* Sheets */}
       <AddFoodSheet open={showAddFood} onClose={() => setShowAddFood(false)} />
+      <SettingsSheet open={showSettings} onClose={() => setShowSettings(false)} />
 
       {/* FAB */}
       <button
