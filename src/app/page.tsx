@@ -98,6 +98,7 @@ function AddFoodSheet({
 }) {
   const [mode, setMode] = useState<"menu" | "text" | "result">("menu");
   const [textInput, setTextInput] = useState("");
+  const [selectedMeal, setSelectedMeal] = useState(currentMeal);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<FoodItem | null>(null);
   const [error, setError] = useState("");
@@ -111,6 +112,7 @@ function AddFoodSheet({
         setTextInput("");
         setResult(null);
         setError("");
+        setSelectedMeal(currentMeal);
       }, 300);
     }
   }, [open]);
@@ -282,40 +284,97 @@ function AddFoodSheet({
           {/* Result mode */}
           {mode === "result" && result && !loading && (
             <div>
-              <div className="bg-[#f9f9f9] rounded-2xl p-4 mb-4">
-                <p className="text-[18px] font-bold text-[#2d2d2d] mb-1">{result.name}</p>
-                <p className="text-[13px] text-[#999] mb-3">{result.portion}</p>
-                <div className="flex justify-between">
-                  <div className="text-center">
-                    <p className="text-[22px] font-bold text-[#4CAF50]">{result.calories}</p>
-                    <p className="text-[11px] text-[#999]">კკალ</p>
+              {/* Calorie summary card */}
+              <div className="bg-[#f9f9f9] rounded-2xl p-4 mb-3">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF6B35" stroke="#FF6B35" strokeWidth="1">
+                    <path d="M12 22c4.97 0 8-3.582 8-8 0-4.418-4-8-4-8s0 4-4 4c-2 0-2-2-2-2S6 11.582 6 14c0 4.418 2.03 8 6 8z" />
+                  </svg>
+                  <span className="text-[32px] font-bold text-[#2d2d2d]">{result.calories}</span>
+                  <span className="text-[16px] text-[#999] mt-2">კკალ</span>
+                </div>
+                <div className="flex justify-around">
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-[#E8D5A0]" />
+                    <span className="text-[14px] font-bold text-[#2d2d2d]">{result.protein}გ</span>
+                    <span className="text-[12px] text-[#999]">ცილა</span>
                   </div>
-                  <div className="text-center">
-                    <p className="text-[22px] font-bold text-[#E8A0BF]">{result.carbs}გ</p>
-                    <p className="text-[11px] text-[#999]">ნახშირწყ.</p>
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-[#E8A0BF]" />
+                    <span className="text-[14px] font-bold text-[#2d2d2d]">{result.carbs}გ</span>
+                    <span className="text-[12px] text-[#999]">ნახშ.</span>
                   </div>
-                  <div className="text-center">
-                    <p className="text-[22px] font-bold text-[#90B8DE]">{result.fat}გ</p>
-                    <p className="text-[11px] text-[#999]">ცხიმი</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[22px] font-bold text-[#E8D5A0]">{result.protein}გ</p>
-                    <p className="text-[11px] text-[#999]">ცილა</p>
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-[#90B8DE]" />
+                    <span className="text-[14px] font-bold text-[#2d2d2d]">{result.fat}გ</span>
+                    <span className="text-[12px] text-[#999]">ცხიმი</span>
                   </div>
                 </div>
               </div>
+
+              {/* Ingredient row with delete */}
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[14px] font-bold text-[#2d2d2d]">1 ინგრედიენტი</p>
+              </div>
+              <div className="bg-[#f9f9f9] rounded-2xl px-4 py-3 mb-5 flex items-center">
+                <div className="w-8 h-8 rounded-full bg-white border border-[#e0e0e0] flex items-center justify-center mr-3 text-[12px] font-bold text-[#888]">1</div>
+                <div className="flex-1">
+                  <p className="text-[14px] font-bold text-[#2d2d2d]">{result.name} <span className="font-normal text-[#999]">{result.portion}</span></p>
+                  <div className="flex gap-2 mt-0.5">
+                    <span className="text-[11px]"><span className="text-[#E8D5A0]">{'\u25CF'}</span> {result.protein}გ</span>
+                    <span className="text-[11px]"><span className="text-[#E8A0BF]">{'\u25CF'}</span> {result.carbs}გ</span>
+                    <span className="text-[11px]"><span className="text-[#90B8DE]">{'\u25CF'}</span> {result.fat}გ</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="text-right mr-1">
+                    <p className="text-[16px] font-bold text-[#2d2d2d]">{result.calories}</p>
+                    <p className="text-[10px] text-[#999]">კკალ</p>
+                  </div>
+                  <button
+                    onClick={() => { setResult(null); setMode("menu"); }}
+                    className="w-9 h-9 rounded-xl bg-[#FEE2E2] flex items-center justify-center"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round">
+                      <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Meal selector */}
+              <div className="flex gap-2 mb-4 overflow-x-auto scrollbar-hide">
+                {["საუზმე", "სადილი", "ვახშამი", "სნეკი"].map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setSelectedMeal(m)}
+                    className={`px-5 py-2.5 rounded-full text-[13px] font-bold shrink-0 transition-colors ${
+                      selectedMeal === m
+                        ? "bg-[#E8F5E9] text-[#4CAF50] border border-[#4CAF50]"
+                        : "bg-[#f5f5f5] text-[#888] border border-[#e0e0e0]"
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+
+              {/* Action buttons */}
               <div className="flex gap-3">
                 <button
-                  onClick={() => { setMode("menu"); setResult(null); }}
-                  className="flex-1 py-3 rounded-2xl border border-[#e0e0e0] text-[15px] font-bold text-[#888]"
+                  onClick={onClose}
+                  className="flex-1 py-3.5 rounded-2xl border border-[#e0e0e0] text-[15px] font-bold text-[#888]"
                 >
-                  გაუქმება
+                  დაბრუნება
                 </button>
                 <button
-                  onClick={() => { onAdd(result); onClose(); }}
-                  className="flex-1 py-3 rounded-2xl bg-[#4CAF50] text-[15px] font-bold text-white"
+                  onClick={() => { onAdd({ ...result, meal: selectedMeal }); onClose(); }}
+                  className="flex-[2] py-3.5 rounded-2xl bg-[#8BC34A] text-[15px] font-bold text-white flex items-center justify-center gap-2"
                 >
-                  დამატება
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                  დღიურში დამატება
                 </button>
               </div>
             </div>
@@ -1161,13 +1220,31 @@ export default function CaloriesPage() {
             {/* Show added foods for this meal */}
             {mealFoods.length > 0 && (
               <div className="mt-2 pt-2 border-t border-[#f0f0f0]">
-                {mealFoods.map((f, i) => (
-                  <div key={i} className="flex items-center justify-between py-1.5">
-                    <span className="text-[13px] text-[#555] flex-1">{f.name}</span>
-                    <span className="text-[12px] text-[#999] mr-2">{f.portion}</span>
-                    <span className="text-[13px] font-semibold text-[#2d2d2d]">{f.calories} კკალ</span>
+                {mealFoods.map((f) => {
+                  const foodIndex = foods.indexOf(f);
+                  return (
+                  <div key={foodIndex} className="flex items-center py-2">
+                    <div className="flex-1">
+                      <span className="text-[13px] font-semibold text-[#555]">{f.name}</span>
+                      <div className="flex gap-2 mt-0.5">
+                        <span className="text-[10px] text-[#aaa]">{f.portion}</span>
+                        <span className="text-[10px]"><span className="text-[#E8D5A0]">{'\u25CF'}</span> {f.protein}გ</span>
+                        <span className="text-[10px]"><span className="text-[#E8A0BF]">{'\u25CF'}</span> {f.carbs}გ</span>
+                        <span className="text-[10px]"><span className="text-[#90B8DE]">{'\u25CF'}</span> {f.fat}გ</span>
+                      </div>
+                    </div>
+                    <span className="text-[13px] font-bold text-[#2d2d2d] mr-2">{f.calories} კკალ</span>
+                    <button
+                      onClick={() => setFoods((prev) => prev.filter((_, idx) => idx !== foodIndex))}
+                      className="w-7 h-7 rounded-lg bg-[#FEE2E2] flex items-center justify-center shrink-0"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                      </svg>
+                    </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
