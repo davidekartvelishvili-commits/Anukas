@@ -1293,20 +1293,23 @@ function getTodayStr() {
 }
 
 // Helper: get the Monday-Sunday week containing a given date
-function getWeekDays(dateStr: string): string[] {
-  const d = new Date(dateStr + "T12:00:00");
-  const day = d.getDay(); // 0=Sun, 1=Mon...6=Sat
-  const monday = new Date(d);
-  monday.setDate(d.getDate() - ((day + 6) % 7));
+// Generate array of dates: 60 days before today + today
+function getCalendarDays(): string[] {
+  const today = new Date();
   const days: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    const dd = new Date(monday);
-    dd.setDate(monday.getDate() + i);
+  for (let i = -60; i <= 0; i++) {
+    const dd = new Date(today);
+    dd.setDate(today.getDate() + i);
     days.push(
       `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, "0")}-${String(dd.getDate()).padStart(2, "0")}`
     );
   }
   return days;
+}
+
+function getDayOfWeek(dateStr: string): number {
+  const d = new Date(dateStr + "T12:00:00");
+  return (d.getDay() + 6) % 7; // 0=Mon, 6=Sun
 }
 
 const GEO_DAY_ABBR = ["ორშ", "სამ", "ოთხ", "ხუთ", "პარ", "შაბ", "კვი"];
@@ -1321,27 +1324,46 @@ function WeekCalendar({
   daysWithData: string[];
 }) {
   const todayStr = getTodayStr();
-  const weekDays = getWeekDays(selectedDate);
+  const calendarDays = getCalendarDays();
   const dataSet = new Set(daysWithData);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const didScroll = useRef(false);
+
+  // Auto-scroll to selected date on mount
+  useEffect(() => {
+    if (!didScroll.current && scrollRef.current) {
+      const el = scrollRef.current.querySelector(`[data-date="${selectedDate}"]`);
+      if (el) {
+        el.scrollIntoView({ inline: "center", block: "nearest" });
+        didScroll.current = true;
+      }
+    }
+  }, [selectedDate]);
 
   return (
-    <div className="bg-white border-b border-gray-200 px-3 py-2.5">
-      <div className="flex justify-around">
-        {weekDays.map((dateStr, i) => {
+    <div className="bg-white border-b border-gray-200 py-2.5">
+      <div
+        ref={scrollRef}
+        className="flex overflow-x-auto scrollbar-hide px-2 gap-1"
+      >
+        {calendarDays.map((dateStr) => {
           const dayNum = parseInt(dateStr.split("-")[2], 10);
+          const dayOfWeek = getDayOfWeek(dateStr);
           const isSelected = dateStr === selectedDate;
+          const isToday = dateStr === todayStr;
           const isFuture = dateStr > todayStr;
           const hasData = dataSet.has(dateStr);
 
           return (
             <button
               key={dateStr}
+              data-date={dateStr}
               disabled={isFuture}
               onClick={() => !isFuture && onSelect(dateStr)}
-              className="flex flex-col items-center gap-0.5 min-w-[38px]"
+              className="flex flex-col items-center gap-0.5 min-w-[44px] shrink-0 py-0.5"
             >
               <span
-                className={`text-[12px] font-semibold ${
+                className={`text-[11px] font-semibold ${
                   isSelected
                     ? "text-[#4CAF50]"
                     : isFuture
@@ -1349,12 +1371,14 @@ function WeekCalendar({
                     : "text-[#999]"
                 }`}
               >
-                {GEO_DAY_ABBR[i]}
+                {GEO_DAY_ABBR[dayOfWeek]}
               </span>
               <div
-                className={`w-[34px] h-[34px] rounded-full flex items-center justify-center ${
+                className={`w-[36px] h-[36px] rounded-full flex items-center justify-center ${
                   isSelected
                     ? "bg-[#4CAF50]"
+                    : isToday
+                    ? "border-2 border-[#4CAF50]"
                     : ""
                 }`}
               >
@@ -1362,6 +1386,8 @@ function WeekCalendar({
                   className={`text-[15px] font-bold ${
                     isSelected
                       ? "text-white"
+                      : isToday
+                      ? "text-[#4CAF50]"
                       : isFuture
                       ? "text-[#d0d0d0]"
                       : "text-[#555]"
@@ -1370,7 +1396,6 @@ function WeekCalendar({
                   {dayNum}
                 </span>
               </div>
-              {/* Data indicator dot */}
               <div className="h-[6px] flex items-center justify-center">
                 {hasData && !isSelected && (
                   <div className="w-[5px] h-[5px] rounded-full bg-[#4CAF50]" />
