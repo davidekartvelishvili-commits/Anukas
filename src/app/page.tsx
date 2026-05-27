@@ -128,6 +128,33 @@ interface FoodItem {
   time: string;
 }
 
+// Activity item type
+interface ActivityItem {
+  name: string;
+  emoji: string;
+  duration: number; // minutes
+  caloriesBurned: number;
+  time: string;
+}
+
+// Calorie burn rates per minute for each activity
+const activityCalRates: Record<string, number> = {
+  "სირბილი": 10,
+  "სეირნობა": 4,
+  "ცურვა": 8,
+  "ველოსიპედი": 7,
+  "იოგა": 3,
+  "ძალოვანი": 6,
+  "ფეხბურთი": 9,
+  "ჩოგბურთი": 8,
+  "კალათბურთი": 8,
+  "ცეკვა": 5,
+  "კრივი": 10,
+  "თხილამური": 7,
+  "ალპინიზმი": 9,
+  "ტანვარჯიში": 5,
+};
+
 // Bottom sheet modal for adding food
 function AddFoodSheet({
   open,
@@ -421,6 +448,323 @@ function AddFoodSheet({
                   დღიურში დამატება
                 </button>
               </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Activity add bottom sheet
+function AddActivitySheet({
+  open,
+  onClose,
+  onAdd,
+  initialActivity,
+  initialTab,
+  goalCalories,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onAdd: (item: ActivityItem) => void;
+  initialActivity: { emoji: string; name: string } | null;
+  initialTab: "quick" | "text";
+  goalCalories: number;
+}) {
+  const [tab, setTab] = useState<"quick" | "text">(initialTab);
+  const [selectedActivity, setSelectedActivity] = useState(initialActivity || activities[0]);
+  const [duration, setDuration] = useState(30);
+  const [textInput, setTextInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [lastBurned, setLastBurned] = useState(0);
+
+  // Reset when opened with new props
+  useEffect(() => {
+    if (open) {
+      setTab(initialTab);
+      setSelectedActivity(initialActivity || activities[0]);
+      setDuration(30);
+      setTextInput("");
+      setError("");
+      setLoading(false);
+      setShowSuccess(false);
+    }
+  }, [open, initialActivity, initialTab]);
+
+  const calRate = activityCalRates[selectedActivity.name] || 5;
+  const calculatedCalories = Math.round(calRate * duration);
+
+  function handleQuickSave() {
+    const now = new Date();
+    const item: ActivityItem = {
+      name: selectedActivity.name,
+      emoji: selectedActivity.emoji,
+      duration,
+      caloriesBurned: calculatedCalories,
+      time: `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`,
+    };
+    onAdd(item);
+    setLastBurned(calculatedCalories);
+    setShowSuccess(true);
+  }
+
+  async function handleTextSave() {
+    if (!textInput.trim()) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/analyze-activity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: textInput }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+        setLoading(false);
+        return;
+      }
+      const now = new Date();
+      // Find matching emoji from activities list
+      const matchedActivity = activities.find((a) => a.name === data.name);
+      const item: ActivityItem = {
+        name: data.name,
+        emoji: matchedActivity?.emoji || "🏃",
+        duration: data.duration,
+        caloriesBurned: data.caloriesBurned,
+        time: `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`,
+      };
+      onAdd(item);
+      setLastBurned(data.caloriesBurned);
+      setShowSuccess(true);
+    } catch {
+      setError("შეცდომა. სცადე თავიდან.");
+    }
+    setLoading(false);
+  }
+
+  if (!open) return null;
+
+  // Success popup
+  if (showSuccess) {
+    return (
+      <>
+        <div className="fixed inset-0 bg-black/40 z-40" onClick={() => { setShowSuccess(false); onClose(); }} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-8">
+          <div className="bg-white rounded-[24px] p-6 max-w-sm w-full shadow-xl">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-full bg-[#FFF3E0] flex items-center justify-center mb-4">
+                <span className="text-[32px]">🔥</span>
+              </div>
+              <h3 className="text-[22px] font-extrabold text-[#2d2d2d] mb-2">ვარჯიში ითვლება!</h3>
+              <p className="text-[14px] text-[#888] mb-4">
+                როცა კალორიას წვავთ, თქვენი დღიური კალორიების მიზანი იმატებს.
+              </p>
+              <div className="bg-[#f9f9f9] rounded-2xl p-4 mb-5 w-full text-left">
+                <p className="text-[14px] font-bold text-[#2d2d2d] mb-1">რატომ?</p>
+                <p className="text-[13px] text-[#666]">
+                  თუ დღეს <span className="font-bold">{goalCalories}</span> კკალ გჭირდებათ და <span className="font-bold text-[#F57C00]">{lastBurned}</span> დაწვით, ესეიგი <span className="font-bold text-[#4CAF50]">{goalCalories + lastBurned}</span> უნდა მიიღოთ რომ დამწვარი კალორია ანაზღაურდეს.
+                </p>
+              </div>
+              <button
+                onClick={() => { setShowSuccess(false); onClose(); }}
+                className="w-full py-3.5 rounded-2xl bg-[#F57C00] text-[16px] font-bold text-white"
+              >
+                გავიგე
+              </button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      <div className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto animate-slideUp">
+        <div className="bg-white rounded-t-[24px] px-5 pt-3 pb-10">
+          <div className="flex justify-center mb-5">
+            <div className="w-10 h-[5px] rounded-full bg-[#ddd]" />
+          </div>
+
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-[22px] font-extrabold text-[#2d2d2d]">
+              ვარჯიშის დამატება
+            </h3>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-full bg-[#f0f0f0] flex items-center justify-center"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex rounded-2xl border border-[#e0e0e0] overflow-hidden mb-5">
+            <button
+              onClick={() => setTab("quick")}
+              className={`flex-1 py-2.5 text-[14px] font-semibold transition-colors ${
+                tab === "quick"
+                  ? "bg-[#FFF3E0] text-[#F57C00] border border-[#F57C00] rounded-2xl -m-px z-10"
+                  : "text-[#888]"
+              }`}
+            >
+              ⚡ სწრაფი
+            </button>
+            <button
+              onClick={() => setTab("text")}
+              className={`flex-1 py-2.5 text-[14px] font-semibold transition-colors ${
+                tab === "text"
+                  ? "bg-[#FFF3E0] text-[#F57C00] border border-[#F57C00] rounded-2xl -m-px z-10"
+                  : "text-[#888]"
+              }`}
+            >
+              ✏️ ტექსტი
+            </button>
+          </div>
+
+          {/* Quick tab */}
+          {tab === "quick" && (
+            <div>
+              {/* Activity selector */}
+              <div className="overflow-x-auto mb-4 -mx-1 scrollbar-hide">
+                <div className="flex gap-2 px-1" style={{ width: "max-content" }}>
+                  {activities.map((a) => (
+                    <button
+                      key={a.name}
+                      onClick={() => setSelectedActivity(a)}
+                      className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 shrink-0 transition-colors ${
+                        selectedActivity.name === a.name
+                          ? "bg-[#FFF3E0] border border-[#F57C00]"
+                          : "bg-[#f5f5f5]"
+                      }`}
+                    >
+                      <span className="text-base">{a.emoji}</span>
+                      <span className={`text-[13px] font-semibold ${
+                        selectedActivity.name === a.name ? "text-[#F57C00]" : "text-[#555]"
+                      }`}>
+                        {a.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Selected activity display */}
+              <div className="bg-[#f9f9f9] rounded-2xl p-4 mb-4 text-center">
+                <span className="text-[40px]">{selectedActivity.emoji}</span>
+                <p className="text-[18px] font-bold text-[#2d2d2d] mt-1">{selectedActivity.name}</p>
+              </div>
+
+              {/* Duration input */}
+              <div className="mb-4">
+                <p className="text-[14px] font-semibold text-[#2d2d2d] mb-2">ხანგრძლივობა</p>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setDuration(Math.max(5, duration - 5))}
+                    className="w-10 h-10 rounded-full border-[1.5px] border-[#e0e0e0] flex items-center justify-center"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M5 12h14" />
+                    </svg>
+                  </button>
+                  <div className="flex-1 flex items-center justify-center gap-2">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={duration}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value) || 0;
+                        setDuration(Math.max(1, Math.min(300, v)));
+                      }}
+                      className="text-[32px] font-bold text-[#2d2d2d] text-center bg-transparent outline-none w-20"
+                    />
+                    <span className="text-[16px] text-[#999]">წუთი</span>
+                  </div>
+                  <button
+                    onClick={() => setDuration(Math.min(300, duration + 5))}
+                    className="w-10 h-10 rounded-full border-[1.5px] border-[#e0e0e0] flex items-center justify-center"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Calculated calories */}
+              <div className="bg-[#FFF3E0] rounded-2xl p-4 mb-5 flex items-center justify-center gap-2">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF6B35" stroke="#FF6B35" strokeWidth="1">
+                  <path d="M12 22c4.97 0 8-3.582 8-8 0-4.418-4-8-4-8s0 4-4 4c-2 0-2-2-2-2S6 11.582 6 14c0 4.418 2.03 8 6 8z" />
+                </svg>
+                <span className="text-[32px] font-bold text-[#F57C00]">{calculatedCalories}</span>
+                <span className="text-[16px] text-[#999] mt-2">კკალ დაიწვება</span>
+              </div>
+
+              {/* Save button */}
+              <button
+                onClick={handleQuickSave}
+                className="w-full py-3.5 rounded-2xl bg-[#4CAF50] text-[16px] font-bold text-white flex items-center justify-center gap-2"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                შენახვა
+              </button>
+            </div>
+          )}
+
+          {/* Text tab */}
+          {tab === "text" && !loading && !error && (
+            <div>
+              <textarea
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                placeholder="მაგ: ვირბინე 20 წუთი, 30 squat..."
+                className="w-full p-4 rounded-2xl border border-[#e0e0e0] text-[16px] text-[#2d2d2d] resize-none outline-none focus:border-[#F57C00] transition-colors"
+                rows={3}
+                autoFocus
+              />
+              <p className="text-[13px] text-[#999] mt-2 mb-4 flex items-center gap-1">
+                ⚡ AI გამოთვლის კალორიებს ავტომატურად
+              </p>
+              <button
+                onClick={handleTextSave}
+                disabled={!textInput.trim()}
+                className="w-full py-3.5 rounded-2xl bg-[#4CAF50] text-[16px] font-bold text-white flex items-center justify-center gap-2 disabled:opacity-40"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                შენახვა
+              </button>
+            </div>
+          )}
+
+          {/* Loading */}
+          {tab === "text" && loading && (
+            <div className="flex flex-col items-center py-10">
+              <div className="w-10 h-10 border-4 border-[#F57C00] border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-[15px] text-[#888]">Claude ანალიზს აკეთებს...</p>
+            </div>
+          )}
+
+          {/* Error */}
+          {tab === "text" && error && !loading && (
+            <div className="text-center py-6">
+              <p className="text-[15px] text-red-500 mb-4">{error}</p>
+              <button
+                onClick={() => setError("")}
+                className="px-6 py-2.5 rounded-xl bg-[#f0f0f0] text-[14px] font-bold text-[#555]"
+              >
+                თავიდან სცადე
+              </button>
             </div>
           )}
         </div>
@@ -966,6 +1310,10 @@ export default function CaloriesPage() {
   const [showProfile, setShowProfile] = useState(false);
   const [regime, setRegime] = useState<"standard" | "fast">("standard");
   const [profile, setProfile] = useState<ProfileData>(defaultProfile);
+  const [userActivities, setUserActivities] = useState<ActivityItem[]>([]);
+  const [showAddActivity, setShowAddActivity] = useState(false);
+  const [activitySheetInitial, setActivitySheetInitial] = useState<{ emoji: string; name: string } | null>(null);
+  const [activitySheetTab, setActivitySheetTab] = useState<"quick" | "text">("text");
 
   // Load saved data from server on mount
   useEffect(() => {
@@ -978,6 +1326,7 @@ export default function CaloriesPage() {
           if (typeof saved.waterMl === "number") setWaterMl(saved.waterMl);
           if (typeof saved.weight === "number") setWeight(saved.weight);
           if (Array.isArray(saved.foods)) setFoods(saved.foods);
+          if (Array.isArray(saved.activities)) setUserActivities(saved.activities);
         }
       })
       .catch(() => {})
@@ -987,8 +1336,8 @@ export default function CaloriesPage() {
   // Save to server whenever data changes
   useEffect(() => {
     if (!loaded) return;
-    saveToServer({ profile, regime, waterMl, weight, foods });
-  }, [profile, regime, waterMl, weight, foods, loaded]);
+    saveToServer({ profile, regime, waterMl, weight, foods, activities: userActivities });
+  }, [profile, regime, waterMl, weight, foods, userActivities, loaded]);
 
   const goalCalories = calculateCalories(profile, regime);
   const macros = calculateMacros(goalCalories);
@@ -1001,7 +1350,8 @@ export default function CaloriesPage() {
     }),
     { calories: 0, carbs: 0, fat: 0, protein: 0 }
   );
-  const remaining = Math.max(0, goalCalories - consumed.calories);
+  const totalBurned = userActivities.reduce((s, a) => s + a.caloriesBurned, 0);
+  const remaining = Math.max(0, goalCalories + totalBurned - consumed.calories);
   const waterGoal = Math.round((Number(profile.weight) || 60) * 33);
   const waterPercent = Math.round((waterMl / waterGoal) * 100);
 
@@ -1428,7 +1778,14 @@ export default function CaloriesPage() {
                 აქტივობა
               </span>
             </div>
-            <button className="flex items-center border-[1.5px] border-[#F57C00] rounded-full px-3.5 py-1.5">
+            <button
+              onClick={() => {
+                setActivitySheetInitial(null);
+                setActivitySheetTab("text");
+                setShowAddActivity(true);
+              }}
+              className="flex items-center border-[1.5px] border-[#F57C00] rounded-full px-3.5 py-1.5"
+            >
               <span className="text-sm font-bold text-[#F57C00]">+ </span>
               <span className="text-[13px] font-semibold text-[#F57C00]">
                 დამატება
@@ -1441,6 +1798,11 @@ export default function CaloriesPage() {
               {activities.map((a) => (
                 <button
                   key={a.name}
+                  onClick={() => {
+                    setActivitySheetInitial(a);
+                    setActivitySheetTab("quick");
+                    setShowAddActivity(true);
+                  }}
                   className="flex items-center gap-1.5 bg-[#f5f5f5] rounded-full px-3.5 py-2 shrink-0"
                 >
                   <span className="text-base">{a.emoji}</span>
@@ -1452,7 +1814,45 @@ export default function CaloriesPage() {
             </div>
           </div>
           <div className="h-px bg-[#ebebeb] mb-3.5" />
-          <p className="text-[13px] text-[#bbb]">ვარჯიში არ დამატებულა</p>
+          {userActivities.length === 0 ? (
+            <p className="text-[13px] text-[#bbb]">ვარჯიში არ დამატებულა</p>
+          ) : (
+            <div>
+              {userActivities.map((a, idx) => (
+                <div key={idx} className="flex items-center py-2.5">
+                  <span className="text-[20px] mr-3">{a.emoji}</span>
+                  <div className="flex-1">
+                    <span className="text-[14px] font-semibold text-[#2d2d2d]">{a.name}</span>
+                    <span className="text-[12px] text-[#999] ml-2">{a.duration} წთ</span>
+                  </div>
+                  <div className="flex items-center gap-1 mr-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#FF6B35" stroke="#FF6B35" strokeWidth="1">
+                      <path d="M12 22c4.97 0 8-3.582 8-8 0-4.418-4-8-4-8s0 4-4 4c-2 0-2-2-2-2S6 11.582 6 14c0 4.418 2.03 8 6 8z" />
+                    </svg>
+                    <span className="text-[14px] font-bold text-[#F57C00]">{a.caloriesBurned}</span>
+                  </div>
+                  <button
+                    onClick={() => setUserActivities((prev) => prev.filter((_, i) => i !== idx))}
+                    className="w-7 h-7 rounded-lg bg-[#FEE2E2] flex items-center justify-center shrink-0"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              <div className="h-px bg-[#ebebeb] my-2" />
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] text-[#888]">{userActivities.length} ვარჯიში დღეს</span>
+                <div className="flex items-center gap-1">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#FF6B35" stroke="#FF6B35" strokeWidth="1">
+                    <path d="M12 22c4.97 0 8-3.582 8-8 0-4.418-4-8-4-8s0 4-4 4c-2 0-2-2-2-2S6 11.582 6 14c0 4.418 2.03 8 6 8z" />
+                  </svg>
+                  <span className="text-[14px] font-bold text-[#F57C00]">{totalBurned} კკალ დაწვა</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1462,6 +1862,14 @@ export default function CaloriesPage() {
         onClose={() => setShowAddFood(false)}
         currentMeal={currentMeal}
         onAdd={(item) => setFoods((prev) => [...prev, item])}
+      />
+      <AddActivitySheet
+        open={showAddActivity}
+        onClose={() => setShowAddActivity(false)}
+        onAdd={(item) => setUserActivities((prev) => [...prev, item])}
+        initialActivity={activitySheetInitial}
+        initialTab={activitySheetTab}
+        goalCalories={goalCalories}
       />
       <SettingsSheet
         open={showSettings}
