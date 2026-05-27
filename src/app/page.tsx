@@ -1689,6 +1689,272 @@ function ProfilePage({
   );
 }
 
+// Feed item for challenge page
+interface FeedItem {
+  id: string;
+  date: string;
+  type: "goal_achieved" | "activity" | "water_goal" | "weight_milestone" | "over_limit" | "streak";
+  emoji: string;
+  title: string;
+  detail?: string;
+  stats?: string;
+  color: string; // accent color for the card border-left or badge
+}
+
+// Challenge / Social Feed page
+function ChallengePage({
+  profile,
+  regime,
+}: {
+  profile: ProfileData;
+  regime: "standard" | "fast";
+}) {
+  const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadFeed() {
+      try {
+        const res = await fetch("/api/data?history=1");
+        const history: HistoryDay[] = await res.json();
+        const goalCalories = calculateCalories(profile, regime);
+        const waterGoal = Math.round((Number(profile.weight) || 65) * 33);
+        const startingWeight = parseFloat((profile as ProfileData & { startingWeight?: string }).startingWeight || profile.weight) || 65;
+        const items: FeedItem[] = [];
+
+        // Calculate streak from today going backwards
+        let streakCount = 0;
+        const reversedDays = [...history].sort((a, b) => b.date.localeCompare(a.date));
+        for (const day of reversedDays) {
+          const consumed = (day.foods || []).reduce((s: number, f: FoodItem) => s + (f.calories || 0), 0);
+          const dayGoal = day.goalCalories || goalCalories;
+          if (consumed > 0 && consumed <= dayGoal) {
+            streakCount++;
+          } else if (consumed > 0) {
+            break;
+          }
+        }
+
+        // Process each day (newest first)
+        const processed = [...history].sort((a, b) => b.date.localeCompare(a.date));
+
+        for (const day of processed) {
+          const consumed = (day.foods || []).reduce((s: number, f: FoodItem) => s + (f.calories || 0), 0);
+          const dayGoal = day.goalCalories || goalCalories;
+          const hasFoods = (day.foods || []).length > 0;
+          const hasActivities = (day.userActivities || []).length > 0;
+          const hasAnyData = hasFoods || hasActivities || (day.waterMl && day.waterMl > 0);
+
+          if (!hasAnyData) continue;
+
+          // Daily goal achieved or over limit
+          if (hasFoods && consumed > 0) {
+            if (consumed <= dayGoal) {
+              items.push({
+                id: `goal-${day.date}`,
+                date: day.date,
+                type: "goal_achieved",
+                emoji: "\u{1F3C6}",
+                title: "\u10D3\u10E6\u10D8\u10E3\u10E0\u10D8 \u10DB\u10D8\u10D6\u10D0\u10DC\u10D8 \u10DB\u10D8\u10E6\u10EC\u10D4\u10E3\u10DA\u10D8\u10D0!",
+                stats: `${consumed} / ${dayGoal} \u10D9\u10D9\u10D0\u10DA`,
+                color: "#4CAF50",
+              });
+            } else {
+              items.push({
+                id: `over-${day.date}`,
+                date: day.date,
+                type: "over_limit",
+                emoji: "\u274C",
+                title: "\u10D9\u10D0\u10DA\u10DD\u10E0\u10D8\u10D4\u10D1\u10D8\u10E1 \u10DA\u10D8\u10DB\u10D8\u10E2\u10D8 \u10D2\u10D0\u10D3\u10D0\u10ED\u10D0\u10E0\u10D1\u10D4\u10D1\u10E3\u10DA\u10D8\u10D0",
+                stats: `${consumed} / ${dayGoal} \u10D9\u10D9\u10D0\u10DA (+${consumed - dayGoal})`,
+                color: "#FF5722",
+              });
+            }
+          }
+
+          // Activities
+          for (const act of (day.userActivities || [])) {
+            items.push({
+              id: `act-${day.date}-${act.name}-${act.time}`,
+              date: day.date,
+              type: "activity",
+              emoji: act.emoji || "\u{1F3C3}",
+              title: `${act.emoji || "\u{1F3C3}"} ${act.name}`,
+              detail: `${act.duration} \u10EC\u10D7, ${act.caloriesBurned} \u10D9\u10D9\u10D0\u10DA \u10D3\u10D0\u10D8\u10EC\u10D5\u10D0`,
+              color: "#FF9800",
+            });
+          }
+
+          // Water goal
+          if (day.waterMl && day.waterMl >= waterGoal) {
+            items.push({
+              id: `water-${day.date}`,
+              date: day.date,
+              type: "water_goal",
+              emoji: "\u{1F4A7}",
+              title: "\u10EC\u10E7\u10DA\u10D8\u10E1 \u10DB\u10D8\u10D6\u10D0\u10DC\u10D8 \u10DB\u10D8\u10E6\u10EC\u10D4\u10E3\u10DA\u10D8\u10D0!",
+              stats: `${day.waterMl} / ${waterGoal} \u10DB\u10DA`,
+              color: "#2196F3",
+            });
+          }
+
+          // Weight milestone
+          if (day.weight && day.weight !== startingWeight) {
+            const diff = day.weight - startingWeight;
+            if (Math.abs(diff) >= 0.5) {
+              const direction = diff < 0 ? "\u10E8\u10D4\u10DB\u10EA\u10D8\u10E0\u10D3\u10D0" : "\u10DB\u10DD\u10D8\u10DB\u10D0\u10E2\u10D0";
+              items.push({
+                id: `weight-${day.date}`,
+                date: day.date,
+                type: "weight_milestone",
+                emoji: "\u2696\uFE0F",
+                title: `\u10EC\u10DD\u10DC\u10D0 ${direction}! ${diff > 0 ? "+" : ""}${diff.toFixed(1)} \u10D9\u10D2`,
+                detail: `${day.weight} \u10D9\u10D2`,
+                color: diff < 0 ? "#4CAF50" : "#FF9800",
+              });
+            }
+          }
+        }
+
+        // Add streak card at the top if >= 2
+        if (streakCount >= 2) {
+          items.unshift({
+            id: `streak-current`,
+            date: new Date().toISOString().split("T")[0],
+            type: "streak",
+            emoji: "\u{1F525}",
+            title: `${streakCount} \u10D3\u10E6\u10D8\u10D0\u10DC\u10D8 \u10E1\u10D4\u10E0\u10D8\u10D0! \u{1F525}`,
+            detail: "\u10D6\u10D4\u10D3\u10D8\u10D6\u10D4\u10D3 \u10DB\u10D8\u10D6\u10D0\u10DC\u10E1 \u10D0\u10E6\u10EC\u10D4\u10D5",
+            color: "#FF6D00",
+          });
+        }
+
+        setFeedItems(items);
+      } catch {
+        setFeedItems([]);
+      }
+      setLoading(false);
+    }
+    loadFeed();
+  }, [profile, regime]);
+
+  // Format date for display
+  function formatDate(dateStr: string): string {
+    const months = [
+      "\u10D8\u10D0\u10DC", "\u10D7\u10D4\u10D1", "\u10DB\u10D0\u10E0", "\u10D0\u10DE\u10E0",
+      "\u10DB\u10D0\u10D8", "\u10D8\u10D5\u10DC", "\u10D8\u10D5\u10DA", "\u10D0\u10D2\u10D5",
+      "\u10E1\u10D4\u10E5", "\u10DD\u10E5\u10E2", "\u10DC\u10DD\u10D4", "\u10D3\u10D4\u10D9"
+    ];
+    const d = new Date(dateStr + "T00:00:00");
+    return `${d.getDate()} ${months[d.getMonth()]}`;
+  }
+
+  // Reaction emojis per type
+  function getReactions(type: FeedItem["type"]): string[] {
+    switch (type) {
+      case "goal_achieved": return ["\u{1F4AA}", "\u{1F389}", "\u{1F525}"];
+      case "activity": return ["\u{1F4AA}", "\u{1F525}"];
+      case "water_goal": return ["\u{1F4A7}", "\u{1F44F}"];
+      case "weight_milestone": return ["\u{1F389}", "\u2B50"];
+      case "over_limit": return ["\u{1F4AA}", "\u{1F91E}"];
+      case "streak": return ["\u{1F525}", "\u{1F3C6}", "\u{1F4AA}"];
+      default: return ["\u{1F4AA}"];
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-20">
+        <div className="w-8 h-8 border-4 border-[#4CAF50] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (feedItems.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center pb-28">
+        <div className="text-center px-8">
+          <span className="text-[56px] block mb-4">{"\u{1F3C6}"}</span>
+          <p className="text-[20px] font-extrabold text-[#2d2d2d] mb-2">
+            {"\u10E8\u10D4\u10DC\u10D8 \u10DB\u10D8\u10E6\u10EC\u10D4\u10D5\u10D4\u10D1\u10D8 \u10D0\u10E5 \u10D2\u10D0\u10DB\u10DD\u10E9\u10DC\u10D3\u10D4\u10D1\u10D0!"}
+          </p>
+          <p className="text-[15px] text-[#999] leading-relaxed">
+            {"\u10D3\u10D0\u10D8\u10EC\u10E7\u10D4 \u10D3\u10E6\u10D8\u10E3\u10E0\u10D8\u10E1 \u10E8\u10D4\u10D5\u10E1\u10D4\u10D1\u10D0 \u2014 \u10E9\u10D0\u10EC\u10D4\u10E0\u10D4 \u10E1\u10D0\u10D9\u10D5\u10D4\u10D1\u10D8, \u10D3\u10D0\u10DA\u10D8\u10D4 \u10EC\u10E7\u10D0\u10DA\u10D8, \u10D8\u10D5\u10D0\u10E0\u10EF\u10D8\u10E8\u10D4 \u10D3\u10D0 \u10DB\u10D8\u10E6\u10EC\u10D4\u10D5\u10D4\u10D1\u10D8 \u10D0\u10E5 \u10D2\u10D0\u10DB\u10DD\u10E9\u10DC\u10D3\u10D4\u10D1\u10D0!"}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto pb-28 px-4 pt-3">
+      {/* Feed header */}
+      <div className="mb-4">
+        <h2 className="text-[22px] font-extrabold text-[#2d2d2d]">{"\u{1F3C6} \u10E9\u10D4\u10DA\u10D4\u10DC\u10EF\u10D8"}</h2>
+        <p className="text-[14px] text-[#999] mt-0.5">{"\u10E8\u10D4\u10DC\u10D8 \u10DB\u10D8\u10E6\u10EC\u10D4\u10D5\u10D4\u10D1\u10D8 \u10D3\u10D0 \u10DE\u10E0\u10DD\u10D2\u10E0\u10D4\u10E1\u10D8"}</p>
+      </div>
+
+      {/* Feed cards */}
+      <div className="flex flex-col gap-3">
+        {feedItems.map((item) => (
+          <div
+            key={item.id}
+            className="bg-white rounded-[20px] shadow-sm border border-[#f0f0f0] overflow-hidden"
+          >
+            {/* Top row: avatar + name + date */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center text-[15px] font-bold text-white" style={{ backgroundColor: item.color }}>
+                  {"\u10D0"}
+                </div>
+                <span className="text-[15px] font-bold text-[#2d2d2d]">{"\u10D0\u10DC\u10E3\u10D9\u10D0"}</span>
+              </div>
+              <span className="text-[13px] text-[#999]">{formatDate(item.date)}</span>
+            </div>
+
+            {/* Achievement content */}
+            <div className="px-4 pb-2">
+              <p className="text-[17px] font-bold text-[#2d2d2d]">
+                {item.type === "activity" ? item.title : `${item.emoji} ${item.title}`}
+              </p>
+              {item.detail && (
+                <p className="text-[14px] text-[#666] mt-1">{item.detail}</p>
+              )}
+            </div>
+
+            {/* Stats row if relevant */}
+            {item.stats && (
+              <div className="px-4 pb-2">
+                <div
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[13px] font-bold"
+                  style={{
+                    backgroundColor: item.color + "15",
+                    color: item.color,
+                  }}
+                >
+                  {"\u{1F4CA}"} {item.stats}
+                </div>
+              </div>
+            )}
+
+            {/* Reaction area */}
+            <div className="px-4 pb-3.5 pt-1 flex gap-1.5">
+              {getReactions(item.type).map((r, i) => (
+                <span
+                  key={i}
+                  className="w-8 h-8 rounded-full bg-[#f5f5f5] flex items-center justify-center text-[14px]"
+                >
+                  {r}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const defaultProfile: ProfileData = {
   age: "34",
   gender: "მამრობითი",
@@ -1855,7 +2121,7 @@ function saveDaily(
 
 export default function CaloriesPage() {
   const [loaded, setLoaded] = useState(false);
-  const [activeTab, setActiveTab] = useState<"diary" | "food" | "progress" | "assistant">("diary");
+  const [activeTab, setActiveTab] = useState<"diary" | "challenge" | "progress" | "assistant">("diary");
   const [selectedDate, setSelectedDate] = useState(getTodayStr());
   const [waterMl, setWaterMl] = useState(0);
   const [weight, setWeight] = useState(65.0);
@@ -2562,14 +2828,8 @@ export default function CaloriesPage() {
         />
       )}
 
-      {activeTab === "food" && (
-        <div className="flex-1 flex items-center justify-center pb-28">
-          <div className="text-center">
-            <span className="text-[48px] block mb-3">🍽️</span>
-            <p className="text-[18px] font-bold text-[#2d2d2d] mb-1">კვების გეგმა</p>
-            <p className="text-[14px] text-[#999]">მალე დაემატება</p>
-          </div>
-        </div>
+      {activeTab === "challenge" && (
+        <ChallengePage profile={profile} regime={regime} />
       )}
 
       {activeTab === "assistant" && (
@@ -2602,21 +2862,26 @@ export default function CaloriesPage() {
             დღიური
           </span>
         </button>
-        <button onClick={() => setActiveTab("food")} className={`flex-1 flex flex-col items-center py-2 rounded-[20px] mx-0.5 ${activeTab === "food" ? "bg-[#f0f0f0]" : ""}`}>
+        <button onClick={() => setActiveTab("challenge")} className={`flex-1 flex flex-col items-center py-2 rounded-[20px] mx-0.5 ${activeTab === "challenge" ? "bg-[#f0f0f0]" : ""}`}>
           <svg
             width="24"
             height="24"
             viewBox="0 0 24 24"
             fill="none"
-            stroke={activeTab === "food" ? "#333" : "#999"}
+            stroke={activeTab === "challenge" ? "#333" : "#999"}
             strokeWidth="2"
             strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            <path d="M12 2C12 2 12 8 12 10M8 2C8 2 7 7 10 9M16 2C16 2 17 7 14 9" />
-            <path d="M7 12h10c0 5-2.24 9-5 9s-5-4-5-9z" />
+            <path d="M6 9H4.5a2.5 2.5 0 010-5H6" />
+            <path d="M18 9h1.5a2.5 2.5 0 000-5H18" />
+            <path d="M4 22h16" />
+            <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+            <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+            <path d="M18 2H6v7a6 6 0 1012 0V2z" />
           </svg>
-          <span className={`text-[11px] mt-1 ${activeTab === "food" ? "text-[#333] font-bold" : "text-[#999] font-medium"}`}>
-            კვება
+          <span className={`text-[11px] mt-1 ${activeTab === "challenge" ? "text-[#333] font-bold" : "text-[#999] font-medium"}`}>
+            ჩელენჯი
           </span>
         </button>
         <button onClick={() => setActiveTab("progress")} className={`flex-1 flex flex-col items-center py-2 rounded-[20px] mx-0.5 ${activeTab === "progress" ? "bg-[#f0f0f0]" : ""}`}>
