@@ -1093,10 +1093,12 @@ function ProgressPage({
   profile,
   regime,
   onWeightGoalsSave,
+  phone,
 }: {
   profile: ProfileData;
   regime: "standard" | "fast";
   onWeightGoalsSave: (startingWeight: number, targetWeight: number) => void;
+  phone: string;
 }) {
   const [historyData, setHistoryData] = useState<HistoryDay[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -1108,14 +1110,14 @@ function ProgressPage({
 
   useEffect(() => {
     setLoadingHistory(true);
-    fetch("/api/data?history=1")
+    fetch(`/api/data?phone=${phone}&history=1`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setHistoryData(data);
       })
       .catch(() => {})
       .finally(() => setLoadingHistory(false));
-  }, []);
+  }, [phone]);
 
   // Weight data points (only days with actual weight data)
   const weightPoints = historyData
@@ -1716,15 +1718,29 @@ interface FeedItem {
   detail?: string;
   stats?: string;
   color: string; // accent color for the card border-left or badge
+  userName?: string; // for multi-user challenge feed
+}
+
+interface AllUsersHistoryItem {
+  phone: string;
+  name: string;
+  date: string;
+  foods: FoodItem[];
+  waterMl: number;
+  weight: number | null;
+  userActivities: ActivityItem[];
+  goalCalories: number | null;
 }
 
 // Challenge / Social Feed page
 function ChallengePage({
   profile,
   regime,
+  phone,
 }: {
   profile: ProfileData;
   regime: "standard" | "fast";
+  phone: string;
 }) {
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
@@ -1748,119 +1764,126 @@ function ChallengePage({
   useEffect(() => {
     async function loadFeed() {
       try {
-        const res = await fetch("/api/data?history=1");
-        const history: HistoryDay[] = await res.json();
-        const goalCalories = calculateCalories(profile, regime);
-        const waterGoal = Math.round((Number(profile.weight) || 65) * 33);
-        const startingWeight = parseFloat((profile as ProfileData & { startingWeight?: string }).startingWeight || profile.weight) || 65;
+        const res = await fetch("/api/data?allUsersHistory=1");
+        const allData: AllUsersHistoryItem[] = await res.json();
+
+        // Group data by user phone
+        const userMap = new Map<string, { name: string; days: AllUsersHistoryItem[] }>();
+        for (const item of allData) {
+          if (!userMap.has(item.phone)) {
+            userMap.set(item.phone, { name: item.name, days: [] });
+          }
+          userMap.get(item.phone)!.days.push(item);
+        }
+
         const items: FeedItem[] = [];
+        const fallbackGoal = calculateCalories(profile, regime);
 
-        // Calculate streak from today going backwards
-        let streakCount = 0;
-        const reversedDays = [...history].sort((a, b) => b.date.localeCompare(a.date));
-        for (const day of reversedDays) {
-          const consumed = (day.foods || []).reduce((s: number, f: FoodItem) => s + (f.calories || 0), 0);
-          const dayGoal = day.goalCalories || goalCalories;
-          if (consumed > 0 && consumed <= dayGoal) {
-            streakCount++;
-          } else if (consumed > 0) {
-            break;
+        // Process each user's data
+        const entries = Array.from(userMap.entries());
+        for (const [userPhone, userData] of entries) {
+          const userName = userData.name;
+          const history = userData.days.sort((a: AllUsersHistoryItem, b: AllUsersHistoryItem) => b.date.localeCompare(a.date));
+
+          // Calculate streak for this user
+          let streakCount = 0;
+          for (const day of history) {
+            const consumed = (day.foods || []).reduce((s: number, f: FoodItem) => s + (f.calories || 0), 0);
+            const dayGoal = day.goalCalories || fallbackGoal;
+            if (consumed > 0 && consumed <= dayGoal) {
+              streakCount++;
+            } else if (consumed > 0) {
+              break;
+            }
           }
-        }
 
-        // Process each day (newest first)
-        const processed = [...history].sort((a, b) => b.date.localeCompare(a.date));
+          for (const day of history) {
+            const consumed = (day.foods || []).reduce((s: number, f: FoodItem) => s + (f.calories || 0), 0);
+            const dayGoal = day.goalCalories || fallbackGoal;
+            const hasFoods = (day.foods || []).length > 0;
+            const hasActivities = (day.userActivities || []).length > 0;
+            const hasAnyData = hasFoods || hasActivities || (day.waterMl && day.waterMl > 0);
 
-        for (const day of processed) {
-          const consumed = (day.foods || []).reduce((s: number, f: FoodItem) => s + (f.calories || 0), 0);
-          const dayGoal = day.goalCalories || goalCalories;
-          const hasFoods = (day.foods || []).length > 0;
-          const hasActivities = (day.userActivities || []).length > 0;
-          const hasAnyData = hasFoods || hasActivities || (day.waterMl && day.waterMl > 0);
+            if (!hasAnyData) continue;
 
-          if (!hasAnyData) continue;
+            // Daily goal achieved or over limit
+            if (hasFoods && consumed > 0) {
+              if (consumed <= dayGoal) {
+                items.push({
+                  id: `goal-${userPhone}-${day.date}`,
+                  date: day.date,
+                  type: "goal_achieved",
+                  emoji: "\u{1F3C6}",
+                  title: "\u10D3\u10E6\u10D8\u10E3\u10E0\u10D8 \u10DB\u10D8\u10D6\u10D0\u10DC\u10D8 \u10DB\u10D8\u10E6\u10EC\u10D4\u10E3\u10DA\u10D8\u10D0!",
+                  stats: `${consumed} / ${dayGoal} \u10D9\u10D9\u10D0\u10DA`,
+                  color: "#4CAF50",
+                  userName,
+                });
+              } else {
+                items.push({
+                  id: `over-${userPhone}-${day.date}`,
+                  date: day.date,
+                  type: "over_limit",
+                  emoji: "\u274C",
+                  title: "\u10D9\u10D0\u10DA\u10DD\u10E0\u10D8\u10D4\u10D1\u10D8\u10E1 \u10DA\u10D8\u10DB\u10D8\u10E2\u10D8 \u10D2\u10D0\u10D3\u10D0\u10ED\u10D0\u10E0\u10D1\u10D4\u10D1\u10E3\u10DA\u10D8\u10D0",
+                  stats: `${consumed} / ${dayGoal} \u10D9\u10D9\u10D0\u10DA (+${consumed - dayGoal})`,
+                  color: "#FF5722",
+                  userName,
+                });
+              }
+            }
 
-          // Daily goal achieved or over limit
-          if (hasFoods && consumed > 0) {
-            if (consumed <= dayGoal) {
+            // Activities
+            for (const act of (day.userActivities || [])) {
               items.push({
-                id: `goal-${day.date}`,
+                id: `act-${userPhone}-${day.date}-${act.name}-${act.time}`,
                 date: day.date,
-                type: "goal_achieved",
-                emoji: "\u{1F3C6}",
-                title: "\u10D3\u10E6\u10D8\u10E3\u10E0\u10D8 \u10DB\u10D8\u10D6\u10D0\u10DC\u10D8 \u10DB\u10D8\u10E6\u10EC\u10D4\u10E3\u10DA\u10D8\u10D0!",
-                stats: `${consumed} / ${dayGoal} \u10D9\u10D9\u10D0\u10DA`,
-                color: "#4CAF50",
+                type: "activity",
+                emoji: act.emoji || "\u{1F3C3}",
+                title: `${act.emoji || "\u{1F3C3}"} ${act.name}`,
+                detail: `${act.duration} \u10EC\u10D7, ${act.caloriesBurned} \u10D9\u10D9\u10D0\u10DA \u10D3\u10D0\u10D8\u10EC\u10D5\u10D0`,
+                color: "#FF9800",
+                userName,
               });
-            } else {
+            }
+
+            // Water goal
+            const waterGoal = Math.round(65 * 33); // default water goal
+            if (day.waterMl && day.waterMl >= waterGoal) {
               items.push({
-                id: `over-${day.date}`,
+                id: `water-${userPhone}-${day.date}`,
                 date: day.date,
-                type: "over_limit",
-                emoji: "\u274C",
-                title: "\u10D9\u10D0\u10DA\u10DD\u10E0\u10D8\u10D4\u10D1\u10D8\u10E1 \u10DA\u10D8\u10DB\u10D8\u10E2\u10D8 \u10D2\u10D0\u10D3\u10D0\u10ED\u10D0\u10E0\u10D1\u10D4\u10D1\u10E3\u10DA\u10D8\u10D0",
-                stats: `${consumed} / ${dayGoal} \u10D9\u10D9\u10D0\u10DA (+${consumed - dayGoal})`,
-                color: "#FF5722",
+                type: "water_goal",
+                emoji: "\u{1F4A7}",
+                title: "\u10EC\u10E7\u10DA\u10D8\u10E1 \u10DB\u10D8\u10D6\u10D0\u10DC\u10D8 \u10DB\u10D8\u10E6\u10EC\u10D4\u10E3\u10DA\u10D8\u10D0!",
+                stats: `${day.waterMl} / ${waterGoal} \u10DB\u10DA`,
+                color: "#2196F3",
+                userName,
               });
             }
           }
 
-          // Activities
-          for (const act of (day.userActivities || [])) {
+          // Add streak card for this user if >= 2
+          if (streakCount >= 2) {
             items.push({
-              id: `act-${day.date}-${act.name}-${act.time}`,
-              date: day.date,
-              type: "activity",
-              emoji: act.emoji || "\u{1F3C3}",
-              title: `${act.emoji || "\u{1F3C3}"} ${act.name}`,
-              detail: `${act.duration} \u10EC\u10D7, ${act.caloriesBurned} \u10D9\u10D9\u10D0\u10DA \u10D3\u10D0\u10D8\u10EC\u10D5\u10D0`,
-              color: "#FF9800",
+              id: `streak-${userPhone}`,
+              date: new Date().toISOString().split("T")[0],
+              type: "streak",
+              emoji: "\u{1F525}",
+              title: `${streakCount} \u10D3\u10E6\u10D8\u10D0\u10DC\u10D8 \u10E1\u10D4\u10E0\u10D8\u10D0! \u{1F525}`,
+              detail: "\u10D6\u10D4\u10D3\u10D8\u10D6\u10D4\u10D3 \u10DB\u10D8\u10D6\u10D0\u10DC\u10E1 \u10D0\u10E6\u10EC\u10D4\u10D5",
+              color: "#FF6D00",
+              userName,
             });
-          }
-
-          // Water goal
-          if (day.waterMl && day.waterMl >= waterGoal) {
-            items.push({
-              id: `water-${day.date}`,
-              date: day.date,
-              type: "water_goal",
-              emoji: "\u{1F4A7}",
-              title: "\u10EC\u10E7\u10DA\u10D8\u10E1 \u10DB\u10D8\u10D6\u10D0\u10DC\u10D8 \u10DB\u10D8\u10E6\u10EC\u10D4\u10E3\u10DA\u10D8\u10D0!",
-              stats: `${day.waterMl} / ${waterGoal} \u10DB\u10DA`,
-              color: "#2196F3",
-            });
-          }
-
-          // Weight milestone
-          if (day.weight && day.weight !== startingWeight) {
-            const diff = day.weight - startingWeight;
-            if (Math.abs(diff) >= 0.5) {
-              const direction = diff < 0 ? "\u10E8\u10D4\u10DB\u10EA\u10D8\u10E0\u10D3\u10D0" : "\u10DB\u10DD\u10D8\u10DB\u10D0\u10E2\u10D0";
-              items.push({
-                id: `weight-${day.date}`,
-                date: day.date,
-                type: "weight_milestone",
-                emoji: "\u2696\uFE0F",
-                title: `\u10EC\u10DD\u10DC\u10D0 ${direction}! ${diff > 0 ? "+" : ""}${diff.toFixed(1)} \u10D9\u10D2`,
-                detail: `${day.weight} \u10D9\u10D2`,
-                color: diff < 0 ? "#4CAF50" : "#FF9800",
-              });
-            }
           }
         }
 
-        // Add streak card at the top if >= 2
-        if (streakCount >= 2) {
-          items.unshift({
-            id: `streak-current`,
-            date: new Date().toISOString().split("T")[0],
-            type: "streak",
-            emoji: "\u{1F525}",
-            title: `${streakCount} \u10D3\u10E6\u10D8\u10D0\u10DC\u10D8 \u10E1\u10D4\u10E0\u10D8\u10D0! \u{1F525}`,
-            detail: "\u10D6\u10D4\u10D3\u10D8\u10D6\u10D4\u10D3 \u10DB\u10D8\u10D6\u10D0\u10DC\u10E1 \u10D0\u10E6\u10EC\u10D4\u10D5",
-            color: "#FF6D00",
-          });
-        }
+        // Sort all items by date (newest first), streaks at top
+        items.sort((a, b) => {
+          if (a.type === "streak" && b.type !== "streak") return -1;
+          if (b.type === "streak" && a.type !== "streak") return 1;
+          return b.date.localeCompare(a.date);
+        });
 
         setFeedItems(items);
       } catch {
@@ -1938,9 +1961,9 @@ function ChallengePage({
             <div className="flex items-center justify-between px-4 pt-4 pb-2">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-full flex items-center justify-center text-[15px] font-bold text-white" style={{ backgroundColor: item.color }}>
-                  {"\u10D0"}
+                  {(item.userName || "\u10D0\u10DC\u10E3\u10D9\u10D0").charAt(0).toUpperCase()}
                 </div>
-                <span className="text-[15px] font-bold text-[#2d2d2d]">{"\u10D0\u10DC\u10E3\u10D9\u10D0"}</span>
+                <span className="text-[15px] font-bold text-[#2d2d2d]">{item.userName || "\u10D0\u10DC\u10E3\u10D9\u10D0"}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[13px] text-[#999]">{formatDate(item.date)}</span>
@@ -2135,19 +2158,20 @@ function WeekCalendar({
 
 // Save to server (debounced via ref) - separate for global and daily
 let saveGlobalTimeout: ReturnType<typeof setTimeout> | null = null;
-function saveGlobal(profile: ProfileData, regime: "standard" | "fast") {
+function saveGlobal(phone: string, profile: ProfileData, regime: "standard" | "fast") {
   if (saveGlobalTimeout) clearTimeout(saveGlobalTimeout);
   saveGlobalTimeout = setTimeout(() => {
     fetch("/api/data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "global", profile, regime }),
+      body: JSON.stringify({ type: "global", phone, profile, regime }),
     }).catch(() => {});
   }, 500);
 }
 
 let saveDailyTimeout: ReturnType<typeof setTimeout> | null = null;
 function saveDaily(
+  phone: string,
   date: string,
   foods: FoodItem[],
   waterMl: number,
@@ -2160,7 +2184,7 @@ function saveDaily(
     fetch("/api/data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "daily", date, foods, waterMl, weight, userActivities, goalCalories }),
+      body: JSON.stringify({ type: "daily", phone, date, foods, waterMl, weight, userActivities, goalCalories }),
     }).catch(() => {});
   }, 500);
 }
@@ -2863,10 +2887,10 @@ export default function CaloriesPage() {
   }
 
   // authState === "authenticated" — render the main app
-  return <AuthenticatedApp onLogout={handleLogout} />;
+  return <AuthenticatedApp onLogout={handleLogout} authUser={authUser!} />;
 }
 
-function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
+function AuthenticatedApp({ onLogout, authUser }: { onLogout: () => void; authUser: { phone: string; name: string } }) {
   const [loaded, setLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<"diary" | "challenge" | "progress" | "assistant">("diary");
   const [selectedDate, setSelectedDate] = useState(getTodayStr());
@@ -2890,10 +2914,11 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
   // Load global data + today's daily data + days index on mount
   useEffect(() => {
     const today = getTodayStr();
+    const phone = authUser.phone;
     Promise.all([
-      fetch("/api/data").then((r) => r.json()),
-      fetch(`/api/data?date=${today}`).then((r) => r.json()),
-      fetch("/api/data?daysIndex=1").then((r) => r.json()),
+      fetch(`/api/data?phone=${phone}`).then((r) => r.json()),
+      fetch(`/api/data?phone=${phone}&date=${today}`).then((r) => r.json()),
+      fetch(`/api/data?phone=${phone}&daysIndex=1`).then((r) => r.json()),
     ])
       .then(([globalData, dailyData, daysIndex]) => {
         if (globalData) {
@@ -2922,7 +2947,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
       if (newDate === selectedDate) return;
       setSelectedDate(newDate);
       // Load daily data for the new date
-      fetch(`/api/data?date=${newDate}`)
+      fetch(`/api/data?phone=${authUser.phone}&date=${newDate}`)
         .then((r) => r.json())
         .then((dailyData) => {
           if (dailyData) {
@@ -2951,13 +2976,13 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
   // Save global data whenever profile/regime changes
   useEffect(() => {
     if (!loaded) return;
-    saveGlobal(profile, regime);
+    saveGlobal(authUser.phone, profile, regime);
   }, [profile, regime, loaded]);
 
   // Save daily data whenever daily fields change
   useEffect(() => {
     if (!loaded) return;
-    saveDaily(selectedDate, foods, waterMl, weight, userActivities, goalCalories);
+    saveDaily(authUser.phone, selectedDate, foods, waterMl, weight, userActivities, goalCalories);
     // Update days index locally
     const hasData = foods.length > 0 || userActivities.length > 0 || waterMl > 0;
     setDaysWithData((prev) => {
@@ -3565,6 +3590,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
         <ProgressPage
           profile={profile}
           regime={regime}
+          phone={authUser.phone}
           onWeightGoalsSave={(sw, tw) => {
             setProfile((p) => ({
               ...p,
@@ -3577,7 +3603,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
       )}
 
       {activeTab === "challenge" && (
-        <ChallengePage profile={profile} regime={regime} />
+        <ChallengePage profile={profile} regime={regime} phone={authUser.phone} />
       )}
 
       {activeTab === "assistant" && (
