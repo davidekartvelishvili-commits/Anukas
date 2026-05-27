@@ -1304,7 +1304,7 @@ function ProgressPage({
                     <rect x={x} y={goalY} width={barWidth} height={goalBarH} rx={4} fill="#ececec" />
                     {/* Consumed bar on top */}
                     {p.consumed > 0 && (
-                      <rect x={x} y={consumedY} width={barWidth} height={consumedH} rx={4} fill={withinGoal ? "#4CAF50" : "#FF9800"} />
+                      <rect x={x} y={consumedY} width={barWidth} height={consumedH} rx={4} fill={withinGoal ? "#4CAF50" : "#E53935"} />
                     )}
                     {/* Day label */}
                     <text x={x + barWidth / 2} y={cChartH - 4} textAnchor="middle" fontSize="10" fill="#bbb">
@@ -1969,7 +1969,9 @@ export default function CaloriesPage() {
     { calories: 0, carbs: 0, fat: 0, protein: 0 }
   );
   const totalBurned = userActivities.reduce((s, a) => s + a.caloriesBurned, 0);
-  const remaining = Math.max(0, goalCalories + totalBurned - consumed.calories);
+  const remaining = goalCalories + totalBurned - consumed.calories;
+  const isOverLimit = remaining < 0;
+  const overAmount = Math.abs(remaining);
   const waterGoal = Math.round((Number(profile.weight) || 60) * 33);
   const waterPercent = Math.round((waterMl / waterGoal) * 100);
 
@@ -2066,13 +2068,24 @@ export default function CaloriesPage() {
               size={200}
               strokeWidth={10}
               progress={goalCalories ? Math.min(100, (consumed.calories / goalCalories) * 100) : 0}
-              color="#4CAF50"
-              bgColor="#e8e8e8"
+              color={isOverLimit ? "#F57C00" : "#4CAF50"}
+              bgColor={isOverLimit ? "#FFF3E0" : "#e8e8e8"}
             />
+            {/* Warning triangle when over limit */}
+            {isOverLimit && (
+              <div className="absolute top-2 right-[60px]">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L1 21h22L12 2z" fill="#FFF3E0" stroke="#F57C00" strokeWidth="1.5" />
+                  <path d="M12 9v4M12 17h.01" stroke="#F57C00" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </div>
+            )}
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-sm text-[#b0b0b0]">დაგრჩა</span>
-              <span className="text-[46px] font-bold text-[#4CAF50] leading-[52px]">
-                {remaining}
+              <span className="text-sm text-[#b0b0b0]">
+                {isOverLimit ? "ზედმეტი" : "დაგრჩა"}
+              </span>
+              <span className={`text-[46px] font-bold leading-[52px] ${isOverLimit ? "text-[#F57C00]" : "text-[#4CAF50]"}`}>
+                {isOverLimit ? `+${overAmount}` : remaining}
               </span>
               <span className="text-sm text-[#b0b0b0] -mt-0.5">კკალ</span>
             </div>
@@ -2128,17 +2141,18 @@ export default function CaloriesPage() {
           {/* Macros */}
           <div className="flex justify-around pb-1.5 px-1">
             {/* Carbs */}
+            {(() => { const over = consumed.carbs > macros.carbs; return (
             <div className="flex flex-col items-center">
               <div className="relative w-[82px] h-[82px] flex items-center justify-center mb-2">
                 <CircularProgress
                   size={82}
                   strokeWidth={6}
                   progress={macros.carbs ? Math.min(100, (consumed.carbs / macros.carbs) * 100) : 0}
-                  color="#E8A0BF"
-                  bgColor="#F5DFE9"
+                  color={over ? "#E57373" : "#E8A0BF"}
+                  bgColor={over ? "#FFEBEE" : "#F5DFE9"}
                 />
                 <div className="absolute flex flex-col items-center">
-                  <span className="text-[20px] font-bold text-[#2d2d2d] leading-6">
+                  <span className={`text-[20px] font-bold leading-6 ${over ? "text-[#E57373]" : "text-[#2d2d2d]"}`}>
                     {consumed.carbs}
                   </span>
                   <span className="text-[11px] text-[#aaa] -mt-px">
@@ -2148,18 +2162,20 @@ export default function CaloriesPage() {
               </div>
               <span className="text-xs text-[#777]">ნახშირწყლები</span>
             </div>
+            ); })()}
             {/* Fats */}
+            {(() => { const over = consumed.fat > macros.fat; return (
             <div className="flex flex-col items-center">
               <div className="relative w-[82px] h-[82px] flex items-center justify-center mb-2">
                 <CircularProgress
                   size={82}
                   strokeWidth={6}
                   progress={macros.fat ? Math.min(100, (consumed.fat / macros.fat) * 100) : 0}
-                  color="#90B8DE"
-                  bgColor="#DAEAF8"
+                  color={over ? "#64B5F6" : "#90B8DE"}
+                  bgColor={over ? "#E3F2FD" : "#DAEAF8"}
                 />
                 <div className="absolute flex flex-col items-center">
-                  <span className="text-[20px] font-bold text-[#2d2d2d] leading-6">
+                  <span className={`text-[20px] font-bold leading-6 ${over ? "text-[#42A5F5]" : "text-[#2d2d2d]"}`}>
                     {consumed.fat}
                   </span>
                   <span className="text-[11px] text-[#aaa] -mt-px">
@@ -2169,18 +2185,20 @@ export default function CaloriesPage() {
               </div>
               <span className="text-xs text-[#777]">ცხიმები</span>
             </div>
+            ); })()}
             {/* Protein */}
+            {(() => { const over = consumed.protein > macros.protein; return (
             <div className="flex flex-col items-center">
               <div className="relative w-[82px] h-[82px] flex items-center justify-center mb-2">
                 <CircularProgress
                   size={82}
                   strokeWidth={6}
                   progress={macros.protein ? Math.min(100, (consumed.protein / macros.protein) * 100) : 0}
-                  color="#E8D5A0"
-                  bgColor="#F5EDDA"
+                  color={over ? "#FFB74D" : "#E8D5A0"}
+                  bgColor={over ? "#FFF3E0" : "#F5EDDA"}
                 />
                 <div className="absolute flex flex-col items-center">
-                  <span className="text-[20px] font-bold text-[#2d2d2d] leading-6">
+                  <span className={`text-[20px] font-bold leading-6 ${over ? "text-[#F57C00]" : "text-[#2d2d2d]"}`}>
                     {consumed.protein}
                   </span>
                   <span className="text-[11px] text-[#aaa] -mt-px">
@@ -2190,6 +2208,7 @@ export default function CaloriesPage() {
               </div>
               <span className="text-xs text-[#777]">ცილები</span>
             </div>
+            ); })()}
           </div>
         </div>
 
