@@ -1,12 +1,56 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import localFont from "next/font/local";
 
 const dachiFont = localFont({
   src: "./fonts/DachiTheLynx.otf",
   variable: "--font-dachi",
 });
+
+// Animated number that rolls up/down like a slot machine
+function AnimatedNumber({
+  value,
+  className,
+  duration = 600,
+}: {
+  value: number;
+  className?: string;
+  duration?: number;
+}) {
+  const [display, setDisplay] = useState(value);
+  const animRef = useRef<number | null>(null);
+  const startRef = useRef(value);
+  const startTimeRef = useRef(0);
+
+  useEffect(() => {
+    if (animRef.current) cancelAnimationFrame(animRef.current);
+    startRef.current = display;
+    startTimeRef.current = performance.now();
+
+    function tick(now: number) {
+      const elapsed = now - startTimeRef.current;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(
+        startRef.current + (value - startRef.current) * eased
+      );
+      setDisplay(current);
+      if (progress < 1) {
+        animRef.current = requestAnimationFrame(tick);
+      }
+    }
+
+    animRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, duration]);
+
+  return <span className={className}>{display}</span>;
+}
 
 // SVG circular progress
 function CircularProgress({
@@ -1269,9 +1313,11 @@ export default function CaloriesPage() {
           <div className="flex justify-between items-center mb-3.5">
             <div>
               <div className="flex items-baseline">
-                <span className="text-[42px] font-bold text-[#1E88E5] leading-[48px]">
-                  {waterMl}
-                </span>
+                <AnimatedNumber
+                  value={waterMl}
+                  className="text-[42px] font-bold text-[#1E88E5] leading-[48px]"
+                  duration={700}
+                />
                 <span className="text-base text-[#888] ml-1.5">მლ</span>
               </div>
               <span className="text-[13px] text-[#aaa] mt-0.5">
