@@ -1512,12 +1512,14 @@ function ProfilePage({
   onSave,
   onLogout,
   phone,
+  userName,
 }: {
   onBack: () => void;
   profile: ProfileData;
   onSave: (data: ProfileData) => void;
   onLogout?: () => void;
   phone?: string;
+  userName?: string;
 }) {
   const [changingPin, setChangingPin] = useState(false);
   const [pinStep, setPinStep] = useState<"current" | "new" | "confirm">("current");
@@ -1619,6 +1621,19 @@ function ProfilePage({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-5 pt-5 pb-8">
+        {/* User info card */}
+        {userName && (
+          <div className="bg-white rounded-2xl p-5 mb-6 shadow-sm flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-[#4CAF50] flex items-center justify-center text-[24px] font-bold text-white shrink-0">
+              {userName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="text-[20px] font-extrabold text-[#2d2d2d]">{userName}</p>
+              {phone && <p className="text-[14px] text-[#999]">{phone}</p>}
+            </div>
+          </div>
+        )}
+
         {/* Body data */}
         <p className="text-[14px] font-bold text-[#999] mb-3 uppercase tracking-wide">
           სხეულის მონაცემები
@@ -3180,6 +3195,7 @@ function AuthenticatedApp({ onLogout, authUser }: { onLogout: () => void; authUs
           onBack={() => setShowProfile(false)}
           onLogout={onLogout}
           phone={authUser?.phone}
+          userName={authUser?.name}
         />
       </div>
     );
