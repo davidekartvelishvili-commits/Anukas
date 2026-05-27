@@ -1286,21 +1286,138 @@ const defaultProfile: ProfileData = {
   activityLevel: "საშუალო (3-5 დღე/კვირაში ვარჯიში)",
 };
 
-// Save to server (debounced via ref)
-let saveTimeout: ReturnType<typeof setTimeout> | null = null;
-function saveToServer(data: Record<string, unknown>) {
-  if (saveTimeout) clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(() => {
+// Helper: get today's date as YYYY-MM-DD
+function getTodayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Helper: get the Monday-Sunday week containing a given date
+function getWeekDays(dateStr: string): string[] {
+  const d = new Date(dateStr + "T12:00:00");
+  const day = d.getDay(); // 0=Sun, 1=Mon...6=Sat
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - ((day + 6) % 7));
+  const days: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const dd = new Date(monday);
+    dd.setDate(monday.getDate() + i);
+    days.push(
+      `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, "0")}-${String(dd.getDate()).padStart(2, "0")}`
+    );
+  }
+  return days;
+}
+
+const GEO_DAY_ABBR = ["ორშ", "სამ", "ოთხ", "ხუთ", "პარ", "შაბ", "კვი"];
+
+function WeekCalendar({
+  selectedDate,
+  onSelect,
+  daysWithData,
+}: {
+  selectedDate: string;
+  onSelect: (date: string) => void;
+  daysWithData: string[];
+}) {
+  const todayStr = getTodayStr();
+  const weekDays = getWeekDays(selectedDate);
+  const dataSet = new Set(daysWithData);
+
+  return (
+    <div className="bg-white border-b border-gray-200 px-3 py-2.5">
+      <div className="flex justify-around">
+        {weekDays.map((dateStr, i) => {
+          const dayNum = parseInt(dateStr.split("-")[2], 10);
+          const isSelected = dateStr === selectedDate;
+          const isFuture = dateStr > todayStr;
+          const hasData = dataSet.has(dateStr);
+
+          return (
+            <button
+              key={dateStr}
+              disabled={isFuture}
+              onClick={() => !isFuture && onSelect(dateStr)}
+              className="flex flex-col items-center gap-0.5 min-w-[38px]"
+            >
+              <span
+                className={`text-[12px] font-semibold ${
+                  isSelected
+                    ? "text-[#4CAF50]"
+                    : isFuture
+                    ? "text-[#d0d0d0]"
+                    : "text-[#999]"
+                }`}
+              >
+                {GEO_DAY_ABBR[i]}
+              </span>
+              <div
+                className={`w-[34px] h-[34px] rounded-full flex items-center justify-center ${
+                  isSelected
+                    ? "bg-[#4CAF50]"
+                    : ""
+                }`}
+              >
+                <span
+                  className={`text-[15px] font-bold ${
+                    isSelected
+                      ? "text-white"
+                      : isFuture
+                      ? "text-[#d0d0d0]"
+                      : "text-[#555]"
+                  }`}
+                >
+                  {dayNum}
+                </span>
+              </div>
+              {/* Data indicator dot */}
+              <div className="h-[6px] flex items-center justify-center">
+                {hasData && !isSelected && (
+                  <div className="w-[5px] h-[5px] rounded-full bg-[#4CAF50]" />
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Save to server (debounced via ref) - separate for global and daily
+let saveGlobalTimeout: ReturnType<typeof setTimeout> | null = null;
+function saveGlobal(profile: ProfileData, regime: "standard" | "fast") {
+  if (saveGlobalTimeout) clearTimeout(saveGlobalTimeout);
+  saveGlobalTimeout = setTimeout(() => {
     fetch("/api/data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ type: "global", profile, regime }),
+    }).catch(() => {});
+  }, 500);
+}
+
+let saveDailyTimeout: ReturnType<typeof setTimeout> | null = null;
+function saveDaily(
+  date: string,
+  foods: FoodItem[],
+  waterMl: number,
+  weight: number,
+  userActivities: ActivityItem[]
+) {
+  if (saveDailyTimeout) clearTimeout(saveDailyTimeout);
+  saveDailyTimeout = setTimeout(() => {
+    fetch("/api/data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "daily", date, foods, waterMl, weight, userActivities }),
     }).catch(() => {});
   }, 500);
 }
 
 export default function CaloriesPage() {
   const [loaded, setLoaded] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(getTodayStr());
   const [waterMl, setWaterMl] = useState(0);
   const [weight, setWeight] = useState(65.0);
   const [showAddFood, setShowAddFood] = useState(false);
@@ -1314,30 +1431,95 @@ export default function CaloriesPage() {
   const [showAddActivity, setShowAddActivity] = useState(false);
   const [activitySheetInitial, setActivitySheetInitial] = useState<{ emoji: string; name: string } | null>(null);
   const [activitySheetTab, setActivitySheetTab] = useState<"quick" | "text">("text");
+  const [daysWithData, setDaysWithData] = useState<string[]>([]);
+  const [lastKnownWeight, setLastKnownWeight] = useState(65.0);
+  const dateLoadedRef = useRef<string | null>(null);
 
-  // Load saved data from server on mount
+  // Load global data + today's daily data + days index on mount
   useEffect(() => {
-    fetch("/api/data")
-      .then((r) => r.json())
-      .then((saved) => {
-        if (saved) {
-          if (saved.profile) setProfile(saved.profile);
-          if (saved.regime) setRegime(saved.regime);
-          if (typeof saved.waterMl === "number") setWaterMl(saved.waterMl);
-          if (typeof saved.weight === "number") setWeight(saved.weight);
-          if (Array.isArray(saved.foods)) setFoods(saved.foods);
-          if (Array.isArray(saved.activities)) setUserActivities(saved.activities);
+    const today = getTodayStr();
+    Promise.all([
+      fetch("/api/data").then((r) => r.json()),
+      fetch(`/api/data?date=${today}`).then((r) => r.json()),
+      fetch("/api/data?daysIndex=1").then((r) => r.json()),
+    ])
+      .then(([globalData, dailyData, daysIndex]) => {
+        if (globalData) {
+          if (globalData.profile) setProfile(globalData.profile);
+          if (globalData.regime) setRegime(globalData.regime);
         }
+        if (dailyData) {
+          if (Array.isArray(dailyData.foods)) setFoods(dailyData.foods);
+          if (typeof dailyData.waterMl === "number") setWaterMl(dailyData.waterMl);
+          if (typeof dailyData.weight === "number") {
+            setWeight(dailyData.weight);
+            setLastKnownWeight(dailyData.weight);
+          }
+          if (Array.isArray(dailyData.userActivities)) setUserActivities(dailyData.userActivities);
+        }
+        if (Array.isArray(daysIndex)) setDaysWithData(daysIndex);
+        dateLoadedRef.current = today;
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
   }, []);
 
-  // Save to server whenever data changes
+  // When selectedDate changes (user taps a day), load that day's data
+  const handleDateSelect = useCallback(
+    (newDate: string) => {
+      if (newDate === selectedDate) return;
+      setSelectedDate(newDate);
+      // Load daily data for the new date
+      fetch(`/api/data?date=${newDate}`)
+        .then((r) => r.json())
+        .then((dailyData) => {
+          if (dailyData) {
+            setFoods(Array.isArray(dailyData.foods) ? dailyData.foods : []);
+            setWaterMl(typeof dailyData.waterMl === "number" ? dailyData.waterMl : 0);
+            if (typeof dailyData.weight === "number") {
+              setWeight(dailyData.weight);
+            } else {
+              setWeight(lastKnownWeight);
+            }
+            setUserActivities(Array.isArray(dailyData.userActivities) ? dailyData.userActivities : []);
+          } else {
+            // No data for this day - start fresh
+            setFoods([]);
+            setWaterMl(0);
+            setWeight(lastKnownWeight);
+            setUserActivities([]);
+          }
+          dateLoadedRef.current = newDate;
+        })
+        .catch(() => {});
+    },
+    [selectedDate, lastKnownWeight]
+  );
+
+  // Save global data whenever profile/regime changes
   useEffect(() => {
     if (!loaded) return;
-    saveToServer({ profile, regime, waterMl, weight, foods, activities: userActivities });
-  }, [profile, regime, waterMl, weight, foods, userActivities, loaded]);
+    saveGlobal(profile, regime);
+  }, [profile, regime, loaded]);
+
+  // Save daily data whenever daily fields change
+  useEffect(() => {
+    if (!loaded) return;
+    saveDaily(selectedDate, foods, waterMl, weight, userActivities);
+    // Update days index locally
+    const hasData = foods.length > 0 || userActivities.length > 0 || waterMl > 0;
+    setDaysWithData((prev) => {
+      const set = new Set(prev);
+      if (hasData) {
+        set.add(selectedDate);
+      } else {
+        set.delete(selectedDate);
+      }
+      return Array.from(set);
+    });
+    // Track last known weight
+    if (weight > 0) setLastKnownWeight(weight);
+  }, [waterMl, weight, foods, userActivities, loaded, selectedDate]);
 
   const goalCalories = calculateCalories(profile, regime);
   const macros = calculateMacros(goalCalories);
@@ -1402,6 +1584,13 @@ export default function CaloriesPage() {
           </svg>
         </button>
       </div>
+
+      {/* Weekly calendar strip */}
+      <WeekCalendar
+        selectedDate={selectedDate}
+        onSelect={handleDateSelect}
+        daysWithData={daysWithData}
+      />
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-4 pt-3.5 pb-28">
