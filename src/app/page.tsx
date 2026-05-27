@@ -1085,6 +1085,7 @@ interface HistoryDay {
   foods: FoodItem[];
   waterMl: number;
   userActivities: ActivityItem[];
+  goalCalories?: number;
 }
 
 // Progress page component
@@ -1121,12 +1122,13 @@ function ProgressPage({
     .filter((d) => d.weight !== null && d.weight > 0)
     .map((d) => ({ date: d.date, weight: d.weight as number }));
 
-  // Calorie data: last 10 days with data
+  // Calorie data: last 10 days — each day carries its own goal from that date
   const caloriePoints = historyData
     .slice(-10)
     .map((d) => ({
       date: d.date,
       consumed: (d.foods || []).reduce((s: number, f: FoodItem) => s + (f.calories || 0), 0),
+      dayGoal: d.goalCalories || goalCalories, // use stored goal, fallback to current
     }));
 
   // Current weight (latest recorded)
@@ -1181,11 +1183,9 @@ function ProgressPage({
   const cChartW = 320, cChartH = 160, cPadL = 40, cPadR = 15, cPadT = 15, cPadB = 25;
   const cPlotW = cChartW - cPadL - cPadR;
   const cPlotH = cChartH - cPadT - cPadB;
-  const cMaxVal = Math.max(...caloriePoints.map((p) => p.consumed), goalCalories, 100) * 1.15;
+  const cMaxVal = Math.max(...caloriePoints.map((p) => Math.max(p.consumed, p.dayGoal)), 100) * 1.15;
   const barWidth = caloriePoints.length > 0 ? Math.min(24, (cPlotW / caloriePoints.length) * 0.6) : 20;
   const barGap = caloriePoints.length > 0 ? cPlotW / caloriePoints.length : 30;
-
-  const goalLineY = cPadT + (1 - goalCalories / cMaxVal) * cPlotH;
 
   // Y-axis ticks for calories
   const cTicks = 4;
@@ -1290,19 +1290,21 @@ function ProgressPage({
                   </g>
                 );
               })}
-              {/* Bars: gray goal background + green consumed overlay */}
+              {/* Bars: gray goal background + green/red consumed overlay */}
               {caloriePoints.map((p, i) => {
                 const x = cPadL + barGap * i + (barGap - barWidth) / 2;
-                const goalBarH = (goalCalories / cMaxVal) * cPlotH;
+                // Use this day's stored goal, not the current global goal
+                const dayGoal = p.dayGoal;
+                const goalBarH = (dayGoal / cMaxVal) * cPlotH;
                 const goalY = cPadT + cPlotH - goalBarH;
                 const consumedH = (p.consumed / cMaxVal) * cPlotH;
                 const consumedY = cPadT + cPlotH - consumedH;
-                const withinGoal = p.consumed <= goalCalories * 1.05;
+                const withinGoal = p.consumed <= dayGoal * 1.05;
                 return (
                   <g key={i}>
                     {/* Goal background bar (light gray) */}
                     <rect x={x} y={goalY} width={barWidth} height={goalBarH} rx={4} fill="#ececec" />
-                    {/* Consumed bar on top */}
+                    {/* Consumed bar on top — green if within that day's goal, red if over */}
                     {p.consumed > 0 && (
                       <rect x={x} y={consumedY} width={barWidth} height={consumedH} rx={4} fill={withinGoal ? "#4CAF50" : "#E53935"} />
                     )}
@@ -1838,14 +1840,15 @@ function saveDaily(
   foods: FoodItem[],
   waterMl: number,
   weight: number,
-  userActivities: ActivityItem[]
+  userActivities: ActivityItem[],
+  goalCalories?: number
 ) {
   if (saveDailyTimeout) clearTimeout(saveDailyTimeout);
   saveDailyTimeout = setTimeout(() => {
     fetch("/api/data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "daily", date, foods, waterMl, weight, userActivities }),
+      body: JSON.stringify({ type: "daily", date, foods, waterMl, weight, userActivities, goalCalories }),
     }).catch(() => {});
   }, 500);
 }
@@ -1941,7 +1944,7 @@ export default function CaloriesPage() {
   // Save daily data whenever daily fields change
   useEffect(() => {
     if (!loaded) return;
-    saveDaily(selectedDate, foods, waterMl, weight, userActivities);
+    saveDaily(selectedDate, foods, waterMl, weight, userActivities, goalCalories);
     // Update days index locally
     const hasData = foods.length > 0 || userActivities.length > 0 || waterMl > 0;
     setDaysWithData((prev) => {

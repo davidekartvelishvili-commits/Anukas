@@ -106,8 +106,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.type === "daily") {
-      const { date, foods, waterMl, weight, userActivities } = body;
-      await redis.set(dayKey(date), { foods, waterMl, weight, userActivities });
+      const { date, foods, waterMl, weight, userActivities, goalCalories } = body;
+      await redis.set(dayKey(date), { foods, waterMl, weight, userActivities, goalCalories });
       // Track this date in the index if it has meaningful data
       const hasData = (foods && foods.length > 0) || (userActivities && userActivities.length > 0) || (waterMl && waterMl > 0);
       if (hasData) {
