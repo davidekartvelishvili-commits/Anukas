@@ -14,11 +14,42 @@ function dayKey(date: string) {
 // GET /api/data — returns global data (profile, regime)
 // GET /api/data?date=2026-05-27 — returns daily data for that date
 // GET /api/data?daysIndex=1 — returns the list of dates that have data
+// GET /api/data?history=1 — returns the last 30 days of daily data (weight, calories, activities)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const date = searchParams.get("date");
     const daysIndex = searchParams.get("daysIndex");
+    const history = searchParams.get("history");
+
+    if (history) {
+      // Return historical data for the last 30 days
+      const today = new Date();
+      const dates: string[] = [];
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        dates.push(
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+        );
+      }
+      // Fetch all days in parallel
+      const results = await Promise.all(
+        dates.map((dt) => redis.get(dayKey(dt)))
+      );
+      const historyData: Record<string, unknown>[] = [];
+      for (let i = 0; i < dates.length; i++) {
+        const raw = results[i] as Record<string, unknown> | null;
+        historyData.push({
+          date: dates[i],
+          weight: raw?.weight ?? null,
+          foods: raw?.foods ?? [],
+          waterMl: raw?.waterMl ?? 0,
+          userActivities: raw?.userActivities ?? [],
+        });
+      }
+      return NextResponse.json(historyData);
+    }
 
     if (daysIndex) {
       // Return the list of dates that have data

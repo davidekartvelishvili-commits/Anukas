@@ -978,6 +978,392 @@ function SettingsSheet({
   );
 }
 
+// Weight goals bottom sheet
+function WeightGoalsSheet({
+  open,
+  onClose,
+  startingWeight,
+  targetWeight,
+  onSave,
+}: {
+  open: boolean;
+  onClose: () => void;
+  startingWeight: number;
+  targetWeight: number;
+  onSave: (startingWeight: number, targetWeight: number) => void;
+}) {
+  const [localStarting, setLocalStarting] = useState(startingWeight);
+  const [localTarget, setLocalTarget] = useState(targetWeight);
+
+  useEffect(() => {
+    if (open) {
+      setLocalStarting(startingWeight);
+      setLocalTarget(targetWeight);
+    }
+  }, [open, startingWeight, targetWeight]);
+
+  if (!open) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      <div className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto animate-slideUp">
+        <div className="bg-white rounded-t-[24px] px-5 pt-3 pb-8">
+          <div className="flex justify-center mb-5">
+            <div className="w-10 h-[5px] rounded-full bg-[#ddd]" />
+          </div>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-[22px] font-extrabold text-[#2d2d2d]">
+              წონის მიზნები
+            </h3>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-full bg-[#f0f0f0] flex items-center justify-center"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Starting weight */}
+          <p className="text-[15px] font-semibold text-[#2d2d2d] mb-2">საწყისი წონა</p>
+          <div className="flex items-center p-4 rounded-2xl border border-[#e0e0e0] mb-4">
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              value={localStarting}
+              onChange={(e) => setLocalStarting(parseFloat(e.target.value) || 0)}
+              className="text-[24px] font-bold text-[#2d2d2d] bg-transparent outline-none flex-1 w-0"
+            />
+            <span className="text-[16px] text-[#999] ml-2">კგ</span>
+          </div>
+
+          {/* Target weight */}
+          <p className="text-[15px] font-semibold text-[#2d2d2d] mb-2">სამიზნე წონა</p>
+          <div className="flex items-center p-4 rounded-2xl border border-[#e0e0e0] mb-6">
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              value={localTarget}
+              onChange={(e) => setLocalTarget(parseFloat(e.target.value) || 0)}
+              className="text-[24px] font-bold text-[#2d2d2d] bg-transparent outline-none flex-1 w-0"
+            />
+            <span className="text-[16px] text-[#999] ml-2">კგ</span>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 py-3.5 rounded-2xl border border-[#e0e0e0] text-[16px] font-bold text-[#2d2d2d]"
+            >
+              გაუქმება
+            </button>
+            <button
+              onClick={() => {
+                onSave(localStarting, localTarget);
+                onClose();
+              }}
+              className="flex-1 py-3.5 rounded-2xl bg-[#4CAF50] text-[16px] font-bold text-white"
+            >
+              შენახვა
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Historical data types
+interface HistoryDay {
+  date: string;
+  weight: number | null;
+  foods: FoodItem[];
+  waterMl: number;
+  userActivities: ActivityItem[];
+}
+
+// Progress page component
+function ProgressPage({
+  profile,
+  regime,
+  onWeightGoalsSave,
+}: {
+  profile: ProfileData;
+  regime: "standard" | "fast";
+  onWeightGoalsSave: (startingWeight: number, targetWeight: number) => void;
+}) {
+  const [historyData, setHistoryData] = useState<HistoryDay[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [showWeightGoals, setShowWeightGoals] = useState(false);
+
+  const startingWeight = parseFloat((profile as ProfileData & { startingWeight?: string }).startingWeight || profile.weight) || 65;
+  const targetWeight = parseFloat((profile as ProfileData & { targetWeight?: string }).targetWeight || "58") || 58;
+  const goalCalories = calculateCalories(profile, regime);
+
+  useEffect(() => {
+    setLoadingHistory(true);
+    fetch("/api/data?history=1")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setHistoryData(data);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingHistory(false));
+  }, []);
+
+  // Weight data points (only days with actual weight data)
+  const weightPoints = historyData
+    .filter((d) => d.weight !== null && d.weight > 0)
+    .map((d) => ({ date: d.date, weight: d.weight as number }));
+
+  // Calorie data: last 10 days with data
+  const caloriePoints = historyData
+    .slice(-10)
+    .map((d) => ({
+      date: d.date,
+      consumed: (d.foods || []).reduce((s: number, f: FoodItem) => s + (f.calories || 0), 0),
+    }));
+
+  // Current weight (latest recorded)
+  const currentWeight = weightPoints.length > 0 ? weightPoints[weightPoints.length - 1].weight : startingWeight;
+  const weightDiff = currentWeight - startingWeight;
+
+  // Activities this week
+  const today = new Date();
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1)); // Monday
+  const weekStartStr = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}-${String(weekStart.getDate()).padStart(2, "0")}`;
+  const weekActivities = historyData
+    .filter((d) => d.date >= weekStartStr)
+    .flatMap((d) => (d.userActivities || []).map((a: ActivityItem) => ({ ...a, date: d.date })));
+  const weekBurned = weekActivities.reduce((s: number, a: ActivityItem) => s + (a.caloriesBurned || 0), 0);
+
+  if (loadingHistory) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-20">
+        <div className="w-8 h-8 border-4 border-[#4CAF50] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // --- Weight chart SVG ---
+  const wChartW = 320, wChartH = 160, wPadL = 40, wPadR = 15, wPadT = 15, wPadB = 25;
+  const wPlotW = wChartW - wPadL - wPadR;
+  const wPlotH = wChartH - wPadT - wPadB;
+  let wMin = Math.min(...weightPoints.map((p) => p.weight), targetWeight) - 1;
+  let wMax = Math.max(...weightPoints.map((p) => p.weight), startingWeight) + 1;
+  if (wMin === wMax) { wMin -= 2; wMax += 2; }
+  const wRange = wMax - wMin;
+
+  const wLinePath = weightPoints.length > 1
+    ? weightPoints.map((p, i) => {
+        const x = wPadL + (i / (weightPoints.length - 1)) * wPlotW;
+        const y = wPadT + (1 - (p.weight - wMin) / wRange) * wPlotH;
+        return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(" ")
+    : "";
+
+  const wAreaPath = weightPoints.length > 1
+    ? wLinePath +
+      ` L${(wPadL + wPlotW).toFixed(1)},${(wPadT + wPlotH).toFixed(1)} L${wPadL},${(wPadT + wPlotH).toFixed(1)} Z`
+    : "";
+
+  // Y-axis ticks for weight
+  const wTicks = 4;
+  const wTickValues = Array.from({ length: wTicks }, (_, i) => wMin + (wRange * i) / (wTicks - 1));
+
+  // --- Calories bar chart SVG ---
+  const cChartW = 320, cChartH = 160, cPadL = 40, cPadR = 15, cPadT = 15, cPadB = 25;
+  const cPlotW = cChartW - cPadL - cPadR;
+  const cPlotH = cChartH - cPadT - cPadB;
+  const cMaxVal = Math.max(...caloriePoints.map((p) => p.consumed), goalCalories, 100) * 1.15;
+  const barWidth = caloriePoints.length > 0 ? Math.min(24, (cPlotW / caloriePoints.length) * 0.6) : 20;
+  const barGap = caloriePoints.length > 0 ? cPlotW / caloriePoints.length : 30;
+
+  const goalLineY = cPadT + (1 - goalCalories / cMaxVal) * cPlotH;
+
+  // Y-axis ticks for calories
+  const cTicks = 4;
+  const cTickValues = Array.from({ length: cTicks }, (_, i) => Math.round((cMaxVal * i) / (cTicks - 1)));
+
+  return (
+    <>
+      <div className="flex-1 overflow-y-auto px-4 pt-3.5 pb-28">
+        {/* Weight Card */}
+        <div className="bg-white rounded-[20px] p-5 mb-3 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[20px] font-extrabold text-[#2d2d2d]">წონა</span>
+            <button onClick={() => setShowWeightGoals(true)} className="w-9 h-9 rounded-full bg-[#f0f0f0] flex items-center justify-center">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Current weight display */}
+          <div className="flex items-baseline gap-2 mb-4">
+            <span className="text-[42px] font-bold text-[#2d2d2d] leading-[48px]">{currentWeight.toFixed(1)}</span>
+            <span className="text-[18px] text-[#999]">კგ</span>
+            <span className={`text-[14px] font-bold px-2.5 py-0.5 rounded-full ml-1 ${weightDiff <= 0 ? "bg-[#E8F5E9] text-[#4CAF50]" : "bg-[#FEE2E2] text-[#EF4444]"}`}>
+              {weightDiff <= 0 ? "" : "+"}{weightDiff.toFixed(1)} კგ
+            </span>
+          </div>
+
+          {/* Weight chart */}
+          {weightPoints.length >= 2 ? (
+            <svg viewBox={`0 0 ${wChartW} ${wChartH}`} className="w-full" style={{ maxHeight: 180 }}>
+              <defs>
+                <linearGradient id="wGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#F57C00" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="#F57C00" stopOpacity="0.02" />
+                </linearGradient>
+              </defs>
+              {/* Grid lines + Y labels */}
+              {wTickValues.map((v, i) => {
+                const y = wPadT + (1 - (v - wMin) / wRange) * wPlotH;
+                return (
+                  <g key={i}>
+                    <line x1={wPadL} y1={y} x2={wChartW - wPadR} y2={y} stroke="#e8e8e8" strokeWidth="1" strokeDasharray="4 3" />
+                    <text x={wPadL - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#aaa">{v.toFixed(0)}</text>
+                  </g>
+                );
+              })}
+              {/* Area fill */}
+              <path d={wAreaPath} fill="url(#wGrad)" />
+              {/* Line */}
+              <path d={wLinePath} fill="none" stroke="#F57C00" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              {/* Dots */}
+              {weightPoints.map((p, i) => {
+                const x = wPadL + (i / (weightPoints.length - 1)) * wPlotW;
+                const y = wPadT + (1 - (p.weight - wMin) / wRange) * wPlotH;
+                return <circle key={i} cx={x} cy={y} r="3.5" fill="#F57C00" stroke="#fff" strokeWidth="1.5" />;
+              })}
+              {/* X-axis date labels (first, mid, last) */}
+              {[0, Math.floor(weightPoints.length / 2), weightPoints.length - 1].filter((v, i, a) => a.indexOf(v) === i).map((idx) => {
+                const x = wPadL + (idx / (weightPoints.length - 1)) * wPlotW;
+                const label = weightPoints[idx].date.slice(5); // MM-DD
+                return <text key={idx} x={x} y={wChartH - 4} textAnchor="middle" fontSize="10" fill="#aaa">{label}</text>;
+              })}
+            </svg>
+          ) : (
+            <p className="text-[13px] text-[#bbb] text-center py-6">არასაკმარისი მონაცემი გრაფიკისთვის</p>
+          )}
+
+          {/* Start / target labels */}
+          <div className="flex justify-between mt-2 px-1">
+            <span className="text-[12px] text-[#999]">საწყისი: {startingWeight} კგ</span>
+            <span className="text-[12px] text-[#999]">მიზანი: {targetWeight} კგ</span>
+          </div>
+        </div>
+
+        {/* Calories Card */}
+        <div className="bg-white rounded-[20px] p-5 mb-3 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[20px] font-extrabold text-[#2d2d2d]">კალორიები</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#4CAF50]" />
+                <span className="text-[11px] text-[#888]">ნორმაში</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ccc]" />
+                <span className="text-[11px] text-[#888]">მიზანი</span>
+              </div>
+            </div>
+          </div>
+
+          {caloriePoints.length > 0 ? (
+            <svg viewBox={`0 0 ${cChartW} ${cChartH}`} className="w-full" style={{ maxHeight: 180 }}>
+              {/* Y-axis labels and grid */}
+              {cTickValues.map((v, i) => {
+                const y = cPadT + (1 - v / cMaxVal) * cPlotH;
+                return (
+                  <g key={i}>
+                    <line x1={cPadL} y1={y} x2={cChartW - cPadR} y2={y} stroke="#e8e8e8" strokeWidth="1" strokeDasharray="4 3" />
+                    <text x={cPadL - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#aaa">{v}</text>
+                  </g>
+                );
+              })}
+              {/* Goal line */}
+              <line x1={cPadL} y1={goalLineY} x2={cChartW - cPadR} y2={goalLineY} stroke="#ccc" strokeWidth="1.5" strokeDasharray="6 4" />
+              {/* Bars */}
+              {caloriePoints.map((p, i) => {
+                const x = cPadL + barGap * i + (barGap - barWidth) / 2;
+                const barH = (p.consumed / cMaxVal) * cPlotH;
+                const y = cPadT + cPlotH - barH;
+                const withinGoal = p.consumed <= goalCalories * 1.05;
+                return (
+                  <g key={i}>
+                    <rect x={x} y={y} width={barWidth} height={barH} rx={4} fill={withinGoal ? "#4CAF50" : "#ccc"} />
+                    {/* Day label */}
+                    <text x={x + barWidth / 2} y={cChartH - 4} textAnchor="middle" fontSize="10" fill="#aaa">
+                      {parseInt(p.date.slice(8), 10)}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+          ) : (
+            <p className="text-[13px] text-[#bbb] text-center py-6">არ არის მონაცემი</p>
+          )}
+        </div>
+
+        {/* Activity Card */}
+        <div className="bg-white rounded-[20px] p-5 mb-3 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[20px]">🔥</span>
+            <span className="text-[20px] font-extrabold text-[#2d2d2d]">აქტივობა</span>
+          </div>
+
+          <div className="bg-[#FFF3E0] rounded-2xl p-4 mb-3 flex items-center justify-center gap-2">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF6B35" stroke="#FF6B35" strokeWidth="1">
+              <path d="M12 22c4.97 0 8-3.582 8-8 0-4.418-4-8-4-8s0 4-4 4c-2 0-2-2-2-2S6 11.582 6 14c0 4.418 2.03 8 6 8z" />
+            </svg>
+            <span className="text-[28px] font-bold text-[#F57C00]">{weekBurned}</span>
+            <span className="text-[14px] text-[#999] mt-1">კკალ ამ კვირაში</span>
+          </div>
+
+          {weekActivities.length === 0 ? (
+            <p className="text-[13px] text-[#bbb]">ამ კვირაში ვარჯიში არ დამატებულა</p>
+          ) : (
+            <div>
+              {weekActivities.slice(0, 10).map((a: ActivityItem & { date?: string }, idx: number) => (
+                <div key={idx} className="flex items-center py-2.5">
+                  <span className="text-[20px] mr-3">{a.emoji}</span>
+                  <div className="flex-1">
+                    <span className="text-[14px] font-semibold text-[#2d2d2d]">{a.name}</span>
+                    <span className="text-[12px] text-[#999] ml-2">{a.duration} წთ</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#FF6B35" stroke="#FF6B35" strokeWidth="1">
+                      <path d="M12 22c4.97 0 8-3.582 8-8 0-4.418-4-8-4-8s0 4-4 4c-2 0-2-2-2-2S6 11.582 6 14c0 4.418 2.03 8 6 8z" />
+                    </svg>
+                    <span className="text-[14px] font-bold text-[#F57C00]">{a.caloriesBurned}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <WeightGoalsSheet
+        open={showWeightGoals}
+        onClose={() => setShowWeightGoals(false)}
+        startingWeight={startingWeight}
+        targetWeight={targetWeight}
+        onSave={onWeightGoalsSave}
+      />
+    </>
+  );
+}
+
 // Profile page
 // Profile data type
 interface ProfileData {
@@ -987,6 +1373,8 @@ interface ProfileData {
   weight: string;
   goal: string;
   activityLevel: string;
+  startingWeight?: string;
+  targetWeight?: string;
 }
 
 // Mifflin-St Jeor calorie calculator
@@ -1442,6 +1830,7 @@ function saveDaily(
 
 export default function CaloriesPage() {
   const [loaded, setLoaded] = useState(false);
+  const [activeTab, setActiveTab] = useState<"diary" | "food" | "progress" | "assistant">("diary");
   const [selectedDate, setSelectedDate] = useState(getTodayStr());
   const [waterMl, setWaterMl] = useState(0);
   const [weight, setWeight] = useState(65.0);
@@ -1610,6 +1999,9 @@ export default function CaloriesPage() {
         </button>
       </div>
 
+      {/* Tab content */}
+      {activeTab === "diary" && (
+        <>
       {/* Weekly calendar strip */}
       <WeekCalendar
         selectedDate={selectedDate}
@@ -1937,7 +2329,7 @@ export default function CaloriesPage() {
               წონა
             </span>
           </div>
-          <p className="text-[13px] text-[#aaa] mb-3.5">მიზანი: 58 კგ</p>
+          <p className="text-[13px] text-[#aaa] mb-3.5">მიზანი: {profile.targetWeight || "58"} კგ</p>
           <div className="flex items-center justify-center gap-5">
             <button
               onClick={() => setWeight(Math.max(0, +(weight - 0.1).toFixed(1)))}
@@ -2108,16 +2500,53 @@ export default function CaloriesPage() {
           <path d="M12 5v14M5 12h14" />
         </svg>
       </button>
+        </>
+      )}
+
+      {activeTab === "progress" && (
+        <ProgressPage
+          profile={profile}
+          regime={regime}
+          onWeightGoalsSave={(sw, tw) => {
+            setProfile((p) => ({
+              ...p,
+              weight: String(sw),
+              startingWeight: String(sw),
+              targetWeight: String(tw),
+            }));
+          }}
+        />
+      )}
+
+      {activeTab === "food" && (
+        <div className="flex-1 flex items-center justify-center pb-28">
+          <div className="text-center">
+            <span className="text-[48px] block mb-3">🍽️</span>
+            <p className="text-[18px] font-bold text-[#2d2d2d] mb-1">კვების გეგმა</p>
+            <p className="text-[14px] text-[#999]">მალე დაემატება</p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "assistant" && (
+        <div className="flex-1 flex items-center justify-center pb-28">
+          <div className="text-center">
+            <span className="text-[48px] block mb-3">💬</span>
+            <p className="text-[18px] font-bold text-[#2d2d2d] mb-1">AI ასისტენტი</p>
+            <p className="text-[14px] text-[#999]">მალე დაემატება</p>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex px-1.5 pt-1.5 pb-5 max-w-md mx-auto">
-        <button className="flex-1 flex flex-col items-center py-2 rounded-[20px] mx-0.5 bg-[#f0f0f0]">
+        <button onClick={() => setActiveTab("diary")} className={`flex-1 flex flex-col items-center py-2 rounded-[20px] mx-0.5 ${activeTab === "diary" ? "bg-[#f0f0f0]" : ""}`}>
           <svg
             width="24"
             height="24"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#333"
+            stroke={activeTab === "diary" ? "#333" : "#999"}
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -2125,51 +2554,51 @@ export default function CaloriesPage() {
             <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
           </svg>
-          <span className="text-[11px] text-[#333] mt-1 font-bold">
+          <span className={`text-[11px] mt-1 ${activeTab === "diary" ? "text-[#333] font-bold" : "text-[#999] font-medium"}`}>
             დღიური
           </span>
         </button>
-        <button className="flex-1 flex flex-col items-center py-2 rounded-[20px] mx-0.5">
+        <button onClick={() => setActiveTab("food")} className={`flex-1 flex flex-col items-center py-2 rounded-[20px] mx-0.5 ${activeTab === "food" ? "bg-[#f0f0f0]" : ""}`}>
           <svg
             width="24"
             height="24"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#999"
+            stroke={activeTab === "food" ? "#333" : "#999"}
             strokeWidth="2"
             strokeLinecap="round"
           >
             <path d="M12 2C12 2 12 8 12 10M8 2C8 2 7 7 10 9M16 2C16 2 17 7 14 9" />
             <path d="M7 12h10c0 5-2.24 9-5 9s-5-4-5-9z" />
           </svg>
-          <span className="text-[11px] text-[#999] mt-1 font-medium">
+          <span className={`text-[11px] mt-1 ${activeTab === "food" ? "text-[#333] font-bold" : "text-[#999] font-medium"}`}>
             კვება
           </span>
         </button>
-        <button className="flex-1 flex flex-col items-center py-2 rounded-[20px] mx-0.5">
+        <button onClick={() => setActiveTab("progress")} className={`flex-1 flex flex-col items-center py-2 rounded-[20px] mx-0.5 ${activeTab === "progress" ? "bg-[#f0f0f0]" : ""}`}>
           <svg
             width="24"
             height="24"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#999"
+            stroke={activeTab === "progress" ? "#333" : "#999"}
             strokeWidth="2"
           >
             <rect x="3" y="12" width="4" height="9" rx="1" />
             <rect x="10" y="7" width="4" height="14" rx="1" />
             <rect x="17" y="3" width="4" height="18" rx="1" />
           </svg>
-          <span className="text-[11px] text-[#999] mt-1 font-medium">
+          <span className={`text-[11px] mt-1 ${activeTab === "progress" ? "text-[#333] font-bold" : "text-[#999] font-medium"}`}>
             პროგრესი
           </span>
         </button>
-        <button className="flex-1 flex flex-col items-center py-2 rounded-[20px] mx-0.5">
+        <button onClick={() => setActiveTab("assistant")} className={`flex-1 flex flex-col items-center py-2 rounded-[20px] mx-0.5 ${activeTab === "assistant" ? "bg-[#f0f0f0]" : ""}`}>
           <svg
             width="24"
             height="24"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#999"
+            stroke={activeTab === "assistant" ? "#333" : "#999"}
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -2177,7 +2606,7 @@ export default function CaloriesPage() {
             <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
             <path d="M8 10h.01M12 10h.01M16 10h.01" />
           </svg>
-          <span className="text-[11px] text-[#999] mt-1 font-medium">
+          <span className={`text-[11px] mt-1 ${activeTab === "assistant" ? "text-[#333] font-bold" : "text-[#999] font-medium"}`}>
             ასისტენტი
           </span>
         </button>
