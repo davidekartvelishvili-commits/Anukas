@@ -1,17 +1,9 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY!;
-
-// Try multiple models in order of preference
-const MODELS = [
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-lite",
-  "gemini-1.5-flash",
-];
-
-function geminiUrl(model: string) {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-}
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+});
 
 const SYSTEM_PROMPT = `You are a Georgian-speaking nutritionist AI. The user will describe food they ate (in Georgian or English) or send a photo of food.
 
@@ -38,76 +30,38 @@ export async function POST(req: NextRequest) {
   try {
     const { text, image } = await req.json();
 
-    const parts: Array<Record<string, unknown>> = [];
-
-    // Add system instruction as first text part
-    parts.push({ text: SYSTEM_PROMPT });
+    const content: Anthropic.MessageCreateParams["messages"][0]["content"] = [];
 
     if (image) {
-      // image is base64 data URL like "data:image/jpeg;base64,..."
       const match = image.match(/^data:(image\/\w+);base64,(.+)$/);
       if (match) {
-        parts.push({
-          inlineData: {
-            mimeType: match[1],
+        content.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: match[1] as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
             data: match[2],
           },
         });
       }
-      parts.push({
+      content.push({
+        type: "text",
         text: text || "რა საკვებია ამ ფოტოზე? გამოთვალე კალორიები და მაკროები.",
       });
     } else {
-      parts.push({ text: text || "" });
+      content.push({ type: "text", text: text || "" });
     }
 
-    const body = JSON.stringify({
-      contents: [{ parts }],
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 1024,
-      },
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content }],
     });
 
-    let data = null;
-    let lastError = "";
-
-    // Try each model, with one retry per model
-    for (const model of MODELS) {
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const response = await fetch(geminiUrl(model), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body,
-        });
-
-        if (response.ok) {
-          data = await response.json();
-          break;
-        }
-
-        lastError = await response.text();
-
-        // If rate limited, wait and retry
-        if (response.status === 429 && attempt === 0) {
-          await new Promise((r) => setTimeout(r, 5000));
-          continue;
-        }
-        break; // other error, try next model
-      }
-      if (data) break;
-    }
-
-    if (!data) {
-      return NextResponse.json(
-        { error: "სერვისი დროებით მიუწვდომელია. სცადე რამდენიმე წამში." },
-        { status: 429 }
-      );
-    }
     const responseText =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      message.content[0].type === "text" ? message.content[0].text : "";
 
-    // Clean markdown code blocks if present
     const cleaned = responseText
       .replace(/```json\s*/g, "")
       .replace(/```\s*/g, "")
