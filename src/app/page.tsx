@@ -1723,7 +1723,7 @@ function ChallengePage({
     setHiddenIds((prev) => {
       const next = new Set(prev);
       next.add(id);
-      try { localStorage.setItem("anukas-hidden-feed", JSON.stringify([...next])); } catch {}
+      try { localStorage.setItem("anukas-hidden-feed", JSON.stringify(Array.from(next))); } catch {}
       return next;
     });
   }
