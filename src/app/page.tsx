@@ -1272,37 +1272,42 @@ function ProgressPage({
                 <span className="text-[11px] text-[#888]">ნორმაში</span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#ccc]" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#e0e0e0]" />
                 <span className="text-[11px] text-[#888]">მიზანი</span>
               </div>
             </div>
           </div>
 
           {caloriePoints.length > 0 ? (
-            <svg viewBox={`0 0 ${cChartW} ${cChartH}`} className="w-full" style={{ maxHeight: 180 }}>
+            <svg viewBox={`0 0 ${cChartW} ${cChartH}`} className="w-full" style={{ maxHeight: 200 }}>
               {/* Y-axis labels and grid */}
               {cTickValues.map((v, i) => {
                 const y = cPadT + (1 - v / cMaxVal) * cPlotH;
                 return (
                   <g key={i}>
-                    <line x1={cPadL} y1={y} x2={cChartW - cPadR} y2={y} stroke="#e8e8e8" strokeWidth="1" strokeDasharray="4 3" />
-                    <text x={cPadL - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#aaa">{v}</text>
+                    <line x1={cPadL} y1={y} x2={cChartW - cPadR} y2={y} stroke="#f0f0f0" strokeWidth="1" />
+                    <text x={wPadL - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#bbb">{v}</text>
                   </g>
                 );
               })}
-              {/* Goal line */}
-              <line x1={cPadL} y1={goalLineY} x2={cChartW - cPadR} y2={goalLineY} stroke="#ccc" strokeWidth="1.5" strokeDasharray="6 4" />
-              {/* Bars */}
+              {/* Bars: gray goal background + green consumed overlay */}
               {caloriePoints.map((p, i) => {
                 const x = cPadL + barGap * i + (barGap - barWidth) / 2;
-                const barH = (p.consumed / cMaxVal) * cPlotH;
-                const y = cPadT + cPlotH - barH;
+                const goalBarH = (goalCalories / cMaxVal) * cPlotH;
+                const goalY = cPadT + cPlotH - goalBarH;
+                const consumedH = (p.consumed / cMaxVal) * cPlotH;
+                const consumedY = cPadT + cPlotH - consumedH;
                 const withinGoal = p.consumed <= goalCalories * 1.05;
                 return (
                   <g key={i}>
-                    <rect x={x} y={y} width={barWidth} height={barH} rx={4} fill={withinGoal ? "#4CAF50" : "#ccc"} />
+                    {/* Goal background bar (light gray) */}
+                    <rect x={x} y={goalY} width={barWidth} height={goalBarH} rx={4} fill="#ececec" />
+                    {/* Consumed bar on top */}
+                    {p.consumed > 0 && (
+                      <rect x={x} y={consumedY} width={barWidth} height={consumedH} rx={4} fill={withinGoal ? "#4CAF50" : "#FF9800"} />
+                    )}
                     {/* Day label */}
-                    <text x={x + barWidth / 2} y={cChartH - 4} textAnchor="middle" fontSize="10" fill="#aaa">
+                    <text x={x + barWidth / 2} y={cChartH - 4} textAnchor="middle" fontSize="10" fill="#bbb">
                       {parseInt(p.date.slice(8), 10)}
                     </text>
                   </g>
@@ -1314,42 +1319,59 @@ function ProgressPage({
           )}
         </div>
 
-        {/* Activity Card */}
+        {/* Activity Card — bar chart matching calorie card style */}
         <div className="bg-white rounded-[20px] p-5 mb-3 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-[20px]">🔥</span>
             <span className="text-[20px] font-extrabold text-[#2d2d2d]">აქტივობა</span>
           </div>
 
-          <div className="bg-[#FFF3E0] rounded-2xl p-4 mb-3 flex items-center justify-center gap-2">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF6B35" stroke="#FF6B35" strokeWidth="1">
-              <path d="M12 22c4.97 0 8-3.582 8-8 0-4.418-4-8-4-8s0 4-4 4c-2 0-2-2-2-2S6 11.582 6 14c0 4.418 2.03 8 6 8z" />
-            </svg>
-            <span className="text-[28px] font-bold text-[#F57C00]">{weekBurned}</span>
-            <span className="text-[14px] text-[#999] mt-1">კკალ ამ კვირაში</span>
-          </div>
+          {(() => {
+            // Build activity burned data for last 10 days
+            const actPoints = historyData.slice(-10).map((d) => ({
+              date: d.date,
+              burned: (d.userActivities || []).reduce((s: number, a: ActivityItem) => s + (a.caloriesBurned || 0), 0),
+            }));
+            const aMaxVal = Math.max(...actPoints.map((p) => p.burned), 50) * 1.2;
+            const aTicks = 5;
+            const aTickValues = Array.from({ length: aTicks }, (_, i) => Math.round((aMaxVal * i) / (aTicks - 1)));
+            const aBarGap = actPoints.length > 0 ? cPlotW / actPoints.length : 30;
+            const aBarW = actPoints.length > 0 ? Math.min(24, aBarGap * 0.6) : 20;
 
-          {weekActivities.length === 0 ? (
-            <p className="text-[13px] text-[#bbb]">ამ კვირაში ვარჯიში არ დამატებულა</p>
-          ) : (
-            <div>
-              {weekActivities.slice(0, 10).map((a: ActivityItem & { date?: string }, idx: number) => (
-                <div key={idx} className="flex items-center py-2.5">
-                  <span className="text-[20px] mr-3">{a.emoji}</span>
-                  <div className="flex-1">
-                    <span className="text-[14px] font-semibold text-[#2d2d2d]">{a.name}</span>
-                    <span className="text-[12px] text-[#999] ml-2">{a.duration} წთ</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#FF6B35" stroke="#FF6B35" strokeWidth="1">
-                      <path d="M12 22c4.97 0 8-3.582 8-8 0-4.418-4-8-4-8s0 4-4 4c-2 0-2-2-2-2S6 11.582 6 14c0 4.418 2.03 8 6 8z" />
-                    </svg>
-                    <span className="text-[14px] font-bold text-[#F57C00]">{a.caloriesBurned}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+            return actPoints.length > 0 ? (
+              <svg viewBox={`0 0 ${cChartW} ${cChartH}`} className="w-full" style={{ maxHeight: 200 }}>
+                {/* Y-axis labels and grid */}
+                {aTickValues.map((v, i) => {
+                  const y = cPadT + (1 - v / aMaxVal) * cPlotH;
+                  return (
+                    <g key={i}>
+                      <line x1={cPadL} y1={y} x2={cChartW - cPadR} y2={y} stroke="#f0f0f0" strokeWidth="1" />
+                      <text x={cPadL - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#bbb">{v}</text>
+                    </g>
+                  );
+                })}
+                {/* Bars */}
+                {actPoints.map((p, i) => {
+                  const x = cPadL + aBarGap * i + (aBarGap - aBarW) / 2;
+                  const barH = p.burned > 0 ? (p.burned / aMaxVal) * cPlotH : 3;
+                  const y = cPadT + cPlotH - barH;
+                  return (
+                    <g key={i}>
+                      <rect
+                        x={x} y={y} width={aBarW} height={barH} rx={4}
+                        fill={p.burned > 0 ? "#F57C00" : "#e8e8e8"}
+                      />
+                      <text x={x + aBarW / 2} y={cChartH - 4} textAnchor="middle" fontSize="10" fill="#bbb">
+                        {parseInt(p.date.slice(8), 10)}
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+            ) : (
+              <p className="text-[13px] text-[#bbb] text-center py-6">არ არის მონაცემი</p>
+            );
+          })()}
         </div>
       </div>
 
