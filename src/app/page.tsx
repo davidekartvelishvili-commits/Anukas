@@ -2663,7 +2663,7 @@ function OnboardingPage({
     );
   }
 
-  const genderEmoji = data.gender === "ქალი" ? "👩" : "👨";
+  const genderImg = data.gender === "ქალი" ? "/girl.jpg" : "/boy.jpg";
 
   return (
     <div className="min-h-screen bg-white flex flex-col max-w-md mx-auto">
@@ -2711,11 +2711,11 @@ function OnboardingPage({
         {/* Step 2: Gender */}
         {step === 2 && (
           <div className="flex flex-col flex-1">
-            <h2 className="text-[28px] font-extrabold text-[#2d2d2d] mb-8">თქვენი სქესი</h2>
-            <div className="flex gap-4 mb-6">
+            <h2 className="text-[28px] font-extrabold text-[#2d2d2d] mb-6 text-center">თქვენი სქესი</h2>
+            <div className="flex flex-col gap-4 mb-6">
               {[
-                { label: "ქალი", emoji: "👩" },
-                { label: "კაცი", emoji: "👨" },
+                { label: "ქალი", img: "/girl.jpg" },
+                { label: "კაცი", img: "/boy.jpg" },
               ].map((g) => (
                 <button
                   key={g.label}
@@ -2723,20 +2723,25 @@ function OnboardingPage({
                     setData({ ...data, gender: g.label });
                     setTimeout(goNext, 200);
                   }}
-                  className={`flex-1 py-8 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all ${
+                  className={`w-full py-6 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${
                     data.gender === g.label
                       ? "border-[#8BC34A] bg-[#f0f9e8]"
                       : "border-[#e0e0e0] bg-white"
                   }`}
                 >
-                  <span className="text-[48px]">{g.emoji}</span>
-                  <span className="text-[18px] font-bold text-[#2d2d2d]">{g.label}</span>
+                  <img src={g.img} alt={g.label} className="h-40 object-contain" />
+                  <span className="text-[20px] font-extrabold text-[#3d4f6f]">{g.label}</span>
                 </button>
               ))}
             </div>
-            <p className="text-[13px] text-[#999] text-center mt-auto pb-8">
-              ეს ინფორმაცია გვეხმარება დღიური კალორიების გამოთვლაში
-            </p>
+            <div className="bg-[#E8F5FD] rounded-2xl p-4 flex items-start gap-3 mt-auto mb-8">
+              <div className="w-6 h-6 rounded-full bg-[#c8e6c9] flex items-center justify-center shrink-0 mt-0.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>
+              </div>
+              <p className="text-[13px] text-[#555] leading-relaxed">
+                ეს ინფორმაცია გვეხმარება დღიური კალორიების გამოთვლაში
+              </p>
+            </div>
           </div>
         )}
 
@@ -2745,7 +2750,7 @@ function OnboardingPage({
           <div className="flex flex-col flex-1">
             <h2 className="text-[28px] font-extrabold text-[#2d2d2d] mb-6">თქვენი ასაკი</h2>
             <div className="flex flex-col items-center my-6">
-              <span className="text-[64px] mb-4">{genderEmoji}</span>
+              <img src={genderImg} alt="" className="h-48 object-contain mb-4" />
               <span className="text-[48px] font-extrabold text-[#8BC34A]">{data.age}</span>
               <span className="text-[18px] text-[#999]">წლის</span>
             </div>
