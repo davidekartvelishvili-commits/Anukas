@@ -1382,12 +1382,7 @@ export default function CaloriesPage() {
     >
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200">
-        <h1
-          className="text-[22px] text-[#2d2d2d]"
-          style={{ fontFamily: "var(--font-dachi)" }}
-        >
-          ანუკას კალორიები
-        </h1>
+        <img src="/logo.png" alt="anukas calories" className="h-11" />
         <button
           onClick={() => setShowProfile(true)}
           className="w-11 h-11 rounded-full border-[1.5px] border-gray-300 flex items-center justify-center bg-white"
