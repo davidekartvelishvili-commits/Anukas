@@ -1710,7 +1710,23 @@ function ChallengePage({
   regime: "standard" | "fast";
 }) {
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const saved = localStorage.getItem("anukas-hidden-feed");
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
   const [loading, setLoading] = useState(true);
+
+  function hideItem(id: string) {
+    setHiddenIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      try { localStorage.setItem("anukas-hidden-feed", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
 
   useEffect(() => {
     async function loadFeed() {
@@ -1896,12 +1912,12 @@ function ChallengePage({
 
       {/* Feed cards */}
       <div className="flex flex-col gap-3">
-        {feedItems.map((item) => (
+        {feedItems.filter((item) => !hiddenIds.has(item.id)).map((item) => (
           <div
             key={item.id}
             className="bg-white rounded-[20px] shadow-sm border border-[#f0f0f0] overflow-hidden"
           >
-            {/* Top row: avatar + name + date */}
+            {/* Top row: avatar + name + date + hide button */}
             <div className="flex items-center justify-between px-4 pt-4 pb-2">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-full flex items-center justify-center text-[15px] font-bold text-white" style={{ backgroundColor: item.color }}>
@@ -1909,7 +1925,20 @@ function ChallengePage({
                 </div>
                 <span className="text-[15px] font-bold text-[#2d2d2d]">{"\u10D0\u10DC\u10E3\u10D9\u10D0"}</span>
               </div>
-              <span className="text-[13px] text-[#999]">{formatDate(item.date)}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] text-[#999]">{formatDate(item.date)}</span>
+                <button
+                  onClick={() => hideItem(item.id)}
+                  className="w-7 h-7 rounded-full bg-[#f5f5f5] flex items-center justify-center"
+                  title="დამალვა"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M2 2l20 20" stroke="#bbb" strokeWidth="2.5" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Achievement content */}
