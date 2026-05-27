@@ -1449,10 +1449,12 @@ function ProfilePage({
   onBack,
   profile,
   onSave,
+  onLogout,
 }: {
   onBack: () => void;
   profile: ProfileData;
   onSave: (data: ProfileData) => void;
+  onLogout?: () => void;
 }) {
   const [age, setAge] = useState(profile.age);
   const [gender, setGender] = useState(profile.gender);
@@ -1684,6 +1686,21 @@ function ProfilePage({
           </svg>
           შენახვა
         </button>
+
+        {/* Logout button */}
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="w-full py-4 rounded-2xl border border-red-300 text-red-500 text-[16px] font-bold mt-4 flex items-center justify-center gap-2"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            გამოსვლა
+          </button>
+        )}
       </div>
     </div>
   );
@@ -2148,7 +2165,708 @@ function saveDaily(
   }, 500);
 }
 
+// =============================================
+// AUTH COMPONENTS: Login, PIN, Onboarding
+// =============================================
+
+function LoginPage({ onPhoneVerified, onNewUser }: { onPhoneVerified: (phone: string) => void; onNewUser: (phone: string) => void }) {
+  const [phone, setPhone] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit() {
+    if (!phone.trim() || phone.length < 6) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "check", phone: phone.trim() }),
+      });
+      const data = await res.json();
+      if (data.exists) {
+        onPhoneVerified(phone.trim());
+      } else {
+        onNewUser(phone.trim());
+      }
+    } catch {
+      setError("შეცდომა. სცადეთ თავიდან.");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div className="min-h-screen bg-[#8BC34A] flex items-center justify-center px-6">
+      <div className="w-full max-w-sm bg-white rounded-[24px] p-8 shadow-xl">
+        <img src="/logo.png" className="h-16 mx-auto mb-6" alt="anukas" />
+
+        <div className="relative mb-4">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[20px]">📱</span>
+          <input
+            type="tel"
+            inputMode="numeric"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))}
+            placeholder="ტელეფონის ნომერი"
+            className="w-full pl-12 pr-4 py-4 rounded-2xl border border-[#e0e0e0] text-[16px] text-[#2d2d2d] outline-none focus:border-[#8BC34A] transition-colors"
+            autoFocus
+          />
+        </div>
+
+        {error && <p className="text-red-500 text-[14px] text-center mb-3">{error}</p>}
+
+        <button
+          onClick={handleSubmit}
+          disabled={loading || phone.length < 6}
+          className="w-full py-4 rounded-2xl bg-[#8BC34A] text-white text-[17px] font-bold disabled:opacity-50 flex items-center justify-center"
+        >
+          {loading ? (
+            <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            "შესვლა"
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PinPage({
+  phone,
+  mode,
+  onSuccess,
+  onBack,
+  confirmPin,
+}: {
+  phone: string;
+  mode: "login" | "create" | "confirm";
+  onSuccess: (pin: string, userData?: { name: string }) => void;
+  onBack: () => void;
+  confirmPin?: string;
+}) {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [shaking, setShaking] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const title =
+    mode === "login" ? "შეიყვანეთ პინი" :
+    mode === "create" ? "შექმენით პინი" :
+    "გაიმეორეთ პინი";
+
+  useEffect(() => {
+    if (pin.length === 6) {
+      handlePinComplete(pin);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin]);
+
+  async function handlePinComplete(enteredPin: string) {
+    if (mode === "login") {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "login", phone, pin: enteredPin }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          onSuccess(enteredPin, data.user ? { name: data.user.name } : undefined);
+        } else {
+          triggerError(data.error || "არასწორი პინი");
+        }
+      } catch {
+        triggerError("შეცდომა. სცადეთ თავიდან.");
+      }
+      setLoading(false);
+    } else if (mode === "create") {
+      onSuccess(enteredPin);
+    } else if (mode === "confirm") {
+      if (enteredPin === confirmPin) {
+        onSuccess(enteredPin);
+      } else {
+        triggerError("პინები არ ემთხვევა");
+      }
+    }
+  }
+
+  function triggerError(msg: string) {
+    setError(msg);
+    setShaking(true);
+    setTimeout(() => {
+      setShaking(false);
+      setPin("");
+      setError("");
+    }, 800);
+  }
+
+  function handleDigit(d: string) {
+    if (pin.length < 6 && !loading) {
+      setPin((prev) => prev + d);
+    }
+  }
+
+  function handleBackspace() {
+    setPin((prev) => prev.slice(0, -1));
+  }
+
+  return (
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Top bar */}
+      <div className="flex items-center px-4 py-4">
+        <button onClick={onBack} className="w-10 h-10 rounded-full border border-[#e0e0e0] flex items-center justify-center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="flex-1 flex flex-col items-center pt-10 px-6">
+        <h2 className="text-[24px] font-extrabold text-[#2d2d2d] mb-8">{title}</h2>
+
+        {/* PIN dots */}
+        <div className={`flex gap-4 mb-4 ${shaking ? "animate-shake" : ""}`}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className={`w-4 h-4 rounded-full transition-all duration-150 ${
+                i < pin.length ? "bg-[#8BC34A] scale-110" : "bg-[#e0e0e0]"
+              }`}
+            />
+          ))}
+        </div>
+
+        {error && <p className="text-red-500 text-[14px] mb-4">{error}</p>}
+
+        {loading && (
+          <div className="w-8 h-8 border-4 border-[#8BC34A] border-t-transparent rounded-full animate-spin mb-4" />
+        )}
+
+        {/* Number pad */}
+        <div className="grid grid-cols-3 gap-3 mt-6 w-full max-w-[280px]">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+            <button
+              key={n}
+              onClick={() => handleDigit(String(n))}
+              className="w-full aspect-square rounded-full bg-[#f5f5f5] text-[24px] font-bold text-[#2d2d2d] flex items-center justify-center active:bg-[#e0e0e0] transition-colors"
+            >
+              {n}
+            </button>
+          ))}
+          <div /> {/* empty space */}
+          <button
+            onClick={() => handleDigit("0")}
+            className="w-full aspect-square rounded-full bg-[#f5f5f5] text-[24px] font-bold text-[#2d2d2d] flex items-center justify-center active:bg-[#e0e0e0] transition-colors"
+          >
+            0
+          </button>
+          <button
+            onClick={handleBackspace}
+            className="w-full aspect-square rounded-full flex items-center justify-center"
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z" />
+              <line x1="18" y1="9" x2="12" y2="15" />
+              <line x1="12" y1="9" x2="18" y2="15" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface OnboardingProfile {
+  name: string;
+  gender: string;
+  age: number;
+  height: number;
+  weight: number;
+  targetWeight: number;
+  goal: string;
+  activityLevel: string;
+}
+
+function OnboardingPage({
+  phone,
+  onComplete,
+  onBack,
+}: {
+  phone: string;
+  onComplete: (user: { phone: string; name: string }) => void;
+  onBack: () => void;
+}) {
+  const [step, setStep] = useState(1);
+  const totalSteps = 8;
+  const [data, setData] = useState<OnboardingProfile>({
+    name: "",
+    gender: "",
+    age: 25,
+    height: 170,
+    weight: 70,
+    targetWeight: 65,
+    goal: "",
+    activityLevel: "",
+  });
+  const [pinMode, setPinMode] = useState<"create" | "confirm" | null>(null);
+  const [createdPin, setCreatedPin] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  function goNext() {
+    if (step < totalSteps) setStep(step + 1);
+  }
+
+  function goBack() {
+    if (step > 1) setStep(step - 1);
+    else onBack();
+  }
+
+  function finishOnboarding() {
+    setPinMode("create");
+  }
+
+  async function handleRegister(pin: string) {
+    setLoading(true);
+    setError("");
+    try {
+      const profilePayload = {
+        age: String(data.age),
+        gender: data.gender === "ქალი" ? "მდედრობითი" : "მამრობითი",
+        height: String(data.height),
+        weight: String(data.weight),
+        goal: data.goal,
+        activityLevel: data.activityLevel,
+        startingWeight: String(data.weight),
+        targetWeight: String(data.targetWeight),
+      };
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "register",
+          phone,
+          pin,
+          name: data.name,
+          profile: profilePayload,
+        }),
+      });
+      const result = await res.json();
+      if (result.ok) {
+        localStorage.setItem("anukas-auth-session", JSON.stringify({ phone, name: data.name }));
+        onComplete({ phone, name: data.name });
+      } else {
+        setError(result.error || "რეგისტრაცია ვერ მოხერხდა");
+        setPinMode(null);
+      }
+    } catch {
+      setError("შეცდომა. სცადეთ თავიდან.");
+      setPinMode(null);
+    }
+    setLoading(false);
+  }
+
+  // PIN flow
+  if (pinMode === "create") {
+    return (
+      <PinPage
+        phone={phone}
+        mode="create"
+        onSuccess={(pin) => {
+          setCreatedPin(pin);
+          setPinMode("confirm");
+        }}
+        onBack={() => setPinMode(null)}
+      />
+    );
+  }
+  if (pinMode === "confirm") {
+    return (
+      <PinPage
+        phone={phone}
+        mode="confirm"
+        confirmPin={createdPin}
+        onSuccess={(pin) => handleRegister(pin)}
+        onBack={() => setPinMode("create")}
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#8BC34A] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const genderEmoji = data.gender === "ქალი" ? "👩" : "👨";
+
+  return (
+    <div className="min-h-screen bg-white flex flex-col max-w-md mx-auto">
+      {/* Top bar with back, progress, step counter */}
+      <div className="flex items-center px-4 py-4 gap-3">
+        <button onClick={goBack} className="text-[15px] font-bold text-[#888] shrink-0">
+          {"< უკან"}
+        </button>
+        <div className="flex-1 h-2 bg-[#e0e0e0] rounded-full overflow-hidden">
+          <div
+            className="h-full bg-[#8BC34A] rounded-full transition-all duration-300"
+            style={{ width: `${(step / totalSteps) * 100}%` }}
+          />
+        </div>
+        <span className="text-[14px] font-bold text-[#888] shrink-0">{step}/{totalSteps}</span>
+      </div>
+
+      {error && <p className="text-red-500 text-[14px] text-center px-6 mb-2">{error}</p>}
+
+      <div className="flex-1 flex flex-col px-6 pt-6">
+        {/* Step 1: Name */}
+        {step === 1 && (
+          <div className="flex flex-col flex-1">
+            <h2 className="text-[28px] font-extrabold text-[#2d2d2d] mb-8">თქვენი სახელი</h2>
+            <input
+              type="text"
+              value={data.name}
+              onChange={(e) => setData({ ...data, name: e.target.value })}
+              placeholder="სახელი"
+              className="w-full px-5 py-4 rounded-2xl border border-[#e0e0e0] text-[18px] text-[#2d2d2d] outline-none focus:border-[#8BC34A] transition-colors mb-8"
+              autoFocus
+            />
+            <div className="mt-auto pb-8">
+              <button
+                onClick={goNext}
+                disabled={!data.name.trim()}
+                className="w-full py-4 rounded-2xl bg-[#8BC34A] text-white text-[17px] font-bold disabled:opacity-40"
+              >
+                {"შემდეგი →"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Gender */}
+        {step === 2 && (
+          <div className="flex flex-col flex-1">
+            <h2 className="text-[28px] font-extrabold text-[#2d2d2d] mb-8">თქვენი სქესი</h2>
+            <div className="flex gap-4 mb-6">
+              {[
+                { label: "ქალი", emoji: "👩" },
+                { label: "კაცი", emoji: "👨" },
+              ].map((g) => (
+                <button
+                  key={g.label}
+                  onClick={() => {
+                    setData({ ...data, gender: g.label });
+                    setTimeout(goNext, 200);
+                  }}
+                  className={`flex-1 py-8 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all ${
+                    data.gender === g.label
+                      ? "border-[#8BC34A] bg-[#f0f9e8]"
+                      : "border-[#e0e0e0] bg-white"
+                  }`}
+                >
+                  <span className="text-[48px]">{g.emoji}</span>
+                  <span className="text-[18px] font-bold text-[#2d2d2d]">{g.label}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[13px] text-[#999] text-center mt-auto pb-8">
+              ეს ინფორმაცია გვეხმარება დღიური კალორიების გამოთვლაში
+            </p>
+          </div>
+        )}
+
+        {/* Step 3: Age */}
+        {step === 3 && (
+          <div className="flex flex-col flex-1">
+            <h2 className="text-[28px] font-extrabold text-[#2d2d2d] mb-6">თქვენი ასაკი</h2>
+            <div className="flex flex-col items-center my-6">
+              <span className="text-[64px] mb-4">{genderEmoji}</span>
+              <span className="text-[48px] font-extrabold text-[#8BC34A]">{data.age}</span>
+              <span className="text-[18px] text-[#999]">წლის</span>
+            </div>
+            <div className="px-2 mb-4">
+              <input
+                type="range"
+                min={18}
+                max={100}
+                value={data.age}
+                onChange={(e) => setData({ ...data, age: parseInt(e.target.value) })}
+                className="green-slider w-full"
+              />
+              <div className="flex justify-between mt-2">
+                <span className="text-[13px] text-[#999]">18</span>
+                <span className="text-[13px] text-[#999]">59</span>
+                <span className="text-[13px] text-[#999]">100</span>
+              </div>
+            </div>
+            <div className="mt-auto pb-8">
+              <button onClick={goNext} className="w-full py-4 rounded-2xl bg-[#8BC34A] text-white text-[17px] font-bold">
+                {"შემდეგი →"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Height */}
+        {step === 4 && (
+          <div className="flex flex-col flex-1">
+            <h2 className="text-[28px] font-extrabold text-[#2d2d2d] mb-6">თქვენი სიმაღლე</h2>
+            <div className="flex flex-col items-center my-8">
+              <span className="text-[56px] font-extrabold text-[#8BC34A]">{data.height}</span>
+              <span className="text-[18px] text-[#999]">სმ</span>
+            </div>
+            <div className="px-2 mb-4">
+              <input
+                type="range"
+                min={120}
+                max={220}
+                value={data.height}
+                onChange={(e) => setData({ ...data, height: parseInt(e.target.value) })}
+                className="green-slider w-full"
+              />
+              <div className="flex justify-between mt-2">
+                <span className="text-[13px] text-[#999]">120</span>
+                <span className="text-[13px] text-[#999]">170</span>
+                <span className="text-[13px] text-[#999]">220</span>
+              </div>
+            </div>
+            <div className="mt-auto pb-8">
+              <button onClick={goNext} className="w-full py-4 rounded-2xl bg-[#8BC34A] text-white text-[17px] font-bold">
+                {"შემდეგი →"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Weight */}
+        {step === 5 && (
+          <div className="flex flex-col flex-1">
+            <h2 className="text-[28px] font-extrabold text-[#2d2d2d] mb-6">თქვენი წონა</h2>
+            <div className="flex flex-col items-center my-8">
+              <span className="text-[56px] font-extrabold text-[#8BC34A]">{data.weight}</span>
+              <span className="text-[18px] text-[#999]">კგ</span>
+            </div>
+            <div className="px-2 mb-4">
+              <input
+                type="range"
+                min={30}
+                max={200}
+                value={data.weight}
+                onChange={(e) => setData({ ...data, weight: parseInt(e.target.value) })}
+                className="green-slider w-full"
+              />
+              <div className="flex justify-between mt-2">
+                <span className="text-[13px] text-[#999]">30</span>
+                <span className="text-[13px] text-[#999]">115</span>
+                <span className="text-[13px] text-[#999]">200</span>
+              </div>
+            </div>
+            <div className="mt-auto pb-8">
+              <button onClick={goNext} className="w-full py-4 rounded-2xl bg-[#8BC34A] text-white text-[17px] font-bold">
+                {"შემდეგი →"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 6: Target Weight */}
+        {step === 6 && (
+          <div className="flex flex-col flex-1">
+            <h2 className="text-[28px] font-extrabold text-[#2d2d2d] mb-6">სამიზნე წონა</h2>
+            <div className="flex flex-col items-center my-8">
+              <span className="text-[56px] font-extrabold text-[#8BC34A]">{data.targetWeight}</span>
+              <span className="text-[18px] text-[#999]">კგ</span>
+            </div>
+            <div className="px-2 mb-4">
+              <input
+                type="range"
+                min={30}
+                max={200}
+                value={data.targetWeight}
+                onChange={(e) => setData({ ...data, targetWeight: parseInt(e.target.value) })}
+                className="green-slider w-full"
+              />
+              <div className="flex justify-between mt-2">
+                <span className="text-[13px] text-[#999]">30</span>
+                <span className="text-[13px] text-[#999]">115</span>
+                <span className="text-[13px] text-[#999]">200</span>
+              </div>
+            </div>
+            <div className="mt-auto pb-8">
+              <button onClick={goNext} className="w-full py-4 rounded-2xl bg-[#8BC34A] text-white text-[17px] font-bold">
+                {"შემდეგი →"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 7: Goal */}
+        {step === 7 && (
+          <div className="flex flex-col flex-1">
+            <h2 className="text-[28px] font-extrabold text-[#2d2d2d] mb-8">თქვენი მიზანი</h2>
+            <div className="flex flex-col gap-4">
+              {[
+                { label: "წონის დაკლება", icon: "📉" },
+                { label: "შენარჩუნება", icon: "⚖️" },
+              ].map((g) => (
+                <button
+                  key={g.label}
+                  onClick={() => {
+                    setData({ ...data, goal: g.label });
+                    setTimeout(goNext, 200);
+                  }}
+                  className={`py-6 rounded-2xl border-2 flex items-center justify-center gap-3 transition-all ${
+                    data.goal === g.label
+                      ? "border-[#8BC34A] bg-[#f0f9e8]"
+                      : "border-[#e0e0e0] bg-white"
+                  }`}
+                >
+                  <span className="text-[32px]">{g.icon}</span>
+                  <span className="text-[18px] font-bold text-[#2d2d2d]">{g.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Step 8: Activity Level */}
+        {step === 8 && (
+          <div className="flex flex-col flex-1">
+            <h2 className="text-[28px] font-extrabold text-[#2d2d2d] mb-6">აქტიურობის დონე</h2>
+            <div className="flex flex-col gap-3 mb-6">
+              {[
+                { label: "მცირე (1-2 დღე/კვირაში ვარჯიში)", short: "მცირე", desc: "ძირითადად მჯდომარე ცხოვრების წესი", icon: "🚶" },
+                { label: "საშუალო (3-5 დღე/კვირაში ვარჯიში)", short: "საშუალო", desc: "კვირაში 3-5 ვარჯიში", icon: "🏃" },
+                { label: "მაღალი (6-7 დღე/კვირაში ვარჯიში)", short: "მაღალი", desc: "ყოველდღიური აქტიური ვარჯიში", icon: "🏋️" },
+              ].map((a) => (
+                <button
+                  key={a.label}
+                  onClick={() => setData({ ...data, activityLevel: a.label })}
+                  className={`p-5 rounded-2xl border-2 flex items-start gap-4 transition-all text-left ${
+                    data.activityLevel === a.label
+                      ? "border-[#8BC34A] bg-[#f0f9e8]"
+                      : "border-[#e0e0e0] bg-white"
+                  }`}
+                >
+                  <span className="text-[32px]">{a.icon}</span>
+                  <div>
+                    <span className="text-[17px] font-bold text-[#2d2d2d] block">{a.short}</span>
+                    <span className="text-[13px] text-[#999]">{a.desc}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="mt-auto pb-8">
+              <button
+                onClick={finishOnboarding}
+                disabled={!data.activityLevel}
+                className="w-full py-4 rounded-2xl bg-[#8BC34A] text-white text-[17px] font-bold disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {"დასრულება ✓"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================
+// MAIN APP WRAPPER WITH AUTH
+// =============================================
+
 export default function CaloriesPage() {
+  // Auth state
+  const [authState, setAuthState] = useState<"loading" | "login" | "pin" | "onboarding" | "authenticated">("loading");
+  const [authUser, setAuthUser] = useState<{ phone: string; name: string } | null>(null);
+  const [authPhone, setAuthPhone] = useState("");
+
+  // Check localStorage for saved session on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("anukas-auth-session");
+      if (saved) {
+        const session = JSON.parse(saved);
+        if (session && session.phone && session.name) {
+          setAuthUser(session);
+          setAuthState("authenticated");
+          return;
+        }
+      }
+    } catch {}
+    setAuthState("login");
+  }, []);
+
+  function handleLogout() {
+    localStorage.removeItem("anukas-auth-session");
+    setAuthUser(null);
+    setAuthPhone("");
+    setAuthState("login");
+  }
+
+  function handleLoginSuccess(user: { phone: string; name: string }) {
+    localStorage.setItem("anukas-auth-session", JSON.stringify(user));
+    setAuthUser(user);
+    setAuthState("authenticated");
+  }
+
+  // Auth screens
+  if (authState === "loading") {
+    return (
+      <div className="min-h-screen bg-[#f5f5f5] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#4CAF50] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (authState === "login") {
+    return (
+      <LoginPage
+        onPhoneVerified={(phone) => {
+          setAuthPhone(phone);
+          setAuthState("pin");
+        }}
+        onNewUser={(phone) => {
+          setAuthPhone(phone);
+          setAuthState("onboarding");
+        }}
+      />
+    );
+  }
+
+  if (authState === "pin") {
+    return (
+      <PinPage
+        phone={authPhone}
+        mode="login"
+        onSuccess={(_pin, userData) => {
+          handleLoginSuccess({ phone: authPhone, name: userData?.name || authPhone });
+        }}
+        onBack={() => setAuthState("login")}
+      />
+    );
+  }
+
+  if (authState === "onboarding") {
+    return (
+      <OnboardingPage
+        phone={authPhone}
+        onComplete={(user) => handleLoginSuccess(user)}
+        onBack={() => setAuthState("login")}
+      />
+    );
+  }
+
+  // authState === "authenticated" — render the main app
+  return <AuthenticatedApp onLogout={handleLogout} />;
+}
+
+function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
   const [loaded, setLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<"diary" | "challenge" | "progress" | "assistant">("diary");
   const [selectedDate, setSelectedDate] = useState(getTodayStr());
@@ -2289,6 +3007,7 @@ export default function CaloriesPage() {
           profile={profile}
           onSave={(data) => setProfile(data)}
           onBack={() => setShowProfile(false)}
+          onLogout={onLogout}
         />
       </div>
     );
