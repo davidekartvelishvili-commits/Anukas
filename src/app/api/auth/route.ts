@@ -34,6 +34,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, user: { phone, name: user.name, profile: user.profile } });
     }
 
+    if (action === "changePin") {
+      const { newPin } = body;
+      const user = (await redis.get(userKey)) as Record<string, unknown> | null;
+      if (!user) {
+        return NextResponse.json({ error: "მომხმარებელი ვერ მოიძებნა" }, { status: 404 });
+      }
+      await redis.set(userKey, { ...user, pin: newPin });
+      return NextResponse.json({ ok: true });
+    }
+
     if (action === "register") {
       const { pin, name, profile } = body;
       const existing = await redis.get(userKey);

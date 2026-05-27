@@ -1447,17 +1447,140 @@ function calculateMacros(calories: number) {
   };
 }
 
+// Inline PIN input for profile page PIN change
+function PinInputInline({ onSubmit, error }: { onSubmit: (pin: string) => void; error?: string }) {
+  const [pin, setPin] = useState("");
+
+  useEffect(() => {
+    if (pin.length === 6) {
+      onSubmit(pin);
+      setTimeout(() => setPin(""), 300);
+    }
+  }, [pin, onSubmit]);
+
+  return (
+    <div className="flex flex-col items-center px-8">
+      {/* Dots */}
+      <div className={`flex gap-3 mb-6 ${error ? "animate-shake" : ""}`}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className={`w-4 h-4 rounded-full transition-colors ${
+              i < pin.length ? "bg-[#4CAF50]" : "bg-[#e0e0e0]"
+            }`}
+          />
+        ))}
+      </div>
+      {error && <p className="text-red-500 text-[14px] mb-4">{error}</p>}
+      {/* Number pad */}
+      <div className="grid grid-cols-3 gap-3">
+        {[1,2,3,4,5,6,7,8,9].map((n) => (
+          <button
+            key={n}
+            onClick={() => pin.length < 6 && setPin(pin + n)}
+            className="w-16 h-16 rounded-full bg-[#f5f5f5] flex items-center justify-center text-[22px] font-bold text-[#2d2d2d]"
+          >
+            {n}
+          </button>
+        ))}
+        <div />
+        <button
+          onClick={() => pin.length < 6 && setPin(pin + "0")}
+          className="w-16 h-16 rounded-full bg-[#f5f5f5] flex items-center justify-center text-[22px] font-bold text-[#2d2d2d]"
+        >
+          0
+        </button>
+        <button
+          onClick={() => setPin(pin.slice(0, -1))}
+          className="w-16 h-16 rounded-full bg-[#f5f5f5] flex items-center justify-center"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z" />
+            <line x1="18" y1="9" x2="12" y2="15" />
+            <line x1="12" y1="9" x2="18" y2="15" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ProfilePage({
   onBack,
   profile,
   onSave,
   onLogout,
+  phone,
 }: {
   onBack: () => void;
   profile: ProfileData;
   onSave: (data: ProfileData) => void;
   onLogout?: () => void;
+  phone?: string;
 }) {
+  const [changingPin, setChangingPin] = useState(false);
+  const [pinStep, setPinStep] = useState<"current" | "new" | "confirm">("current");
+  const [newPin, setNewPin] = useState("");
+  const [pinError, setPinError] = useState("");
+
+  async function handlePinSubmit(pin: string) {
+    if (pinStep === "current") {
+      // Verify current pin
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "login", phone, pin }),
+      });
+      if (res.ok) {
+        setPinStep("new");
+        setPinError("");
+      } else {
+        setPinError("არასწორი პინი");
+      }
+    } else if (pinStep === "new") {
+      setNewPin(pin);
+      setPinStep("confirm");
+      setPinError("");
+    } else if (pinStep === "confirm") {
+      if (pin === newPin) {
+        // Save new pin
+        await fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "changePin", phone, newPin: pin }),
+        });
+        setChangingPin(false);
+        setPinStep("current");
+        setNewPin("");
+        setPinError("");
+      } else {
+        setPinError("პინები არ ემთხვევა");
+      }
+    }
+  }
+
+  if (changingPin) {
+    return (
+      <div className="min-h-screen bg-[#f5f5f5] flex flex-col">
+        <div className="flex items-center px-5 py-4 bg-white">
+          <button
+            onClick={() => { setChangingPin(false); setPinStep("current"); setPinError(""); }}
+            className="w-11 h-11 rounded-full border border-[#e0e0e0] flex items-center justify-center mr-4"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+          <h1 className="text-[22px] font-extrabold text-[#2d2d2d] flex-1 text-center mr-[60px]">
+            {pinStep === "current" ? "მიმდინარე პინი" : pinStep === "new" ? "ახალი პინი" : "გაიმეორეთ პინი"}
+          </h1>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <PinInputInline onSubmit={handlePinSubmit} error={pinError} />
+        </div>
+      </div>
+    );
+  }
   const [age, setAge] = useState(profile.age);
   const [gender, setGender] = useState(profile.gender);
   const [showGender, setShowGender] = useState(false);
@@ -1689,11 +1812,25 @@ function ProfilePage({
           შენახვა
         </button>
 
+        {/* Change PIN button */}
+        {phone && (
+          <button
+            onClick={() => setChangingPin(true)}
+            className="w-full py-4 rounded-2xl border border-[#e0e0e0] text-[#555] text-[16px] font-bold mt-4 flex items-center justify-center gap-2"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0110 0v4" />
+            </svg>
+            პინის შეცვლა
+          </button>
+        )}
+
         {/* Logout button */}
         {onLogout && (
           <button
             onClick={onLogout}
-            className="w-full py-4 rounded-2xl border border-red-300 text-red-500 text-[16px] font-bold mt-4 flex items-center justify-center gap-2"
+            className="w-full py-4 rounded-2xl border border-red-300 text-red-500 text-[16px] font-bold mt-3 flex items-center justify-center gap-2"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
@@ -3033,6 +3170,7 @@ function AuthenticatedApp({ onLogout, authUser }: { onLogout: () => void; authUs
           onSave={(data) => setProfile(data)}
           onBack={() => setShowProfile(false)}
           onLogout={onLogout}
+          phone={authUser?.phone}
         />
       </div>
     );
