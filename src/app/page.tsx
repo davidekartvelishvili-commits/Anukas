@@ -1401,6 +1401,7 @@ interface ProfileData {
   activityLevel: string;
   startingWeight?: string;
   targetWeight?: string;
+  manualGoalCalories?: string;
 }
 
 // Mifflin-St Jeor calorie calculator
@@ -3047,6 +3048,8 @@ function AuthenticatedApp({ onLogout, authUser }: { onLogout: () => void; authUs
   const [profile, setProfile] = useState<ProfileData>(defaultProfile);
   const [userActivities, setUserActivities] = useState<ActivityItem[]>([]);
   const [showAddActivity, setShowAddActivity] = useState(false);
+  const [showEditGoal, setShowEditGoal] = useState(false);
+  const [editGoalValue, setEditGoalValue] = useState("");
   const [activitySheetInitial, setActivitySheetInitial] = useState<{ emoji: string; name: string } | null>(null);
   const [activitySheetTab, setActivitySheetTab] = useState<"quick" | "text">("text");
   const [daysWithData, setDaysWithData] = useState<string[]>([]);
@@ -3140,7 +3143,8 @@ function AuthenticatedApp({ onLogout, authUser }: { onLogout: () => void; authUs
     if (weight > 0) setLastKnownWeight(weight);
   }, [waterMl, weight, foods, userActivities, loaded, selectedDate]);
 
-  const goalCalories = calculateCalories(profile, regime);
+  const calculatedCalories = calculateCalories(profile, regime);
+  const goalCalories = profile.manualGoalCalories ? Number(profile.manualGoalCalories) : calculatedCalories;
   const macros = calculateMacros(goalCalories);
   const consumed = foods.reduce(
     (acc, f) => ({
@@ -3313,10 +3317,13 @@ function AuthenticatedApp({ onLogout, authUser }: { onLogout: () => void; authUs
                 </svg>
                 <span className="text-[13px] text-[#999]">მიზანი</span>
               </div>
-              <span className="text-[38px] font-bold text-[#2d2d2d] leading-[44px]">
+              <button
+                onClick={() => { setEditGoalValue(String(goalCalories)); setShowEditGoal(true); }}
+                className="text-[38px] font-bold text-[#2d2d2d] leading-[44px] underline decoration-dotted decoration-[#ccc] underline-offset-4"
+              >
                 {goalCalories}
-              </span>
-              <span className="text-[13px] text-[#b0b0b0] -mt-0.5">კკალ</span>
+              </button>
+              <span className="text-[13px] text-[#b0b0b0] -mt-0.5">კკალ ✏️</span>
             </div>
           </div>
 
@@ -3708,6 +3715,63 @@ function AuthenticatedApp({ onLogout, authUser }: { onLogout: () => void; authUs
           setRegime(newRegime);
         }}
       />
+
+      {/* Manual goal edit popup */}
+      {showEditGoal && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowEditGoal(false)} />
+          <div className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto animate-slideUp">
+            <div className="bg-white rounded-t-[24px] px-5 pt-3 pb-8">
+              <div className="flex justify-center mb-5">
+                <div className="w-10 h-[5px] rounded-full bg-[#ddd]" />
+              </div>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-[22px] font-extrabold text-[#2d2d2d]">დღიური კალორიები</h3>
+                <button onClick={() => setShowEditGoal(false)} className="w-9 h-9 rounded-full bg-[#f0f0f0] flex items-center justify-center">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <p className="text-[13px] text-[#888] mb-3">ჩაწერეთ სასურველი დღიური კალორიების რაოდენობა ან დატოვეთ ცარიელი ავტომატური გამოთვლისთვის</p>
+              <div className="flex items-center p-4 rounded-2xl border border-[#e0e0e0] mb-2">
+                <input
+                  inputMode="numeric"
+                  value={editGoalValue}
+                  onChange={(e) => setEditGoalValue(e.target.value.replace(/[^0-9]/g, ""))}
+                  placeholder={String(calculatedCalories)}
+                  className="text-[28px] font-bold text-[#2d2d2d] bg-transparent outline-none flex-1 w-0"
+                />
+                <span className="text-[16px] text-[#999] ml-2">კკალ</span>
+              </div>
+              <p className="text-[12px] text-[#aaa] mb-5">ავტომატური: {calculatedCalories} კკალ (პროფილის მიხედვით)</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setProfile((p) => ({ ...p, manualGoalCalories: undefined }));
+                    setShowEditGoal(false);
+                  }}
+                  className="flex-1 py-3.5 rounded-2xl border border-[#e0e0e0] text-[15px] font-bold text-[#888]"
+                >
+                  ავტომატური
+                </button>
+                <button
+                  onClick={() => {
+                    const val = editGoalValue.trim();
+                    if (val && Number(val) > 0) {
+                      setProfile((p) => ({ ...p, manualGoalCalories: val }));
+                    } else {
+                      setProfile((p) => ({ ...p, manualGoalCalories: undefined }));
+                    }
+                    setShowEditGoal(false);
+                  }}
+                  className="flex-1 py-3.5 rounded-2xl bg-[#4CAF50] text-[15px] font-bold text-white"
+                >
+                  შენახვა
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* FAB */}
       <button
